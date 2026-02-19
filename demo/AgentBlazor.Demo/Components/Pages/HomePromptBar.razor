@@ -1,0 +1,129 @@
+@inject NavigationManager Navigation
+
+<section class="home-prompt">
+    <div class="home-prompt__inner">
+        <p class="home-prompt__label">Demo Prompt Bar</p>
+
+        <div class="home-prompt__chips">
+            @foreach (var suggestion in _suggestedPrompts)
+            {
+                <button type="button" @onclick="() => SubmitSuggestionAsync(suggestion)">@suggestion</button>
+            }
+        </div>
+
+        <form class="home-prompt__form" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+            <input type="text"
+                   @bind="_prompt"
+                   placeholder="Try: show me all suppliers that are high risk"
+                   aria-label="Prompt input" />
+            <button type="submit">Run</button>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(_status))
+        {
+            <p class="home-prompt__status">@_status</p>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly string[] _suggestedPrompts =
+    [
+        "Show me all suppliers that are high risk",
+        "Show me low risk suppliers",
+        "Open supplier onboarding",
+        "Open workspace"
+    ];
+
+    private string _prompt = string.Empty;
+    private string? _status;
+
+    private Task SubmitSuggestionAsync(string prompt)
+    {
+        _prompt = prompt;
+        return SubmitAsync();
+    }
+
+    private Task SubmitAsync()
+    {
+        var prompt = _prompt.Trim();
+        if (prompt.Length == 0)
+        {
+            _status = "Enter a prompt or pick one of the suggested prompts.";
+            return Task.CompletedTask;
+        }
+
+        if (TryResolveRoute(prompt, out var targetUri, out var destinationLabel))
+        {
+            _status = $"Routing to {destinationLabel}.";
+            Navigation.NavigateTo(targetUri);
+            return Task.CompletedTask;
+        }
+
+        _status = "This demo route bar supports supplier, onboarding, workspace, and debug intents.";
+        return Task.CompletedTask;
+    }
+
+    private static bool TryResolveRoute(
+        string prompt,
+        out string uri,
+        out string destinationLabel)
+    {
+        var normalized = prompt.Trim();
+        if (normalized.Length == 0)
+        {
+            uri = string.Empty;
+            destinationLabel = string.Empty;
+            return false;
+        }
+
+        if (ContainsAny(normalized, "supplier", "suppliers"))
+        {
+            if (ContainsAny(normalized, "high risk", "high-risk", "highest risk", "risky"))
+            {
+                uri = "/suppliers?risk=high&sort=desc";
+                destinationLabel = "Suppliers (high risk)";
+                return true;
+            }
+
+            if (ContainsAny(normalized, "low risk", "lowest risk", "least risk"))
+            {
+                uri = "/suppliers?risk=low&sort=asc";
+                destinationLabel = "Suppliers (low risk)";
+                return true;
+            }
+
+            uri = "/suppliers";
+            destinationLabel = "Suppliers";
+            return true;
+        }
+
+        if (ContainsAny(normalized, "onboarding", "onboard", "new supplier", "create supplier", "register supplier"))
+        {
+            uri = "/supplier-onboarding";
+            destinationLabel = "Supplier Onboarding";
+            return true;
+        }
+
+        if (ContainsAny(normalized, "workspace", "tabs", "navigation"))
+        {
+            uri = "/workspace";
+            destinationLabel = "Workspace";
+            return true;
+        }
+
+        if (ContainsAny(normalized, "debug", "diagnostic", "inspect"))
+        {
+            uri = "/debug";
+            destinationLabel = "Debug";
+            return true;
+        }
+
+        uri = string.Empty;
+        destinationLabel = string.Empty;
+        return false;
+    }
+
+    private static bool ContainsAny(string source, params string[] terms) =>
+        terms.Any(term => source.Contains(term, StringComparison.OrdinalIgnoreCase));
+}

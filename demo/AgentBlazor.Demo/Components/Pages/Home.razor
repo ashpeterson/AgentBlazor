@@ -1,29 +1,32 @@
 @page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>AgentBlazor Demo</PageTitle>
 
-<MudPaper Class="demo-surface demo-hero pa-6" Elevation="0">
-    <MudText Typo="Typo.h3" GutterBottom="true">AgentBlazor Demo</MudText>
-    <MudText Typo="Typo.body1" Class="demo-subtitle">
-        Sample line-of-business screens with AgentBlazor wrappers and a built-in UI agent.
-    </MudText>
+<section class="home-halo">
+    <div class="home-halo__hero">
+        <div class="home-halo__brand">AB</div>
+        <p class="home-halo__eyebrow">AgentBlazor Demo</p>
+        <h1>The AI layer for your existing Blazor UI.</h1>
+        <p>
+            Describe what you need. The demo routes you to the right screen and starts with the right state,
+            including supplier risk filters.
+        </p>
+    </div>
 
-    <MudStack Row="true" Spacing="2" Class="mt-5">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/suppliers">
-            Open Suppliers
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" Href="/supplier-onboarding">
-            Open Onboarding
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Tertiary" Href="/workspace">
-            Open Workspace
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="/debug">
-            Open Debug
-        </MudButton>
-    </MudStack>
-</MudPaper>
+    <div class="home-halo__highlights">
+        <article>
+            <h2>Natural Prompt Routing</h2>
+            <p>Ask for high-risk suppliers, onboarding, or workspace views from one prompt bar.</p>
+        </article>
+        <article>
+            <h2>Agent-Ready Components</h2>
+            <p>AgentDataGrid, AgentForm, AgentDialog, AgentNavMenu, and AgentTabs are wired and discoverable.</p>
+        </article>
+        <article>
+            <h2>Deterministic Demo Flow</h2>
+            <p>Prompt from home, navigate instantly, and show the exact page state your request implies.</p>
+        </article>
+    </div>
+</section>
 
-<MudPaper Class="demo-surface pa-4 mt-4" Elevation="0">
-    <AgentBlazorShell />
-</MudPaper>
+<HomePromptBar />

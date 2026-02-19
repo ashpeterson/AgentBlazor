@@ -1,0 +1,115 @@
+.home-halo {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(118, 152, 222, 0.35);
+    border-radius: 1.2rem;
+    padding: 2rem 1.6rem 8.25rem;
+    background:
+        radial-gradient(circle at 50% 10%, rgba(253, 95, 109, 0.24), rgba(253, 95, 109, 0) 30%),
+        radial-gradient(circle at 85% 80%, rgba(82, 176, 255, 0.2), rgba(82, 176, 255, 0) 37%),
+        radial-gradient(circle at 20% 68%, rgba(102, 144, 255, 0.2), rgba(102, 144, 255, 0) 34%),
+        linear-gradient(165deg, #050a1c 0%, #081530 42%, #06142a 100%);
+    box-shadow: 0 30px 48px rgba(2, 8, 22, 0.44);
+    color: #f2f5ff;
+}
+
+.home-halo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at center, rgba(182, 213, 255, 0.45) 0.8px, transparent 0.8px);
+    background-size: 20px 20px;
+    opacity: 0.18;
+    pointer-events: none;
+}
+
+.home-halo__hero,
+.home-halo__highlights {
+    position: relative;
+    z-index: 1;
+}
+
+.home-halo__hero {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: 0.85rem;
+    margin-bottom: 2rem;
+}
+
+.home-halo__brand {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #fee9ec;
+    border: 1px solid rgba(255, 167, 177, 0.5);
+    background: linear-gradient(165deg, #ff5462, #cc2741);
+    box-shadow: 0 12px 24px rgba(250, 80, 94, 0.35);
+}
+
+.home-halo__eyebrow {
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: rgba(255, 171, 178, 0.95);
+}
+
+.home-halo h1 {
+    margin: 0;
+    max-width: 20ch;
+    font-size: clamp(1.9rem, 4.1vw, 3.35rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+}
+
+.home-halo__hero > p {
+    margin: 0;
+    max-width: 64ch;
+    color: rgba(220, 234, 255, 0.84);
+    font-size: 1.01rem;
+}
+
+.home-halo__highlights {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.home-halo__highlights article {
+    border: 1px solid rgba(145, 175, 235, 0.26);
+    border-radius: 0.9rem;
+    background: linear-gradient(165deg, rgba(13, 25, 52, 0.85), rgba(10, 20, 44, 0.92));
+    padding: 0.95rem 1rem;
+    min-height: 9rem;
+}
+
+.home-halo__highlights h2 {
+    margin: 0 0 0.42rem;
+    font-size: 1.04rem;
+    line-height: 1.18;
+    color: #f6f8ff;
+}
+
+.home-halo__highlights p {
+    margin: 0;
+    color: rgba(201, 220, 250, 0.87);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+@media (max-width: 940px) {
+    .home-halo {
+        padding: 1.4rem 1.05rem 8.55rem;
+    }
+
+    .home-halo__highlights {
+        grid-template-columns: 1fr;
+    }
+}

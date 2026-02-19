@@ -1,0 +1,101 @@
+.home-prompt {
+    position: fixed;
+    left: calc(300px + 2.75rem);
+    right: 1.8rem;
+    bottom: 1.2rem;
+    z-index: 22;
+}
+
+.home-prompt__inner {
+    border: 1px solid rgba(129, 158, 223, 0.36);
+    border-radius: 1.05rem;
+    background: linear-gradient(165deg, rgba(10, 23, 48, 0.95), rgba(7, 18, 40, 0.97));
+    box-shadow: 0 24px 42px rgba(3, 8, 22, 0.5);
+    padding: 0.75rem 0.85rem 0.8rem;
+    backdrop-filter: blur(10px);
+}
+
+.home-prompt__label {
+    margin: 0 0 0.45rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(169, 197, 250, 0.92);
+}
+
+.home-prompt__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+}
+
+.home-prompt__chips button {
+    border: 1px solid rgba(111, 147, 219, 0.45);
+    background: linear-gradient(165deg, rgba(16, 33, 67, 0.9), rgba(12, 26, 56, 0.94));
+    color: rgba(219, 231, 252, 0.95);
+    border-radius: 999px;
+    padding: 0.31rem 0.64rem;
+    font-size: 0.79rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.home-prompt__chips button:hover {
+    border-color: rgba(140, 181, 255, 0.72);
+    color: #ffffff;
+}
+
+.home-prompt__form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.55rem;
+}
+
+.home-prompt__form input {
+    width: 100%;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(126, 161, 230, 0.52);
+    background: rgba(6, 16, 36, 0.84);
+    color: #f3f8ff;
+    font-size: 0.96rem;
+    line-height: 1.2;
+    padding: 0.68rem 0.75rem;
+    font-family: "Manrope", "Segoe UI", sans-serif;
+}
+
+.home-prompt__form input::placeholder {
+    color: rgba(166, 190, 234, 0.8);
+}
+
+.home-prompt__form input:focus {
+    outline: 2px solid rgba(123, 174, 255, 0.55);
+    outline-offset: 1px;
+}
+
+.home-prompt__form button {
+    border: 1px solid rgba(255, 126, 138, 0.45);
+    border-radius: 0.7rem;
+    background: linear-gradient(165deg, #ff5968, #d0334f);
+    color: #fff8fa;
+    font-size: 0.92rem;
+    font-weight: 700;
+    padding: 0.64rem 1rem;
+    cursor: pointer;
+    min-width: 4.4rem;
+}
+
+.home-prompt__status {
+    margin: 0.48rem 0 0;
+    font-size: 0.78rem;
+    color: rgba(175, 199, 246, 0.9);
+}
+
+@media (max-width: 980px) {
+    .home-prompt {
+        left: 0.9rem;
+        right: 0.9rem;
+        bottom: 0.8rem;
+    }
+}
