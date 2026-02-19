@@ -1,10 +1,11 @@
 .demo-shell {
     min-height: 100vh;
     display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 1.25rem;
-    padding: 1.1rem;
+    grid-template-columns: 260px 1fr;
+    gap: 1rem;
+    padding: 1rem;
     color: var(--ab-ink);
+    background: var(--ab-bg);
 }
 
 .demo-shell__sidebar {
@@ -22,12 +23,13 @@
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.95rem 1.2rem;
-    border-radius: 1rem;
-    border: 1px solid var(--ab-border-strong);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(249, 251, 255, 0.95));
-    box-shadow: 0 10px 30px rgba(15, 36, 78, 0.08);
-    backdrop-filter: blur(10px);
+    padding: 0.85rem 1.2rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--ab-border);
+    background: rgba(8, 10, 20, 0.85);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 
 .demo-shell__controls {
@@ -49,13 +51,27 @@
     font-weight: 600;
 }
 
+.demo-shell__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-shell__brand-logo {
+    width: 1.9rem;
+    height: 1.9rem;
+    object-fit: contain;
+    border-radius: 0.35rem;
+    filter: drop-shadow(0 0 6px rgba(220, 50, 60, 0.4));
+}
+
 .demo-shell__eyebrow {
     margin: 0;
     font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--ab-ink-muted);
+    color: var(--ab-ink);
 }
 
 .demo-shell__links {
@@ -64,18 +80,20 @@
 }
 
 .demo-shell__topbar ::deep a {
-    color: var(--ab-ink);
+    color: var(--ab-ink-muted);
     text-decoration: none;
     font-weight: 600;
     font-size: 0.83rem;
     padding: 0.4rem 0.72rem;
-    border-radius: 999px;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .demo-shell__topbar ::deep a:hover {
-    background: rgba(37, 108, 255, 0.08);
-    border-color: rgba(37, 108, 255, 0.25);
+    color: var(--ab-ink);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--ab-border);
 }
 
 .demo-shell__content {

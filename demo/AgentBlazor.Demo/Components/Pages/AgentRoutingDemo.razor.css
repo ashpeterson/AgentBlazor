@@ -1,7 +1,7 @@
 .agent-routing-demo__panel {
     border: 1px solid var(--ab-border);
     border-radius: 1rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 255, 0.92));
+    background: var(--ab-surface);
     box-shadow: var(--ab-shadow);
     backdrop-filter: blur(8px);
 }

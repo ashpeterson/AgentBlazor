@@ -307,6 +307,7 @@ public sealed class AgentDataGridDemoState
 
 public sealed class DemoDataGridActionExecutor(
     IAgentComponentRegistry componentRegistry,
+    IAgentNavigationIntentService navigationIntentService,
     AgentDataGridDemoState state) : IDataGridActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
@@ -322,6 +323,13 @@ public sealed class DemoDataGridActionExecutor(
             actionId: request.ActionId,
             arguments: request.Arguments,
             cancellationToken);
+
+        if (!handled)
+        {
+            // No DataGrid is registered yet — we're mid-navigation.
+            // Store the action so the destination page's AgentDataGrid picks it up on init.
+            navigationIntentService.Enqueue("DataGrid", AgentAction.Create(request.ActionId, request.Arguments));
+        }
 
         var (succeeded, message) = state.ApplyAction(request.ActionId, request.Arguments);
         var stateResult = new ComponentActionExecutionResult(

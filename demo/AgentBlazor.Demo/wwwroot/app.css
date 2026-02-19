@@ -1,25 +1,25 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 
 :root {
-    --ab-bg: #f3f7ff;
-    --ab-bg-soft: #eef4ff;
-    --ab-ink: #13233f;
-    --ab-ink-muted: #5b6f95;
-    --ab-border: rgba(20, 60, 125, 0.14);
-    --ab-border-strong: rgba(17, 56, 120, 0.24);
-    --ab-accent: #2466da;
-    --ab-accent-soft: rgba(36, 102, 218, 0.12);
-    --ab-surface: rgba(255, 255, 255, 0.88);
-    --ab-shadow: 0 22px 40px rgba(11, 32, 70, 0.12);
-    --ab-nav-start: #0d2348;
-    --ab-nav-mid: #14376c;
-    --ab-nav-end: #1f4c8f;
-    --ab-nav-border: rgba(203, 221, 255, 0.18);
-    --ab-nav-link: rgba(237, 245, 255, 0.86);
-    --ab-nav-link-hover: rgba(194, 221, 255, 0.16);
-    --ab-nav-active-ink: #0f2d5f;
-    --ab-nav-active-bg-start: #e8f2ff;
-    --ab-nav-active-bg-end: #f7fbff;
+    --ab-bg: #03040a;
+    --ab-bg-soft: #080c18;
+    --ab-ink: #e8f0ff;
+    --ab-ink-muted: #7a92bb;
+    --ab-border: rgba(255, 255, 255, 0.07);
+    --ab-border-strong: rgba(255, 255, 255, 0.12);
+    --ab-accent: #e03a58;
+    --ab-accent-soft: rgba(224, 58, 88, 0.15);
+    --ab-surface: rgba(13, 17, 32, 0.9);
+    --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
+    --ab-nav-start: #06090f;
+    --ab-nav-mid: #090d1a;
+    --ab-nav-end: #0c1122;
+    --ab-nav-border: rgba(255, 255, 255, 0.07);
+    --ab-nav-link: rgba(200, 218, 255, 0.75);
+    --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
+    --ab-nav-active-ink: #ffffff;
+    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
+    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
 }
 
 html,
@@ -29,54 +29,51 @@ body {
     min-height: 100%;
     font-family: "Manrope", "Segoe UI", sans-serif;
     color: var(--ab-ink);
-    background:
-        radial-gradient(1400px 700px at -10% -10%, rgba(159, 199, 255, 0.45), transparent 62%),
-        radial-gradient(1300px 700px at 108% -6%, rgba(160, 216, 255, 0.28), transparent 58%),
-        linear-gradient(180deg, #f8fbff 0%, var(--ab-bg) 100%);
+    background: var(--ab-bg);
 }
 
 .demo-theme--aurora {
-    --ab-bg: #f3f7ff;
-    --ab-bg-soft: #eef4ff;
-    --ab-ink: #13233f;
-    --ab-ink-muted: #5b6f95;
-    --ab-border: rgba(20, 60, 125, 0.14);
-    --ab-border-strong: rgba(17, 56, 120, 0.24);
-    --ab-accent: #2466da;
-    --ab-accent-soft: rgba(36, 102, 218, 0.12);
-    --ab-surface: rgba(255, 255, 255, 0.88);
-    --ab-shadow: 0 22px 40px rgba(11, 32, 70, 0.12);
-    --ab-nav-start: #0d2348;
-    --ab-nav-mid: #14376c;
-    --ab-nav-end: #1f4c8f;
-    --ab-nav-border: rgba(203, 221, 255, 0.18);
-    --ab-nav-link: rgba(237, 245, 255, 0.86);
-    --ab-nav-link-hover: rgba(194, 221, 255, 0.16);
-    --ab-nav-active-ink: #0f2d5f;
-    --ab-nav-active-bg-start: #e8f2ff;
-    --ab-nav-active-bg-end: #f7fbff;
+    --ab-bg: #03040a;
+    --ab-bg-soft: #080c18;
+    --ab-ink: #e8f0ff;
+    --ab-ink-muted: #7a92bb;
+    --ab-border: rgba(255, 255, 255, 0.07);
+    --ab-border-strong: rgba(255, 255, 255, 0.12);
+    --ab-accent: #e03a58;
+    --ab-accent-soft: rgba(224, 58, 88, 0.15);
+    --ab-surface: rgba(13, 17, 32, 0.9);
+    --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
+    --ab-nav-start: #06090f;
+    --ab-nav-mid: #090d1a;
+    --ab-nav-end: #0c1122;
+    --ab-nav-border: rgba(255, 255, 255, 0.07);
+    --ab-nav-link: rgba(200, 218, 255, 0.75);
+    --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
+    --ab-nav-active-ink: #ffffff;
+    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
+    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
 }
 
 .demo-theme--coastline {
-    --ab-bg: #eef9f7;
-    --ab-bg-soft: #e5f4f1;
-    --ab-ink: #14333f;
-    --ab-ink-muted: #52727c;
-    --ab-border: rgba(26, 87, 102, 0.18);
-    --ab-border-strong: rgba(21, 78, 99, 0.28);
-    --ab-accent: #0f6a8f;
-    --ab-accent-soft: rgba(15, 106, 143, 0.16);
-    --ab-surface: rgba(255, 255, 255, 0.9);
-    --ab-shadow: 0 22px 40px rgba(9, 45, 56, 0.13);
-    --ab-nav-start: #0c3140;
-    --ab-nav-mid: #125062;
-    --ab-nav-end: #176b79;
-    --ab-nav-border: rgba(182, 231, 243, 0.2);
-    --ab-nav-link: rgba(232, 249, 253, 0.9);
-    --ab-nav-link-hover: rgba(174, 234, 244, 0.18);
-    --ab-nav-active-ink: #0d4f62;
-    --ab-nav-active-bg-start: #dbf4f8;
-    --ab-nav-active-bg-end: #ecfbff;
+    --ab-bg: #03050a;
+    --ab-bg-soft: #060d0b;
+    --ab-ink: #e0f4ee;
+    --ab-ink-muted: #6a9a8a;
+    --ab-border: rgba(255, 255, 255, 0.07);
+    --ab-border-strong: rgba(255, 255, 255, 0.12);
+    --ab-accent: #e03a58;
+    --ab-accent-soft: rgba(224, 58, 88, 0.15);
+    --ab-surface: rgba(12, 20, 16, 0.92);
+    --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
+    --ab-nav-start: #050e0a;
+    --ab-nav-mid: #081410;
+    --ab-nav-end: #0a1a14;
+    --ab-nav-border: rgba(255, 255, 255, 0.07);
+    --ab-nav-link: rgba(180, 228, 210, 0.75);
+    --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
+    --ab-nav-active-ink: #ffffff;
+    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
+    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
 }
 
 a {

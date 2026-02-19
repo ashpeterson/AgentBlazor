@@ -45,6 +45,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
         services.TryAddSingleton<IAgentRuntime, FrameworkBackedAgentRuntime>();
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
+        services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
 
         return new AgentBlazorBuilder(services, store);
     }

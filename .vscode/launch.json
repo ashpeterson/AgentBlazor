@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Demo (Blazor)",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj",
+      "preLaunchTask": "build",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      }
+    },
+    {
+      "name": "Run Tests",
+      "type": "dotnet",
+      "request": "launch",
+      "preLaunchTask": "test"
+    }
+  ]
+}

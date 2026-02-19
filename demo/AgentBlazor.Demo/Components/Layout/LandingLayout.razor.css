@@ -1,0 +1,161 @@
+/* ── Shell ──────────────────────────────────────── */
+
+.lp {
+    min-height: 100svh;
+    background: #03040a;
+    color: #f2f5ff;
+}
+
+/* ── Header ─────────────────────────────────────── */
+
+.lp__header {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 200;
+    height: 3.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 1.75rem;
+    background: rgba(4, 9, 24, 0.7);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Brand */
+
+.lp__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.lp__brand-logo {
+    width: 2.2rem;
+    height: 2.2rem;
+    object-fit: contain;
+    border-radius: 0.4rem;
+    filter: drop-shadow(0 0 8px rgba(220, 50, 60, 0.55));
+}
+
+.lp__brand-name {
+    font-size: 0.97rem;
+    font-weight: 700;
+    color: rgba(236, 244, 255, 0.95);
+    letter-spacing: -0.01em;
+}
+
+/* Nav links */
+
+.lp__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-left: auto;
+}
+
+.lp__nav a {
+    color: rgba(210, 228, 255, 0.72);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.38rem 0.8rem;
+    border-radius: 0.55rem;
+    border: 1px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.lp__nav a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Header end */
+
+.lp__header-end {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.lp__theme-select {
+    min-width: 10rem;
+}
+
+.lp__theme-select ::deep .mud-input-control {
+    margin-top: 0;
+}
+
+.lp__theme-select ::deep .mud-input-slot {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: rgba(210, 228, 255, 0.82);
+}
+
+.lp__theme-select ::deep .mud-input-outlined-border {
+    border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.lp__docs-link {
+    color: rgba(180, 210, 255, 0.72);
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.38rem 0.8rem;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.lp__docs-link:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Error UI ────────────────────────────────────── */
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff6dc;
+    color: #6e4a00;
+    bottom: 0;
+    box-shadow: 0 -6px 28px rgba(22, 28, 45, 0.15);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.8rem 1.3rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.9rem;
+    top: 0.55rem;
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 720px) {
+    .lp__nav {
+        display: none;
+    }
+
+    .lp__header {
+        padding: 0 1rem;
+    }
+
+    .lp__docs-link {
+        display: none;
+    }
+}

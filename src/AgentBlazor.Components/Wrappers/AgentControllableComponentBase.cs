@@ -9,6 +9,9 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     [Inject]
     protected IAgentComponentRegistry ComponentRegistry { get; set; } = default!;
 
+    [Inject]
+    private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
+
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = string.Empty;
 
@@ -18,6 +21,28 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     {
         base.OnInitialized();
         ComponentRegistry.Register(this);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await ApplyNavigationIntentsAsync();
+    }
+
+    private async Task ApplyNavigationIntentsAsync()
+    {
+        if (!NavigationIntentService.HasPending(ComponentType))
+        {
+            return;
+        }
+
+        var pending = NavigationIntentService.Dequeue(ComponentType);
+        foreach (var action in pending)
+        {
+            await ExecuteActionAsync(action);
+        }
+
+        await RequestComponentRefreshAsync();
     }
 
     public abstract ComponentCapability GetCapability();
