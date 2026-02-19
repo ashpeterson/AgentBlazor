@@ -1,0 +1,9 @@
+.agent-nav-tabs-demo__panel {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 16px;
+}
+
+.agent-nav-tabs-demo__subtitle {
+    color: var(--mud-palette-text-secondary);
+    max-width: 78ch;
+}

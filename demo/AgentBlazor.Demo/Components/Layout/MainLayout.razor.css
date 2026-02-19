@@ -1,0 +1,135 @@
+.demo-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1.25rem;
+    padding: 1.1rem;
+    color: var(--ab-ink);
+}
+
+.demo-shell__sidebar {
+    position: sticky;
+    top: 1.1rem;
+    align-self: start;
+}
+
+.demo-shell__main {
+    min-width: 0;
+}
+
+.demo-shell__topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.95rem 1.2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border-strong);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(249, 251, 255, 0.95));
+    box-shadow: 0 10px 30px rgba(15, 36, 78, 0.08);
+    backdrop-filter: blur(10px);
+}
+
+.demo-shell__controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.demo-shell__theme-select {
+    min-width: 11.3rem;
+}
+
+.demo-shell__theme-select ::deep .mud-input-control {
+    margin-top: 0;
+}
+
+.demo-shell__theme-select ::deep .mud-input-slot {
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.demo-shell__eyebrow {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ab-ink-muted);
+}
+
+.demo-shell__links {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+.demo-shell__topbar ::deep a {
+    color: var(--ab-ink);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.83rem;
+    padding: 0.4rem 0.72rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.demo-shell__topbar ::deep a:hover {
+    background: rgba(37, 108, 255, 0.08);
+    border-color: rgba(37, 108, 255, 0.25);
+}
+
+.demo-shell__content {
+    padding: 1.25rem 0.2rem 2rem;
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff6dc;
+    color: #6e4a00;
+    bottom: 0;
+    box-shadow: 0 -6px 28px rgba(22, 28, 45, 0.15);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.8rem 1.3rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.9rem;
+    top: 0.55rem;
+}
+
+@media (max-width: 980px) {
+    .demo-shell {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+        padding: 0.7rem;
+    }
+
+    .demo-shell__sidebar {
+        position: static;
+    }
+
+    .demo-shell__topbar {
+        padding: 0.8rem 0.95rem;
+        flex-wrap: wrap;
+    }
+
+    .demo-shell__links {
+        width: 100%;
+    }
+
+    .demo-shell__controls {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .demo-shell__theme-select {
+        min-width: 100%;
+    }
+}

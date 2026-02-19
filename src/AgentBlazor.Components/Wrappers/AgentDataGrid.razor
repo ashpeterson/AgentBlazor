@@ -1,0 +1,638 @@
+@typeparam TItem
+@namespace AgentBlazor.Components
+@attribute [CascadingTypeParameter(nameof(TItem))]
+@using AgentBlazor.Components
+@using AgentBlazor.Runtime
+@using MudBlazor
+@inherits AgentControllableComponentBase
+
+<MudDataGrid T="TItem"
+             Items="EffectiveItems"
+             Dense="Dense"
+             Hover="Hover"
+             Bordered="Bordered"
+             Striped="Striped"
+             RowClassFunc="RowClassFunc"
+             @attributes="AdditionalAttributes">
+    <Columns>
+        @Columns
+    </Columns>
+</MudDataGrid>
+
+@code {
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    [Parameter]
+    public string? SortColumn { get; set; }
+
+    [Parameter]
+    public string SortDirection { get; set; } = "asc";
+
+    [Parameter]
+    public EventCallback<string?> SortColumnChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> SortDirectionChanged { get; set; }
+
+    [Parameter]
+    public string? FilterColumn { get; set; }
+
+    [Parameter]
+    public string? FilterOperator { get; set; }
+
+    [Parameter]
+    public object? FilterValue { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FilterColumnChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FilterOperatorChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<object?> FilterValueChanged { get; set; }
+
+    [Parameter]
+    public int CurrentPageIndex { get; set; }
+
+    [Parameter]
+    public EventCallback<int> CurrentPageIndexChanged { get; set; }
+
+    [Parameter]
+    public int PageSize { get; set; }
+
+    [Parameter]
+    public EventCallback<int> PageSizeChanged { get; set; }
+
+    [Parameter]
+    public string? FocusedRowKey { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FocusedRowKeyChanged { get; set; }
+
+    [Parameter]
+    public string RowKeyProperty { get; set; } = "Id";
+
+    [Parameter]
+    public RenderFragment? Columns { get; set; }
+
+    [Parameter]
+    public bool Dense { get; set; } = true;
+
+    [Parameter]
+    public bool Hover { get; set; } = true;
+
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    [Parameter]
+    public bool Striped { get; set; } = true;
+
+    [Parameter]
+    public Func<TItem, int, string>? RowClassFunc { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public override string ComponentType => "DataGrid";
+
+    public override ComponentCapability GetCapability()
+    {
+        var capability = new ComponentCapability(AgentId, "Agent-aware data grid wrapper.");
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridSortActionId,
+            "Sort the data grid."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            "Filter data grid rows."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId,
+            "Clear data grid filters."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridSetPageActionId,
+            "Navigate to a specific page."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridGoToPageActionId,
+            "Navigate to a specific page."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId,
+            "Focus the requested row."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.DataGridSelectRowActionId,
+            "Select and focus the requested row."));
+        return capability;
+    }
+
+    public override ComponentState GetCurrentState()
+    {
+        var rowCount = Items switch
+        {
+            null => 0,
+            ICollection<TItem> collection => collection.Count,
+            IReadOnlyCollection<TItem> readOnlyCollection => readOnlyCollection.Count,
+            _ => Items.Count()
+        };
+
+        return new ComponentState
+        {
+            ["rowCount"] = rowCount,
+            ["dense"] = Dense,
+            ["hover"] = Hover,
+            ["bordered"] = Bordered,
+            ["striped"] = Striped,
+            ["sortColumn"] = SortColumn,
+            ["sortDirection"] = SortDirection,
+            ["filterColumn"] = FilterColumn,
+            ["filterOperator"] = FilterOperator,
+            ["filterValue"] = FilterValue?.ToString(),
+            ["currentPageIndex"] = CurrentPageIndex,
+            ["pageSize"] = PageSize,
+            ["focusedRowKey"] = FocusedRowKey
+        };
+    }
+
+    public override async Task<ActionResult> ExecuteActionAsync(
+        AgentAction action,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, action);
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryGetStringParameter(action, "column", out var column))
+            {
+                return ActionResult.Failure("Action 'sort' requires 'column' parameter.");
+            }
+
+            var direction = TryGetStringParameter(action, "direction", out var sortDirection)
+                ? sortDirection
+                : "asc";
+            if (!IsSupportedSortDirection(direction))
+            {
+                return ActionResult.Failure("Action 'sort' requires direction 'asc' or 'desc'.");
+            }
+
+            SortColumn = column;
+            SortDirection = direction;
+            await SortColumnChanged.InvokeAsync(SortColumn);
+            await SortDirectionChanged.InvokeAsync(SortDirection);
+
+            return await CompleteAndRefreshAsync(ActionResult.Success($"Sorted by '{SortColumn}' ({SortDirection})."));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            var hasColumn = TryGetStringParameterWithAliases(action, out var column, "column", "field", "property");
+            var hasOperator = TryGetStringParameterWithAliases(action, out var filterOperator, "operator", "op", "comparison");
+            var hasValue = TryGetParameterValue(action, out var rawValue, "value", "fieldValue", "threshold", "query", "term");
+
+            var usedDefaultOperator = false;
+
+            if (hasOperator)
+            {
+                filterOperator = NormalizeFilterOperator(filterOperator);
+                hasOperator = !string.IsNullOrWhiteSpace(filterOperator);
+            }
+
+            if (!hasOperator)
+            {
+                if (hasValue)
+                {
+                    filterOperator = "contains";
+                    hasOperator = true;
+                    usedDefaultOperator = true;
+                }
+            }
+
+            if (!hasColumn && (hasOperator || hasValue) && !string.IsNullOrWhiteSpace(FilterColumn))
+            {
+                column = FilterColumn!;
+                hasColumn = true;
+            }
+
+            if (!hasColumn)
+            {
+                return ActionResult.Failure("Action 'filter' requires 'column' parameter.");
+            }
+
+            if (!hasOperator)
+            {
+                return ActionResult.Failure("Action 'filter' requires 'operator' parameter.");
+            }
+
+            if (!hasValue && RequiresFilterValue(filterOperator!))
+            {
+                return ActionResult.Failure("Action 'filter' requires 'value' parameter for this operator.");
+            }
+
+            FilterColumn = column;
+            FilterOperator = filterOperator;
+            FilterValue = NormalizeParameterValue(rawValue);
+            CurrentPageIndex = 0;
+            await FilterColumnChanged.InvokeAsync(FilterColumn);
+            await FilterOperatorChanged.InvokeAsync(FilterOperator);
+            await FilterValueChanged.InvokeAsync(FilterValue);
+            await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
+
+            var defaulted = usedDefaultOperator
+                ? " (defaulted missing filter parameters)."
+                : string.Empty;
+            return await CompleteAndRefreshAsync(ActionResult.Success($"Applied filter {FilterColumn} {FilterOperator} {FilterValue ?? "null"}{defaulted}"));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            FilterColumn = null;
+            FilterOperator = null;
+            FilterValue = null;
+            CurrentPageIndex = 0;
+            await FilterColumnChanged.InvokeAsync(FilterColumn);
+            await FilterOperatorChanged.InvokeAsync(FilterOperator);
+            await FilterValueChanged.InvokeAsync(FilterValue);
+            await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
+            return await CompleteAndRefreshAsync(ActionResult.Success("Cleared filters."));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSetPageActionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridGoToPageActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            var hasPageIndex = TryGetIntParameter(action, "pageIndex", out var pageIndex) ||
+                               TryGetIntParameter(action, "page", out pageIndex);
+            if (!hasPageIndex)
+            {
+                return ActionResult.Failure("Action 'set_page' requires 'pageIndex' (or 'page') parameter.");
+            }
+
+            if (pageIndex < 0)
+            {
+                return ActionResult.Failure("Action 'set_page' requires non-negative 'pageIndex'.");
+            }
+
+            CurrentPageIndex = pageIndex;
+            await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
+
+            if (TryGetIntParameter(action, "pageSize", out var pageSize))
+            {
+                if (pageSize <= 0)
+                {
+                    return ActionResult.Failure("Action 'set_page' requires positive 'pageSize' when provided.");
+                }
+
+                PageSize = pageSize;
+                await PageSizeChanged.InvokeAsync(PageSize);
+            }
+
+            return await CompleteAndRefreshAsync(ActionResult.Success(PageSize > 0
+                ? $"Set page to {CurrentPageIndex} with page size {PageSize}."
+                : $"Set page to {CurrentPageIndex}."));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryGetStringParameter(action, "rowKey", out var rowKey))
+            {
+                return ActionResult.Failure($"Action '{action.Name}' requires 'rowKey' parameter.");
+            }
+
+            FocusedRowKey = rowKey;
+            await FocusedRowKeyChanged.InvokeAsync(FocusedRowKey);
+
+            if (PageSize > 0 && TryResolveRowIndex(rowKey, out var rowIndex))
+            {
+                CurrentPageIndex = rowIndex / PageSize;
+                await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
+            }
+
+            return await CompleteAndRefreshAsync(ActionResult.Success($"Focused row '{FocusedRowKey}'."));
+        }
+
+        return ActionResult.Unknown(action.Name);
+    }
+
+    private IEnumerable<TItem> EffectiveItems => ApplyPaging(ApplySort(ApplyFilter(Items ?? [])));
+
+    private IEnumerable<TItem> ApplyFilter(IEnumerable<TItem> source)
+    {
+        if (string.IsNullOrWhiteSpace(FilterColumn) || string.IsNullOrWhiteSpace(FilterOperator))
+        {
+            return source;
+        }
+
+        return source.Where(item => MatchesFilter(item, FilterColumn!, FilterOperator!, FilterValue));
+    }
+
+    private IEnumerable<TItem> ApplySort(IEnumerable<TItem> source)
+    {
+        if (string.IsNullOrWhiteSpace(SortColumn))
+        {
+            return source;
+        }
+
+        var descending = string.Equals(SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        return descending
+            ? source.OrderByDescending(item => ResolveComparableSortKey(item, SortColumn!))
+            : source.OrderBy(item => ResolveComparableSortKey(item, SortColumn!));
+    }
+
+    private IEnumerable<TItem> ApplyPaging(IEnumerable<TItem> source)
+    {
+        if (PageSize <= 0)
+        {
+            return source;
+        }
+
+        var pageIndex = Math.Max(0, CurrentPageIndex);
+        return source.Skip(pageIndex * PageSize).Take(PageSize);
+    }
+
+    private bool TryResolveRowIndex(string rowKey, out int index)
+    {
+        index = -1;
+        if (string.IsNullOrWhiteSpace(RowKeyProperty))
+        {
+            return false;
+        }
+
+        var ordered = ApplySort(ApplyFilter(Items ?? []));
+        var current = 0;
+        foreach (var row in ordered)
+        {
+            if (TryGetPropertyValue(row, RowKeyProperty, out var raw) &&
+                string.Equals(raw?.ToString(), rowKey, StringComparison.OrdinalIgnoreCase))
+            {
+                index = current;
+                return true;
+            }
+
+            current++;
+        }
+
+        return false;
+    }
+
+    private static bool MatchesFilter(TItem item, string propertyName, string @operator, object? expectedRaw)
+    {
+        if (!TryGetPropertyValue(item, propertyName, out var actual))
+        {
+            return false;
+        }
+
+        var normalizedOperator = @operator.Trim().ToLowerInvariant();
+        var expected = NormalizeParameterValue(expectedRaw);
+
+        if (normalizedOperator is "isnull" or "is_null")
+        {
+            return actual is null;
+        }
+
+        if (normalizedOperator is "notnull" or "not_null")
+        {
+            return actual is not null;
+        }
+
+        if (actual is null)
+        {
+            return normalizedOperator is "eq" or "==" or "equals"
+                ? expected is null
+                : normalizedOperator is "neq" or "!=" or "notequals" && expected is not null;
+        }
+
+        var actualString = actual.ToString() ?? string.Empty;
+        var expectedString = expected?.ToString() ?? string.Empty;
+
+        if (normalizedOperator is "contains")
+        {
+            return actualString.Contains(expectedString, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (normalizedOperator is "startswith" or "starts_with")
+        {
+            return actualString.StartsWith(expectedString, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (normalizedOperator is "endswith" or "ends_with")
+        {
+            return actualString.EndsWith(expectedString, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!TryCoerce(expected, actual.GetType(), out var coercedExpected))
+        {
+            coercedExpected = expected;
+        }
+
+        var comparison = CompareValues(actual, coercedExpected);
+        return normalizedOperator switch
+        {
+            "eq" or "==" or "equals" => comparison == 0,
+            "neq" or "!=" or "notequals" => comparison != 0,
+            "gt" or ">" => comparison > 0,
+            "gte" or ">=" => comparison >= 0,
+            "lt" or "<" => comparison < 0,
+            "lte" or "<=" => comparison <= 0,
+            _ => false
+        };
+    }
+
+    private static IComparable? ResolveComparableSortKey(TItem item, string propertyName)
+    {
+        if (!TryGetPropertyValue(item, propertyName, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value as IComparable ?? value.ToString();
+    }
+
+    private static int CompareValues(object? left, object? right)
+    {
+        if (left is null && right is null)
+        {
+            return 0;
+        }
+
+        if (left is null)
+        {
+            return -1;
+        }
+
+        if (right is null)
+        {
+            return 1;
+        }
+
+        if (left is IComparable comparable && right.GetType().IsAssignableTo(left.GetType()))
+        {
+            return comparable.CompareTo(right);
+        }
+
+        return string.Compare(left.ToString(), right.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetPropertyValue(TItem item, string propertyName, out object? value)
+    {
+        var property = typeof(TItem).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .FirstOrDefault(p => string.Equals(p.Name, propertyName, StringComparison.OrdinalIgnoreCase));
+        if (property is null)
+        {
+            value = null;
+            return false;
+        }
+
+        value = property.GetValue(item);
+        return true;
+    }
+
+    private static bool TryGetStringParameter(AgentAction action, string key, out string value)
+    {
+        value = string.Empty;
+        if (!action.Parameters.TryGetValue(key, out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        var normalized = NormalizeParameterValue(raw)?.ToString();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        value = normalized;
+        return true;
+    }
+
+    private static bool TryGetStringParameterWithAliases(
+        AgentAction action,
+        out string value,
+        params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (TryGetStringParameter(action, key, out value))
+            {
+                return true;
+            }
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetParameterValue(
+        AgentAction action,
+        out object? value,
+        params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (action.Parameters.TryGetValue(key, out var raw))
+            {
+                value = NormalizeParameterValue(raw);
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryGetIntParameter(AgentAction action, string key, out int value)
+    {
+        value = 0;
+        if (!action.Parameters.TryGetValue(key, out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        var normalized = NormalizeParameterValue(raw);
+        if (normalized is int i)
+        {
+            value = i;
+            return true;
+        }
+
+        if (normalized is long l && l is >= int.MinValue and <= int.MaxValue)
+        {
+            value = (int)l;
+            return true;
+        }
+
+        if (normalized is string s && int.TryParse(s, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        return int.TryParse(normalized?.ToString(), out value);
+    }
+
+    private static bool IsSupportedSortDirection(string direction) =>
+        string.Equals(direction, "asc", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeFilterOperator(string value) =>
+        value.Trim().ToLowerInvariant() switch
+        {
+            "equal" or "equals" or "=" => "eq",
+            "notequal" or "not_equals" => "neq",
+            "greater_than" or "greaterthan" or "high" or "highest" or "top" or "max" => ">=",
+            "less_than" or "lessthan" or "low" or "lowest" or "bottom" or "min" => "<=",
+            var normalized => normalized
+        };
+
+    private static bool RequiresFilterValue(string filterOperator) =>
+        filterOperator is not "isnull" and not "is_null" and not "notnull" and not "not_null";
+
+    private static object? NormalizeParameterValue(object? raw)
+    {
+        if (raw is System.Text.Json.JsonElement json)
+        {
+            return json.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.String => json.GetString(),
+                System.Text.Json.JsonValueKind.Number when json.TryGetInt64(out var i64) => i64,
+                System.Text.Json.JsonValueKind.Number when json.TryGetDouble(out var d) => d,
+                System.Text.Json.JsonValueKind.True => true,
+                System.Text.Json.JsonValueKind.False => false,
+                System.Text.Json.JsonValueKind.Null => null,
+                _ => json.ToString()
+            };
+        }
+
+        return raw;
+    }
+
+    private static bool TryCoerce(object? value, Type targetType, out object? coerced)
+    {
+        coerced = value;
+        if (value is null)
+        {
+            return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) is not null;
+        }
+
+        var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (underlyingType.IsAssignableFrom(value.GetType()))
+        {
+            coerced = value;
+            return true;
+        }
+
+        try
+        {
+            coerced = Convert.ChangeType(value, underlyingType, System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            coerced = value;
+            return false;
+        }
+    }
+
+    private async Task<ActionResult> CompleteAndRefreshAsync(ActionResult result)
+    {
+        await RequestComponentRefreshAsync();
+        return result;
+    }
+}

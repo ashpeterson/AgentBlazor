@@ -1,0 +1,25 @@
+@namespace AgentBlazor.Components
+
+<AgentThemeProvider>
+    <AgentPopoverProvider>
+        <AgentDialogProvider>
+            <AgentSnackbarProvider>
+                <section class="ab-shell">
+                    @if (ChildContent is null)
+                    {
+                        <AgentChatWidget />
+                    }
+                    else
+                    {
+                        @ChildContent
+                    }
+                </section>
+            </AgentSnackbarProvider>
+        </AgentDialogProvider>
+    </AgentPopoverProvider>
+</AgentThemeProvider>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

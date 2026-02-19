@@ -1,0 +1,100 @@
+@page "/suppliers-debug"
+@using AgentBlazor.Components
+@using AgentBlazor.Demo.Services
+@using MudBlazor
+@inject AgentDataGridDemoState GridState
+@implements IDisposable
+
+<PageTitle>Suppliers Debug</PageTitle>
+
+<MudPaper Class="pa-4 agent-grid-demo__panel" Elevation="1">
+    <MudText Typo="Typo.h4">AgentDataGrid Flow</MudText>
+    <MudText Typo="Typo.body2" Class="agent-grid-demo__subtitle">
+        Use the chat widget below with prompts like "filter risky suppliers", "sort suppliers", "next page", or "focus highest risk supplier".
+        The built-in agent invokes AgentDataGrid capability tools, and this page updates from executor actions.
+    </MudText>
+
+    <MudStack Row="true" Spacing="1" Class="my-3">
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+            Filter: @_snapshot.FilterSummary
+        </MudChip>
+        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Filled">
+            Sort: Risk @(_snapshot.SortDescending ? "desc" : "asc")
+        </MudChip>
+        <MudChip T="string" Color="Color.Info" Variant="Variant.Filled">
+            Page: @_snapshot.CurrentPage / @_snapshot.TotalPages
+        </MudChip>
+        <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled">
+            Focus: @(_snapshot.FocusedSupplierId ?? "None")
+        </MudChip>
+    </MudStack>
+
+    <AgentDataGrid TItem="SupplierRow"
+                   AgentId="supplier-grid"
+                   Items="@_snapshot.VisibleRows"
+                   Dense="true"
+                   Hover="true"
+                   Bordered="true"
+                   Striped="true"
+                   RowClassFunc="RowClass">
+        <Columns>
+            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="Supplier ID" />
+            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+            <PropertyColumn T="SupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+            <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+        </Columns>
+    </AgentDataGrid>
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.subtitle1">Recent Executor Events</MudText>
+    <MudList T="string" Dense="true">
+        @foreach (var evt in _snapshot.RecentEvents)
+        {
+            <MudListItem T="string">@evt</MudListItem>
+        }
+    </MudList>
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-4 agent-grid-demo__panel" Elevation="1">
+    <AgentChatWidget
+        Title="Agent Chat"
+        Description="AgentBlazor is active. Try prompts like: sort suppliers ascending, filter risk score <= 50, focus supplier SUP-010." />
+</MudPaper>
+
+@code {
+    private AgentDataGridDemoSnapshot _snapshot = new(
+        FilterSummary: "All suppliers",
+        SortDescending: true,
+        CurrentPage: 1,
+        TotalPages: 1,
+        FocusedSupplierId: null,
+        VisibleRows: [],
+        RecentEvents: []);
+
+    protected override void OnInitialized()
+    {
+        _snapshot = GridState.Snapshot;
+        GridState.Changed += OnGridStateChanged;
+    }
+
+    public void Dispose()
+    {
+        GridState.Changed -= OnGridStateChanged;
+    }
+
+    private void OnGridStateChanged()
+    {
+        _snapshot = GridState.Snapshot;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string RowClass(SupplierRow row, int rowNumber)
+    {
+        _ = rowNumber;
+        return string.Equals(row.SupplierId, _snapshot.FocusedSupplierId, StringComparison.OrdinalIgnoreCase)
+            ? "agent-grid-demo__focused-row"
+            : string.Empty;
+    }
+}

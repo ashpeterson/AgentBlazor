@@ -1,0 +1,93 @@
+@page "/workspace-debug"
+@using AgentBlazor.Components
+@using AgentBlazor.Demo.Services
+@using MudBlazor
+@inject AgentNavigationTabsDemoState NavTabsState
+@implements IDisposable
+
+<PageTitle>Workspace Debug</PageTitle>
+
+<MudPaper Class="pa-4 agent-nav-tabs-demo__panel" Elevation="1">
+    <MudText Typo="Typo.h4">AgentNavMenu + AgentTabs Flow</MudText>
+    <MudText Typo="Typo.body2" Class="agent-nav-tabs-demo__subtitle">
+        Try prompts like "go to suppliers", "navigate to /settings", or "switch to tab 2".
+        These actions execute through AgentNavMenu and AgentTabs capability tools.
+    </MudText>
+
+    <MudStack Row="true" Spacing="1" Class="my-3">
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+            Current target: @_snapshot.CurrentTarget
+        </MudChip>
+        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Filled">
+            Active tab: @_snapshot.ActiveTabIndex
+        </MudChip>
+    </MudStack>
+
+    <AgentNavMenu AgentId="supplier-nav" Dense="true">
+        <MudNavLink Href="/suppliers" Match="NavLinkMatch.Prefix">Suppliers</MudNavLink>
+        <MudNavLink Href="/risk" Match="NavLinkMatch.Prefix">Risk</MudNavLink>
+        <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix">Settings</MudNavLink>
+    </AgentNavMenu>
+
+    <MudDivider Class="my-3" />
+
+    <AgentTabs AgentId="supplier-tabs"
+               ActivePanelIndex="@_snapshot.ActiveTabIndex"
+               ActivePanelIndexChanged="OnActivePanelChanged">
+        <MudTabPanel Text="Overview">
+            <MudText Typo="Typo.body2">Overview tab content.</MudText>
+        </MudTabPanel>
+        <MudTabPanel Text="Risk">
+            <MudText Typo="Typo.body2">Risk tab content.</MudText>
+        </MudTabPanel>
+        <MudTabPanel Text="Audit">
+            <MudText Typo="Typo.body2">Audit tab content.</MudText>
+        </MudTabPanel>
+    </AgentTabs>
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.subtitle1">Recent Executor Events</MudText>
+    <MudList T="string" Dense="true">
+        @foreach (var evt in _snapshot.RecentEvents)
+        {
+            <MudListItem T="string">@evt</MudListItem>
+        }
+    </MudList>
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-4 agent-nav-tabs-demo__panel" Elevation="1">
+    <AgentChatWidget
+        Title="Navigation + Tabs Agent Chat"
+        Description="Built-in AgentBlazor UI Agent is active. Try prompts like: go to /suppliers, switch to tab 1." />
+</MudPaper>
+
+@code {
+    private AgentNavigationTabsDemoSnapshot _snapshot = new(
+        ActiveTabIndex: 0,
+        CurrentTarget: "/suppliers",
+        RecentEvents: []);
+
+    protected override void OnInitialized()
+    {
+        _snapshot = NavTabsState.Snapshot;
+        NavTabsState.Changed += OnStateChanged;
+    }
+
+    public void Dispose()
+    {
+        NavTabsState.Changed -= OnStateChanged;
+    }
+
+    private Task OnActivePanelChanged(int index)
+    {
+        NavTabsState.SetTabIndexFromUi(index);
+        return Task.CompletedTask;
+    }
+
+    private void OnStateChanged()
+    {
+        _snapshot = NavTabsState.Snapshot;
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\AgentBlazor.DefaultAgent\AgentBlazor.DefaultAgent.csproj" />
+    <ProjectReference Include="..\AgentBlazor.ProviderAdapters\AgentBlazor.ProviderAdapters.csproj" />
+    <ProjectReference Include="..\AgentBlazor.Licensing\AgentBlazor.Licensing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

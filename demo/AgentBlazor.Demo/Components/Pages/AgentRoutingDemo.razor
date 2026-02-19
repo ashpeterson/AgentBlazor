@@ -1,0 +1,176 @@
+@page "/agent-routing-demo"
+@using AgentBlazor.Agents
+@using AgentBlazor.Components
+@using AgentBlazor.Options
+@using AgentBlazor.Runtime
+@using Microsoft.Extensions.Options
+@using MudBlazor
+@inject IAgentRuntime AgentRuntime
+@inject IAgentRegistry AgentRegistry
+@inject IComponentCapabilityCatalog ComponentCatalog
+@inject IOptions<AgentBlazorOptions> AgentOptions
+
+<PageTitle>Built-In Agent Playground</PageTitle>
+
+<MudPaper Class="pa-4 agent-routing-demo__panel" Elevation="1">
+    <MudText Typo="Typo.h4">Built-In Agent Playground</MudText>
+    <MudText Typo="Typo.body2" Class="agent-routing-demo__subtitle">
+        Custom agents are disabled in this demo pass. Use this page to run prompts against the built-in AgentBlazor UI Agent only.
+    </MudText>
+
+    <MudTable Items="_routes" Dense="true" Hover="true" Bordered="true" Class="mt-3">
+        <HeaderContent>
+            <MudTh>Route</MudTh>
+            <MudTh>Agent Name</MudTh>
+            <MudTh>Allowed Component Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Label</MudTd>
+            <MudTd>@context.ResolvedAgentName</MudTd>
+            <MudTd>@context.AllowedComponentActionsSummary</MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-4 agent-routing-demo__panel" Elevation="1">
+    <MudText Typo="Typo.h6">Run Prompt Against Built-In Route</MudText>
+    <MudTextField T="string"
+                  Label="Prompt"
+                  Variant="Variant.Outlined"
+                  FullWidth="true"
+                  @bind-Value="_prompt" />
+
+    <MudSwitch T="bool"
+               Class="mt-3"
+               Color="Color.Warning"
+               Label="Include approval context (agentblazor.approvals = all)"
+               @bind-Value="_includeApprovalContext" />
+
+    <MudStack Row="true" Spacing="1" Class="mt-3">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RunDefaultRouteAsync" Disabled="@_isBusy">
+            Run Built-In Agent
+        </MudButton>
+    </MudStack>
+
+    @if (_lastResponse is not null)
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.subtitle1">Last Route Result</MudText>
+        <MudText Typo="Typo.body2"><strong>Route:</strong> @_lastRunLabel</MudText>
+        <MudText Typo="Typo.body2"><strong>Agent:</strong> @_lastResponse.AgentName</MudText>
+        <MudText Typo="Typo.body2"><strong>Response:</strong> @_lastResponse.ResponseText</MudText>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-3">Planned Actions</MudText>
+        <MudList T="string" Dense="true">
+            @if (_lastResponse.PlannedActions.Count == 0)
+            {
+                <MudListItem T="string">None</MudListItem>
+            }
+            else
+            {
+                @foreach (var action in _lastResponse.PlannedActions)
+                {
+                    <MudListItem T="string">@action.ComponentId.@action.ActionId</MudListItem>
+                }
+            }
+        </MudList>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-3">Execution Results</MudText>
+        <MudList T="string" Dense="true">
+            @if (_lastResponse.ExecutionResults.Count == 0)
+            {
+                <MudListItem T="string">None</MudListItem>
+            }
+            else
+            {
+                @foreach (var result in _lastResponse.ExecutionResults)
+                {
+                    <MudListItem T="string">@result.ComponentId.@result.ActionId -> @result.Message</MudListItem>
+                }
+            }
+        </MudList>
+    }
+</MudPaper>
+
+@code {
+    private readonly List<RoutePreview> _routes = [];
+    private string _prompt = "Open the onboarding dialog, set fields, validate, then sort suppliers ascending.";
+    private bool _includeApprovalContext;
+    private bool _isBusy;
+    private AgentTurnResponse? _lastResponse;
+    private string _lastRunLabel = "Built-In Route";
+
+    protected override void OnInitialized()
+    {
+        _routes.Clear();
+        _routes.Add(BuildRoutePreview());
+    }
+
+    private async Task RunDefaultRouteAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        try
+        {
+            var context = _includeApprovalContext
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["agentblazor.approvals"] = "all"
+                }
+                : null;
+
+            _lastResponse = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+                UserMessage: _prompt,
+                AgentName: null,
+                Context: context));
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private RoutePreview BuildRoutePreview()
+    {
+        var registration = ResolveDefaultRegistration();
+        if (registration is null)
+        {
+            return new RoutePreview("Built-In Route", "(none)", "No matching agent registration found.");
+        }
+
+        var policy = ComponentActionPolicy.EvaluateAllowedCapabilities(
+            ComponentCatalog.GetComponents(),
+            registration.AllowedComponents,
+            registration.AllowedActions);
+
+        var allowedComponentActions = policy.AllowedComponents
+            .Where(c => AgentComponentV1CapabilityProfile.ComponentIds.Contains(c.ComponentId, StringComparer.OrdinalIgnoreCase))
+            .SelectMany(c => c.Actions.Select(a => ComponentActionPolicy.ToActionKey(c.ComponentId, a.ActionId)))
+            .OrderBy(static x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var summary = allowedComponentActions.Length == 0
+            ? "No component actions allowed."
+            : string.Join(", ", allowedComponentActions);
+
+        return new RoutePreview("Built-In Route", registration.Name, summary);
+    }
+
+    private AgentRegistration? ResolveDefaultRegistration()
+    {
+        if (AgentRegistry.TryGet(AgentOptions.Value.DefaultAgent.Name, out var configuredDefault))
+        {
+            return configuredDefault;
+        }
+
+        return AgentRegistry.GetAll()
+            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+    }
+
+    private sealed record RoutePreview(string Label, string ResolvedAgentName, string AllowedComponentActionsSummary);
+}

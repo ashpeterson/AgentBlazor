@@ -1,0 +1,86 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Runtime
+@implements IDisposable
+@inject IAgentChatWidgetState WidgetState
+
+<section class="ab-chat-widget" style="@HostStyle">
+    @if (WidgetState.IsOpen)
+    {
+        <div class="ab-chat-widget__window" role="dialog" aria-label="Agent chat widget">
+            <header class="ab-chat-widget__window-header">
+                <span>@(Title ?? "Agent Assistant")</span>
+                <button type="button"
+                        class="ab-chat-widget__icon-btn"
+                        @onclick="Close"
+                        aria-label="Minimize chat widget">
+                    &minus;
+                </button>
+            </header>
+
+            <div class="ab-chat-widget__window-body">
+                <AgentChatSurface Title="@Title"
+                                  Description="@Description"
+                                  FormName="@FormName"
+                                  DefaultAgentName="@DefaultAgentName" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <button type="button"
+                class="ab-chat-widget__bubble"
+                @onclick="Open"
+                aria-label="Open agent chat widget">
+            <span class="ab-chat-widget__bubble-label">@BubbleLabel</span>
+        </button>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; } = "AgentBlazor Chat Widget";
+
+    [Parameter]
+    public string? Description { get; set; } =
+        "Built-in component-aware agent is active by default. You can also select custom registered agents.";
+
+    [Parameter]
+    public string BubbleLabel { get; set; } = "Ask Agent";
+
+    [Parameter]
+    public string Width { get; set; } = "360px";
+
+    [Parameter]
+    public string Height { get; set; } = "560px";
+
+    [Parameter]
+    public string Right { get; set; } = "1.25rem";
+
+    [Parameter]
+    public string Bottom { get; set; } = "1.25rem";
+
+    [Parameter]
+    public string? FormName { get; set; }
+
+    [Parameter]
+    public string? DefaultAgentName { get; set; }
+
+    private string HostStyle =>
+        $"--ab-chat-widget-width:{Width};--ab-chat-widget-height:{Height};--ab-chat-widget-right:{Right};--ab-chat-widget-bottom:{Bottom};";
+
+    protected override void OnInitialized()
+    {
+        WidgetState.Changed += OnWidgetStateChanged;
+    }
+
+    public void Dispose()
+    {
+        WidgetState.Changed -= OnWidgetStateChanged;
+    }
+
+    private void Open() => WidgetState.Open();
+
+    private void Close() => WidgetState.Close();
+
+    private void OnWidgetStateChanged() => _ = InvokeAsync(StateHasChanged);
+}

@@ -1,0 +1,45 @@
+@page "/workspace"
+@page "/agent-nav-tabs-demo"
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>Workspace</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Workspace</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <AgentNavMenu AgentId="workspace-nav" Dense="true">
+            <MudNavLink Href="/suppliers" Match="NavLinkMatch.Prefix">Suppliers</MudNavLink>
+            <MudNavLink Href="/supplier-onboarding" Match="NavLinkMatch.Prefix">Onboarding</MudNavLink>
+            <MudNavLink Href="/workspace" Match="NavLinkMatch.Prefix">Workspace</MudNavLink>
+        </AgentNavMenu>
+    </MudItem>
+    <MudItem xs="12" md="9">
+        <AgentTabs AgentId="workspace-tabs"
+                   ActivePanelIndex="@_activeTabIndex"
+                   ActivePanelIndexChanged="OnActivePanelChanged">
+            <MudTabPanel Text="Overview">
+                <MudText Typo="Typo.body2">Overview content.</MudText>
+            </MudTabPanel>
+            <MudTabPanel Text="Risk">
+                <MudText Typo="Typo.body2">Risk analysis content.</MudText>
+            </MudTabPanel>
+            <MudTabPanel Text="Audit">
+                <MudText Typo="Typo.body2">Audit trail content.</MudText>
+            </MudTabPanel>
+        </AgentTabs>
+    </MudItem>
+</MudGrid>
+
+<AgentChatWidget />
+
+@code {
+    private int _activeTabIndex;
+
+    private Task OnActivePanelChanged(int index)
+    {
+        _activeTabIndex = index;
+        return Task.CompletedTask;
+    }
+}

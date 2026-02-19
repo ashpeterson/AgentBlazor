@@ -1,0 +1,59 @@
+@page "/weather"
+@attribute [StreamRendering]
+
+<PageTitle>Weather</PageTitle>
+
+<MudPaper Class="demo-surface pa-5" Elevation="0">
+    <MudText Typo="Typo.h4" GutterBottom="true">Weather</MudText>
+    <MudText Typo="Typo.body2" Class="demo-subtitle">
+        Streaming-rendered sample data page styled to match the AgentBlazor demo shell.
+    </MudText>
+
+    @if (forecasts is null)
+    {
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Class="mt-5" />
+    }
+    else
+    {
+        <MudTable Items="forecasts" Dense="true" Hover="true" Bordered="true" Class="mt-4">
+            <HeaderContent>
+                <MudTh>Date</MudTh>
+                <MudTh>Temp. (C)</MudTh>
+                <MudTh>Temp. (F)</MudTh>
+                <MudTh>Summary</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Date">@context.Date.ToShortDateString()</MudTd>
+                <MudTd DataLabel="Temp. (C)">@context.TemperatureC</MudTd>
+                <MudTd DataLabel="Temp. (F)">@context.TemperatureF</MudTd>
+                <MudTd DataLabel="Summary">@context.Summary</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(500);
+
+        var startDate = DateOnly.FromDateTime(DateTime.Now);
+        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+        forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        {
+            Date = startDate.AddDays(index),
+            TemperatureC = Random.Shared.Next(-20, 55),
+            Summary = summaries[Random.Shared.Next(summaries.Length)]
+        }).ToArray();
+    }
+
+    private sealed class WeatherForecast
+    {
+        public DateOnly Date { get; set; }
+        public int TemperatureC { get; set; }
+        public string? Summary { get; set; }
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    }
+}

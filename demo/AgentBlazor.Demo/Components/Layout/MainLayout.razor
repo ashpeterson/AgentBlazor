@@ -1,0 +1,121 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_activeTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="demo-shell @CurrentThemeCssClass">
+    <aside class="demo-shell__sidebar">
+        <NavMenu />
+    </aside>
+
+    <main class="demo-shell__main">
+        <header class="demo-shell__topbar">
+            <p class="demo-shell__eyebrow">AgentBlazor Demo Environment</p>
+            <div class="demo-shell__controls">
+                <MudSelect T="string"
+                           Value="_selectedThemeKey"
+                           ValueChanged="OnThemeChanged"
+                           Label="Theme"
+                           Dense="true"
+                           Variant="Variant.Outlined"
+                           Class="demo-shell__theme-select">
+                    @foreach (var option in ThemeOptions)
+                    {
+                        <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <div class="demo-shell__links">
+                    <a href="https://learn.microsoft.com/aspnet/core/" target="_blank" rel="noopener noreferrer">ASP.NET Core</a>
+                    <a href="https://docs.ag-ui.com/" target="_blank" rel="noopener noreferrer">AG-UI</a>
+                </div>
+            </div>
+        </header>
+
+        <article class="demo-shell__content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private const string AuroraThemeKey = "aurora";
+    private const string CoastlineThemeKey = "coastline";
+
+    private static readonly MudTheme AuroraTheme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#2466da",
+            Secondary = "#1b8bb2",
+            Tertiary = "#3a63db",
+            Info = "#2f7be2",
+            Success = "#2ca06f",
+            Warning = "#d28a2f",
+            Error = "#ce485f",
+            Background = "#f3f7ff",
+            Surface = "#ffffff",
+            AppbarBackground = "#ffffff",
+            AppbarText = "#13233f",
+            DrawerBackground = "#0f2d5f",
+            DrawerText = "#ecf4ff",
+            TextPrimary = "#13233f",
+            TextSecondary = "#5b6f95"
+        }
+    };
+
+    private static readonly MudTheme CoastlineTheme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#0f6a8f",
+            Secondary = "#2b9776",
+            Tertiary = "#2a7f87",
+            Info = "#1a7cb2",
+            Success = "#2a8a66",
+            Warning = "#c9862a",
+            Error = "#c74d4d",
+            Background = "#f0f8f7",
+            Surface = "#ffffff",
+            AppbarBackground = "#ffffff",
+            AppbarText = "#132c3a",
+            DrawerBackground = "#0c3749",
+            DrawerText = "#e8f7fb",
+            TextPrimary = "#132c3a",
+            TextSecondary = "#4f6f7d"
+        }
+    };
+
+    private static readonly IReadOnlyList<ThemeOption> ThemeOptions =
+    [
+        new(AuroraThemeKey, "Aurora Blue"),
+        new(CoastlineThemeKey, "Coastline Mint")
+    ];
+
+    private string _selectedThemeKey = AuroraThemeKey;
+    private MudTheme _activeTheme = AuroraTheme;
+
+    private string CurrentThemeCssClass =>
+        string.Equals(_selectedThemeKey, CoastlineThemeKey, StringComparison.OrdinalIgnoreCase)
+            ? "demo-theme--coastline"
+            : "demo-theme--aurora";
+
+    private Task OnThemeChanged(string key)
+    {
+        _selectedThemeKey = key;
+        _activeTheme = string.Equals(key, CoastlineThemeKey, StringComparison.OrdinalIgnoreCase)
+            ? CoastlineTheme
+            : AuroraTheme;
+        return Task.CompletedTask;
+    }
+
+    private sealed record ThemeOption(string Key, string Label);
+}

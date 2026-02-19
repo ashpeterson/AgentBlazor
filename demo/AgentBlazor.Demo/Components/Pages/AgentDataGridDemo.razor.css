@@ -1,0 +1,17 @@
+.agent-grid-demo__panel {
+    border: 1px solid var(--ab-border);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 255, 0.92));
+    box-shadow: var(--ab-shadow);
+    backdrop-filter: blur(8px);
+}
+
+.agent-grid-demo__subtitle {
+    max-width: 74ch;
+    color: var(--ab-ink-muted);
+}
+
+::deep .agent-grid-demo__focused-row {
+    background-color: #fff6d4 !important;
+    font-weight: 600;
+}

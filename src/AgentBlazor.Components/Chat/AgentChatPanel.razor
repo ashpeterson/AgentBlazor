@@ -1,0 +1,31 @@
+@namespace AgentBlazor.Components
+
+<aside class="ab-chat-panel" style="@PanelStyle" role="complementary" aria-label="Agent chat panel">
+    <AgentChatSurface Title="@Title"
+                      Description="@Description"
+                      FormName="@FormName"
+                      DefaultAgentName="@DefaultAgentName" />
+</aside>
+
+@code {
+    [Parameter]
+    public string Width { get; set; } = "350px";
+
+    [Parameter]
+    public string Height { get; set; } = "100%";
+
+    [Parameter]
+    public string? Title { get; set; } = "Agent Assistant";
+
+    [Parameter]
+    public string? Description { get; set; } =
+        "Built-in component-aware agent is active by default. You can also select custom registered agents.";
+
+    [Parameter]
+    public string? FormName { get; set; }
+
+    [Parameter]
+    public string? DefaultAgentName { get; set; }
+
+    private string PanelStyle => $"--ab-chat-panel-width:{Width};--ab-chat-panel-height:{Height};";
+}

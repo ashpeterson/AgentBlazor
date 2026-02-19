@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/AgentBlazor.Components/AgentBlazor.Components.csproj" />
+    <Project Path="src/AgentBlazor.Core/AgentBlazor.Core.csproj" />
+    <Project Path="src/AgentBlazor.DefaultAgent/AgentBlazor.DefaultAgent.csproj" />
+    <Project Path="src/AgentBlazor.Hosting/AgentBlazor.Hosting.csproj" />
+    <Project Path="src/AgentBlazor.Licensing/AgentBlazor.Licensing.csproj" />
+    <Project Path="src/AgentBlazor.ProviderAdapters/AgentBlazor.ProviderAdapters.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj" />
+    <Project Path="tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj" />
+    <Project Path="tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

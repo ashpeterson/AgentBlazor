@@ -1,0 +1,109 @@
+@page "/supplier-onboarding"
+@page "/agent-dialog-form-demo"
+@using System.ComponentModel.DataAnnotations
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>Supplier Onboarding</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Supplier Onboarding</MudText>
+
+<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _dialogVisible = true)">
+    Open Onboarding Dialog
+</MudButton>
+
+<AgentDialog AgentId="supplier-onboarding-dialog"
+             Visible="@_dialogVisible"
+             VisibleChanged="OnDialogVisibleChanged">
+    <TitleContent>
+        <MudText Typo="Typo.h6">New Supplier</MudText>
+    </TitleContent>
+    <DialogContent>
+        <AgentForm AgentId="supplier-onboarding-form"
+                   Model="@_model"
+                   ValidationChanged="OnValidationChanged"
+                   Submitted="OnSubmitted">
+            <ChildContent Context="formContext">
+                <DataAnnotationsValidator />
+                <MudTextField T="string"
+                              Label="Supplier name"
+                              For="@(() => _model.SupplierName)"
+                              @bind-Value="_model.SupplierName" />
+                <MudTextField T="string"
+                              Label="Contact email"
+                              For="@(() => _model.ContactEmail)"
+                              @bind-Value="_model.ContactEmail" />
+                <MudTextField T="string"
+                              Label="Risk tier"
+                              For="@(() => _model.RiskTier)"
+                              @bind-Value="_model.RiskTier" />
+                <MudNumericField T="decimal"
+                                 Label="Requested budget"
+                                 For="@(() => _model.RequestedBudget)"
+                                 @bind-Value="_model.RequestedBudget"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="USD" />
+                @if (_lastSubmitUtc is not null)
+                {
+                    <MudText Typo="Typo.caption" Class="mt-2">
+                        Last submitted: @_lastSubmitUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                    </MudText>
+                }
+                @if (_lastValidation.HasValue)
+                {
+                    <MudText Typo="Typo.caption">
+                        Validation: @(_lastValidation.Value ? "Passed" : "Failed")
+                    </MudText>
+                }
+            </ChildContent>
+        </AgentForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => _dialogVisible = false)">
+            Close
+        </MudButton>
+    </DialogActions>
+</AgentDialog>
+
+<AgentChatWidget />
+
+@code {
+    private readonly SupplierOnboardingModel _model = new();
+    private bool _dialogVisible;
+    private bool? _lastValidation;
+    private DateTimeOffset? _lastSubmitUtc;
+
+    private Task OnDialogVisibleChanged(bool visible)
+    {
+        _dialogVisible = visible;
+        return Task.CompletedTask;
+    }
+
+    private Task OnValidationChanged(bool isValid)
+    {
+        _lastValidation = isValid;
+        return Task.CompletedTask;
+    }
+
+    private Task OnSubmitted()
+    {
+        _lastSubmitUtc = DateTimeOffset.UtcNow;
+        _dialogVisible = false;
+        return Task.CompletedTask;
+    }
+
+    private sealed class SupplierOnboardingModel
+    {
+        [Required]
+        public string SupplierName { get; set; } = string.Empty;
+
+        [Required, EmailAddress]
+        public string ContactEmail { get; set; } = string.Empty;
+
+        [Required]
+        public string RiskTier { get; set; } = string.Empty;
+
+        [Range(typeof(decimal), "0.01", "1000000000")]
+        public decimal RequestedBudget { get; set; }
+    }
+}

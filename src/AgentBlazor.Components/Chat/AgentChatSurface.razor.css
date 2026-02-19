@@ -1,0 +1,97 @@
+.ab-chat-surface {
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 0.625rem;
+}
+
+.ab-chat-surface__header {
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+}
+
+.ab-chat-surface__body {
+    margin: 0;
+    color: #546071;
+    font-size: 0.88rem;
+}
+
+.ab-chat-surface__timeline {
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    padding-right: 0.125rem;
+}
+
+.ab-chat-surface__item {
+    border: 1px solid #d9dde2;
+    border-radius: 10px;
+    padding: 0.55rem 0.625rem;
+    background: #fff;
+}
+
+.ab-chat-surface__item--assistant {
+    border-color: #bfd4f2;
+    background: #f5f9ff;
+}
+
+.ab-chat-surface__item-role {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #5c6775;
+    margin-bottom: 0.25rem;
+}
+
+.ab-chat-surface__item-text {
+    color: #1f2933;
+    font-size: 0.9rem;
+}
+
+.ab-chat-surface__actions,
+.ab-chat-surface__results {
+    margin: 0.45rem 0 0 1rem;
+    padding: 0;
+    color: #334155;
+}
+
+.ab-chat-surface__controls {
+    display: grid;
+    gap: 0.375rem;
+}
+
+.ab-chat-surface__label {
+    font-size: 0.76rem;
+    color: #4d5663;
+    font-weight: 700;
+}
+
+.ab-chat-surface__select,
+.ab-chat-surface__input {
+    width: 100%;
+    border: 1px solid #c7ced8;
+    border-radius: 8px;
+    padding: 0.45rem 0.5rem;
+    font: inherit;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.ab-chat-surface__submit {
+    border: 0;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    background: #0f6bdc;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    justify-self: start;
+}
+
+.ab-chat-surface__submit:disabled {
+    opacity: 0.7;
+    cursor: default;
+}

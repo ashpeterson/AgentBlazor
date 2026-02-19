@@ -1,0 +1,121 @@
+PROJECT
+We are building the agentic component library for asp.net core Blazor web framework. The aim is to build this into a sellable product with a free, paid, premium style payment options.
+
+BACKGROUND
+AG-UI is the agent protocol for agents to interact with UI components more details can be found here on the base protocol https://docs.ag-ui.com/introduction we also have the source available here C:\Git\repos\ag-ui we are aiming to build on top of the open source material UI component library mudblazor source available here C:\Git\repos\MudBlazor but this is purely the component library for agentic UI - think of this as a user been able to chat via text and voice to there UI (e.g. a user could promt : navigate to this supplier and show me there risk report, the agent would then have the ability to understand and complete the users intent) the agent library we are utilising is here : C:\Git\Grouptree\agent-framework this is the MS Agent Framework docs available here : https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-csharp. We are targeting a blazor .net 10 web app.
+
+STRUCTURE
+The main project structure I see would look like (as a brief guide this is open to discussion)
+
+- Blazor Front End (what we will use to test AND will eventually become our demo/public site)
+- Core class library (contains all our services etc etc, what we actually ship and sell)
+
+
+STARTING POINT 
+
+A user should be able to register the agentblzor services using something similar to what MudBlazor does like this :
+
+
+Installation
+Install Package:
+
+dotnet add package MudBlazor
+Add to _Imports.razor:
+
+@using MudBlazor
+Add to MainLayout.razor or App.razor:
+
+<MudThemeProvider/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+Add to HTML head section (index.html/_Layout.cshtml/_Host.cshtml/App.razor):
+
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+<link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+Add to the default Blazor script at the end of the HTML body section:
+
+<script src="_content/MudBlazor/MudBlazor.min.js"></script>
+Add to Program.cs:
+
+using MudBlazor.Services;
+builder.Services.AddMudServices();
+
+
+Example Usage
+<MudText Typo="Typo.h6">
+    MudBlazor is @Text
+</MudText>
+
+<MudButton Variant="Variant.Filled" 
+           Color="Color.Primary" 
+           OnClick="ButtonOnClick">
+    @ButtonText
+</MudButton>
+
+@code {
+    string Text { get; set; } = "????";
+    string ButtonText { get; set; } = "Click Me";
+    int ClickCount { get; set; }
+
+    void ButtonOnClick()
+    {
+        ClickCount += 1;
+        Text = $"Awesome x {ClickCount}";
+        ButtonText = "Click Me Again";
+    }
+}
+
+
+But we would be using something along the lines of :
+
+
+dotnet add package AgentBlazor
+@using AgentBlazor
+
+
+<script src="_content/AgentBlazor/AgentBlazor.min.js"></script>
+Add to Program.cs:
+
+using Agent.Services;
+builder.Services.AddAgentBlazorServices("HERE YOU WOULD PASS YOUR LLM PROVIDER EG. OpenAI, Antrhopic, AzureOpenAI, LocalLLama instance etc with API KEYS ETC);
+
+A user should also have the ability to build there agents using our system like 
+
+
+builder.Services.AgentBlazor.AddAgent("My custom supplier nav agent etc); - this will wrap the MS Agent Generation but intwined with our AG-UI support etc.
+
+BASE COMPONENTS
+
+After we have way to register users should be able to add our char interface components (this could be a full chat window component, chat widgets etc a host of different chat components) an good example of a chat interface we want AS A COMPONENT IN OUR library can be found here : C:\Git\Grouptree\ChatAppDemo\ChatApp1\ChatApp1.csproj
+
+UI COMPONETNS
+Think grids, maps, forms, etc we need to scale this sensible and enable the pricing plans here
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

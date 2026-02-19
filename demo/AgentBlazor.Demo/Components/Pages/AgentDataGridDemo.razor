@@ -1,0 +1,57 @@
+@page "/suppliers"
+@page "/agent-grid-demo"
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>Suppliers</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Suppliers</MudText>
+
+<AgentDataGrid TItem="Supplier"
+               AgentId="supplier-grid"
+               Items="@_suppliers"
+               Dense="true"
+               Hover="true"
+               Bordered="true"
+               Striped="true">
+    <Columns>
+        <PropertyColumn T="Supplier" TProperty="string" Property="x => x.Name" Title="Supplier" />
+        <PropertyColumn T="Supplier" TProperty="string" Property="x => x.Region" Title="Region" />
+        <PropertyColumn T="Supplier" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+        <PropertyColumn T="Supplier" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+    </Columns>
+</AgentDataGrid>
+
+<AgentChatWidget />
+
+@code {
+    private readonly List<Supplier> _suppliers = SupplierData.Generate(50);
+
+    private sealed record Supplier(
+        string Name,
+        string Region,
+        int RiskScore,
+        DateTime LastAuditDate);
+
+    private static class SupplierData
+    {
+        private static readonly string[] Regions = ["EMEA", "NA", "APAC", "LATAM"];
+
+        public static List<Supplier> Generate(int count)
+        {
+            var rows = new List<Supplier>(count);
+            var start = new DateTime(2025, 01, 01);
+            for (var i = 0; i < count; i++)
+            {
+                var idx = i + 1;
+                rows.Add(new Supplier(
+                    Name: $"Supplier {idx:000}",
+                    Region: Regions[i % Regions.Length],
+                    RiskScore: (i * 13 + 17) % 100,
+                    LastAuditDate: start.AddDays((i * 11) % 390)));
+            }
+
+            return rows;
+        }
+    }
+}

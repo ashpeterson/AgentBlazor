@@ -1,0 +1,162 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Agents
+@using AgentBlazor.Runtime
+@inject IAgentRegistry AgentRegistry
+@inject IAgentRuntime AgentRuntime
+
+<section class="ab-chat-surface">
+    @if (!string.IsNullOrWhiteSpace(Title))
+    {
+        <header class="ab-chat-surface__header">@Title</header>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <p class="ab-chat-surface__body">@Description</p>
+    }
+
+    @if (_timeline.Count > 0)
+    {
+        <div class="ab-chat-surface__timeline">
+            @foreach (var item in _timeline)
+            {
+                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role">
+                    <div class="ab-chat-surface__item-role">@item.RoleLabel</div>
+                    <div class="ab-chat-surface__item-text">@item.Text</div>
+
+                    @if (item.PlannedActions.Count > 0)
+                    {
+                        <ul class="ab-chat-surface__actions">
+                            @foreach (var action in item.PlannedActions)
+                            {
+                                <li>@action.ComponentId.@action.ActionId</li>
+                            }
+                        </ul>
+                    }
+
+                    @if (item.ExecutionResults.Count > 0)
+                    {
+                        <ul class="ab-chat-surface__results">
+                            @foreach (var result in item.ExecutionResults)
+                            {
+                                <li>@result.Message</li>
+                            }
+                        </ul>
+                    }
+                </article>
+            }
+        </div>
+    }
+
+    <EditForm class="ab-chat-surface__controls" Model="@this" FormName="@EffectiveFormName" OnValidSubmit="SendAsync">
+        <label class="ab-chat-surface__label" for="@AgentSelectId">Agent</label>
+        <select id="@AgentSelectId" class="ab-chat-surface__select" @bind="_selectedAgent">
+            @foreach (var agent in _agentNames)
+            {
+                <option value="@agent">@agent</option>
+            }
+        </select>
+
+        <label class="ab-chat-surface__label" for="@PromptId">Prompt</label>
+        <textarea id="@PromptId" class="ab-chat-surface__input" rows="3" @bind="_prompt"
+                  placeholder="Type an instruction like 'open the chat widget'"></textarea>
+
+        <button type="submit" class="ab-chat-surface__submit" disabled="@_isBusy">
+            @(_isBusy ? "Running..." : "Send")
+        </button>
+    </EditForm>
+</section>
+
+@code {
+    private readonly List<string> _agentNames = [];
+    private readonly List<ChatTimelineItem> _timeline = [];
+    private string _prompt = string.Empty;
+    private string? _selectedAgent;
+    private bool _isBusy;
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string? FormName { get; set; }
+
+    [Parameter]
+    public string? DefaultAgentName { get; set; }
+
+    private string EffectiveFormName =>
+        string.IsNullOrWhiteSpace(FormName)
+            ? $"agent-chat-surface-{_instanceId}"
+            : FormName;
+
+    private string AgentSelectId => $"ab-agent-select-{_instanceId}";
+
+    private string PromptId => $"ab-agent-prompt-{_instanceId}";
+
+    protected override void OnInitialized()
+    {
+        _agentNames.AddRange(
+            AgentRegistry.GetAll()
+                .Select(static agent => agent.Name)
+                .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(DefaultAgentName))
+        {
+            _selectedAgent = _agentNames.FirstOrDefault(name =>
+                string.Equals(name, DefaultAgentName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        _selectedAgent ??= _agentNames.FirstOrDefault();
+    }
+
+    private async Task SendAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        var message = _prompt.Trim();
+        if (message.Length == 0)
+        {
+            return;
+        }
+
+        _timeline.Add(ChatTimelineItem.User(message));
+        _prompt = string.Empty;
+        _isBusy = true;
+
+        try
+        {
+            var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+                message,
+                _selectedAgent,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["agentblazor.session_id"] = _instanceId
+                }));
+            _timeline.Add(ChatTimelineItem.Agent(response));
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private sealed record ChatTimelineItem(
+        string Role,
+        string RoleLabel,
+        string Text,
+        IReadOnlyList<PlannedComponentAction> PlannedActions,
+        IReadOnlyList<ComponentActionExecutionResult> ExecutionResults)
+    {
+        public static ChatTimelineItem User(string text) =>
+            new("user", "User", text, [], []);
+
+        public static ChatTimelineItem Agent(AgentTurnResponse response) =>
+            new("assistant", response.AgentName, response.ResponseText, response.PlannedActions, response.ExecutionResults);
+    }
+}

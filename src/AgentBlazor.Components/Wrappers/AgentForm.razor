@@ -1,0 +1,284 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Components
+@using AgentBlazor.Runtime
+@using Microsoft.AspNetCore.Components.Forms
+@inherits AgentControllableComponentBase
+
+<EditForm EditContext="_editContext"
+          FormName="@EffectiveFormName"
+          OnValidSubmit="HandleValidSubmitAsync"
+          @attributes="AdditionalAttributes">
+    @if (ChildContent is not null)
+    {
+        @ChildContent(_editContext!)
+    }
+</EditForm>
+
+@code {
+    private EditContext? _editContext;
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
+    private Dictionary<string, object?> _initialValues = new(StringComparer.OrdinalIgnoreCase);
+
+    [Parameter, EditorRequired]
+    public object Model { get; set; } = default!;
+
+    [Parameter]
+    public RenderFragment<EditContext>? ChildContent { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> ValidationChanged { get; set; }
+
+    [Parameter]
+    public EventCallback Submitted { get; set; }
+
+    [Parameter]
+    public string? FormName { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public override string ComponentType => "Form";
+
+    private string EffectiveFormName =>
+        string.IsNullOrWhiteSpace(FormName)
+            ? $"agent-form-{_instanceId}"
+            : FormName;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        EnsureEditContext();
+    }
+
+    public override ComponentCapability GetCapability()
+    {
+        var capability = new ComponentCapability(AgentId, "Agent-aware form wrapper.");
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+            "Set a form field value."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.FormValidateActionId,
+            "Validate the form."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.FormSubmitActionId,
+            "Submit the form.",
+            RequiresApproval: true));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.FormResetActionId,
+            "Reset form fields to initial values."));
+        return capability;
+    }
+
+    public override ComponentState GetCurrentState()
+    {
+        EnsureEditContext();
+        var values = CaptureValues(Model);
+        return new ComponentState
+        {
+            ["fieldCount"] = values.Count,
+            ["isValid"] = _editContext!.Validate()
+        };
+    }
+
+    public override async Task<ActionResult> ExecuteActionAsync(
+        AgentAction action,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentFormComponentId, action);
+        EnsureEditContext();
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!action.TryGetParameter<string>("field", out var field) || string.IsNullOrWhiteSpace(field))
+            {
+                return ActionResult.Failure("Action 'set_field' requires 'field' parameter.");
+            }
+
+            if (!action.Parameters.TryGetValue("value", out var raw))
+            {
+                action.Parameters.TryGetValue("fieldValue", out raw);
+            }
+            if (!TrySetFieldValue(Model, field, Normalize(raw), out var message))
+            {
+                return ActionResult.Failure(message);
+            }
+
+            _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, field));
+            await RequestComponentRefreshAsync();
+            return ActionResult.Success(message);
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            var valid = _editContext!.Validate();
+            await ValidationChanged.InvokeAsync(valid);
+            await RequestComponentRefreshAsync();
+            return valid
+                ? ActionResult.Success("Form validation passed.")
+                : ActionResult.Failure("Form validation failed.");
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            var valid = _editContext!.Validate();
+            await ValidationChanged.InvokeAsync(valid);
+            if (!valid)
+            {
+                return ActionResult.Failure("Submit blocked because validation failed.");
+            }
+
+            await Submitted.InvokeAsync();
+            await RequestComponentRefreshAsync();
+            return ActionResult.Success("Submitted form.");
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormResetActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            RestoreValues(Model, _initialValues);
+            _editContext = new EditContext(Model);
+            await ValidationChanged.InvokeAsync(false);
+            await RequestComponentRefreshAsync();
+            return ActionResult.Success("Reset form to initial values.");
+        }
+
+        return ActionResult.Unknown(action.Name);
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        await Submitted.InvokeAsync();
+    }
+
+    private void EnsureEditContext()
+    {
+        if (Model is null)
+        {
+            throw new InvalidOperationException($"{nameof(AgentForm)} requires a non-null {nameof(Model)}.");
+        }
+
+        if (_editContext is null || !ReferenceEquals(_editContext.Model, Model))
+        {
+            _editContext = new EditContext(Model);
+            _initialValues = CaptureValues(Model);
+        }
+    }
+
+    private static Dictionary<string, object?> CaptureValues(object model)
+    {
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanRead || !property.CanWrite || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            values[property.Name] = property.GetValue(model);
+        }
+
+        return values;
+    }
+
+    private static void RestoreValues(object model, IReadOnlyDictionary<string, object?> values)
+    {
+        foreach (var property in model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanWrite || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            if (!values.TryGetValue(property.Name, out var initial))
+            {
+                continue;
+            }
+
+            if (initial is null)
+            {
+                property.SetValue(model, null);
+                continue;
+            }
+
+            if (TryConvert(initial, property.PropertyType, out var converted))
+            {
+                property.SetValue(model, converted);
+            }
+        }
+    }
+
+    private static bool TrySetFieldValue(object model, string field, object? raw, out string message)
+    {
+        var property = model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .FirstOrDefault(p => p.CanWrite && string.Equals(p.Name, field, StringComparison.OrdinalIgnoreCase));
+        if (property is null)
+        {
+            message = $"Field '{field}' was not found on form model '{model.GetType().Name}'.";
+            return false;
+        }
+
+        if (raw is null)
+        {
+            property.SetValue(model, null);
+            message = $"Set field '{property.Name}' to null.";
+            return true;
+        }
+
+        if (!TryConvert(raw, property.PropertyType, out var converted))
+        {
+            message = $"Unable to convert field '{property.Name}' value '{raw}' to {property.PropertyType.Name}.";
+            return false;
+        }
+
+        property.SetValue(model, converted);
+        message = $"Set field '{property.Name}' to '{converted}'.";
+        return true;
+    }
+
+    private static object? Normalize(object? value)
+    {
+        if (value is System.Text.Json.JsonElement json)
+        {
+            return json.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.String => json.GetString(),
+                System.Text.Json.JsonValueKind.Number when json.TryGetInt64(out var i64) => i64,
+                System.Text.Json.JsonValueKind.Number when json.TryGetDouble(out var d) => d,
+                System.Text.Json.JsonValueKind.True => true,
+                System.Text.Json.JsonValueKind.False => false,
+                System.Text.Json.JsonValueKind.Null => null,
+                _ => json.ToString()
+            };
+        }
+
+        return value;
+    }
+
+    private static bool TryConvert(object raw, Type destinationType, out object? converted)
+    {
+        var targetType = Nullable.GetUnderlyingType(destinationType) ?? destinationType;
+        try
+        {
+            if (targetType.IsEnum)
+            {
+                converted = raw is string s
+                    ? Enum.Parse(targetType, s, ignoreCase: true)
+                    : Enum.ToObject(targetType, raw);
+                return true;
+            }
+
+            if (targetType == typeof(Guid))
+            {
+                converted = raw is Guid g ? g : Guid.Parse(raw.ToString() ?? string.Empty);
+                return true;
+            }
+
+            converted = Convert.ChangeType(raw, targetType, System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            converted = null;
+            return false;
+        }
+    }
+}

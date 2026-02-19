@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AgentBlazor</AssemblyName>
+    <PackageId>AgentBlazor</PackageId>
+    <Description>Agentic component library for ASP.NET Core Blazor.</Description>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
+    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.DefaultAgent\AgentBlazor.DefaultAgent.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.Components\AgentBlazor.Components.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.ProviderAdapters\AgentBlazor.ProviderAdapters.csproj" />
+  </ItemGroup>
+
+</Project>

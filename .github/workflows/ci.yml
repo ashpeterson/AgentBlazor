@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (pinned)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET Info
+        run: dotnet --info
+
+      - name: Validate Central Package Pinning
+        shell: pwsh
+        run: |
+          $matches = rg -n "<PackageReference[^>]*Version=" -g "*.csproj"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host $matches
+            throw "Found PackageReference entries with inline Version. Use Directory.Packages.props."
+          }
+          if (-not (Test-Path "Directory.Packages.props")) {
+            throw "Directory.Packages.props is missing."
+          }
+
+      - name: Restore (locked mode)
+        run: dotnet restore AgentBlazor.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
+
+      - name: Test
+        run: dotnet test AgentBlazor.slnx -c Release --no-build -nologo

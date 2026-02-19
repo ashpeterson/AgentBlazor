@@ -1,0 +1,88 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Components
+@using AgentBlazor.Runtime
+@using MudBlazor
+@inherits AgentControllableComponentBase
+@inject NavigationManager Navigation
+
+<MudNavMenu Dense="Dense" @attributes="AdditionalAttributes">
+    @ChildContent
+</MudNavMenu>
+
+@code {
+    [Parameter]
+    public bool Dense { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public override string ComponentType => "NavMenu";
+
+    public override ComponentCapability GetCapability()
+    {
+        var capability = new ComponentCapability(AgentId, "Agent-aware navigation menu wrapper.");
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            "Navigate to an internal route."));
+        capability.UpsertAction(new ComponentActionCapability(
+            AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId,
+            "Navigate to an external URL.",
+            RequiresApproval: true));
+        return capability;
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["uri"] = Navigation.Uri,
+        ["dense"] = Dense
+    };
+
+    public override Task<ActionResult> ExecuteActionAsync(
+        AgentAction action,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, action);
+
+        var target = ResolveTarget(action);
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return Task.FromResult(ActionResult.Failure(
+                $"Action '{action.Name}' requires 'uri', 'url', or 'target' parameter."));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo(target, forceLoad: false);
+            return Task.FromResult(ActionResult.Success($"Navigated to {target}."));
+        }
+
+        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo(target, forceLoad: true);
+            return Task.FromResult(ActionResult.Success($"Navigated externally to {target}."));
+        }
+
+        return Task.FromResult(ActionResult.Unknown(action.Name));
+    }
+
+    private static string? ResolveTarget(AgentAction action)
+    {
+        if (action.TryGetParameter<string>("uri", out var uri) && !string.IsNullOrWhiteSpace(uri))
+        {
+            return uri;
+        }
+
+        if (action.TryGetParameter<string>("url", out var url) && !string.IsNullOrWhiteSpace(url))
+        {
+            return url;
+        }
+
+        return action.TryGetParameter<string>("target", out var target) && !string.IsNullOrWhiteSpace(target)
+            ? target
+            : null;
+    }
+}

@@ -1,0 +1,181 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+
+:root {
+    --ab-bg: #f3f7ff;
+    --ab-bg-soft: #eef4ff;
+    --ab-ink: #13233f;
+    --ab-ink-muted: #5b6f95;
+    --ab-border: rgba(20, 60, 125, 0.14);
+    --ab-border-strong: rgba(17, 56, 120, 0.24);
+    --ab-accent: #2466da;
+    --ab-accent-soft: rgba(36, 102, 218, 0.12);
+    --ab-surface: rgba(255, 255, 255, 0.88);
+    --ab-shadow: 0 22px 40px rgba(11, 32, 70, 0.12);
+    --ab-nav-start: #0d2348;
+    --ab-nav-mid: #14376c;
+    --ab-nav-end: #1f4c8f;
+    --ab-nav-border: rgba(203, 221, 255, 0.18);
+    --ab-nav-link: rgba(237, 245, 255, 0.86);
+    --ab-nav-link-hover: rgba(194, 221, 255, 0.16);
+    --ab-nav-active-ink: #0f2d5f;
+    --ab-nav-active-bg-start: #e8f2ff;
+    --ab-nav-active-bg-end: #f7fbff;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    font-family: "Manrope", "Segoe UI", sans-serif;
+    color: var(--ab-ink);
+    background:
+        radial-gradient(1400px 700px at -10% -10%, rgba(159, 199, 255, 0.45), transparent 62%),
+        radial-gradient(1300px 700px at 108% -6%, rgba(160, 216, 255, 0.28), transparent 58%),
+        linear-gradient(180deg, #f8fbff 0%, var(--ab-bg) 100%);
+}
+
+.demo-theme--aurora {
+    --ab-bg: #f3f7ff;
+    --ab-bg-soft: #eef4ff;
+    --ab-ink: #13233f;
+    --ab-ink-muted: #5b6f95;
+    --ab-border: rgba(20, 60, 125, 0.14);
+    --ab-border-strong: rgba(17, 56, 120, 0.24);
+    --ab-accent: #2466da;
+    --ab-accent-soft: rgba(36, 102, 218, 0.12);
+    --ab-surface: rgba(255, 255, 255, 0.88);
+    --ab-shadow: 0 22px 40px rgba(11, 32, 70, 0.12);
+    --ab-nav-start: #0d2348;
+    --ab-nav-mid: #14376c;
+    --ab-nav-end: #1f4c8f;
+    --ab-nav-border: rgba(203, 221, 255, 0.18);
+    --ab-nav-link: rgba(237, 245, 255, 0.86);
+    --ab-nav-link-hover: rgba(194, 221, 255, 0.16);
+    --ab-nav-active-ink: #0f2d5f;
+    --ab-nav-active-bg-start: #e8f2ff;
+    --ab-nav-active-bg-end: #f7fbff;
+}
+
+.demo-theme--coastline {
+    --ab-bg: #eef9f7;
+    --ab-bg-soft: #e5f4f1;
+    --ab-ink: #14333f;
+    --ab-ink-muted: #52727c;
+    --ab-border: rgba(26, 87, 102, 0.18);
+    --ab-border-strong: rgba(21, 78, 99, 0.28);
+    --ab-accent: #0f6a8f;
+    --ab-accent-soft: rgba(15, 106, 143, 0.16);
+    --ab-surface: rgba(255, 255, 255, 0.9);
+    --ab-shadow: 0 22px 40px rgba(9, 45, 56, 0.13);
+    --ab-nav-start: #0c3140;
+    --ab-nav-mid: #125062;
+    --ab-nav-end: #176b79;
+    --ab-nav-border: rgba(182, 231, 243, 0.2);
+    --ab-nav-link: rgba(232, 249, 253, 0.9);
+    --ab-nav-link-hover: rgba(174, 234, 244, 0.18);
+    --ab-nav-active-ink: #0d4f62;
+    --ab-nav-active-bg-start: #dbf4f8;
+    --ab-nav-active-bg-end: #ecfbff;
+}
+
+a {
+    color: var(--ab-accent);
+}
+
+h1,
+h2,
+h3 {
+    letter-spacing: -0.02em;
+}
+
+.demo-surface {
+    border: 1px solid var(--ab-border);
+    border-radius: 1rem;
+    background: var(--ab-surface);
+    box-shadow: var(--ab-shadow);
+    backdrop-filter: blur(8px);
+}
+
+.demo-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.demo-hero::after {
+    content: "";
+    position: absolute;
+    right: -7rem;
+    top: -7rem;
+    width: 16rem;
+    height: 16rem;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(36, 102, 218, 0.26), rgba(36, 102, 218, 0) 66%);
+    pointer-events: none;
+}
+
+.demo-subtitle {
+    margin: 0;
+    color: var(--ab-ink-muted);
+    max-width: 85ch;
+}
+
+.demo-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.demo-muted {
+    color: var(--ab-ink-muted);
+}
+
+.demo-code {
+    border-radius: 0.45rem;
+    border: 1px solid var(--ab-border);
+    background: rgba(245, 248, 255, 0.9);
+    padding: 0.15rem 0.4rem;
+    color: #0f2b5d;
+    font-weight: 650;
+}
+
+.mud-button-root.mud-button-filled {
+    border-radius: 0.7rem;
+}
+
+.mud-paper {
+    color: var(--ab-ink);
+}
+
+.mud-input-slot {
+    font-family: "Manrope", "Segoe UI", sans-serif;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #2ca85b;
+}
+
+.invalid {
+    outline: 1px solid #d7344f;
+}
+
+.validation-message {
+    color: #d7344f;
+}
+
+.blazor-error-boundary {
+    background: #c73535;
+    color: #ffffff;
+    padding: 1rem 1rem 1rem 3.5rem;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
+
+@media (max-width: 760px) {
+    .demo-hero::after {
+        width: 12rem;
+        height: 12rem;
+    }
+}

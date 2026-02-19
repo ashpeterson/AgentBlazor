@@ -1,0 +1,65 @@
+using AgentBlazor;
+using AgentBlazor.Demo.Components;
+using AgentBlazor.Demo.Services;
+using MudBlazor.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddMudServices();
+builder.Services.AddSingleton<AgentDataGridDemoState>();
+builder.Services.AddSingleton<AgentDialogFormDemoState>();
+builder.Services.AddSingleton<AgentNavigationTabsDemoState>();
+builder.Services.AddSingleton<DemoTelemetrySink>();
+builder.Services.AddAgentBlazorTelemetrySink<DemoTelemetrySink>();
+builder.Services.AddAgentBlazorDataGridExecutor<DemoDataGridActionExecutor>();
+builder.Services.AddAgentBlazorDialogExecutor<DemoDialogActionExecutor>();
+builder.Services.AddAgentBlazorFormExecutor<DemoFormActionExecutor>();
+builder.Services.AddAgentBlazorNavigationExecutor<DemoNavigationActionExecutor>();
+builder.Services.AddAgentBlazorTabsExecutor<DemoTabsActionExecutor>();
+
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
+var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
+    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var ollamaModel = builder.Configuration["Ollama:Model"]
+    ?? Environment.GetEnvironmentVariable("OLLAMA_MODEL");
+var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"]
+    ?? Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT")
+    ?? "http://127.0.0.1:11434/v1";
+var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
+    ?? Environment.GetEnvironmentVariable("OLLAMA_API_KEY");
+
+builder.Services.AddAgentBlazor(options =>
+{
+    if (!string.IsNullOrWhiteSpace(ollamaModel))
+    {
+        options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
+    }
+    else if (!string.IsNullOrWhiteSpace(openAiApiKey))
+    {
+        options.UseOpenAI(openAiApiKey, openAiModel);
+    }
+});
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseHttpsRedirection();
+
+app.UseAntiforgery();
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorAgUiRun();
+
+app.Run();
