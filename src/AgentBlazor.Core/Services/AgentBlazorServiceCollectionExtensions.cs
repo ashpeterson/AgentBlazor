@@ -52,6 +52,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
+        services.TryAddSingleton<IComponentActionArgumentResolver, ComponentActionArgumentResolver>();
 
         // Conversation management
         services.AddOptions<ConversationOptions>();

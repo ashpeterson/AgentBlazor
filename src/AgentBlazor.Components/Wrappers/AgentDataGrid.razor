@@ -92,6 +92,14 @@
     [Parameter]
     public Func<TItem, int, string>? RowClassFunc { get; set; }
 
+    /// <summary>Optional display/LLM column names to canonical property names (e.g. "Risk Level" → "RiskScore"). Used by schema resolution when applying queued actions.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, string>? ColumnAliases { get; set; }
+
+    /// <summary>Optional per-column semantic value to canonical value (e.g. "RiskScore" → { "High" → 70, "Low" → 30 }). Used by schema resolution when applying queued actions.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, object?>>? ValueMappings { get; set; }
+
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
@@ -135,7 +143,7 @@
             _ => Items.Count()
         };
 
-        return new ComponentState
+        var state = new ComponentState
         {
             ["rowCount"] = rowCount,
             ["dense"] = Dense,
@@ -152,6 +160,15 @@
             ["focusedRowKey"] = FocusedRowKey,
             ["columns"] = columns
         };
+        if (ColumnAliases is { Count: > 0 })
+        {
+            state[AgentBlazor.Core.Runtime.Components.ComponentActionArgumentResolver.StateKeyColumnAliases] = ColumnAliases;
+        }
+        if (ValueMappings is { Count: > 0 })
+        {
+            state[AgentBlazor.Core.Runtime.Components.ComponentActionArgumentResolver.StateKeyValueMappings] = ValueMappings;
+        }
+        return state;
     }
 
     public override async Task<ActionResult> ExecuteActionAsync(

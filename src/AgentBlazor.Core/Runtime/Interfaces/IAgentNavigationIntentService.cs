@@ -1,4 +1,5 @@
 using AgentBlazor.Core.Runtime.Agents;
+using Microsoft.Extensions.Logging;
 
 namespace AgentBlazor.Core.Runtime.Interfaces;
 
@@ -29,6 +30,12 @@ internal sealed class InMemoryAgentNavigationIntentService : IAgentNavigationInt
     private readonly Dictionary<string, Dictionary<string, Queue<AgentAction>>> _pendingScoped =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gate = new();
+    private readonly ILogger<InMemoryAgentNavigationIntentService>? _logger;
+
+    public InMemoryAgentNavigationIntentService(ILogger<InMemoryAgentNavigationIntentService>? logger = null)
+    {
+        _logger = logger;
+    }
 
     public void Enqueue(string componentType, AgentAction action)
         => Enqueue(componentType, agentId: null, action);
@@ -49,6 +56,10 @@ internal sealed class InMemoryAgentNavigationIntentService : IAgentNavigationInt
                 }
 
                 queue.Enqueue(action);
+                _logger?.LogInformation(
+                    "[AgentFlow] NavIntent.Enqueue: ComponentType={ComponentType}, AgentId=(unscoped), ActionId={ActionId}, ArgsKeys=[{Keys}]",
+                    componentType, action.Name,
+                    action.Parameters is null ? "" : string.Join(", ", action.Parameters.Keys));
                 return;
             }
 
@@ -65,6 +76,10 @@ internal sealed class InMemoryAgentNavigationIntentService : IAgentNavigationInt
             }
 
             scopedQueue.Enqueue(action);
+            _logger?.LogInformation(
+                "[AgentFlow] NavIntent.Enqueue: ComponentType={ComponentType}, AgentId={AgentId}, ActionId={ActionId}, ArgsKeys=[{Keys}]",
+                componentType, agentId, action.Name,
+                action.Parameters is null ? "" : string.Join(", ", action.Parameters.Keys));
         }
     }
 
@@ -83,6 +98,9 @@ internal sealed class InMemoryAgentNavigationIntentService : IAgentNavigationInt
             {
                 DrainScopedQueueUnsafe(componentType, agentId, items);
                 DrainUnscopedQueueUnsafe(componentType, items);
+                _logger?.LogInformation(
+                    "[AgentFlow] NavIntent.Dequeue: ComponentType={ComponentType}, AgentId={AgentId}, DequeuedCount={Count}, ActionIds=[{Ids}]",
+                    componentType, agentId, items.Count, string.Join(", ", items.Select(static a => a.Name)));
                 return items;
             }
 
@@ -110,6 +128,9 @@ internal sealed class InMemoryAgentNavigationIntentService : IAgentNavigationInt
                 _pendingScoped.Remove(componentType);
             }
 
+            _logger?.LogInformation(
+                "[AgentFlow] NavIntent.Dequeue: ComponentType={ComponentType}, AgentId=(all), DequeuedCount={Count}, ActionIds=[{Ids}]",
+                componentType, items.Count, string.Join(", ", items.Select(static a => a.Name)));
             return items;
         }
     }

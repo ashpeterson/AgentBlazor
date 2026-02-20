@@ -17,6 +17,9 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
 
     [Inject]
+    private IComponentActionArgumentResolver? ActionArgumentResolver { get; set; }
+
+    [Inject]
     private ILoggerFactory? LoggerFactory { get; set; }
 
     [Parameter, EditorRequired]
@@ -43,13 +46,29 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     {
         if (!NavigationIntentService.HasPending(ComponentType, AgentId))
         {
+            _logger?.LogDebug("[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} has no pending actions.", ComponentType, AgentId);
             return;
         }
 
         var pending = NavigationIntentService.Dequeue(ComponentType, AgentId);
+        _logger?.LogInformation(
+            "[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} applying {Count} pending action(s): [{ActionIds}]",
+            ComponentType, AgentId, pending.Count, string.Join(", ", pending.Select(static a => a.Name)));
+
         foreach (var action in pending)
         {
-            var result = await ExecuteActionAsync(action);
+            var arguments = action.Parameters;
+            if (ActionArgumentResolver is not null)
+            {
+                var state = GetCurrentState();
+                arguments = ActionArgumentResolver.Resolve(ComponentType, action.Name, action.Parameters, state);
+            }
+
+            var resolvedAction = AgentAction.Create(action.Name, arguments);
+            var result = await ExecuteActionAsync(resolvedAction);
+            _logger?.LogInformation(
+                "[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} applied {ActionName} Succeeded={Succeeded} Message={Message}",
+                ComponentType, AgentId, action.Name, result.Succeeded, result.Message);
             if (!result.Succeeded)
             {
                 _logger?.LogWarning(

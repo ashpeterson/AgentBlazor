@@ -1,10 +1,14 @@
 @namespace AgentBlazor.Components
+@using AgentBlazor.Components.Chat
 
-<aside class="ab-chat-panel" style="@PanelStyle" role="complementary" aria-label="Agent chat panel">
+<aside class="ab-chat-panel @(Theme?.CssClass)" data-theme="@(Theme?.DataTheme)" style="@_panelStyle" role="complementary" aria-label="@(Title ?? "Agent chat panel")">
     <AgentChatSurface Title="@Title"
                       Description="@Description"
                       FormName="@FormName"
-                      DefaultAgentName="@DefaultAgentName" />
+                      DefaultAgentName="@DefaultAgentName"
+                      Placeholder="@Placeholder"
+                      Theme="@Theme"
+                      CssClass="@CssClass" />
 </aside>
 
 @code {
@@ -22,10 +26,27 @@
         "Built-in component-aware agent is active by default. You can also select custom registered agents.";
 
     [Parameter]
+    public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
+
+    [Parameter]
+    public ChatTheme? Theme { get; set; }
+
+    [Parameter]
     public string? FormName { get; set; }
 
     [Parameter]
     public string? DefaultAgentName { get; set; }
 
-    private string PanelStyle => $"--ab-chat-panel-width:{Width};--ab-chat-panel-height:{Height};";
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    private string _panelStyle
+    {
+        get
+        {
+            var vars = $"--ab-chat-panel-width:{Width};--ab-chat-panel-height:{Height};";
+            var themeStyle = Theme?.GetStyleString();
+            return string.IsNullOrEmpty(themeStyle) ? vars : vars + " " + themeStyle;
+        }
+    }
 }

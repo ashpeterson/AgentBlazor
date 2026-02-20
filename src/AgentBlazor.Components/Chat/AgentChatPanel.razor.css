@@ -1,9 +1,20 @@
+/* Uses same variable names as Surface where applicable */
+.ab-chat-panel {
+    --ab-chat-panel-bg: #f8fbff;
+    --ab-chat-panel-border: #d8dee8;
+}
+
+.ab-chat-panel[data-theme="dark"] {
+    --ab-chat-panel-bg: #1e293b;
+    --ab-chat-panel-border: #334155;
+}
+
 .ab-chat-panel {
     width: var(--ab-chat-panel-width, 350px);
     height: var(--ab-chat-panel-height, 100%);
     min-height: 24rem;
-    border-left: 1px solid #d8dee8;
-    background: #f8fbff;
+    border-left: 1px solid var(--ab-chat-panel-border);
+    background: var(--ab-chat-panel-bg);
     box-sizing: border-box;
     padding: 0.75rem;
 }
