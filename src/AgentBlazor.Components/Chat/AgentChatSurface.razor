@@ -137,10 +137,7 @@
             var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
                 message,
                 _selectedAgent,
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["agentblazor.session_id"] = _instanceId
-                }));
+                SessionId: _instanceId));
             _timeline.Add(ChatTimelineItem.Agent(response));
         }
         finally

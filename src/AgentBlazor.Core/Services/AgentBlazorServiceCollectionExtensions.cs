@@ -8,6 +8,10 @@ using AgentBlazor.Telemetry;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Conversation;
+using AgentBlazor.Core.Runtime.Intent;
+using AgentBlazor.Core.Runtime.Preferences;
+using AgentBlazor.Core.Runtime.Routing;
 
 namespace AgentBlazor.Services;
 
@@ -48,6 +52,24 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
+
+        // Conversation management
+        services.AddOptions<ConversationOptions>();
+        services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
+        services.TryAddSingleton<IConversationManager, ConversationManager>();
+
+        // Intent classification and routing
+        services.AddOptions<IntentClassificationOptions>();
+        services.TryAddSingleton<IIntentClassifier, KeywordIntentClassifier>();
+        services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();
+        services.TryAddSingleton<IIntentResolver, IntentResolver>();
+
+        // User preferences
+        services.TryAddSingleton<IUserPreferenceService, InMemoryUserPreferenceService>();
+
+        // Action planning and response building
+        services.TryAddSingleton<IActionPlanner, ActionPlanner>();
+        services.TryAddSingleton<IResponseBuilder, ResponseBuilder>();
 
         return new AgentBlazorBuilder(services, store);
     }

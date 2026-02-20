@@ -6,7 +6,9 @@ using System.Text.Json;
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Telemetry;
@@ -26,10 +28,16 @@ internal sealed class AgentRuntime(
     IOptions<AgentBlazorOptions> options,
     IComponentActionExecutor executor,
     IAgentBlazorTelemetrySink telemetrySink,
+    IConversationManager? conversationManager = null,
+    IIntentResolver? intentResolver = null,
+    IUserPreferenceService? userPreferenceService = null,
+    IResponseBuilder? responseBuilder = null,
     ILogger<AgentRuntime>? logger = null,
     IChatClient? chatClient = null,
     IAgentBlazorEntitlementService? entitlementService = null) : IAgentRuntime
 {
+    // Legacy support: keep internal clarifications for backward compatibility
+    // when IConversationManager is not available
     private readonly ConcurrentDictionary<string, PendingClarification> _pendingClarifications =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -106,6 +114,20 @@ internal sealed class AgentRuntime(
         var registeredComponentSnapshots = RegisteredComponentSnapshotBuilder.Build(componentRegistry);
         var conversationKey = BuildConversationKey(request, registration.Name);
         var hasRegisteredComponents = registeredComponentSnapshots.Count > 0;
+        var sessionId = request.GetEffectiveSessionId();
+        var userId = request.GetEffectiveUserId();
+
+        // Get conversation history and user preferences if available
+        ConversationHistory? conversationHistory = null;
+        UserPreferences? userPreferences = null;
+        if (conversationManager is not null)
+        {
+            conversationHistory = await conversationManager.GetHistoryAsync(sessionId, cancellationToken);
+        }
+        if (userPreferenceService is not null)
+        {
+            userPreferences = await userPreferenceService.GetPreferencesAsync(sessionId, cancellationToken);
+        }
         var blockedActionKeys = policyEvaluation.BlockedActionKeys
             .Concat(entitlementEvaluation.BlockedActionKeys)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -337,6 +359,20 @@ internal sealed class AgentRuntime(
                 request.UserMessage,
                 executionResultSnapshot,
                 registeredComponentSnapshots);
+
+            // Store conversation turn and record actions for preferences
+            await StoreConversationTurnAsync(
+                sessionId,
+                request.UserMessage,
+                text,
+                plannedActionSnapshot,
+                executionResultSnapshot,
+                cancellationToken);
+            await RecordActionsForPreferencesAsync(
+                sessionId,
+                executionResultSnapshot,
+                cancellationToken);
+
             var response = new AgentTurnResponse(
                 AgentName: registration.Name,
                 ResponseText: text,
@@ -3317,6 +3353,66 @@ internal sealed class AgentRuntime(
                 "Telemetry sink failed while recording runtime event {TelemetryKind} for {AgentName}.",
                 telemetryEvent.Kind,
                 telemetryEvent.AgentName);
+        }
+    }
+
+    private async Task StoreConversationTurnAsync(
+        string sessionId,
+        string userMessage,
+        string agentResponse,
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        IReadOnlyList<ComponentActionExecutionResult> executionResults,
+        CancellationToken cancellationToken)
+    {
+        if (conversationManager is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var turn = new ConversationTurn
+            {
+                Timestamp = DateTime.UtcNow,
+                UserMessage = userMessage,
+                AgentResponse = agentResponse,
+                PlannedActions = plannedActions,
+                ExecutionResults = executionResults
+            };
+
+            await conversationManager.AppendTurnAsync(sessionId, turn, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to store conversation turn for session {SessionId}", sessionId);
+        }
+    }
+
+    private async Task RecordActionsForPreferencesAsync(
+        string sessionId,
+        IReadOnlyList<ComponentActionExecutionResult> executionResults,
+        CancellationToken cancellationToken)
+    {
+        if (userPreferenceService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var result in executionResults.Where(r => r.Succeeded))
+            {
+                await userPreferenceService.RecordActionAsync(
+                    sessionId,
+                    result.ComponentId,
+                    result.ActionId,
+                    arguments: null, // Arguments not currently tracked in execution results
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to record actions for preferences in session {SessionId}", sessionId);
         }
     }
 
