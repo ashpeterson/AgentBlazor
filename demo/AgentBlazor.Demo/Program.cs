@@ -1,6 +1,5 @@
 using AgentBlazor;
 using AgentBlazor.Demo.Components;
-using AgentBlazor.Demo.Services;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,17 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
-builder.Services.AddSingleton<AgentDataGridDemoState>();
-builder.Services.AddSingleton<AgentDialogFormDemoState>();
-builder.Services.AddSingleton<AgentNavigationTabsDemoState>();
-builder.Services.AddSingleton<DemoTelemetrySink>();
-builder.Services.AddAgentBlazorTelemetrySink<DemoTelemetrySink>();
-builder.Services.AddAgentBlazorDataGridExecutor<DemoDataGridActionExecutor>();
-builder.Services.AddAgentBlazorDialogExecutor<DemoDialogActionExecutor>();
-builder.Services.AddAgentBlazorFormExecutor<DemoFormActionExecutor>();
-builder.Services.AddAgentBlazorNavigationExecutor<DemoNavigationActionExecutor>();
-builder.Services.AddAgentBlazorTabsExecutor<DemoTabsActionExecutor>();
-//test
+
 var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -33,13 +22,14 @@ var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
 
 builder.Services.AddAgentBlazor(options =>
 {
-    if (!string.IsNullOrWhiteSpace(ollamaModel))
-    {
-        options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
-    }
-    else if (!string.IsNullOrWhiteSpace(openAiApiKey))
+
+    if (!string.IsNullOrWhiteSpace(openAiApiKey))
     {
         options.UseOpenAI(openAiApiKey, openAiModel);
+    }
+    else if (!string.IsNullOrWhiteSpace(ollamaModel))
+    {
+        options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
     }
 });
 
@@ -60,6 +50,6 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-app.MapAgentBlazorAgUiRun();
+app.MapAgentBlazorEndpoints();
 
 app.Run();

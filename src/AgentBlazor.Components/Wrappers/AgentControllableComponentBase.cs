@@ -1,6 +1,10 @@
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Runtime;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 
 namespace AgentBlazor;
 
@@ -12,14 +16,20 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     [Inject]
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
 
+    [Inject]
+    private ILoggerFactory? LoggerFactory { get; set; }
+
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = string.Empty;
+
+    private ILogger? _logger;
 
     public abstract string ComponentType { get; }
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
+        _logger ??= LoggerFactory?.CreateLogger(GetType());
         ComponentRegistry.Register(this);
     }
 
@@ -31,15 +41,24 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
 
     private async Task ApplyNavigationIntentsAsync()
     {
-        if (!NavigationIntentService.HasPending(ComponentType))
+        if (!NavigationIntentService.HasPending(ComponentType, AgentId))
         {
             return;
         }
 
-        var pending = NavigationIntentService.Dequeue(ComponentType);
+        var pending = NavigationIntentService.Dequeue(ComponentType, AgentId);
         foreach (var action in pending)
         {
-            await ExecuteActionAsync(action);
+            var result = await ExecuteActionAsync(action);
+            if (!result.Succeeded)
+            {
+                _logger?.LogWarning(
+                    "Pending action failed for {ComponentType}/{AgentId}: {ActionName} -> {Message}",
+                    ComponentType,
+                    AgentId,
+                    action.Name,
+                    result.Message);
+            }
         }
 
         await RequestComponentRefreshAsync();

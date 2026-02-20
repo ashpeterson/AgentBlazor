@@ -1,6 +1,9 @@
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Runtime;
 
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Interfaces;
 
 public interface IAgentControllable
 {

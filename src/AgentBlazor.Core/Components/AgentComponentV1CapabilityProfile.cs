@@ -157,7 +157,11 @@ public static class AgentComponentV1CapabilityProfile
           "additionalProperties": false,
           "properties": {
             "column": { "type": "string", "description": "Column/property name." },
-            "operator": { "type": "string", "description": "Filter operator." },
+            "operator": {
+              "type": "string",
+              "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "startswith", "endswith", "in", "notin", "isnull", "notnull"],
+              "description": "Filter operator. Use the sort action for asc/desc ordering."
+            },
             "value": {
               "description": "Filter value.",
               "type": ["string", "number", "boolean", "null"]

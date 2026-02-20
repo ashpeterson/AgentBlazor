@@ -1,7 +1,7 @@
-using AgentBlazor;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
-using AgentBlazor.Runtime;
 using AgentBlazor.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

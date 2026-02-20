@@ -1,4 +1,4 @@
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Agents;
 
 public sealed record AgentAction(
     string Name,

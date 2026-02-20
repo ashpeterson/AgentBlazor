@@ -1,6 +1,6 @@
 @page "/suppliers"
 @using AgentBlazor.Components
-@using AgentBlazor.Demo.Services
+@using AgentBlazor.Demo.Models
 @using MudBlazor
 
 <PageTitle>Suppliers — AgentBlazor Demo</PageTitle>
@@ -12,42 +12,19 @@
 
 <MudPaper Elevation="1" Class="pa-4 mb-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
-        @if (!string.IsNullOrWhiteSpace(_grid?.FilterColumn))
-        {
-            <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">
-                Filter: @_grid.FilterColumn @_grid.FilterOperator @_grid.FilterValue
-            </MudChip>
-        }
-        else
-        {
-            <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">No filter</MudChip>
-        }
-        @if (!string.IsNullOrWhiteSpace(_grid?.SortColumn))
-        {
-            <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Size="Size.Small">
-                Sort: @_grid.SortColumn @_grid.SortDirection
-            </MudChip>
-        }
-        @if (!string.IsNullOrWhiteSpace(_grid?.FocusedRowKey))
-        {
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
-                Focus: @_grid.FocusedRowKey
-            </MudChip>
-        }
+        <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">Ask the agent to filter, sort, or focus rows</MudChip>
         <MudSpacer />
         <MudText Typo="Typo.caption" Color="Color.Secondary">@_suppliers.Count suppliers loaded</MudText>
     </MudStack>
 
-    <AgentDataGrid @ref="_grid"
-                   TItem="SupplierRow"
+    <AgentDataGrid TItem="SupplierRow"
                    AgentId="supplier-grid"
                    Items="@_suppliers"
                    Dense="true"
                    Hover="true"
                    Bordered="true"
                    Striped="true"
-                   RowKeyProperty="SupplierId"
-                   RowClassFunc="GetRowClass">
+                   RowKeyProperty="SupplierId">
         <Columns>
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
@@ -71,28 +48,7 @@
                  Description="Ask me to navigate, filter, sort, or focus suppliers." />
 
 @code {
-    private AgentDataGrid<SupplierRow>? _grid;
-
-    private readonly List<SupplierRow> _suppliers =
-    [
-        new("SUP-001", "Alpine Components",    "EMEA",  82, new DateTime(2025, 12, 04)),
-        new("SUP-002", "Beacon Industrial",    "NA",    71, new DateTime(2026, 01, 12)),
-        new("SUP-003", "Crestline Textiles",   "APAC",  49, new DateTime(2025, 11, 21)),
-        new("SUP-004", "Deltawave Metals",     "EMEA",  67, new DateTime(2026, 02, 06)),
-        new("SUP-005", "Everfield Logistics",  "NA",    38, new DateTime(2025, 10, 19)),
-        new("SUP-006", "Farside Plastics",     "APAC",  91, new DateTime(2026, 02, 10)),
-        new("SUP-007", "Grayson Foods",        "EMEA",  55, new DateTime(2025, 09, 15)),
-        new("SUP-008", "Harbor Electric",      "LATAM", 62, new DateTime(2025, 12, 28)),
-        new("SUP-009", "Ionis Chemical",       "NA",    76, new DateTime(2026, 01, 31)),
-        new("SUP-010", "Juniper BioWorks",     "APAC",  44, new DateTime(2025, 08, 07)),
-        new("SUP-011", "Keystone Minerals",    "EMEA",  88, new DateTime(2026, 02, 02)),
-        new("SUP-012", "Lighthouse MedTech",   "NA",    59, new DateTime(2025, 11, 03)),
-    ];
-
-    private string GetRowClass(SupplierRow row, int _) =>
-        string.Equals(row.SupplierId, _grid?.FocusedRowKey, StringComparison.OrdinalIgnoreCase)
-            ? "supplier-row--focused"
-            : string.Empty;
+    private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
 
     private static Color RiskColor(int score) => score switch
     {

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.AI;
 
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Components;
 
 public static class ComponentActionApprovalPolicy
 {

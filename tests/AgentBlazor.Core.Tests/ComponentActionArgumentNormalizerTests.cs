@@ -1,5 +1,8 @@
+using System.Text.Json;
 using AgentBlazor.Components;
-using AgentBlazor.Runtime;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,117 +11,121 @@ namespace AgentBlazor.Core.Tests;
 public class ComponentActionArgumentNormalizerTests
 {
     [Fact]
-    public void Normalize_DataGridFilterAliases_MapsCanonicalKeys()
+    public void Normalize_UnwrapsJsonElements_WithoutChangingSchemaKeys()
     {
+        using var document = JsonDocument.Parse("""
+            {
+              "column": "RiskScore",
+              "operator": ">=",
+              "value": 70,
+              "active": true,
+              "notes": null
+            }
+            """);
+        var root = document.RootElement;
+        var arguments = new Dictionary<string, object?>
+        {
+            ["column"] = root.GetProperty("column"),
+            ["operator"] = root.GetProperty("operator"),
+            ["value"] = root.GetProperty("value"),
+            ["active"] = root.GetProperty("active"),
+            ["notes"] = root.GetProperty("notes")
+        };
+
         var normalized = ComponentActionArgumentNormalizer.Normalize(
             AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
             AgentComponentV1CapabilityProfile.DataGridFilterActionId,
-            new Dictionary<string, object?>
-            {
-                ["field"] = "RiskScore",
-                ["comparison"] = "highest",
-                ["threshold"] = 70
-            });
+            arguments,
+            reason: "show me all suppliers that are high risk");
 
         Assert.Equal("RiskScore", normalized["column"]?.ToString());
         Assert.Equal(">=", normalized["operator"]?.ToString());
-        Assert.Equal(70L, Convert.ToInt64(normalized["value"]));
+        Assert.Equal(70, Assert.IsType<int>(normalized["value"]));
+        Assert.True(Assert.IsType<bool>(normalized["active"]));
+        Assert.Null(normalized["notes"]);
     }
 
     [Fact]
-    public void Normalize_FormNavigationAndTabsAliases_MapsCanonicalKeys()
+    public void Normalize_AppliesCanonicalAliasesAcrossComponents()
     {
-        var form = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            AgentComponentV1CapabilityProfile.FormSetFieldActionId,
-            new Dictionary<string, object?>
-            {
-                ["name"] = "SupplierName",
-                ["fieldValue"] = "Contoso"
-            });
-        Assert.Equal("SupplierName", form["field"]?.ToString());
-        Assert.Equal("Contoso", form["value"]?.ToString());
-
         var nav = ComponentActionArgumentNormalizer.Normalize(
             AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
             AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
             new Dictionary<string, object?>
             {
-                ["route"] = "/suppliers"
+                ["route"] = "/supplier-onboarding",
+                ["replaceHistory"] = "true"
+            },
+            reason: "open supplier onboarding");
+
+        Assert.Equal("/supplier-onboarding", nav["uri"]?.ToString());
+        Assert.True(Assert.IsType<bool>(nav["replaceHistory"]));
+
+        var gridFilter = ComponentActionArgumentNormalizer.Normalize(
+            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            new Dictionary<string, object?>
+            {
+                ["field"] = "RiskScore",
+                ["comparison"] = ">=",
+                ["fieldValue"] = 70
             });
-        Assert.Equal("/suppliers", nav["uri"]?.ToString());
+
+        Assert.Equal("RiskScore", gridFilter["column"]?.ToString());
+        Assert.Equal(">=", gridFilter["operator"]?.ToString());
+        Assert.Equal(70, Assert.IsType<int>(gridFilter["value"]));
+
+        var formSetField = ComponentActionArgumentNormalizer.Normalize(
+            AgentComponentV1CapabilityProfile.AgentFormComponentId,
+            AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+            new Dictionary<string, object?>
+            {
+                ["name"] = "SupplierName",
+                ["input"] = "Contoso"
+            });
+
+        Assert.Equal("SupplierName", formSetField["field"]?.ToString());
+        Assert.Equal("Contoso", formSetField["value"]?.ToString());
 
         var tabs = ComponentActionArgumentNormalizer.Normalize(
             AgentComponentV1CapabilityProfile.AgentTabsComponentId,
             AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
             new Dictionary<string, object?>
             {
-                ["tab"] = "2"
+                ["tab"] = "second"
             });
-        Assert.Equal(2, Assert.IsType<int>(tabs["index"]));
+
+        Assert.Equal(1, Assert.IsType<int>(tabs["index"]));
     }
 
     [Fact]
-    public void Normalize_DataGridFilterFromIntent_InfersRiskParameters()
-    {
-        var highest = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
-            arguments: null,
-            reason: "filter by highest risk supplier");
-
-        Assert.Equal("RiskScore", highest["column"]?.ToString());
-        Assert.Equal(">=", highest["operator"]?.ToString());
-        Assert.Equal(70, Assert.IsType<int>(highest["value"]));
-
-        var lowest = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
-            arguments: null,
-            reason: "filter by lowest risk supplier");
-
-        Assert.Equal("RiskScore", lowest["column"]?.ToString());
-        Assert.Equal("<=", lowest["operator"]?.ToString());
-        Assert.Equal(30, Assert.IsType<int>(lowest["value"]));
-    }
-
-    [Fact]
-    public void Normalize_DataGridSort_UsesStateHints_WhenColumnMissing()
+    public void Normalize_DataGridSort_PromotesOperatorDirectionAlias()
     {
         var normalized = ComponentActionArgumentNormalizer.Normalize(
             AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
             AgentComponentV1CapabilityProfile.DataGridSortActionId,
             new Dictionary<string, object?>
             {
-                ["currentFilterColumn"] = "RiskScore"
-            },
-            reason: "now sort from highest to lowest");
+                ["field"] = "RiskScore",
+                ["operator"] = "descending"
+            });
 
         Assert.Equal("RiskScore", normalized["column"]?.ToString());
         Assert.Equal("desc", normalized["direction"]?.ToString());
     }
 
     [Fact]
-    public void Normalize_NavigationAndTabsFromIntent_InfersRequiredParameters()
+    public async Task ComponentActionExecutor_UnwrapsJsonArguments_BeforeDispatch()
     {
-        var nav = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
-            arguments: null,
-            reason: "go to suppliers");
-        Assert.Equal("/suppliers", nav["uri"]?.ToString());
+        using var document = JsonDocument.Parse("""
+            {
+              "column": "RiskScore",
+              "operator": ">=",
+              "value": 70
+            }
+            """);
+        var root = document.RootElement;
 
-        var tabs = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
-            arguments: null,
-            reason: "switch to second tab");
-        Assert.Equal(1, Assert.IsType<int>(tabs["index"]));
-    }
-
-    [Fact]
-    public async Task ComponentActionExecutor_NormalizesArguments_BeforeDispatch()
-    {
         var services = new ServiceCollection();
         services.AddSingleton<CapturingDataGridExecutor>();
         services.AddSingleton<IDataGridActionExecutor>(sp => sp.GetRequiredService<CapturingDataGridExecutor>());
@@ -128,33 +135,22 @@ public class ComponentActionArgumentNormalizerTests
         var componentExecutor = provider.GetRequiredService<IComponentActionExecutor>();
         var capturing = provider.GetRequiredService<CapturingDataGridExecutor>();
 
-        var aliasResult = await componentExecutor.ExecuteAsync(new PlannedComponentAction(
+        var result = await componentExecutor.ExecuteAsync(new PlannedComponentAction(
             AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
             AgentComponentV1CapabilityProfile.DataGridFilterActionId,
-            "normalize aliases",
+            "normalize json only",
             new Dictionary<string, object?>
             {
-                ["field"] = "RiskScore",
-                ["comparison"] = "high",
-                ["threshold"] = "70"
+                ["column"] = root.GetProperty("column"),
+                ["operator"] = root.GetProperty("operator"),
+                ["value"] = root.GetProperty("value")
             }));
 
-        Assert.True(aliasResult.Succeeded);
+        Assert.True(result.Succeeded);
         Assert.NotNull(capturing.LastRequest);
         Assert.Equal("RiskScore", capturing.LastRequest!.Arguments!["column"]?.ToString());
         Assert.Equal(">=", capturing.LastRequest.Arguments!["operator"]?.ToString());
-        Assert.Equal("70", capturing.LastRequest.Arguments!["value"]?.ToString());
-
-        var intentResult = await componentExecutor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
-            "filter by lowest risk supplier"));
-
-        Assert.True(intentResult.Succeeded);
-        Assert.NotNull(capturing.LastRequest);
-        Assert.Equal("RiskScore", capturing.LastRequest!.Arguments!["column"]?.ToString());
-        Assert.Equal("<=", capturing.LastRequest.Arguments!["operator"]?.ToString());
-        Assert.Equal(30, Assert.IsType<int>(capturing.LastRequest.Arguments!["value"]));
+        Assert.Equal(70, Assert.IsType<int>(capturing.LastRequest.Arguments!["value"]));
     }
 
     private sealed class CapturingDataGridExecutor : IDataGridActionExecutor

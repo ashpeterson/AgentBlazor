@@ -1,11 +1,13 @@
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Options;
-using AgentBlazor.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using AgentBlazor.Telemetry;
+using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
 
 namespace AgentBlazor.Services;
 
@@ -43,7 +45,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
         services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
         services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
-        services.TryAddSingleton<IAgentRuntime, FrameworkBackedAgentRuntime>();
+        services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
 

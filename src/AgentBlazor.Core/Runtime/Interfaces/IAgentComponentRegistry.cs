@@ -1,4 +1,4 @@
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Interfaces;
 
 public interface IAgentComponentRegistry
 {

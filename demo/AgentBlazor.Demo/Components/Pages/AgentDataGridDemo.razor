@@ -1,6 +1,5 @@
 @page "/agent-grid-demo"
 @using AgentBlazor.Components
-@using Microsoft.AspNetCore.Components
 @using MudBlazor
 
 <PageTitle>Suppliers</PageTitle>
@@ -10,35 +9,9 @@
     <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="/">Back To Home</MudButton>
 </MudStack>
 
-<MudStack Row="true" Spacing="1" Class="mb-3">
-    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">@_lensLabel</MudChip>
-    @if (!string.IsNullOrWhiteSpace(_filterColumn) && !string.IsNullOrWhiteSpace(_filterOperator))
-    {
-        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">
-            Filter: @_filterColumn @_filterOperator @_filterValue
-        </MudChip>
-    }
-    @if (!string.IsNullOrWhiteSpace(_sortColumn))
-    {
-        <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">
-            Sort: @_sortColumn @_sortDirection
-        </MudChip>
-    }
-</MudStack>
-
 <AgentDataGrid TItem="Supplier"
                AgentId="supplier-grid"
                Items="@_suppliers"
-               SortColumn="@_sortColumn"
-               SortDirection="@_sortDirection"
-               SortColumnChanged="OnSortColumnChanged"
-               SortDirectionChanged="OnSortDirectionChanged"
-               FilterColumn="@_filterColumn"
-               FilterOperator="@_filterOperator"
-               FilterValue="@_filterValue"
-               FilterColumnChanged="OnFilterColumnChanged"
-               FilterOperatorChanged="OnFilterOperatorChanged"
-               FilterValueChanged="OnFilterValueChanged"
                Dense="true"
                Hover="true"
                Bordered="true"
@@ -51,137 +24,16 @@
     </Columns>
 </AgentDataGrid>
 
+<AgentChatWidget />
+
 @code {
     private readonly List<Supplier> _suppliers = SupplierData.Generate(50);
-    private string? _sortColumn;
-    private string _sortDirection = "asc";
-    private string? _filterColumn;
-    private string? _filterOperator;
-    private object? _filterValue;
-    private string _lensLabel = "All Suppliers";
-    private string _routeSignature = string.Empty;
-
-    [SupplyParameterFromQuery(Name = "risk")]
-    public string? RiskQuery { get; set; }
-
-    [SupplyParameterFromQuery(Name = "sort")]
-    public string? SortQuery { get; set; }
 
     private sealed record Supplier(
         string Name,
         string Region,
         int RiskScore,
         DateTime LastAuditDate);
-
-    protected override void OnParametersSet()
-    {
-        var risk = NormalizeRisk(RiskQuery);
-        var sort = NormalizeSort(SortQuery);
-        var signature = $"{risk}|{sort}";
-        if (string.Equals(signature, _routeSignature, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _routeSignature = signature;
-        ApplyRouteIntent(risk, sort);
-    }
-
-    private void ApplyRouteIntent(string? risk, string? sortDirection)
-    {
-        _filterColumn = null;
-        _filterOperator = null;
-        _filterValue = null;
-        _sortColumn = null;
-        _sortDirection = "asc";
-        _lensLabel = "All Suppliers";
-
-        if (string.Equals(risk, "high", StringComparison.OrdinalIgnoreCase))
-        {
-            _filterColumn = nameof(Supplier.RiskScore);
-            _filterOperator = ">=";
-            _filterValue = 70;
-            _sortColumn = nameof(Supplier.RiskScore);
-            _sortDirection = "desc";
-            _lensLabel = "High-Risk Suppliers";
-        }
-        else if (string.Equals(risk, "low", StringComparison.OrdinalIgnoreCase))
-        {
-            _filterColumn = nameof(Supplier.RiskScore);
-            _filterOperator = "<=";
-            _filterValue = 30;
-            _sortColumn = nameof(Supplier.RiskScore);
-            _sortDirection = "asc";
-            _lensLabel = "Low-Risk Suppliers";
-        }
-
-        if (string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase))
-        {
-            _sortColumn ??= nameof(Supplier.RiskScore);
-            _sortDirection = sortDirection!;
-        }
-    }
-
-    private static string? NormalizeRisk(string? risk)
-    {
-        if (string.IsNullOrWhiteSpace(risk))
-        {
-            return null;
-        }
-
-        return risk.Trim().ToLowerInvariant() switch
-        {
-            "high" or "highest" or "risky" => "high",
-            "low" or "lowest" => "low",
-            _ => null
-        };
-    }
-
-    private static string? NormalizeSort(string? sort)
-    {
-        if (string.IsNullOrWhiteSpace(sort))
-        {
-            return null;
-        }
-
-        return sort.Trim().ToLowerInvariant() switch
-        {
-            "asc" or "ascending" => "asc",
-            "desc" or "descending" => "desc",
-            _ => null
-        };
-    }
-
-    private Task OnSortColumnChanged(string? value)
-    {
-        _sortColumn = value;
-        return Task.CompletedTask;
-    }
-
-    private Task OnSortDirectionChanged(string value)
-    {
-        _sortDirection = value;
-        return Task.CompletedTask;
-    }
-
-    private Task OnFilterColumnChanged(string? value)
-    {
-        _filterColumn = value;
-        return Task.CompletedTask;
-    }
-
-    private Task OnFilterOperatorChanged(string? value)
-    {
-        _filterOperator = value;
-        return Task.CompletedTask;
-    }
-
-    private Task OnFilterValueChanged(object? value)
-    {
-        _filterValue = value;
-        return Task.CompletedTask;
-    }
 
     private static class SupplierData
     {

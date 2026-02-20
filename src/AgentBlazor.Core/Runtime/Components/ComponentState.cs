@@ -1,4 +1,4 @@
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Components;
 
 public sealed class ComponentState : Dictionary<string, object?>
 {

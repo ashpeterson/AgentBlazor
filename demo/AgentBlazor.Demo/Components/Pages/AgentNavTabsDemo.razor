@@ -16,9 +16,7 @@
         </AgentNavMenu>
     </MudItem>
     <MudItem xs="12" md="9">
-        <AgentTabs AgentId="workspace-tabs"
-                   ActivePanelIndex="@_activeTabIndex"
-                   ActivePanelIndexChanged="OnActivePanelChanged">
+        <AgentTabs AgentId="workspace-tabs">
             <MudTabPanel Text="Overview">
                 <MudText Typo="Typo.body2">Overview content.</MudText>
             </MudTabPanel>
@@ -33,13 +31,3 @@
 </MudGrid>
 
 <AgentChatWidget />
-
-@code {
-    private int _activeTabIndex;
-
-    private Task OnActivePanelChanged(int index)
-    {
-        _activeTabIndex = index;
-        return Task.CompletedTask;
-    }
-}

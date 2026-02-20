@@ -1,3 +1,4 @@
+using AgentBlazor.Core.Runtime.Agents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,42 +27,42 @@ public static class AgentBlazorServiceExtensions
     }
 
     public static IServiceCollection AddAgentBlazorDataGridExecutor<TExecutor>(this IServiceCollection services)
-        where TExecutor : class, AgentBlazor.Runtime.IDataGridActionExecutor
+        where TExecutor : class, IDataGridActionExecutor
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<AgentBlazor.Runtime.IDataGridActionExecutor, TExecutor>();
+        services.AddSingleton<IDataGridActionExecutor, TExecutor>();
         return services;
     }
 
     public static IServiceCollection AddAgentBlazorDialogExecutor<TExecutor>(this IServiceCollection services)
-        where TExecutor : class, AgentBlazor.Runtime.IDialogActionExecutor
+        where TExecutor : class, IDialogActionExecutor
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<AgentBlazor.Runtime.IDialogActionExecutor, TExecutor>();
+        services.AddSingleton<IDialogActionExecutor, TExecutor>();
         return services;
     }
 
     public static IServiceCollection AddAgentBlazorFormExecutor<TExecutor>(this IServiceCollection services)
-        where TExecutor : class, AgentBlazor.Runtime.IFormActionExecutor
+        where TExecutor : class, IFormActionExecutor
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<AgentBlazor.Runtime.IFormActionExecutor, TExecutor>();
+        services.AddSingleton<IFormActionExecutor, TExecutor>();
         return services;
     }
 
     public static IServiceCollection AddAgentBlazorNavigationExecutor<TExecutor>(this IServiceCollection services)
-        where TExecutor : class, AgentBlazor.Runtime.INavigationActionExecutor
+        where TExecutor : class, INavigationActionExecutor
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<AgentBlazor.Runtime.INavigationActionExecutor, TExecutor>();
+        services.AddSingleton<INavigationActionExecutor, TExecutor>();
         return services;
     }
 
     public static IServiceCollection AddAgentBlazorTabsExecutor<TExecutor>(this IServiceCollection services)
-        where TExecutor : class, AgentBlazor.Runtime.ITabsActionExecutor
+        where TExecutor : class, ITabsActionExecutor
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton<AgentBlazor.Runtime.ITabsActionExecutor, TExecutor>();
+        services.AddSingleton<ITabsActionExecutor, TExecutor>();
         return services;
     }
 
@@ -70,6 +71,15 @@ public static class AgentBlazorServiceExtensions
         string pattern = "/agentblazor/agui/run")
     {
         return AgentBlazor.Hosting.AgentBlazorAgUiEndpointRouteBuilderExtensions.MapAgentBlazorAgUiRun(
+            endpoints,
+            pattern);
+    }
+
+    public static IEndpointConventionBuilder MapAgentBlazorEndpoints(
+        this IEndpointRouteBuilder endpoints,
+        string pattern = "/agentblazor/agui/run")
+    {
+        return AgentBlazor.Hosting.AgentBlazorAgUiEndpointRouteBuilderExtensions.MapAgentBlazorEndpoints(
             endpoints,
             pattern);
     }

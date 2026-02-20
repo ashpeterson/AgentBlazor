@@ -1,6 +1,7 @@
+using AgentBlazor.Core.Runtime.Interfaces;
 using System.Collections.Concurrent;
 
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Components;
 
 internal sealed class InMemoryAgentComponentRegistry : IAgentComponentRegistry
 {

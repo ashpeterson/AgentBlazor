@@ -1,5 +1,8 @@
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Runtime;
@@ -330,6 +333,163 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public async Task DefaultTypedExecutors_DispatchToRegisteredComponents_ByAgentId()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "supplier-grid",
+            componentType: "DataGrid",
+            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+
+        var executor = provider.GetRequiredService<IDataGridActionExecutor>();
+        var result = await executor.ExecuteAsync(new DataGridActionRequest(
+            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentId"] = "supplier-grid"
+            }));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("supplier-grid", result.Message);
+    }
+
+    [Fact]
+    public async Task DefaultTypedExecutors_QueuePendingIntents_WhenComponentIsNotRegistered()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var tabsExecutor = provider.GetRequiredService<ITabsActionExecutor>();
+        var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
+
+        var result = await tabsExecutor.ExecuteAsync(new TabsActionRequest(
+            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentId"] = "workspace-tabs"
+            }));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(intents.HasPending("Tabs", "workspace-tabs"));
+    }
+
+    [Fact]
+    public async Task DefaultTypedExecutors_DoNotFallback_WhenTargetAgentIdIsMissing()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "supplier-grid-a",
+            componentType: "DataGrid",
+            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+
+        var executor = provider.GetRequiredService<IDataGridActionExecutor>();
+        var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
+        var result = await executor.ExecuteAsync(new DataGridActionRequest(
+            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentId"] = "supplier-grid-missing",
+                ["column"] = "Region",
+                ["operator"] = "eq",
+                ["value"] = "EMEA"
+            }));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(intents.HasPending("DataGrid", "supplier-grid-missing"));
+    }
+
+    [Fact]
+    public async Task DefaultTypedExecutors_DataGridQueuesMissingArguments_ForWrapperLevelValidation()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var executor = provider.GetRequiredService<IDataGridActionExecutor>();
+        var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
+
+        var result = await executor.ExecuteAsync(new DataGridActionRequest(
+            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentId"] = "supplier-grid-missing"
+            }));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(intents.HasPending("DataGrid", "supplier-grid-missing"));
+    }
+
+    [Fact]
+    public async Task DefaultTypedExecutors_DispatchByAgentId_ForAllComponentTypes()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "grid-a",
+            componentType: "DataGrid",
+            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "dialog-a",
+            componentType: "Dialog",
+            supportedActionId: AgentComponentV1CapabilityProfile.DialogOpenActionId));
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "form-a",
+            componentType: "Form",
+            supportedActionId: AgentComponentV1CapabilityProfile.FormValidateActionId));
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "nav-a",
+            componentType: "NavMenu",
+            supportedActionId: AgentComponentV1CapabilityProfile.NavigationNavigateToActionId));
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "tabs-a",
+            componentType: "Tabs",
+            supportedActionId: AgentComponentV1CapabilityProfile.TabsSwitchTabActionId));
+
+        var dataGrid = await provider.GetRequiredService<IDataGridActionExecutor>().ExecuteAsync(
+            new DataGridActionRequest(
+                AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                new Dictionary<string, object?> { ["agentId"] = "grid-a" }));
+        var dialog = await provider.GetRequiredService<IDialogActionExecutor>().ExecuteAsync(
+            new DialogActionRequest(
+                AgentComponentV1CapabilityProfile.DialogOpenActionId,
+                new Dictionary<string, object?> { ["agentId"] = "dialog-a" }));
+        var form = await provider.GetRequiredService<IFormActionExecutor>().ExecuteAsync(
+            new FormActionRequest(
+                AgentComponentV1CapabilityProfile.FormValidateActionId,
+                new Dictionary<string, object?> { ["agentId"] = "form-a" }));
+        var nav = await provider.GetRequiredService<INavigationActionExecutor>().ExecuteAsync(
+            new NavigationActionRequest(
+                AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+                new Dictionary<string, object?> { ["agentId"] = "nav-a" }));
+        var tabs = await provider.GetRequiredService<ITabsActionExecutor>().ExecuteAsync(
+            new TabsActionRequest(
+                AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+                new Dictionary<string, object?> { ["agentId"] = "tabs-a" }));
+
+        Assert.Equal("grid-a", dataGrid.Message);
+        Assert.Equal("dialog-a", dialog.Message);
+        Assert.Equal("form-a", form.Message);
+        Assert.Equal("nav-a", nav.Message);
+        Assert.Equal("tabs-a", tabs.Message);
+    }
+
+    [Fact]
     public async Task ComponentActionExecutor_DispatchesKnownMudActions_ToTypedExecutors()
     {
         var services = new ServiceCollection();
@@ -513,6 +673,35 @@ public class ServiceRegistrationTests
         {
             _ = cancellationToken;
             return Task.FromResult(ActionResult.Success($"Handled {action.Name}."));
+        }
+    }
+
+    private sealed class TypedStubAgentControllable(
+        string agentId,
+        string componentType,
+        string supportedActionId) : IAgentControllable
+    {
+        public string AgentId { get; } = agentId;
+
+        public string ComponentType { get; } = componentType;
+
+        public ComponentCapability GetCapability()
+        {
+            var capability = new ComponentCapability(AgentId, "Typed stub component");
+            capability.UpsertAction(new ComponentActionCapability(
+                supportedActionId,
+                "Stub supported action"));
+            return capability;
+        }
+
+        public ComponentState GetCurrentState() => new();
+
+        public Task<ActionResult> ExecuteActionAsync(
+            AgentAction action,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            return Task.FromResult(ActionResult.Success(AgentId));
         }
     }
 }

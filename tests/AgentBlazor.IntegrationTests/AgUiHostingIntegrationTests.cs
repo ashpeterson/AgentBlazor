@@ -1,6 +1,9 @@
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Hosting;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;

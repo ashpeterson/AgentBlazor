@@ -1,6 +1,8 @@
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Interfaces;
 
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Components;
 
 internal sealed class NoOpComponentActionExecutor(
     IDataGridActionExecutor dataGridExecutor,

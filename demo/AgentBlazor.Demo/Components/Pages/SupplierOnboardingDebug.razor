@@ -1,86 +1,55 @@
 @page "/supplier-onboarding-debug"
+@using System.ComponentModel.DataAnnotations
 @using AgentBlazor.Components
-@using AgentBlazor.Demo.Services
 @using MudBlazor
-@inject AgentDialogFormDemoState FormState
-@implements IDisposable
 
 <PageTitle>Supplier Onboarding Debug</PageTitle>
 
 <MudPaper Class="pa-4 agent-dialog-form-demo__panel" Elevation="1">
-    <MudText Typo="Typo.h4">AgentDialog + AgentForm Flow</MudText>
+    <MudText Typo="Typo.h4">AgentDialog + AgentForm Debug</MudText>
     <MudText Typo="Typo.body2" Class="agent-dialog-form-demo__subtitle">
-        Prompt the agent to open/close the dialog, set form fields, validate, and submit.
-        `AgentForm.submit` is approval-gated by policy and will require approval context to execute.
+        This page uses only wrapper components. Ask the agent to open/close dialog, set fields, validate, and submit.
     </MudText>
 
-    <MudStack Row="true" Spacing="1" Class="my-3">
-        <MudChip T="string" Color="@(_snapshot.DialogVisible ? Color.Success : Color.Default)" Variant="Variant.Filled">
-            Dialog: @(_snapshot.DialogVisible ? "Open" : "Closed")
-        </MudChip>
-        <MudChip T="string" Color="@(_snapshot.LastValidationSucceeded ? Color.Success : Color.Warning)" Variant="Variant.Filled">
-            Last validation: @(_snapshot.LastValidationSucceeded ? "Passed" : "Not passed")
-        </MudChip>
-        <MudChip T="string" Color="Color.Info" Variant="Variant.Filled">
-            Submissions: @_snapshot.SubmissionCount
-        </MudChip>
-        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Filled">
-            Last submit: @(_snapshot.LastSubmittedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "none")
-        </MudChip>
-    </MudStack>
-
-    @if (_snapshot.ValidationErrors.Count > 0)
-    {
-        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-            <MudText Typo="Typo.subtitle2">Validation errors</MudText>
-            <MudList T="string" Dense="true">
-                @foreach (var error in _snapshot.ValidationErrors)
-                {
-                    <MudListItem T="string">@error</MudListItem>
-                }
-            </MudList>
-        </MudAlert>
-    }
-
-    <MudText Typo="Typo.subtitle1">Recent Executor Events</MudText>
-    <MudList T="string" Dense="true">
-        @foreach (var evt in _snapshot.RecentEvents)
-        {
-            <MudListItem T="string">@evt</MudListItem>
-        }
-    </MudList>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
+        Open Dialog
+    </MudButton>
 </MudPaper>
 
-<AgentDialog AgentId="supplier-onboarding-dialog"
-             Visible="@_dialogVisible"
-             VisibleChanged="OnDialogVisibleChanged">
+<AgentDialog @ref="_dialog"
+             AgentId="supplier-onboarding-dialog-debug">
     <TitleContent>
         <MudText Typo="Typo.h6">Supplier Onboarding Dialog</MudText>
     </TitleContent>
     <DialogContent>
-        <MudForm @ref="_form" Class="agent-dialog-form-demo__form">
-            <MudTextField T="string"
-                          Label="Supplier name"
-                          Value="@_snapshot.Draft.SupplierName"
-                          ReadOnly="true" />
-            <MudTextField T="string"
-                          Label="Contact email"
-                          Value="@_snapshot.Draft.ContactEmail"
-                          ReadOnly="true" />
-            <MudTextField T="string"
-                          Label="Risk tier"
-                          Value="@_snapshot.Draft.RiskTier"
-                          ReadOnly="true" />
-            <MudNumericField T="decimal"
-                             Label="Requested budget"
-                             Value="@_snapshot.Draft.RequestedBudget"
-                             ReadOnly="true"
-                             Adornment="Adornment.End"
-                             AdornmentText="USD" />
-        </MudForm>
+        <AgentForm AgentId="supplier-onboarding-form-debug"
+                   Model="@_model"
+                   Submitted="OnSubmitted">
+            <ChildContent Context="formContext">
+                <DataAnnotationsValidator />
+                <MudTextField T="string"
+                              Label="Supplier name"
+                              For="@(() => _model.SupplierName)"
+                              @bind-Value="_model.SupplierName" />
+                <MudTextField T="string"
+                              Label="Contact email"
+                              For="@(() => _model.ContactEmail)"
+                              @bind-Value="_model.ContactEmail" />
+                <MudTextField T="string"
+                              Label="Risk tier"
+                              For="@(() => _model.RiskTier)"
+                              @bind-Value="_model.RiskTier" />
+                <MudNumericField T="decimal"
+                                 Label="Requested budget"
+                                 For="@(() => _model.RequestedBudget)"
+                                 @bind-Value="_model.RequestedBudget"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="USD" />
+            </ChildContent>
+        </AgentForm>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@CloseDialogAsync">
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseDialogAsync">
             Close
         </MudButton>
     </DialogActions>
@@ -89,61 +58,31 @@
 <MudPaper Class="pa-4 mt-4 agent-dialog-form-demo__panel" Elevation="1">
     <AgentChatWidget
         Title="Supplier Onboarding Agent Chat"
-        Description="Built-in AgentBlazor UI Agent is active. Try prompts like: open dialog, set form fields, validate form, submit form." />
+        Description="Try: open dialog, set SupplierName to Contoso, validate form, submit form." />
 </MudPaper>
 
 @code {
-    private MudForm? _form;
-    private AgentDialogFormDemoSnapshot _snapshot = new(
-        DialogVisible: false,
-        Draft: new SupplierOnboardingDraft(),
-        LastValidationSucceeded: false,
-        ValidationErrors: [],
-        SubmissionCount: 0,
-        LastSubmittedUtc: null,
-        RecentEvents: []);
-    private bool _dialogVisible;
-    private bool _suppressDialogCallback;
+    private AgentDialog? _dialog;
+    private readonly SupplierOnboardingModel _model = new();
 
-    protected override void OnInitialized()
+    private Task OpenDialogAsync() => _dialog?.OpenAsync() ?? Task.CompletedTask;
+
+    private Task CloseDialogAsync() => _dialog?.CloseAsync() ?? Task.CompletedTask;
+
+    private Task OnSubmitted() => CloseDialogAsync();
+
+    private sealed class SupplierOnboardingModel
     {
-        _snapshot = FormState.Snapshot;
-        _dialogVisible = _snapshot.DialogVisible;
-        FormState.Changed += OnStateChanged;
-    }
+        [Required]
+        public string SupplierName { get; set; } = string.Empty;
 
-    public void Dispose()
-    {
-        FormState.Changed -= OnStateChanged;
-    }
+        [Required, EmailAddress]
+        public string ContactEmail { get; set; } = string.Empty;
 
-    private async Task CloseDialogAsync()
-    {
-        _ = FormState.ApplyDialogAction(AgentComponentV1CapabilityProfile.DialogCloseActionId);
-        await Task.CompletedTask;
-    }
+        [Required]
+        public string RiskTier { get; set; } = string.Empty;
 
-    private async Task OnDialogVisibleChanged(bool visible)
-    {
-        if (_suppressDialogCallback)
-        {
-            return;
-        }
-
-        _dialogVisible = visible;
-        _ = FormState.ApplyDialogAction(
-            visible
-                ? AgentComponentV1CapabilityProfile.DialogOpenActionId
-                : AgentComponentV1CapabilityProfile.DialogCloseActionId);
-        await Task.CompletedTask;
-    }
-
-    private void OnStateChanged()
-    {
-        _snapshot = FormState.Snapshot;
-        _suppressDialogCallback = true;
-        _dialogVisible = _snapshot.DialogVisible;
-        _suppressDialogCallback = false;
-        _ = InvokeAsync(StateHasChanged);
+        [Range(typeof(decimal), "0.01", "1000000000")]
+        public decimal RequestedBudget { get; set; }
     }
 }

@@ -1,4 +1,6 @@
-namespace AgentBlazor.Runtime;
+using AgentBlazor.Core.Runtime.Components;
+
+namespace AgentBlazor.Core.Runtime.Interfaces;
 
 public interface IComponentActionExecutor
 {

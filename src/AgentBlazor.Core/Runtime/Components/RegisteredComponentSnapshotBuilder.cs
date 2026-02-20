@@ -1,7 +1,8 @@
+using AgentBlazor.Core.Runtime.Interfaces;
 using System.Globalization;
 using System.Text.Json;
 
-namespace AgentBlazor.Runtime;
+namespace AgentBlazor.Core.Runtime.Components;
 
 public readonly record struct RegisteredComponentSnapshot(
     string AgentId,

@@ -1,13 +1,10 @@
 @page "/agentblazor-status"
 @using AgentBlazor.Agents
 @using AgentBlazor.Options
-@using AgentBlazor.Telemetry
-@using AgentBlazor.Demo.Services
 @using Microsoft.Extensions.Options
 @inject IAgentRegistry AgentRegistry
 @inject IComponentCapabilityCatalog ComponentCatalog
 @inject IOptions<AgentBlazorOptions> AgentOptions
-@inject DemoTelemetrySink DemoTelemetry
 
 <PageTitle>AgentBlazor Status</PageTitle>
 
@@ -69,41 +66,8 @@
     </MudItem>
 </MudGrid>
 
-<MudPaper Class="demo-surface pa-4 mt-4" Elevation="0">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-        <MudText Typo="Typo.h6">Run Telemetry (Recent)</MudText>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="RefreshTelemetry">Refresh</MudButton>
-    </MudStack>
-    <MudTable Items="@_telemetryRows" Dense="true" Hover="true" Bordered="true" Class="mt-3">
-        <HeaderContent>
-            <MudTh>Time (UTC)</MudTh>
-            <MudTh>Source</MudTh>
-            <MudTh>Agent</MudTh>
-            <MudTh>Kind</MudTh>
-            <MudTh>Outcome</MudTh>
-            <MudTh>Counts</MudTh>
-            <MudTh>Detail</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Time (UTC)">@context.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
-            <MudTd DataLabel="Source">@context.Source</MudTd>
-            <MudTd DataLabel="Agent">@context.AgentName</MudTd>
-            <MudTd DataLabel="Kind">@context.Kind</MudTd>
-            <MudTd DataLabel="Outcome">@(context.Outcome?.ToString() ?? "-")</MudTd>
-            <MudTd DataLabel="Counts">@($"{context.PlannedActionCount}/{context.ExecutionResultCount}/{context.FailedExecutionCount}/{context.BlockedActionCount}")</MudTd>
-            <MudTd DataLabel="Detail">@(string.IsNullOrWhiteSpace(context.Detail) ? "-" : context.Detail)</MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText Typo="Typo.body2" Class="demo-muted pa-2">
-                No telemetry events recorded yet. Run chat prompts or AG-UI requests to populate this table.
-            </MudText>
-        </NoRecordsContent>
-    </MudTable>
-</MudPaper>
-
 @code {
     private IReadOnlyList<ComponentRow> _catalogRows = [];
-    private IReadOnlyList<AgentBlazorRunTelemetryEvent> _telemetryRows = [];
 
     protected override void OnInitialized()
     {
@@ -111,12 +75,6 @@
             .OrderBy(static c => c.ComponentId, StringComparer.OrdinalIgnoreCase)
             .Select(static c => new ComponentRow(c.ComponentId, c.Actions.Count))
             .ToArray();
-        RefreshTelemetry();
-    }
-
-    private void RefreshTelemetry()
-    {
-        _telemetryRows = DemoTelemetry.GetRecent();
     }
 
     private sealed record ComponentRow(string ComponentId, int ActionCount);

@@ -1,5 +1,5 @@
 using AgentBlazor.Components;
-using AgentBlazor.Runtime;
+using AgentBlazor.Core.Runtime.Agents;
 using Microsoft.AspNetCore.Components;
 
 #pragma warning disable BL0005 // Setting parameters directly is intentional in wrapper logic unit tests.
@@ -118,7 +118,7 @@ public class WrapperActionExecutionTests
     }
 
     [Fact]
-    public async Task AgentDataGrid_FilterWithoutParameters_UsesIntentAndSupportsStateTransition()
+    public async Task AgentDataGrid_FilterWithOnlyIntent_FailsWithoutExplicitParameters()
     {
         var rows = new[]
         {
@@ -142,13 +142,13 @@ public class WrapperActionExecutionTests
             ["intent"] = "filter by lowest risk supplier"
         }));
 
-        Assert.True(highest.Succeeded);
-        Assert.True(lowest.Succeeded);
-        Assert.Contains("Applied filter RiskScore >= 70", highest.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Applied filter RiskScore <= 30", lowest.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("RiskScore", grid.FilterColumn);
-        Assert.Equal("<=", grid.FilterOperator);
-        Assert.Equal(30, Convert.ToInt32(grid.FilterValue));
+        Assert.False(highest.Succeeded);
+        Assert.False(lowest.Succeeded);
+        Assert.Contains("requires 'column' parameter", highest.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("requires 'column' parameter", lowest.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(grid.FilterColumn);
+        Assert.Null(grid.FilterOperator);
+        Assert.Null(grid.FilterValue);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class WrapperActionExecutionTests
     }
 
     [Fact]
-    public async Task AgentDataGrid_SortWithoutColumn_UsesIntentAndStateHints()
+    public async Task AgentDataGrid_SortWithoutColumn_FailsWithoutExplicitColumn()
     {
         var rows = new[]
         {
@@ -194,9 +194,37 @@ public class WrapperActionExecutionTests
             ["currentFilterColumn"] = "RiskScore"
         }));
 
+        Assert.False(result.Succeeded);
+        Assert.Contains("requires 'column' parameter", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(grid.SortColumn);
+        Assert.Equal("asc", grid.SortDirection);
+    }
+
+    [Fact]
+    public async Task AgentDataGrid_FilterByName_ResolvesSupplierNameProperty()
+    {
+        var rows = new[]
+        {
+            new SupplierNameRow("SUP-001", "Alpine Components", 82),
+            new SupplierNameRow("SUP-002", "Beacon Industrial", 55)
+        };
+
+        var grid = new AgentDataGrid<SupplierNameRow>
+        {
+            AgentId = "supplier-grid",
+            Items = rows
+        };
+
+        var result = await grid.ExecuteActionAsync(AgentAction.Create("filter", new Dictionary<string, object?>
+        {
+            ["column"] = "Name",
+            ["operator"] = "contains",
+            ["value"] = "Alpine"
+        }));
+
         Assert.True(result.Succeeded);
-        Assert.Equal("RiskScore", grid.SortColumn);
-        Assert.Equal("desc", grid.SortDirection);
+        Assert.Equal("Name", grid.FilterColumn);
+        Assert.Contains("Applied filter Name contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -242,6 +270,8 @@ public class WrapperActionExecutionTests
     private sealed record SupplierRow(string SupplierId, string Region, int RiskScore);
 
     private sealed record RegionOnlyRow(string SupplierId, string Region);
+
+    private sealed record SupplierNameRow(string SupplierId, string SupplierName, int RiskScore);
 
     private sealed class SupplierFormModel
     {

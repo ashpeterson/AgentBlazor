@@ -4,9 +4,10 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
-using AgentBlazor.Runtime;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -306,6 +307,9 @@ internal sealed class AgentBlazorHostedAgentFactory(
         builder.AppendLine("You are AgentBlazor's built-in UI agent powered by Microsoft Agent Framework.");
         builder.AppendLine("Always use the provided tools when a user asks for UI actions.");
         builder.AppendLine("Prefer concise responses and reference completed UI actions.");
+        builder.AppendLine("For multi-step requests, execute all required tools in the same turn (for example navigate, then filter/sort/select).");
+        builder.AppendLine("Do not stop after navigation when the user also requested work on the destination surface.");
+        builder.AppendLine("You can call component tools even before the destination component is mounted; runtime will queue them.");
         builder.AppendLine("If required action parameters are missing or ambiguous, ask a concise clarifying question before calling a tool.");
         builder.AppendLine("When sorting or filtering, include explicit column/operator/value arguments.");
         if (!string.IsNullOrWhiteSpace(registration.Instructions))
@@ -441,10 +445,13 @@ internal sealed class AgentBlazorHostedAgentFactory(
         string actionId,
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponentSnapshots)
     {
-        if (!TryResolveComponentState(componentId, actionId, registeredComponentSnapshots, out var state))
+        if (!TryResolveComponentSnapshot(componentId, actionId, registeredComponentSnapshots, out var snapshot))
         {
             return;
         }
+
+        AddIfNotNullOrWhiteSpace(arguments, "agentId", snapshot.AgentId);
+        var state = snapshot.State;
 
         if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
@@ -504,45 +511,45 @@ internal sealed class AgentBlazorHostedAgentFactory(
         arguments[argumentKey] = raw;
     }
 
-    private static bool TryResolveComponentState(
+    private static bool TryResolveComponentSnapshot(
         string componentId,
         string actionId,
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponentSnapshots,
-        out IReadOnlyDictionary<string, string> state)
+        out RegisteredComponentSnapshot snapshot)
     {
-        state = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        snapshot = default!;
         var componentType = ResolveComponentType(componentId);
         if (componentType.Length == 0 || registeredComponentSnapshots.Count == 0)
         {
             return false;
         }
 
-        foreach (var snapshot in registeredComponentSnapshots
-                     .OrderBy(static snapshot => snapshot.AgentId, StringComparer.OrdinalIgnoreCase))
+        foreach (var candidate in registeredComponentSnapshots
+                     .OrderBy(static registered => registered.AgentId, StringComparer.OrdinalIgnoreCase))
         {
-            if (!string.Equals(snapshot.ComponentType, componentType, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(candidate.ComponentType, componentType, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (!snapshot.Actions.Contains(actionId, StringComparer.OrdinalIgnoreCase))
+            if (!candidate.Actions.Contains(actionId, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            state = snapshot.State;
+            snapshot = candidate;
             return true;
         }
 
-        foreach (var snapshot in registeredComponentSnapshots
-                     .OrderBy(static snapshot => snapshot.AgentId, StringComparer.OrdinalIgnoreCase))
+        foreach (var candidate in registeredComponentSnapshots
+                     .OrderBy(static registered => registered.AgentId, StringComparer.OrdinalIgnoreCase))
         {
-            if (!string.Equals(snapshot.ComponentType, componentType, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(candidate.ComponentType, componentType, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            state = snapshot.State;
+            snapshot = candidate;
             return true;
         }
 

@@ -8,20 +8,18 @@
 
 <MudText Typo="Typo.h4" Class="mb-4">Supplier Onboarding</MudText>
 
-<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => _dialogVisible = true)">
+<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
     Open Onboarding Dialog
 </MudButton>
 
-<AgentDialog AgentId="supplier-onboarding-dialog"
-             Visible="@_dialogVisible"
-             VisibleChanged="OnDialogVisibleChanged">
+<AgentDialog @ref="_dialog"
+             AgentId="supplier-onboarding-dialog">
     <TitleContent>
         <MudText Typo="Typo.h6">New Supplier</MudText>
     </TitleContent>
     <DialogContent>
         <AgentForm AgentId="supplier-onboarding-form"
                    Model="@_model"
-                   ValidationChanged="OnValidationChanged"
                    Submitted="OnSubmitted">
             <ChildContent Context="formContext">
                 <DataAnnotationsValidator />
@@ -43,23 +41,11 @@
                                  @bind-Value="_model.RequestedBudget"
                                  Adornment="Adornment.End"
                                  AdornmentText="USD" />
-                @if (_lastSubmitUtc is not null)
-                {
-                    <MudText Typo="Typo.caption" Class="mt-2">
-                        Last submitted: @_lastSubmitUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                    </MudText>
-                }
-                @if (_lastValidation.HasValue)
-                {
-                    <MudText Typo="Typo.caption">
-                        Validation: @(_lastValidation.Value ? "Passed" : "Failed")
-                    </MudText>
-                }
             </ChildContent>
         </AgentForm>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="@(() => _dialogVisible = false)">
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseDialogAsync">
             Close
         </MudButton>
     </DialogActions>
@@ -68,29 +54,14 @@
 <AgentChatWidget />
 
 @code {
+    private AgentDialog? _dialog;
     private readonly SupplierOnboardingModel _model = new();
-    private bool _dialogVisible;
-    private bool? _lastValidation;
-    private DateTimeOffset? _lastSubmitUtc;
 
-    private Task OnDialogVisibleChanged(bool visible)
-    {
-        _dialogVisible = visible;
-        return Task.CompletedTask;
-    }
+    private Task OpenDialogAsync() => _dialog?.OpenAsync() ?? Task.CompletedTask;
 
-    private Task OnValidationChanged(bool isValid)
-    {
-        _lastValidation = isValid;
-        return Task.CompletedTask;
-    }
+    private Task CloseDialogAsync() => _dialog?.CloseAsync() ?? Task.CompletedTask;
 
-    private Task OnSubmitted()
-    {
-        _lastSubmitUtc = DateTimeOffset.UtcNow;
-        _dialogVisible = false;
-        return Task.CompletedTask;
-    }
+    private Task OnSubmitted() => CloseDialogAsync();
 
     private sealed class SupplierOnboardingModel
     {

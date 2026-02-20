@@ -1,6 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Licensing;
 using AgentBlazor.Runtime;
 using AgentBlazor.Services;
@@ -69,6 +72,153 @@ public class AgentRuntimeIntegrationTests
     }
 
     [Fact]
+    public async Task RunTurnAsync_NavigationOnlyToolCall_AppendsCrossSurfaceContinuationAction()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentnavmenu_navigate_to",
+            new Dictionary<string, object?>
+            {
+                ["uri"] = "/suppliers"
+            }));
+        services.AddSingleton<CountingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var executor = provider.GetRequiredService<CountingExecutor>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk"));
+
+        Assert.Equal(2, executor.CallCount);
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_NavigationOnlyToolCall_SingularRiskSupplierPrompt_AppendsFilterContinuation()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentnavmenu_navigate_to",
+            new Dictionary<string, object?>
+            {
+                ["uri"] = "/suppliers"
+            }));
+        services.AddSingleton<CountingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me my highest risk supplier"));
+
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_NavigationOnlyToolCall_HighRiskPrompt_RecoversMissingFilterValueInSameTurn()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentnavmenu_navigate_to",
+            new Dictionary<string, object?>
+            {
+                ["uri"] = "/suppliers"
+            }));
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
+
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded &&
+            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_DataGridFilterAliasPayload_RecoversToCanonicalRiskFilterBeforeQueue()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentdatagrid_filter",
+            new Dictionary<string, object?>
+            {
+                ["field"] = "RiskCategory",
+                ["operator"] = "in",
+                ["fieldValue"] = new[] { "High" },
+                ["target"] = "supplier-grid"
+            }));
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
+
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded &&
+            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("Which column should I filter", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_DataGridOnlyToolCall_AppendsNavigationContinuationAction()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentdatagrid_filter",
+            new Dictionary<string, object?>
+            {
+                ["column"] = "RiskScore",
+                ["operator"] = ">=",
+                ["value"] = 70
+            }));
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk"));
+
+        Assert.Equal(2, response.PlannedActions.Count);
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded);
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task RunTurnAsync_WhenActionIsMissingRequiredParameter_AppendsClarificationGuidance()
     {
         var services = new ServiceCollection();
@@ -88,8 +238,75 @@ public class AgentRuntimeIntegrationTests
             !result.Succeeded &&
             result.Message.Contains("requires 'column' parameter", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Contains("I need one more detail", response.ResponseText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Did you mean sort by 'RiskScore' descending?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Which column should I sort by?", response.ResponseText);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_WhenNavigationActionIsMissingUriFamily_RespondsWithSingleRouteQuestion()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
+        services.AddSingleton<MissingNavigationTargetExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
+
+        Assert.Equal(
+            "Did you mean navigate to '/supplier-onboarding'?",
+            response.ResponseText);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_WhenNavigationActionIsMissingUriFamily_AutoRecoversWithInferredUri()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
+        services.AddSingleton<MissingNavigationTargetThenSuccessExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetThenSuccessExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
+
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded &&
+            result.Message.Contains("/supplier-onboarding", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_NavigationOnlyToolCall_WithEntityPrompt_AppendsEntityFilterContinuation()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentnavmenu_navigate_to",
+            new Dictionary<string, object?>
+            {
+                ["uri"] = "/suppliers"
+            }));
+        services.AddSingleton<CapturingPlannedActionExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to supplier SUP-006"));
+
+        var continuation = Assert.Single(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(continuation.Arguments);
+        Assert.Equal("SUP-006", continuation.Arguments["value"]?.ToString());
+        Assert.Equal("eq", continuation.Arguments["operator"]?.ToString());
     }
 
     [Fact]
@@ -113,10 +330,10 @@ public class AgentRuntimeIntegrationTests
             "sort highest to lowest",
             Context: context));
         var second = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "yes",
+            "RiskScore",
             Context: context));
 
-        Assert.Contains("Did you mean sort by 'RiskScore' descending?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Which column should I sort by?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(second.ExecutionResults, static result =>
             string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
@@ -204,6 +421,34 @@ public class AgentRuntimeIntegrationTests
         Assert.Contains(response.ExecutionResults, static result =>
             string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_WithStructuredJsonDirectiveText_ForwardsDirectiveArguments()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new JsonDirectiveThenTextChatClient(
+            "agentblazor_agentnavmenu_navigate_to",
+            """{"uri":"/suppliers"}"""));
+        services.AddSingleton<CapturingPlannedActionExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var executor = provider.GetRequiredService<CapturingPlannedActionExecutor>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers"));
+
+        var action = Assert.IsType<PlannedComponentAction>(executor.LastAction);
+        Assert.Equal(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, action.ComponentId);
+        Assert.Equal(AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, action.ActionId);
+        Assert.NotNull(action.Arguments);
+        Assert.Equal("/suppliers", action.Arguments["uri"]?.ToString());
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -594,7 +839,9 @@ public class AgentRuntimeIntegrationTests
         }
     }
 
-    private sealed class JsonDirectiveThenTextChatClient(string functionName) : IChatClient
+    private sealed class JsonDirectiveThenTextChatClient(
+        string functionName,
+        string argumentsJson = "{}") : IChatClient
     {
         private int _callCount;
 
@@ -613,7 +860,7 @@ public class AgentRuntimeIntegrationTests
                 var payload = $$"""
                                 {
                                   "name": "{{functionName}}",
-                                  "arguments": {}
+                                  "arguments": {{argumentsJson}}
                                 }
                                 """;
                 return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, payload)));
@@ -639,7 +886,7 @@ public class AgentRuntimeIntegrationTests
                     $$"""
                       {
                         "name": "{{functionName}}",
-                        "arguments": {}
+                        "arguments": {{argumentsJson}}
                       }
                       """);
             }
@@ -951,6 +1198,47 @@ public class AgentRuntimeIntegrationTests
                 action.ActionId,
                 Succeeded: true,
                 Message: $"Sorted by {LastColumn} ({LastDirection ?? "asc"})."));
+        }
+    }
+
+    private sealed class MissingNavigationTargetExecutor : IComponentActionExecutor
+    {
+        public Task<ComponentActionExecutionResult> ExecuteAsync(
+            PlannedComponentAction action,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            return Task.FromResult(new ComponentActionExecutionResult(
+                action.ComponentId,
+                action.ActionId,
+                Succeeded: false,
+                Message: "Action 'navigate_to' requires 'uri', 'url', or 'target' parameter."));
+        }
+    }
+
+    private sealed class MissingNavigationTargetThenSuccessExecutor : IComponentActionExecutor
+    {
+        public Task<ComponentActionExecutionResult> ExecuteAsync(
+            PlannedComponentAction action,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            if (action.Arguments is null ||
+                !action.Arguments.TryGetValue("uri", out var uriRaw) ||
+                string.IsNullOrWhiteSpace(uriRaw?.ToString()))
+            {
+                return Task.FromResult(new ComponentActionExecutionResult(
+                    action.ComponentId,
+                    action.ActionId,
+                    Succeeded: false,
+                    Message: "Action 'navigate_to' requires 'uri', 'url', or 'target' parameter."));
+            }
+
+            return Task.FromResult(new ComponentActionExecutionResult(
+                action.ComponentId,
+                action.ActionId,
+                Succeeded: true,
+                Message: $"Navigated to {uriRaw}."));
         }
     }
 

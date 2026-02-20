@@ -90,6 +90,16 @@
         return ActionResult.Unknown(action.Name);
     }
 
+    public Task<ActionResult> OpenAsync(CancellationToken cancellationToken = default)
+        => ExecuteActionAsync(
+            AgentAction.Create(AgentComponentV1CapabilityProfile.DialogOpenActionId),
+            cancellationToken);
+
+    public Task<ActionResult> CloseAsync(CancellationToken cancellationToken = default)
+        => ExecuteActionAsync(
+            AgentAction.Create(AgentComponentV1CapabilityProfile.DialogCloseActionId),
+            cancellationToken);
+
     private async Task OnVisibleChanged(bool visible)
     {
         Visible = visible;

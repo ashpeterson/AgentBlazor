@@ -1,4 +1,6 @@
-namespace AgentBlazor.Runtime;
+using AgentBlazor.Core.Runtime.Agents;
+
+namespace AgentBlazor.Core.Runtime.Interfaces;
 
 public interface IAgentRuntime
 {
