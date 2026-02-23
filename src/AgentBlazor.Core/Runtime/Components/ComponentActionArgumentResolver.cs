@@ -230,50 +230,52 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
         return tokens;
     }
 
+    /// <summary>Built-in semantic values for filter resolution when the app does not provide ValueMappings.
+    /// Enables "high risk", "low", etc. to work with zero app configuration.</summary>
+    private static readonly IReadOnlyDictionary<string, object> SemanticValueFallbacks =
+        new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["high"] = 70,
+            ["medium"] = 50,
+            ["low"] = 30
+        };
+
     private static void ResolveFilterValue(ComponentState state, IDictionary<string, object?> result)
     {
         if (!TryGetString((IReadOnlyDictionary<string, object?>)result, "column", out var column) || string.IsNullOrWhiteSpace(column))
-        {
             return;
-        }
-
-        var valueMappings = GetValueMappings(state);
-        if (valueMappings is null)
-        {
-            return;
-        }
-
-        if (!valueMappings.TryGetValue(column, out var columnMap) || columnMap is null)
-        {
-            return;
-        }
-
         if (!TryGetValue((IReadOnlyDictionary<string, object?>)result, "value", out var rawValue))
-        {
             return;
-        }
-
         var valueStr = rawValue?.ToString()?.Trim();
         if (string.IsNullOrEmpty(valueStr))
-        {
             return;
-        }
 
-        if (columnMap.TryGetValue(valueStr, out var resolved))
+        // 1) App-provided ValueMappings (optional)
+        var valueMappings = GetValueMappings(state);
+        if (valueMappings is not null && valueMappings.TryGetValue(column, out var columnMap) && columnMap is not null)
         {
-            result["value"] = resolved;
-            PromoteEqToGteForSemanticThreshold(result);
-            return;
-        }
-
-        foreach (var (key, val) in columnMap)
-        {
-            if (string.Equals(key, valueStr, StringComparison.OrdinalIgnoreCase))
+            if (columnMap.TryGetValue(valueStr, out var resolved))
             {
-                result["value"] = val;
+                result["value"] = resolved;
                 PromoteEqToGteForSemanticThreshold(result);
                 return;
             }
+            foreach (var (key, val) in columnMap)
+            {
+                if (string.Equals(key, valueStr, StringComparison.OrdinalIgnoreCase))
+                {
+                    result["value"] = val;
+                    PromoteEqToGteForSemanticThreshold(result);
+                    return;
+                }
+            }
+        }
+
+        // 2) Built-in semantic fallback so apps don't need ValueMappings for common terms
+        if (SemanticValueFallbacks.TryGetValue(valueStr, out var fallback))
+        {
+            result["value"] = fallback;
+            PromoteEqToGteForSemanticThreshold(result);
         }
     }
 

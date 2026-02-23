@@ -2,51 +2,56 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build",
+        "label": "build",
+        "command": "dotnet",
+        "type": "process",
+        "args": [
+            "build",
+            "/property:GenerateFullPaths=true",
+            "/consoleloggerparameters:NoSummary;ForceNoAlign"
+        ],
+        "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "buildDemo",
       "command": "dotnet",
       "type": "process",
       "args": [
         "build",
-        "${workspaceFolder}/AgentBlazor.slnx",
-        "--configuration",
-        "Debug"
+        "${workspaceFolder}/demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary;ForceNoAlign"
       ],
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
+      "problemMatcher": "$msCompile"
     },
     {
       "label": "test",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "test",
-        "${workspaceFolder}/AgentBlazor.slnx",
-        "--configuration",
-        "Debug"
-      ],
+      "args": ["test", "${workspaceFolder}/AgentBlazor.sln", "--configuration", "Debug"],
       "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      }
+      "group": { "kind": "test", "isDefault": true }
     },
     {
-      "label": "watch",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "watch",
-        "--project",
-        "${workspaceFolder}/demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj",
-        "run",
-        "--configuration",
-        "Debug"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true
+        "label": "watch",
+        "command": "dotnet",
+        "type": "process",
+        "args": [
+            "watch",
+            "run"
+        ],
+        "problemMatcher": "$msCompile"
+    },
+    {
+        "label": "publish",
+        "command": "dotnet",
+        "type": "process",
+        "args": [
+            "publish",
+            "/property:GenerateFullPaths=true",
+            "/consoleloggerparameters:NoSummary;ForceNoAlign"
+        ],
+        "problemMatcher": "$msCompile"
     }
   ]
 }

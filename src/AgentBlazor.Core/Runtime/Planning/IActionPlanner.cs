@@ -39,6 +39,22 @@ public sealed record ActionPlanRequest
     /// Conversation context for multi-turn interactions.
     /// </summary>
     public IReadOnlyList<ConversationTurn> ConversationHistory { get; init; } = [];
+
+    /// <summary>
+    /// Available app routes (path, description, aliases) for intent→route navigation.
+    /// Planner uses this to output navigate_to with the correct uri when the user is not on the target page.
+    /// </summary>
+    public IReadOnlyList<AvailableRoute> AvailableRoutes { get; init; } = [];
+}
+
+/// <summary>
+/// A route the user can navigate to (from [Route] discovery).
+/// </summary>
+public sealed record AvailableRoute
+{
+    public required string Path { get; init; }
+    public string? Description { get; init; }
+    public required IReadOnlyList<string> Aliases { get; init; }
 }
 
 /// <summary>

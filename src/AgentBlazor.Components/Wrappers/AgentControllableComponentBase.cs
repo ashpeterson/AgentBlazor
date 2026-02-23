@@ -4,6 +4,7 @@ using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Runtime;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Logging;
 
 namespace AgentBlazor;
@@ -15,6 +16,12 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
 
     [Inject]
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
+
+    [Inject]
+    private IComponentRouteRegistry? ComponentRouteRegistry { get; set; }
+
+    [Inject]
+    private NavigationManager? Navigation { get; set; }
 
     [Inject]
     protected IComponentActionArgumentResolver? ActionArgumentResolver { get; set; }
@@ -29,11 +36,23 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
 
     public abstract string ComponentType { get; }
 
+    /// <summary>
+    /// Component id used for route registration (e.g. AgentDataGrid). Used to know which route hosts this component when navigating.
+    /// </summary>
+    protected abstract string ComponentIdForRoute { get; }
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
         _logger ??= LoggerFactory?.CreateLogger(GetType());
         ComponentRegistry.Register(this);
+
+        if (ComponentRouteRegistry is not null && Navigation is not null)
+        {
+            var uri = Navigation.Uri;
+            var path = string.IsNullOrEmpty(uri) ? "/" : new Uri(uri).AbsolutePath;
+            ComponentRouteRegistry.Register(ComponentIdForRoute, path);
+        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -122,5 +141,7 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         {
             _ = ComponentRegistry.Unregister(AgentId);
         }
+
+        ComponentRouteRegistry?.Unregister(ComponentIdForRoute);
     }
 }

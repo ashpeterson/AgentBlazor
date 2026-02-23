@@ -3,23 +3,21 @@
   "configurations": [
     {
       "name": "Launch Demo (Blazor)",
-      "type": "dotnet",
+      "type": "coreclr",
       "request": "launch",
-      "projectPath": "${workspaceFolder}/demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj",
-      "preLaunchTask": "build",
+      "preLaunchTask": "buildDemo",
+      "program": "${workspaceFolder}/demo/AgentBlazor.Demo/bin/Debug/net10.0/AgentBlazor.Demo.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/demo/AgentBlazor.Demo",
+      "stopAtEntry": false,
       "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5249"
       },
       "serverReadyAction": {
         "action": "openExternally",
         "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
       }
-    },
-    {
-      "name": "Run Tests",
-      "type": "dotnet",
-      "request": "launch",
-      "preLaunchTask": "test"
     }
   ]
 }

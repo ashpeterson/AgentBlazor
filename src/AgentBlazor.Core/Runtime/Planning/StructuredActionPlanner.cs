@@ -138,13 +138,28 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
                 }
                 sb.AppendLine();
             }
-            sb.AppendLine("If the user asks to filter, sort, or act on a DataGrid/Form/Tabs that is NOT listed above, add AgentNavMenu navigate_to as the first step with the correct uri, then the component action.");
+            sb.AppendLine("If the user asks to filter, sort, or act on a DataGrid/Form/Tabs that is NOT listed above, add AgentNavMenu navigate_to as the first step with uri set to the route from AVAILABLE ROUTES below, then the component action.");
         }
         else
         {
             sb.AppendLine();
             sb.AppendLine("CURRENTLY MOUNTED COMPONENTS: (none - user is likely on home or a page without agent components)");
-            sb.AppendLine("If the request involves a grid, form, or tabs, add AgentNavMenu navigate_to as the first step with uri set to the relevant route (e.g. /suppliers, /workspace), then add the component action.");
+            sb.AppendLine("If the request involves a grid, form, or tabs, add AgentNavMenu navigate_to as the first step with uri set to the route from AVAILABLE ROUTES below, then add the component action.");
+        }
+
+        if (request.AvailableRoutes.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("AVAILABLE ROUTES (use these for navigate_to arguments.uri):");
+            foreach (var r in request.AvailableRoutes)
+            {
+                sb.Append("- ").Append(r.Path);
+                if (!string.IsNullOrWhiteSpace(r.Description))
+                    sb.Append(" — ").Append(r.Description);
+                if (r.Aliases.Count > 0)
+                    sb.Append(" (aliases: ").Append(string.Join(", ", r.Aliases)).Append(')');
+                sb.AppendLine();
+            }
         }
 
         return sb.ToString();
