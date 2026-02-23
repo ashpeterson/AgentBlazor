@@ -63,8 +63,8 @@ public class AgentRuntimeIntegrationTests
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter low risk suppliers"));
 
         var action = Assert.IsType<PlannedComponentAction>(executor.LastAction);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, action.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.DataGridFilterActionId, action.ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDataGridComponentId, action.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.DataGridFilterActionId, action.ActionId);
         Assert.NotNull(action.Arguments);
         Assert.Equal("RiskScore", action.Arguments["column"]?.ToString());
         Assert.Equal("<=", action.Arguments["operator"]?.ToString());
@@ -93,14 +93,14 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(2, executor.CallCount);
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -124,8 +124,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me my highest risk supplier"));
 
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -146,8 +146,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
 
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded &&
             result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
@@ -174,8 +174,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
 
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded &&
             result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("Which column should I filter", response.ResponseText, StringComparison.OrdinalIgnoreCase);
@@ -203,18 +203,18 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(2, response.PlannedActions.Count);
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -233,8 +233,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("sort from highest to lowest"));
 
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
             !result.Succeeded &&
             result.Message.Contains("requires 'column' parameter", StringComparison.OrdinalIgnoreCase));
 
@@ -275,8 +275,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
 
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded &&
             result.Message.Contains("/supplier-onboarding", StringComparison.OrdinalIgnoreCase));
     }
@@ -301,8 +301,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to supplier SUP-006"));
 
         var continuation = Assert.Single(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(continuation.Arguments);
         Assert.Equal("SUP-006", continuation.Arguments["value"]?.ToString());
@@ -335,8 +335,8 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Contains("Which column should I sort by?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(second.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
         Assert.Equal(2, executor.CallCount);
         Assert.Equal("RiskScore", executor.LastColumn);
@@ -416,11 +416,11 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(1, executor.CallCount);
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -442,13 +442,13 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers"));
 
         var action = Assert.IsType<PlannedComponentAction>(executor.LastAction);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, action.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, action.ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentNavMenuComponentId, action.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.NavigationNavigateToActionId, action.ActionId);
         Assert.NotNull(action.Arguments);
         Assert.Equal("/suppliers", action.Arguments["uri"]?.ToString());
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -492,10 +492,10 @@ public class AgentRuntimeIntegrationTests
             .AddAgentBlazorServices()
             .AddAgent("risk-only-agent", agent =>
             {
-                agent.WithAllowedComponents(AgentComponentV1CapabilityProfile.AgentDataGridComponentId);
+                agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDataGridComponentId);
                 agent.WithAllowedActions(
-                    $"{AgentComponentV1CapabilityProfile.AgentDataGridComponentId}.{AgentComponentV1CapabilityProfile.DataGridFilterActionId}",
-                    $"{AgentComponentV1CapabilityProfile.AgentDataGridComponentId}.{AgentComponentV1CapabilityProfile.DataGridSortActionId}");
+                    $"{AgentComponentCapabilityProfile.AgentDataGridComponentId}.{AgentComponentCapabilityProfile.DataGridFilterActionId}",
+                    $"{AgentComponentCapabilityProfile.AgentDataGridComponentId}.{AgentComponentCapabilityProfile.DataGridSortActionId}");
             });
 
         using var provider = services.BuildServiceProvider();
@@ -509,8 +509,8 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(1, executor.CallCount);
         Assert.Contains(defaultRouteResponse.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
 
         Assert.Empty(riskRouteResponse.PlannedActions);
@@ -530,8 +530,8 @@ public class AgentRuntimeIntegrationTests
             .AddAgentBlazorServices()
             .AddAgent("policy-empty-agent", agent =>
             {
-                agent.WithAllowedComponents(AgentComponentV1CapabilityProfile.AgentDialogComponentId);
-                agent.WithAllowedActions($"{AgentComponentV1CapabilityProfile.AgentDialogComponentId}.not_an_action");
+                agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDialogComponentId);
+                agent.WithAllowedActions($"{AgentComponentCapabilityProfile.AgentDialogComponentId}.not_an_action");
             });
 
         using var provider = services.BuildServiceProvider();
@@ -568,8 +568,8 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Message.Contains("Approval required", StringComparison.Ordinal));
     }
 
@@ -590,8 +590,8 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Message.Contains("Approval required", StringComparison.Ordinal));
     }
 
@@ -642,8 +642,8 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(1, executor.CallCount);
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -659,8 +659,8 @@ public class AgentRuntimeIntegrationTests
             .AddAgentBlazorServices()
             .AddAgent("premium-submit-agent", agent =>
             {
-                agent.WithAllowedComponents(AgentComponentV1CapabilityProfile.AgentFormComponentId);
-                agent.WithAllowedActions($"{AgentComponentV1CapabilityProfile.AgentFormComponentId}.{AgentComponentV1CapabilityProfile.FormSubmitActionId}");
+                agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentFormComponentId);
+                agent.WithAllowedActions($"{AgentComponentCapabilityProfile.AgentFormComponentId}.{AgentComponentCapabilityProfile.FormSubmitActionId}");
             });
 
         using var provider = services.BuildServiceProvider();
@@ -746,11 +746,11 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal("acme", RuntimeCustomTools.LastSupplierId);
         Assert.Equal(1, executor.CallCount);
         Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
     }
 
@@ -1167,8 +1167,8 @@ public class AgentRuntimeIntegrationTests
             _ = cancellationToken;
             Interlocked.Increment(ref _callCount);
 
-            if (!string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(action.ActionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
             {
                 return Task.FromResult(new ComponentActionExecutionResult(
                     action.ComponentId,

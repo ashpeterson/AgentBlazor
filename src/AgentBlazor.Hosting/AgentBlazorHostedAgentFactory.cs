@@ -453,7 +453,7 @@ internal sealed class AgentBlazorHostedAgentFactory(
         AddIfNotNullOrWhiteSpace(arguments, "agentId", snapshot.AgentId);
         var state = snapshot.State;
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "sortColumn", "currentSortColumn");
             AddStateHint(arguments, state, "filterColumn", "currentFilterColumn");
@@ -463,13 +463,13 @@ internal sealed class AgentBlazorHostedAgentFactory(
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "activePanelIndex", "currentIndex");
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "uri", "currentUri");
         }
@@ -559,11 +559,11 @@ internal sealed class AgentBlazorHostedAgentFactory(
     private static string ResolveComponentType(string componentId) =>
         componentId switch
         {
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId => "DataGrid",
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId => "Dialog",
-            AgentComponentV1CapabilityProfile.AgentFormComponentId => "Form",
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId => "NavMenu",
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId => "Tabs",
+            AgentComponentCapabilityProfile.AgentDataGridComponentId => "DataGrid",
+            AgentComponentCapabilityProfile.AgentDialogComponentId => "Dialog",
+            AgentComponentCapabilityProfile.AgentFormComponentId => "Form",
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId => "NavMenu",
+            AgentComponentCapabilityProfile.AgentTabsComponentId => "Tabs",
             _ => string.Empty
         };
 

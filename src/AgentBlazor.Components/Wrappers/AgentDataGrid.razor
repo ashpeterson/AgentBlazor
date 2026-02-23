@@ -109,25 +109,25 @@
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware data grid wrapper.");
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridSortActionId,
+            AgentComponentCapabilityProfile.DataGridSortActionId,
             "Sort the data grid."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             "Filter data grid rows."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId,
+            AgentComponentCapabilityProfile.DataGridClearFiltersActionId,
             "Clear data grid filters."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridSetPageActionId,
+            AgentComponentCapabilityProfile.DataGridSetPageActionId,
             "Navigate to a specific page."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridGoToPageActionId,
+            AgentComponentCapabilityProfile.DataGridGoToPageActionId,
             "Navigate to a specific page."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId,
+            AgentComponentCapabilityProfile.DataGridNavigateToRowActionId,
             "Focus the requested row."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DataGridSelectRowActionId,
+            AgentComponentCapabilityProfile.DataGridSelectRowActionId,
             "Select and focus the requested row."));
         return capability;
     }
@@ -176,8 +176,8 @@
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
-        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, action);
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+        action = NormalizeAction(AgentComponentCapabilityProfile.AgentDataGridComponentId, action);
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (!TryGetStringParameter(action, "column", out var column))
             {
@@ -206,8 +206,12 @@
             return await CompleteAndRefreshAsync(ActionResult.Success($"Sorted by '{SortColumn}' ({SortDirection})."));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
         {
+            var state = GetCurrentState();
+            var columns = GetFilterableColumns();
+            var resolvedArgs = ComponentActionArgumentResolver.ResolveArguments(ComponentType, action.Name, action.Parameters, state, knownColumns: columns);
+            action = AgentAction.Create(action.Name, new Dictionary<string, object?>(resolvedArgs, StringComparer.OrdinalIgnoreCase));
             var hasColumn = TryGetStringParameterWithAliases(action, out var column, "column", "field", "property");
             var hasOperator = TryGetStringParameterWithAliases(action, out var filterOperator, "operator", "op", "comparison");
             var hasValue = TryGetParameterValue(action, out var rawValue, "value", "fieldValue", "threshold", "query", "term");
@@ -301,7 +305,7 @@
             return await CompleteAndRefreshAsync(ActionResult.Success($"Applied filter {FilterColumn} {FilterOperator} {FilterValue ?? "null"}{defaulted}"));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridClearFiltersActionId, StringComparison.OrdinalIgnoreCase))
         {
             FilterColumn = null;
             FilterOperator = null;
@@ -314,8 +318,8 @@
             return await CompleteAndRefreshAsync(ActionResult.Success("Cleared filters."));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSetPageActionId, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridGoToPageActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridSetPageActionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridGoToPageActionId, StringComparison.OrdinalIgnoreCase))
         {
             var hasPageIndex = TryGetIntParameter(action, "pageIndex", out var pageIndex) ||
                                TryGetIntParameter(action, "page", out pageIndex);
@@ -348,8 +352,8 @@
                 : $"Set page to {CurrentPageIndex}."));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(action.Name, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (!TryGetStringParameter(action, "rowKey", out var rowKey))
             {

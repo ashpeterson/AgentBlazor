@@ -29,7 +29,7 @@
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware tabs wrapper.");
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             "Switch to a specific tab index."));
         return capability;
     }
@@ -44,8 +44,8 @@
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
-        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentTabsComponentId, action);
-        if (!string.Equals(action.Name, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
+        action = NormalizeAction(AgentComponentCapabilityProfile.AgentTabsComponentId, action);
+        if (!string.Equals(action.Name, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
         {
             return ActionResult.Unknown(action.Name);
         }

@@ -1,3 +1,4 @@
+using System.Reflection;
 using AgentBlazor.Core.Runtime.Routing;
 
 namespace AgentBlazor.Core.Runtime.Interfaces;
@@ -7,6 +8,11 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 /// </summary>
 public interface IRouteRegistry
 {
+    /// <summary>
+    /// Scans an assembly for [Route] page components and registers their routes.
+    /// </summary>
+    void ScanAssembly(Assembly assembly);
+
     /// <summary>
     /// Registers a route definition.
     /// </summary>

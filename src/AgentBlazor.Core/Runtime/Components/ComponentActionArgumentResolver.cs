@@ -6,13 +6,15 @@ namespace AgentBlazor.Core.Runtime.Components;
 /// <summary>
 /// Default schema-aware argument resolver. Uses component state to map display/LLM names
 /// to canonical column names and semantic values to concrete values (e.g. "High" → 70 for RiskScore).
+/// Column names are resolved by: (1) exact match on discovered columns, (2) optional alias map,
+/// (3) deterministic discovery-based match (token overlap against reflected property names).
 /// </summary>
 public sealed class ComponentActionArgumentResolver : IComponentActionArgumentResolver
 {
-    /// <summary>State key: list of canonical column/property names.</summary>
+    /// <summary>State key: list of canonical column/property names (from reflection on the grid's TItem).</summary>
     public const string StateKeyColumns = "columns";
 
-    /// <summary>State key: display name or alias → canonical column name.</summary>
+    /// <summary>State key: optional display name or alias → canonical column name.</summary>
     public const string StateKeyColumnAliases = "columnAliases";
 
     /// <summary>State key: per-column semantic value → canonical value (e.g. "RiskScore" → { "High" → 70 }).</summary>
@@ -23,76 +25,214 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
         string actionId,
         IReadOnlyDictionary<string, object?>? arguments,
         ComponentState componentState)
+        => ResolveArguments(componentType, actionId, arguments, componentState);
+
+    /// <summary>
+    /// Resolves arguments using component state (column discovery, aliases, value mappings).
+    /// Use this when an <see cref="IComponentActionArgumentResolver"/> instance is not available (e.g. optional DI).
+    /// </summary>
+    public static IReadOnlyDictionary<string, object?> ResolveArguments(
+        string componentType,
+        string actionId,
+        IReadOnlyDictionary<string, object?>? arguments,
+        ComponentState componentState)
+        => ResolveArguments(componentType, actionId, arguments, componentState, knownColumns: null);
+
+    /// <summary>
+    /// Resolves arguments with optional explicit column list (from reflection). When <paramref name="knownColumns"/> is provided,
+    /// it is used for column resolution instead of state["columns"], so resolution works even when state does not expose columns.
+    /// </summary>
+    public static IReadOnlyDictionary<string, object?> ResolveArguments(
+        string componentType,
+        string actionId,
+        IReadOnlyDictionary<string, object?>? arguments,
+        ComponentState componentState,
+        string[]? knownColumns)
     {
         if (arguments is null || arguments.Count == 0)
         {
             return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var result = new Dictionary<string, object?>(arguments, StringComparer.OrdinalIgnoreCase);
-
-        if (string.Equals(componentType, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in arguments)
         {
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+            result[kv.Key] = kv.Value;
+        }
+
+        // ComponentType may be "DataGrid" (from IAgentControllable) or "AgentDataGrid" (from capability profile)
+        if (IsDataGridComponentType(componentType))
+        {
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
             {
-                ResolveColumn(componentState, result);
-                if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+                ResolveColumn(componentState, result, knownColumns);
+                if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
                 {
                     ResolveFilterValue(componentState, result);
                 }
             }
         }
 
-        return result;
+        return new Dictionary<string, object?>(result, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static void ResolveColumn(ComponentState state, IDictionary<string, object?> result)
+    private static bool IsDataGridComponentType(string componentType) =>
+        string.Equals(componentType, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(componentType, "DataGrid", StringComparison.OrdinalIgnoreCase);
+
+    private static void ResolveColumn(ComponentState state, IDictionary<string, object?> result, string[]? knownColumns = null)
     {
-        if (!TryGetString(result, "column", out var columnHint) || string.IsNullOrWhiteSpace(columnHint))
+        if (!TryGetString((IReadOnlyDictionary<string, object?>)result, "column", out var columnHint) || string.IsNullOrWhiteSpace(columnHint))
         {
             return;
         }
 
-        var canonical = ResolveColumnName(columnHint, state);
+        var canonical = ResolveColumnName(columnHint, state, knownColumns);
         if (canonical is not null)
         {
             result["column"] = canonical;
         }
     }
 
-    private static string? ResolveColumnName(string hint, ComponentState state)
+    private static string? ResolveColumnName(string hint, ComponentState state, string[]? knownColumns = null)
     {
-        var columns = GetStringArray(state, StateKeyColumns);
-        if (columns is not null)
+        var columns = knownColumns ?? GetStringArray(state, StateKeyColumns);
+        if (columns is not null && columns.Length > 0)
         {
+            // 1) Exact match on discovered columns (from reflection on grid TItem)
             var exact = columns.FirstOrDefault(c => string.Equals(c, hint, StringComparison.OrdinalIgnoreCase));
             if (exact is not null)
             {
                 return exact;
             }
-        }
 
-        var aliases = GetColumnAliases(state);
-        if (aliases is not null && aliases.TryGetValue(hint, out var mapped))
-        {
-            return mapped;
-        }
-
-        foreach (var (alias, canonical) in aliases ?? [])
-        {
-            if (string.Equals(alias, hint, StringComparison.OrdinalIgnoreCase))
+            // 2) Optional alias map (app can override or add display-name → canonical)
+            var aliases = GetColumnAliases(state);
+            if (aliases is not null && aliases.TryGetValue(hint, out var mapped))
             {
-                return canonical;
+                return mapped;
+            }
+            if (aliases is not null)
+            {
+                foreach (var (alias, canonical) in aliases)
+                {
+                    if (string.Equals(alias, hint, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return canonical;
+                    }
+                }
+            }
+
+            // 3) Deterministic discovery-based match: resolve LLM-style names (e.g. "riskLevel") to canonical property names (e.g. "RiskScore") using token overlap over reflected columns. No app configuration required.
+            if (TryResolveColumnByDiscovery(hint, columns, out var discovered))
+            {
+                return discovered;
             }
         }
 
         return null;
     }
 
+    /// <summary>
+    /// Resolves a column hint to a canonical column name by token overlap over the discovered column list.
+    /// Deterministic: same hint and same column list always yield the same result.
+    /// </summary>
+    private static bool TryResolveColumnByDiscovery(string hint, string[] columns, out string? canonical)
+    {
+        canonical = null;
+        if (string.IsNullOrWhiteSpace(hint) || columns.Length == 0)
+        {
+            return false;
+        }
+
+        var hintTokens = GetIdentifierTokens(hint);
+        if (hintTokens.Count == 0)
+        {
+            return false;
+        }
+
+        int bestScore = -1;
+        string? bestColumn = null;
+
+        foreach (var column in columns)
+        {
+            var columnTokens = GetIdentifierTokens(column);
+            int score = 0;
+            foreach (var token in hintTokens)
+            {
+                if (columnTokens.Contains(token, StringComparer.OrdinalIgnoreCase))
+                {
+                    score++;
+                }
+            }
+            if (score > bestScore && score > 0)
+            {
+                bestScore = score;
+                bestColumn = column;
+            }
+            else if (score == bestScore && bestColumn is not null && string.Compare(column, bestColumn, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                bestColumn = column;
+            }
+        }
+
+        if (bestColumn is not null && bestScore > 0)
+        {
+            canonical = bestColumn;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Splits an identifier into tokens (e.g. "riskLevel" → ["risk","level"], "RiskScore" → ["risk","score"]) for deterministic matching.
+    /// Splits on non-letter/digit and on camelCase boundaries (uppercase after lowercase).
+    /// </summary>
+    private static List<string> GetIdentifierTokens(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        var tokens = new List<string>();
+        var current = new System.Text.StringBuilder();
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (!char.IsLetterOrDigit(c))
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+                continue;
+            }
+
+            if (char.IsUpper(c) && current.Length > 0)
+            {
+                tokens.Add(current.ToString());
+                current.Clear();
+            }
+
+            current.Append(char.ToLowerInvariant(c));
+        }
+
+        if (current.Length > 0)
+        {
+            tokens.Add(current.ToString());
+        }
+
+        return tokens;
+    }
+
     private static void ResolveFilterValue(ComponentState state, IDictionary<string, object?> result)
     {
-        if (!TryGetString(result, "column", out var column) || string.IsNullOrWhiteSpace(column))
+        if (!TryGetString((IReadOnlyDictionary<string, object?>)result, "column", out var column) || string.IsNullOrWhiteSpace(column))
         {
             return;
         }
@@ -108,7 +248,7 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
             return;
         }
 
-        if (!TryGetValue(result, "value", out var rawValue))
+        if (!TryGetValue((IReadOnlyDictionary<string, object?>)result, "value", out var rawValue))
         {
             return;
         }
@@ -122,6 +262,7 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
         if (columnMap.TryGetValue(valueStr, out var resolved))
         {
             result["value"] = resolved;
+            PromoteEqToGteForSemanticThreshold(result);
             return;
         }
 
@@ -130,8 +271,24 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
             if (string.Equals(key, valueStr, StringComparison.OrdinalIgnoreCase))
             {
                 result["value"] = val;
+                PromoteEqToGteForSemanticThreshold(result);
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    /// When a filter value was resolved from a semantic term (e.g. "high" → 70), treat "eq" as "gte"
+    /// so that "high risk" shows rows with score >= 70 instead of exactly 70.
+    /// </summary>
+    private static void PromoteEqToGteForSemanticThreshold(IDictionary<string, object?> result)
+    {
+        if (!TryGetString((IReadOnlyDictionary<string, object?>)result, "operator", out var op))
+            return;
+        if (string.Equals(op, "eq", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(op, "==", StringComparison.OrdinalIgnoreCase))
+        {
+            result["operator"] = "gte";
         }
     }
 

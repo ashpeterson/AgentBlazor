@@ -1,8 +1,13 @@
 namespace AgentBlazor.Components;
 
-public static class AgentComponentV1CapabilityProfile
+/// <summary>
+/// Canonical component and action identifiers and JSON schemas for agent-controllable components.
+/// Single source of truth for the shipped component capability profile.
+/// </summary>
+public static class AgentComponentCapabilityProfile
 {
-    public const string ProfileId = "agentblazor.components.v1";
+    /// <summary>Identifier for this capability profile (e.g. for diagnostics).</summary>
+    public const string ProfileId = "agentblazor.components";
 
     public const string AgentDataGridComponentId = "AgentDataGrid";
     public const string AgentDialogComponentId = "AgentDialog";
@@ -151,6 +156,49 @@ public static class AgentComponentV1CapabilityProfile
                 InputSchema: TabsSwitchTabInputSchema));
     }
 
+    /// <summary>
+    /// Applies a minimal subset: same components but only actions that do not require approval
+    /// (excludes DialogConfirm, FormSubmit, NavigationNavigateExternal).
+    /// </summary>
+    public static void ApplyMinimal(ComponentCapabilityCatalogBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddComponent(
+            AgentDataGridComponentId,
+            "AgentDataGrid interactions for filtering, sorting, row focus, and pagination.",
+            new ComponentActionCapability(DataGridFilterActionId, "Apply a filter to an AgentDataGrid column.", RequiresApproval: false, InputSchema: DataGridFilterInputSchema),
+            new ComponentActionCapability(DataGridSortActionId, "Apply sorting to an AgentDataGrid column.", RequiresApproval: false, InputSchema: DataGridSortInputSchema),
+            new ComponentActionCapability(DataGridClearFiltersActionId, "Clear AgentDataGrid filters.", RequiresApproval: false, InputSchema: DataGridClearFiltersInputSchema),
+            new ComponentActionCapability(DataGridNavigateToRowActionId, "Focus or navigate to a specific AgentDataGrid row.", RequiresApproval: false, InputSchema: DataGridNavigateToRowInputSchema),
+            new ComponentActionCapability(DataGridSelectRowActionId, "Select a specific AgentDataGrid row.", RequiresApproval: false, InputSchema: DataGridNavigateToRowInputSchema),
+            new ComponentActionCapability(DataGridGoToPageActionId, "Navigate to an AgentDataGrid page.", RequiresApproval: false, InputSchema: DataGridSetPageInputSchema),
+            new ComponentActionCapability(DataGridSetPageActionId, "Set AgentDataGrid paging state.", RequiresApproval: false, InputSchema: DataGridSetPageInputSchema));
+
+        builder.AddComponent(
+            AgentDialogComponentId,
+            "AgentDialog interactions for opening and closing dialogs.",
+            new ComponentActionCapability(DialogOpenActionId, "Open an AgentDialog with optional parameters.", RequiresApproval: false, InputSchema: DialogOpenInputSchema),
+            new ComponentActionCapability(DialogCloseActionId, "Close an AgentDialog with an optional reason.", RequiresApproval: false, InputSchema: DialogCloseInputSchema));
+
+        builder.AddComponent(
+            AgentFormComponentId,
+            "AgentForm interactions for field mutation and validation.",
+            new ComponentActionCapability(FormSetFieldActionId, "Set a field value on an AgentForm.", RequiresApproval: false, InputSchema: FormSetFieldInputSchema),
+            new ComponentActionCapability(FormValidateActionId, "Trigger validation on an AgentForm.", RequiresApproval: false, InputSchema: FormValidateInputSchema),
+            new ComponentActionCapability(FormResetActionId, "Reset AgentForm fields to initial values.", RequiresApproval: false, InputSchema: FormResetInputSchema));
+
+        builder.AddComponent(
+            AgentNavMenuComponentId,
+            "AgentNavMenu interactions for internal route changes.",
+            new ComponentActionCapability(NavigationNavigateToActionId, "Navigate to an internal route.", RequiresApproval: false, InputSchema: NavigationNavigateToInputSchema));
+
+        builder.AddComponent(
+            AgentTabsComponentId,
+            "AgentTabs interactions for switching active tabs.",
+            new ComponentActionCapability(TabsSwitchTabActionId, "Switch active tab by index.", RequiresApproval: false, InputSchema: TabsSwitchTabInputSchema));
+    }
+
     public const string DataGridFilterInputSchema = """
         {
           "type": "object",
@@ -160,10 +208,10 @@ public static class AgentComponentV1CapabilityProfile
             "operator": {
               "type": "string",
               "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "startswith", "endswith", "in", "notin", "isnull", "notnull"],
-              "description": "Filter operator. Use the sort action for asc/desc ordering."
+              "description": "Filter operator. For threshold phrases (e.g. 'high risk', 'low risk') use gte or lte so the app can map semantic values; use eq only for exact match. Use the sort action for asc/desc ordering."
             },
             "value": {
-              "description": "Filter value.",
+              "description": "Filter value; use semantic terms (e.g. high, low) when the app maps them to numbers.",
               "type": ["string", "number", "boolean", "null"]
             }
           },

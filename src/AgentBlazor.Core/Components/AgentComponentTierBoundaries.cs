@@ -16,39 +16,39 @@ public static class AgentComponentTierBoundaries
     private static readonly IReadOnlyDictionary<string, (string FeatureKey, AgentBlazorTier RequiredTier)> ActionTiers =
         new Dictionary<string, (string FeatureKey, AgentBlazorTier RequiredTier)>(StringComparer.OrdinalIgnoreCase)
         {
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridFilterActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridFilterActionId)] =
                 (DataGridBasicFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridSortActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridSortActionId)] =
                 (DataGridBasicFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridClearFiltersActionId)] =
                 (DataGridBasicFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId)] =
                 (DataGridAdvancedFeature, AgentBlazorTier.Paid),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridSelectRowActionId)] =
                 (DataGridAdvancedFeature, AgentBlazorTier.Paid),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridGoToPageActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridGoToPageActionId)] =
                 (DataGridAdvancedFeature, AgentBlazorTier.Paid),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, AgentComponentV1CapabilityProfile.DataGridSetPageActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridSetPageActionId)] =
                 (DataGridAdvancedFeature, AgentBlazorTier.Paid),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDialogComponentId, AgentComponentV1CapabilityProfile.DialogOpenActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDialogComponentId, AgentComponentCapabilityProfile.DialogOpenActionId)] =
                 (DialogFlowFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDialogComponentId, AgentComponentV1CapabilityProfile.DialogCloseActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDialogComponentId, AgentComponentCapabilityProfile.DialogCloseActionId)] =
                 (DialogFlowFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentDialogComponentId, AgentComponentV1CapabilityProfile.DialogConfirmActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDialogComponentId, AgentComponentCapabilityProfile.DialogConfirmActionId)] =
                 (DialogFlowFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentFormComponentId, AgentComponentV1CapabilityProfile.FormSetFieldActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormSetFieldActionId)] =
                 (FormAssistFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentFormComponentId, AgentComponentV1CapabilityProfile.FormValidateActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormValidateActionId)] =
                 (FormAssistFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentFormComponentId, AgentComponentV1CapabilityProfile.FormResetActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormResetActionId)] =
                 (FormAssistFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentFormComponentId, AgentComponentV1CapabilityProfile.FormSubmitActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormSubmitActionId)] =
                 (FormSubmissionFeature, AgentBlazorTier.Premium),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentNavMenuComponentId, AgentComponentCapabilityProfile.NavigationNavigateToActionId)] =
                 (NavigationInternalFeature, AgentBlazorTier.Free),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentNavMenuComponentId, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId)] =
                 (NavigationExternalFeature, AgentBlazorTier.Premium),
-            [ComponentActionPolicy.ToActionKey(AgentComponentV1CapabilityProfile.AgentTabsComponentId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId)] =
+            [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentTabsComponentId, AgentComponentCapabilityProfile.TabsSwitchTabActionId)] =
                 (TabsFeature, AgentBlazorTier.Free)
         };
 

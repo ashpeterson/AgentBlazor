@@ -104,8 +104,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "navigate",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             Keywords = ["go to", "navigate to", "open", "show me", "take me to", "bring me to", "go", "navigate", "switch to"],
             ExcludeKeywords = ["dialog", "tab"],
             BaseConfidence = 0.75f,
@@ -125,8 +125,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "filter",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridFilterActionId,
             Keywords = ["filter", "show only", "where", "with", "having", "high risk", "highest risk", "low risk", "lowest risk", "find", "search for"],
             BaseConfidence = 0.75f,
             Priority = 8,
@@ -151,8 +151,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "sort",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridSortActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridSortActionId,
             Keywords = ["sort", "order by", "arrange", "ascending", "descending", "highest to lowest", "lowest to highest", "asc", "desc"],
             BaseConfidence = 0.8f,
             Priority = 7,
@@ -171,8 +171,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "switch_tab",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentTabsComponentId,
+            ActionId = AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             Keywords = ["switch tab", "tab", "first tab", "second tab", "third tab", "next tab", "previous tab"],
             BaseConfidence = 0.8f,
             Priority = 6,
@@ -191,8 +191,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "open_dialog",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDialogComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DialogOpenActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
+            ActionId = AgentComponentCapabilityProfile.DialogOpenActionId,
             Keywords = ["open dialog", "show dialog", "open modal", "show modal", "popup"],
             BaseConfidence = 0.85f,
             Priority = 5
@@ -200,8 +200,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "close_dialog",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDialogComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DialogCloseActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
+            ActionId = AgentComponentCapabilityProfile.DialogCloseActionId,
             Keywords = ["close dialog", "close modal", "dismiss", "cancel dialog"],
             BaseConfidence = 0.85f,
             Priority = 5
@@ -209,8 +209,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "confirm_dialog",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDialogComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DialogConfirmActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
+            ActionId = AgentComponentCapabilityProfile.DialogConfirmActionId,
             Keywords = ["confirm", "confirm dialog", "ok", "yes", "proceed", "submit dialog"],
             ExcludeKeywords = ["form"],
             BaseConfidence = 0.7f,
@@ -221,8 +221,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "set_field",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentFormComponentId,
+            ActionId = AgentComponentCapabilityProfile.FormSetFieldActionId,
             Keywords = ["set field", "update field", "change field", "set", "update", "change", "fill in", "enter"],
             BaseConfidence = 0.7f,
             Priority = 3,
@@ -245,8 +245,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "submit_form",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.FormSubmitActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentFormComponentId,
+            ActionId = AgentComponentCapabilityProfile.FormSubmitActionId,
             Keywords = ["submit form", "submit", "save form", "save"],
             ExcludeKeywords = ["dialog"],
             BaseConfidence = 0.8f,
@@ -255,8 +255,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "validate_form",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.FormValidateActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentFormComponentId,
+            ActionId = AgentComponentCapabilityProfile.FormValidateActionId,
             Keywords = ["validate form", "validate", "check form", "verify form"],
             BaseConfidence = 0.8f,
             Priority = 4
@@ -264,8 +264,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "reset_form",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.FormResetActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentFormComponentId,
+            ActionId = AgentComponentCapabilityProfile.FormResetActionId,
             Keywords = ["reset form", "clear form", "reset", "clear fields"],
             BaseConfidence = 0.8f,
             Priority = 4
@@ -275,8 +275,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "go_to_page",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridGoToPageActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridGoToPageActionId,
             Keywords = ["page", "go to page", "next page", "previous page", "first page", "last page"],
             BaseConfidence = 0.8f,
             Priority = 3,
@@ -295,8 +295,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "select_row",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridSelectRowActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridSelectRowActionId,
             Keywords = ["select", "select row", "click on", "choose"],
             BaseConfidence = 0.7f,
             Priority = 2,
@@ -315,8 +315,8 @@ internal sealed class IntentRule
         new IntentRule
         {
             IntentName = "clear_filters",
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridClearFiltersActionId,
             Keywords = ["clear filter", "clear filters", "remove filter", "reset filter", "show all"],
             BaseConfidence = 0.85f,
             Priority = 6

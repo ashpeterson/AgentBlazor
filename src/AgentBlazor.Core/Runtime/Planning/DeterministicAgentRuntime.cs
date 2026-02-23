@@ -127,6 +127,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
 
             _logger?.LogInformation("Plan created with {StepCount} steps", plan.Steps.Count);
 
+            plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents);
+
             // PHASE 2: VALIDATE
             _logger?.LogInformation("Phase 2: Validating plan");
 
@@ -320,6 +322,88 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
                     .ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? "")
             })
             .ToList();
+    }
+
+    /// <summary>
+    /// When the plan's first step targets a component that is not mounted, prepend a navigate_to step
+    /// using the route from UnmountedComponentRoutes (if configured). Ensures deterministic navigation
+    /// without relying on the LLM to always output navigate first.
+    /// </summary>
+    private ActionPlan EnsureNavigationWhenTargetUnmounted(ActionPlan plan, IReadOnlyList<MountedComponentState> mountedComponents)
+    {
+        if (plan.Steps.Count == 0) return plan;
+
+        var first = plan.Steps[0];
+        if (string.Equals(first.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(first.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return plan;
+        }
+
+        if (IsComponentTypeMounted(first.ComponentId, mountedComponents))
+        {
+            _logger?.LogDebug(
+                "Skipping navigation prepend: first step targets component {ComponentId} which is already mounted.",
+                first.ComponentId);
+            return plan;
+        }
+
+        var routes = _options.Value.UnmountedComponentRoutes;
+        if (routes.Count == 0)
+        {
+            _logger?.LogDebug(
+                "Skipping navigation prepend: UnmountedComponentRoutes is empty (no assemblies scanned or no AgentComponentIds on pages).");
+            return plan;
+        }
+
+        if (!TryGetRouteForComponent(first.ComponentId, routes, out var route) || string.IsNullOrWhiteSpace(route))
+        {
+            _logger?.LogDebug(
+                "Skipping navigation prepend: no route configured for component {ComponentId}. Mounted count={MountedCount}, Route keys=[{RouteKeys}]",
+                first.ComponentId, mountedComponents.Count, string.Join(", ", routes.Keys));
+            return plan;
+        }
+
+        var navigateStep = new PlannedStep
+        {
+            ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
+            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["uri"] = route }
+        };
+
+        var newSteps = new List<PlannedStep> { navigateStep };
+        foreach (var step in plan.Steps)
+        {
+            newSteps.Add(step);
+        }
+
+        _logger?.LogInformation(
+            "Prepending navigation to {Route} because first step targets unmounted component {ComponentId}",
+            route, first.ComponentId);
+
+        return plan with { Steps = newSteps };
+    }
+
+    private static bool TryGetRouteForComponent(string componentId, IDictionary<string, string> routes, out string? route)
+    {
+        if (routes.TryGetValue(componentId, out route) && !string.IsNullOrWhiteSpace(route))
+            return true;
+        var componentType = componentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? componentId[5..]
+            : componentId;
+        if (routes.TryGetValue(componentType, out route) && !string.IsNullOrWhiteSpace(route))
+            return true;
+        route = null;
+        return false;
+    }
+
+    private static bool IsComponentTypeMounted(string componentId, IReadOnlyList<MountedComponentState> mountedComponents)
+    {
+        var expectedType = componentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? componentId[5..]
+            : componentId;
+        return mountedComponents.Any(m =>
+            string.Equals(m.ComponentType, expectedType, StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlySet<string> GetApprovedActions()

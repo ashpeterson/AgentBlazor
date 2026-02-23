@@ -78,6 +78,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("4. If you cannot determine a required parameter, set needsClarification to true.");
         sb.AppendLine("5. Do NOT infer, guess, or assume parameter values that aren't in the request.");
         sb.AppendLine("6. If the request is ambiguous, ask for clarification.");
+        sb.AppendLine("7. NAVIGATION FIRST: If an action targets a component (e.g. AgentDataGrid, AgentForm, AgentTabs) that is NOT in CURRENTLY MOUNTED COMPONENTS below, you MUST add a first step: AgentNavMenu navigate_to with arguments.uri set to the route where that component lives (e.g. /suppliers for a suppliers grid, /workspace for workspace/tabs). Then add the component action as the second step. Do not output only the component action when the user is on another page.");
         sb.AppendLine();
         sb.AppendLine("OUTPUT SCHEMA:");
         sb.AppendLine(@"{
@@ -126,7 +127,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         if (request.MountedComponents.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("CURRENTLY MOUNTED COMPONENTS:");
+            sb.AppendLine("CURRENTLY MOUNTED COMPONENTS (what is on the current page):");
             foreach (var mounted in request.MountedComponents)
             {
                 sb.Append("- ").Append(mounted.AgentId).Append(" (").Append(mounted.ComponentType).Append(')');
@@ -137,6 +138,13 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
                 }
                 sb.AppendLine();
             }
+            sb.AppendLine("If the user asks to filter, sort, or act on a DataGrid/Form/Tabs that is NOT listed above, add AgentNavMenu navigate_to as the first step with the correct uri, then the component action.");
+        }
+        else
+        {
+            sb.AppendLine();
+            sb.AppendLine("CURRENTLY MOUNTED COMPONENTS: (none - user is likely on home or a page without agent components)");
+            sb.AppendLine("If the request involves a grid, form, or tabs, add AgentNavMenu navigate_to as the first step with uri set to the relevant route (e.g. /suppliers, /workspace), then add the component action.");
         }
 
         return sb.ToString();

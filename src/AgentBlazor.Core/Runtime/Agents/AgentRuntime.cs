@@ -1222,8 +1222,8 @@ internal sealed class AgentRuntime(
             filterAction.ActionId);
 
         var navPlanned = new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             $"{BuildToolInvocationReason(userMessage)} (intent-only navigation)",
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["uri"] = uri });
         plannedActions.Enqueue(navPlanned);
@@ -1388,8 +1388,8 @@ internal sealed class AgentRuntime(
         {
             return TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId,
                 out action);
         }
 
@@ -1403,8 +1403,8 @@ internal sealed class AgentRuntime(
         {
             return TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridSortActionId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridSortActionId,
                 out action);
         }
 
@@ -1412,8 +1412,8 @@ internal sealed class AgentRuntime(
         {
             if (!TryResolveAllowedAction(
                     allowedComponents,
-                    AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-                    AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+                    AgentComponentCapabilityProfile.AgentTabsComponentId,
+                    AgentComponentCapabilityProfile.TabsSwitchTabActionId,
                     out action))
             {
                 return false;
@@ -1437,13 +1437,13 @@ internal sealed class AgentRuntime(
         {
             var actionId =
                 ContainsAny(userMessage, "close dialog")
-                    ? AgentComponentV1CapabilityProfile.DialogCloseActionId
+                    ? AgentComponentCapabilityProfile.DialogCloseActionId
                     : ContainsAny(userMessage, "confirm dialog")
-                        ? AgentComponentV1CapabilityProfile.DialogConfirmActionId
-                        : AgentComponentV1CapabilityProfile.DialogOpenActionId;
+                        ? AgentComponentCapabilityProfile.DialogConfirmActionId
+                        : AgentComponentCapabilityProfile.DialogOpenActionId;
             return TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+                AgentComponentCapabilityProfile.AgentDialogComponentId,
                 actionId,
                 out action);
         }
@@ -1452,22 +1452,22 @@ internal sealed class AgentRuntime(
         {
             var actionId =
                 ContainsAny(userMessage, "submit form")
-                    ? AgentComponentV1CapabilityProfile.FormSubmitActionId
+                    ? AgentComponentCapabilityProfile.FormSubmitActionId
                     : ContainsAny(userMessage, "reset form")
-                        ? AgentComponentV1CapabilityProfile.FormResetActionId
+                        ? AgentComponentCapabilityProfile.FormResetActionId
                         : ContainsAny(userMessage, "validate form")
-                            ? AgentComponentV1CapabilityProfile.FormValidateActionId
-                            : AgentComponentV1CapabilityProfile.FormSetFieldActionId;
+                            ? AgentComponentCapabilityProfile.FormValidateActionId
+                            : AgentComponentCapabilityProfile.FormSetFieldActionId;
             if (!TryResolveAllowedAction(
                     allowedComponents,
-                    AgentComponentV1CapabilityProfile.AgentFormComponentId,
+                    AgentComponentCapabilityProfile.AgentFormComponentId,
                     actionId,
                     out action))
             {
                 return false;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
                 TryExtractFieldAssignment(userMessage, out var field, out var value))
             {
                 action = action with
@@ -1497,8 +1497,8 @@ internal sealed class AgentRuntime(
         action = default;
         if (!TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-                AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+                AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.NavigationNavigateToActionId,
                 out var navigationAction))
         {
             return false;
@@ -1510,7 +1510,7 @@ internal sealed class AgentRuntime(
         }
 
         var hasQueuedSurfaceAction = executionSnapshot.Any(result =>
-            !string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded &&
             result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
         if (!hasQueuedSurfaceAction)
@@ -1520,7 +1520,7 @@ internal sealed class AgentRuntime(
 
         var hasMissingSurfaceType = executionSnapshot.Any(result =>
         {
-            if (string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -1572,8 +1572,8 @@ internal sealed class AgentRuntime(
 
         if (TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId,
                 out var filterAction))
         {
             action = filterAction with
@@ -1590,8 +1590,8 @@ internal sealed class AgentRuntime(
 
         if (TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridSelectRowActionId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridSelectRowActionId,
                 out var selectAction))
         {
             action = selectAction with
@@ -1606,8 +1606,8 @@ internal sealed class AgentRuntime(
 
         if (TryResolveAllowedAction(
                 allowedComponents,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridNavigateToRowActionId,
                 out var navigateToRowAction))
         {
             action = navigateToRowAction with
@@ -2021,9 +2021,9 @@ internal sealed class AgentRuntime(
     {
         return executionResults.Any(static result =>
             result.Succeeded &&
-            string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase)) ||
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase)) ||
             plannedActions.Any(static action =>
-                string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
+                string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasNonNavigationAction(
@@ -2031,9 +2031,9 @@ internal sealed class AgentRuntime(
         IReadOnlyList<ComponentActionExecutionResult> executionResults)
     {
         return executionResults.Any(static result =>
-                   !string.Equals(result.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase)) ||
+                   !string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase)) ||
                plannedActions.Any(static action =>
-                   !string.Equals(action.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
+                   !string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasQueuedExecutionResultForComponent(
@@ -2123,17 +2123,17 @@ internal sealed class AgentRuntime(
             : "Execute this UI action.";
         var requiredArgumentsHint = action.ActionId switch
         {
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId =>
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId =>
                 " Required args: provide one of uri, url, or target (for example uri='/suppliers').",
-            AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId =>
+            AgentComponentCapabilityProfile.NavigationNavigateExternalActionId =>
                 " Required args: provide one of uri, url, or target.",
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId =>
+            AgentComponentCapabilityProfile.DataGridFilterActionId =>
                 " Required args: column, operator, and value.",
-            AgentComponentV1CapabilityProfile.DataGridSortActionId =>
+            AgentComponentCapabilityProfile.DataGridSortActionId =>
                 " Required args: column. Optional: direction ('asc' or 'desc').",
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId =>
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId =>
                 " Required args: index.",
-            AgentComponentV1CapabilityProfile.FormSetFieldActionId =>
+            AgentComponentCapabilityProfile.FormSetFieldActionId =>
                 " Required args: field and value.",
             _ => string.Empty
         };
@@ -2281,7 +2281,7 @@ internal sealed class AgentRuntime(
         AddIfNotNullOrWhiteSpace(arguments, "agentId", snapshot.AgentId);
         var state = snapshot.State;
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "sortColumn", "currentSortColumn");
             AddStateHint(arguments, state, "filterColumn", "currentFilterColumn");
@@ -2291,13 +2291,13 @@ internal sealed class AgentRuntime(
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "activePanelIndex", "currentIndex");
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "uri", "currentUri");
         }
@@ -2346,9 +2346,9 @@ internal sealed class AgentRuntime(
         string userMessage,
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponentSnapshots)
     {
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
                 !arguments.ContainsKey("direction"))
             {
                 var inferredDirection = InferSortDirection(userMessage);
@@ -2358,15 +2358,15 @@ internal sealed class AgentRuntime(
                 }
             }
 
-            if ((string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase)) &&
+            if ((string.Equals(actionId, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase)) &&
                 !arguments.ContainsKey("rowKey") &&
                 TryExtractEntityKeyToken(userMessage, out var rowKey))
             {
                 arguments["rowKey"] = rowKey;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
             {
                 // Infer risk-based filter so "show me high risk suppliers" works from any page (e.g. home)
                 if (!arguments.ContainsKey("column") && TryInferRiskFilterArguments(userMessage, out var riskColumn, out var riskOperator, out var riskValue))
@@ -2389,9 +2389,9 @@ internal sealed class AgentRuntime(
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            (string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)) &&
             !HasAnyKey(arguments, "uri", "url", "target") &&
             TryInferNavigationUri(userMessage, out var inferredUri))
         {
@@ -2399,8 +2399,8 @@ internal sealed class AgentRuntime(
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
             !arguments.ContainsKey("index") &&
             TryParseIndexFromUserMessage(userMessage, out var tabIndex))
         {
@@ -2408,8 +2408,8 @@ internal sealed class AgentRuntime(
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
             TryExtractFieldAssignment(userMessage, out var field, out var value))
         {
             AddIfMissing(arguments, "field", field);
@@ -2465,11 +2465,11 @@ internal sealed class AgentRuntime(
     private static string ResolveComponentType(string componentId) =>
         componentId switch
         {
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId => "DataGrid",
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId => "Dialog",
-            AgentComponentV1CapabilityProfile.AgentFormComponentId => "Form",
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId => "NavMenu",
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId => "Tabs",
+            AgentComponentCapabilityProfile.AgentDataGridComponentId => "DataGrid",
+            AgentComponentCapabilityProfile.AgentDialogComponentId => "Dialog",
+            AgentComponentCapabilityProfile.AgentFormComponentId => "Form",
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId => "NavMenu",
+            AgentComponentCapabilityProfile.AgentTabsComponentId => "Tabs",
             _ => string.Empty
         };
 
@@ -2603,8 +2603,8 @@ internal sealed class AgentRuntime(
     {
         var columnExamples = BuildDataGridColumnExamples(registeredComponents);
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(parameter, "column", StringComparison.OrdinalIgnoreCase))
         {
             if (TrySuggestDataGridSort(userMessage, registeredComponents, out var column, out var direction))
@@ -2623,8 +2623,8 @@ internal sealed class AgentRuntime(
                 : "Which column should I sort by?";
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
         {
             return parameter.ToLowerInvariant() switch
             {
@@ -2637,7 +2637,7 @@ internal sealed class AgentRuntime(
             };
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
             parameter is not null &&
             (parameter.Equals("uri", StringComparison.OrdinalIgnoreCase) ||
              parameter.Equals("url", StringComparison.OrdinalIgnoreCase) ||
@@ -2651,13 +2651,13 @@ internal sealed class AgentRuntime(
             return "Which route should I navigate to (for example /suppliers or /settings)?";
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(parameter, "index", StringComparison.OrdinalIgnoreCase))
         {
             return "Which tab should I switch to (for example first, second, or an explicit index)?";
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
         {
             var parameterKey = parameter?.ToLowerInvariant() ?? string.Empty;
             return parameterKey switch
@@ -3085,11 +3085,11 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(
                 failedPlan.ActionId,
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(missingParameter, "operator", StringComparison.OrdinalIgnoreCase) &&
             !args.ContainsKey("operator") &&
@@ -3100,11 +3100,11 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.AgentNavMenuComponentId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(
                 failedPlan.ActionId,
-                AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+                AgentComponentCapabilityProfile.NavigationNavigateToActionId,
                 StringComparison.OrdinalIgnoreCase))
         {
             if (!args.ContainsKey("uri") &&
@@ -3123,11 +3123,11 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.AgentNavMenuComponentId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(
                 failedPlan.ActionId,
-                AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId,
+                AgentComponentCapabilityProfile.NavigationNavigateExternalActionId,
                 StringComparison.OrdinalIgnoreCase))
         {
             if (!args.ContainsKey("uri") &&
@@ -3146,16 +3146,16 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
                 StringComparison.OrdinalIgnoreCase))
         {
             if ((string.Equals(
                      failedPlan.ActionId,
-                     AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId,
+                     AgentComponentCapabilityProfile.DataGridNavigateToRowActionId,
                      StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(
                      failedPlan.ActionId,
-                     AgentComponentV1CapabilityProfile.DataGridSelectRowActionId,
+                     AgentComponentCapabilityProfile.DataGridSelectRowActionId,
                      StringComparison.OrdinalIgnoreCase)) &&
                 string.Equals(missingParameter, "rowKey", StringComparison.OrdinalIgnoreCase) &&
                 !args.ContainsKey("rowKey") &&
@@ -3166,7 +3166,7 @@ internal sealed class AgentRuntime(
 
             if (string.Equals(
                     failedPlan.ActionId,
-                    AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                    AgentComponentCapabilityProfile.DataGridFilterActionId,
                     StringComparison.OrdinalIgnoreCase) &&
                 TryExtractEntityKeyToken(userMessage, out var filterEntity))
             {
@@ -3189,11 +3189,11 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentTabsComponentId,
+                AgentComponentCapabilityProfile.AgentTabsComponentId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(
                 failedPlan.ActionId,
-                AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+                AgentComponentCapabilityProfile.TabsSwitchTabActionId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(missingParameter, "index", StringComparison.OrdinalIgnoreCase) &&
             !args.ContainsKey("index") &&
@@ -3204,11 +3204,11 @@ internal sealed class AgentRuntime(
 
         if (string.Equals(
                 failedPlan.ComponentId,
-                AgentComponentV1CapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.AgentFormComponentId,
                 StringComparison.OrdinalIgnoreCase) &&
             string.Equals(
                 failedPlan.ActionId,
-                AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+                AgentComponentCapabilityProfile.FormSetFieldActionId,
                 StringComparison.OrdinalIgnoreCase) &&
             TryExtractFieldAssignment(userMessage, out var field, out var value))
         {
@@ -3303,8 +3303,8 @@ internal sealed class AgentRuntime(
     {
         var args = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(missingParameter, "column", StringComparison.OrdinalIgnoreCase) &&
             TrySuggestDataGridSort(userMessage, registeredComponents, out var column, out var direction))
         {
@@ -3317,8 +3317,8 @@ internal sealed class AgentRuntime(
             return args;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
             (string.Equals(missingParameter, "uri", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(missingParameter, "url", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(missingParameter, "target", StringComparison.OrdinalIgnoreCase)) &&
@@ -3328,8 +3328,8 @@ internal sealed class AgentRuntime(
             return args;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(missingParameter, "index", StringComparison.OrdinalIgnoreCase) &&
             TryParseIndexFromUserMessage(userMessage, out var tabIndex))
         {

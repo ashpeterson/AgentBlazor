@@ -28,7 +28,6 @@ var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
 
 builder.Services.AddAgentBlazor(options =>
 {
-
     if (!string.IsNullOrWhiteSpace(openAiApiKey))
     {
         options.UseOpenAI(openAiApiKey, openAiModel);

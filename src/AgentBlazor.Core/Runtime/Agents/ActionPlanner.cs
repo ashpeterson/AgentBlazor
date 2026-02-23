@@ -105,10 +105,10 @@ internal sealed class ActionPlanner : IActionPlanner
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponents)
     {
         // DataGrid actions
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
             // Sort direction inference
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
                 !args.ContainsKey("direction"))
             {
                 var inferredDirection = InferSortDirection(userMessage);
@@ -119,8 +119,8 @@ internal sealed class ActionPlanner : IActionPlanner
             }
 
             // Row key extraction for navigation/selection
-            if ((string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase)) &&
+            if ((string.Equals(actionId, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase)) &&
                 !args.ContainsKey("rowKey") &&
                 _intentResolver.TryExtractEntityKeyToken(userMessage, out var rowKey))
             {
@@ -128,7 +128,7 @@ internal sealed class ActionPlanner : IActionPlanner
             }
 
             // Filter entity extraction
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
                 _intentResolver.TryExtractEntityKeyToken(userMessage, out var filterEntityKey))
             {
                 AddIfMissing(args, "operator", "eq");
@@ -143,9 +143,9 @@ internal sealed class ActionPlanner : IActionPlanner
         }
 
         // Navigation actions
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            (string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)) &&
             !HasAnyKey(args, "uri", "url", "target") &&
             _intentResolver.TryInferNavigationUri(userMessage, out var inferredUri))
         {
@@ -154,8 +154,8 @@ internal sealed class ActionPlanner : IActionPlanner
         }
 
         // Tab switching
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
             !args.ContainsKey("index") &&
             TryParseIndexFromUserMessage(userMessage, out var tabIndex))
         {
@@ -164,8 +164,8 @@ internal sealed class ActionPlanner : IActionPlanner
         }
 
         // Form field assignment
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase) &&
             TryExtractFieldAssignment(userMessage, out var field, out var value))
         {
             AddIfMissing(args, "field", field);
@@ -261,17 +261,17 @@ internal sealed class ActionPlanner : IActionPlanner
 
         var requiredArgumentsHint = action.ActionId switch
         {
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId =>
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId =>
                 " Required args: provide one of uri, url, or target (for example uri='/suppliers').",
-            AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId =>
+            AgentComponentCapabilityProfile.NavigationNavigateExternalActionId =>
                 " Required args: provide one of uri, url, or target.",
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId =>
+            AgentComponentCapabilityProfile.DataGridFilterActionId =>
                 " Required args: column, operator, and value.",
-            AgentComponentV1CapabilityProfile.DataGridSortActionId =>
+            AgentComponentCapabilityProfile.DataGridSortActionId =>
                 " Required args: column. Optional: direction ('asc' or 'desc').",
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId =>
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId =>
                 " Required args: index.",
-            AgentComponentV1CapabilityProfile.FormSetFieldActionId =>
+            AgentComponentCapabilityProfile.FormSetFieldActionId =>
                 " Required args: field and value.",
             _ => string.Empty
         };
@@ -283,29 +283,29 @@ internal sealed class ActionPlanner : IActionPlanner
     {
         var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
             {
                 parameters["column"] = "The column to filter on";
                 parameters["operator"] = "The filter operator (eq, ne, gt, lt, gte, lte, contains, startswith, endswith)";
                 parameters["value"] = "The value to filter by";
             }
-            else if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
             {
                 parameters["column"] = "The column to sort by";
                 parameters["direction"] = "The sort direction (asc or desc)";
             }
         }
-        else if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             parameters["uri"] = "The URI to navigate to";
         }
-        else if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
         {
             parameters["index"] = "The tab index (0-based)";
         }
-        else if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
         {
             parameters["field"] = "The field name";
             parameters["value"] = "The value to set";
@@ -328,7 +328,7 @@ internal sealed class ActionPlanner : IActionPlanner
         AddIfNotNullOrWhiteSpace(arguments, "agentId", snapshot.AgentId);
         var state = snapshot.State;
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "sortColumn", "currentSortColumn");
             AddStateHint(arguments, state, "filterColumn", "currentFilterColumn");
@@ -338,13 +338,13 @@ internal sealed class ActionPlanner : IActionPlanner
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "activePanelIndex", "currentIndex");
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             AddStateHint(arguments, state, "uri", "currentUri");
         }
@@ -434,11 +434,11 @@ internal sealed class ActionPlanner : IActionPlanner
     private static string ResolveComponentType(string componentId) =>
         componentId switch
         {
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId => "DataGrid",
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId => "Dialog",
-            AgentComponentV1CapabilityProfile.AgentFormComponentId => "Form",
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId => "NavMenu",
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId => "Tabs",
+            AgentComponentCapabilityProfile.AgentDataGridComponentId => "DataGrid",
+            AgentComponentCapabilityProfile.AgentDialogComponentId => "Dialog",
+            AgentComponentCapabilityProfile.AgentFormComponentId => "Form",
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId => "NavMenu",
+            AgentComponentCapabilityProfile.AgentTabsComponentId => "Tabs",
             _ => string.Empty
         };
 

@@ -112,8 +112,8 @@ internal sealed record ResolvedIntent
     public static ResolvedIntent Navigate(string uri, IntentClassification classification) => new()
     {
         Classification = classification,
-        ComponentId = AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-        ActionId = AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+        ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+        ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
         Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["uri"] = uri
@@ -131,8 +131,8 @@ internal sealed record ResolvedIntent
         object? value = null) => new()
     {
         Classification = classification,
-        ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-        ActionId = AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+        ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+        ActionId = AgentComponentCapabilityProfile.DataGridFilterActionId,
         Arguments = BuildArguments(("column", column), ("operator", @operator), ("value", value)),
         Reason = "Filter data grid"
     };
@@ -146,8 +146,8 @@ internal sealed record ResolvedIntent
         string? direction = null) => new()
     {
         Classification = classification,
-        ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-        ActionId = AgentComponentV1CapabilityProfile.DataGridSortActionId,
+        ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+        ActionId = AgentComponentCapabilityProfile.DataGridSortActionId,
         Arguments = BuildArguments(("column", column), ("direction", direction)),
         Reason = "Sort data grid"
     };

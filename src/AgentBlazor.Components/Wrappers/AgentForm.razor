@@ -54,17 +54,17 @@
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware form wrapper.");
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+            AgentComponentCapabilityProfile.FormSetFieldActionId,
             "Set a form field value."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.FormValidateActionId,
+            AgentComponentCapabilityProfile.FormValidateActionId,
             "Validate the form."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.FormSubmitActionId,
+            AgentComponentCapabilityProfile.FormSubmitActionId,
             "Submit the form.",
             RequiresApproval: true));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.FormResetActionId,
+            AgentComponentCapabilityProfile.FormResetActionId,
             "Reset form fields to initial values."));
         return capability;
     }
@@ -85,9 +85,9 @@
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
-        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentFormComponentId, action);
+        action = NormalizeAction(AgentComponentCapabilityProfile.AgentFormComponentId, action);
         EnsureEditContext();
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (!action.TryGetParameter<string>("field", out var field) || string.IsNullOrWhiteSpace(field))
             {
@@ -108,7 +108,7 @@
             return ActionResult.Success(message);
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase))
         {
             var valid = _editContext!.Validate();
             await ValidationChanged.InvokeAsync(valid);
@@ -118,7 +118,7 @@
                 : ActionResult.Failure("Form validation failed.");
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase))
         {
             var valid = _editContext!.Validate();
             await ValidationChanged.InvokeAsync(valid);
@@ -132,7 +132,7 @@
             return ActionResult.Success("Submitted form.");
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.FormResetActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormResetActionId, StringComparison.OrdinalIgnoreCase))
         {
             RestoreValues(Model, _initialValues);
             _editContext = new EditContext(Model);

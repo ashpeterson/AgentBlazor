@@ -25,10 +25,10 @@
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware navigation menu wrapper.");
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             "Navigate to an internal route."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId,
+            AgentComponentCapabilityProfile.NavigationNavigateExternalActionId,
             "Navigate to an external URL.",
             RequiresApproval: true));
         return capability;
@@ -45,7 +45,7 @@
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
-        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, action);
+        action = NormalizeAction(AgentComponentCapabilityProfile.AgentNavMenuComponentId, action);
 
         var target = ResolveTarget(action);
         if (string.IsNullOrWhiteSpace(target))
@@ -54,13 +54,13 @@
                 $"Action '{action.Name}' requires 'uri', 'url', or 'target' parameter."));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
         {
             Navigation.NavigateTo(target, forceLoad: false);
             return Task.FromResult(ActionResult.Success($"Navigated to {target}."));
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase))
         {
             Navigation.NavigateTo(target, forceLoad: true);
             return Task.FromResult(ActionResult.Success($"Navigated externally to {target}."));

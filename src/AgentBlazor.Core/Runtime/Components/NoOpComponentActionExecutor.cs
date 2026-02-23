@@ -25,36 +25,36 @@ internal sealed class NoOpComponentActionExecutor(
 
         return (action.ComponentId, action.ActionId) switch
         {
-            (AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId or
-                AgentComponentV1CapabilityProfile.DataGridClearFiltersActionId or
-                AgentComponentV1CapabilityProfile.DataGridSortActionId or
-                AgentComponentV1CapabilityProfile.DataGridSelectRowActionId or
-                AgentComponentV1CapabilityProfile.DataGridGoToPageActionId or
-                AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId or
-                AgentComponentV1CapabilityProfile.DataGridSetPageActionId) =>
+            (AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId or
+                AgentComponentCapabilityProfile.DataGridClearFiltersActionId or
+                AgentComponentCapabilityProfile.DataGridSortActionId or
+                AgentComponentCapabilityProfile.DataGridSelectRowActionId or
+                AgentComponentCapabilityProfile.DataGridGoToPageActionId or
+                AgentComponentCapabilityProfile.DataGridNavigateToRowActionId or
+                AgentComponentCapabilityProfile.DataGridSetPageActionId) =>
                 dataGridExecutor.ExecuteAsync(new DataGridActionRequest(action.ActionId, normalizedArguments), cancellationToken),
 
-            (AgentComponentV1CapabilityProfile.AgentDialogComponentId,
-                AgentComponentV1CapabilityProfile.DialogOpenActionId or
-                AgentComponentV1CapabilityProfile.DialogCloseActionId or
-                AgentComponentV1CapabilityProfile.DialogConfirmActionId) =>
+            (AgentComponentCapabilityProfile.AgentDialogComponentId,
+                AgentComponentCapabilityProfile.DialogOpenActionId or
+                AgentComponentCapabilityProfile.DialogCloseActionId or
+                AgentComponentCapabilityProfile.DialogConfirmActionId) =>
                 dialogExecutor.ExecuteAsync(new DialogActionRequest(action.ActionId, normalizedArguments), cancellationToken),
 
-            (AgentComponentV1CapabilityProfile.AgentFormComponentId,
-                AgentComponentV1CapabilityProfile.FormSetFieldActionId or
-                AgentComponentV1CapabilityProfile.FormValidateActionId or
-                AgentComponentV1CapabilityProfile.FormResetActionId or
-                AgentComponentV1CapabilityProfile.FormSubmitActionId) =>
+            (AgentComponentCapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.FormSetFieldActionId or
+                AgentComponentCapabilityProfile.FormValidateActionId or
+                AgentComponentCapabilityProfile.FormResetActionId or
+                AgentComponentCapabilityProfile.FormSubmitActionId) =>
                 formExecutor.ExecuteAsync(new FormActionRequest(action.ActionId, normalizedArguments), cancellationToken),
 
-            (AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-                AgentComponentV1CapabilityProfile.NavigationNavigateToActionId or
-                AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId) =>
+            (AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.NavigationNavigateToActionId or
+                AgentComponentCapabilityProfile.NavigationNavigateExternalActionId) =>
                 navigationExecutor.ExecuteAsync(new NavigationActionRequest(action.ActionId, normalizedArguments), cancellationToken),
 
-            (AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-                AgentComponentV1CapabilityProfile.TabsSwitchTabActionId) =>
+            (AgentComponentCapabilityProfile.AgentTabsComponentId,
+                AgentComponentCapabilityProfile.TabsSwitchTabActionId) =>
                 tabsExecutor.ExecuteAsync(new TabsActionRequest(action.ActionId, normalizedArguments), cancellationToken),
 
             ("AgentChatWidget", "open_widget" or "close_widget") =>

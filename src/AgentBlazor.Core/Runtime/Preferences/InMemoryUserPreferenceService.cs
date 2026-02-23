@@ -78,7 +78,7 @@ internal sealed class InMemoryUserPreferenceService : IUserPreferenceService
                     data.ValueFrequency[valueKey] = valueCount + 1;
 
                     // Track sort preferences
-                    if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
                     {
                         if (string.Equals(key, "column", StringComparison.OrdinalIgnoreCase))
                         {
@@ -91,7 +91,7 @@ internal sealed class InMemoryUserPreferenceService : IUserPreferenceService
                     }
 
                     // Track route visits
-                    if (string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
+                    if (string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
                         string.Equals(key, "uri", StringComparison.OrdinalIgnoreCase))
                     {
                         data.RouteVisits.TryGetValue(valueStr, out var routeCount);

@@ -1,3 +1,4 @@
+using System.Reflection;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
 using AgentBlazor.Services;
@@ -10,6 +11,7 @@ public sealed class AgentBlazorRegistrationOptions
     private Action<IServiceCollection>? _providerRegistration;
     private Action<AgentBlazorOptions>? _optionsConfiguration;
     private Action<AgentBlazorBuilder>? _builderConfiguration;
+    private readonly List<Assembly> _agentPageAssemblies = [];
 
     public string? AgentName { get; set; }
 
@@ -44,6 +46,16 @@ public sealed class AgentBlazorRegistrationOptions
         _providerRegistration = services => services.AddOllamaProvider(model, endpoint, apiKey);
     }
 
+    /// <summary>
+    /// Adds an assembly to the list scanned at startup for routes and agent pages
+    /// ([Route] types, AgentComponentIds, etc.). If never called, the entry assembly is scanned by default.
+    /// </summary>
+    public void AddAssemblyToScan(Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        _agentPageAssemblies.Add(assembly);
+    }
+
     public void Configure(Action<AgentBlazorOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
@@ -61,6 +73,15 @@ public sealed class AgentBlazorRegistrationOptions
     internal void ApplyOptions(AgentBlazorOptions options)
     {
         options.DefaultAgent.Enabled = true;
+
+        var assembliesToScan = _agentPageAssemblies.Count > 0
+            ? _agentPageAssemblies
+            : GetDefaultAgentPageAssemblies();
+        foreach (var assembly in assembliesToScan)
+        {
+            options.AssembliesToScan.Add(assembly);
+            AgentPageDiscovery.DiscoverAgentPages(assembly, options.UnmountedComponentRoutes);
+        }
 
         if (!string.IsNullOrWhiteSpace(AgentName))
         {
@@ -81,4 +102,13 @@ public sealed class AgentBlazorRegistrationOptions
     }
 
     internal void ApplyBuilder(AgentBlazorBuilder builder) => _builderConfiguration?.Invoke(builder);
+
+    private static List<Assembly> GetDefaultAgentPageAssemblies()
+    {
+        var list = new List<Assembly>();
+        var entry = Assembly.GetEntryAssembly();
+        if (entry is not null)
+            list.Add(entry);
+        return list;
+    }
 }

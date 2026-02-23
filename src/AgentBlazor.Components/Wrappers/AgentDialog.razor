@@ -43,13 +43,13 @@
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware dialog wrapper.");
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DialogOpenActionId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
             "Open dialog."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DialogCloseActionId,
+            AgentComponentCapabilityProfile.DialogCloseActionId,
             "Close dialog."));
         capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentV1CapabilityProfile.DialogConfirmActionId,
+            AgentComponentCapabilityProfile.DialogConfirmActionId,
             "Confirm dialog action.",
             RequiresApproval: true));
         return capability;
@@ -65,8 +65,8 @@
         CancellationToken cancellationToken = default)
     {
         _ = cancellationToken;
-        action = NormalizeAction(AgentComponentV1CapabilityProfile.AgentDialogComponentId, action);
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))
+        action = NormalizeAction(AgentComponentCapabilityProfile.AgentDialogComponentId, action);
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))
         {
             Visible = true;
             await VisibleChanged.InvokeAsync(true);
@@ -74,7 +74,7 @@
             return ActionResult.Success("Dialog opened.");
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DialogCloseActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogCloseActionId, StringComparison.OrdinalIgnoreCase))
         {
             Visible = false;
             await VisibleChanged.InvokeAsync(false);
@@ -82,7 +82,7 @@
             return ActionResult.Success("Dialog closed.");
         }
 
-        if (string.Equals(action.Name, AgentComponentV1CapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase))
         {
             return ActionResult.Failure("Confirm workflow registration is present, but execution wiring is not implemented yet.");
         }
@@ -92,12 +92,12 @@
 
     public Task<ActionResult> OpenAsync(CancellationToken cancellationToken = default)
         => ExecuteActionAsync(
-            AgentAction.Create(AgentComponentV1CapabilityProfile.DialogOpenActionId),
+            AgentAction.Create(AgentComponentCapabilityProfile.DialogOpenActionId),
             cancellationToken);
 
     public Task<ActionResult> CloseAsync(CancellationToken cancellationToken = default)
         => ExecuteActionAsync(
-            AgentAction.Create(AgentComponentV1CapabilityProfile.DialogCloseActionId),
+            AgentAction.Create(AgentComponentCapabilityProfile.DialogCloseActionId),
             cancellationToken);
 
     private async Task OnVisibleChanged(bool visible)

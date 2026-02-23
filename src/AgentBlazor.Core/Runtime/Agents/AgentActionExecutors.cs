@@ -171,13 +171,13 @@ internal sealed class NoOpDataGridActionExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
             request.ActionId,
             request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "DataGrid",
-            componentId: AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+            componentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
             actionId: request.ActionId,
             arguments: normalizedArguments,
             cancellationToken);
@@ -191,7 +191,7 @@ internal sealed class NoOpDataGridActionExecutor(
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
             AgentAction.Create(request.ActionId, normalizedArguments));
         return new ComponentActionExecutionResult(
-            ComponentId: AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+            ComponentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
             Message: $"Queued AgentDataGrid action '{request.ActionId}' until a matching DataGrid component is registered.");
@@ -208,13 +208,13 @@ internal sealed class NoOpDialogActionExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
             request.ActionId,
             request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Dialog",
-            componentId: AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+            componentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
             actionId: request.ActionId,
             arguments: normalizedArguments,
             cancellationToken);
@@ -228,7 +228,7 @@ internal sealed class NoOpDialogActionExecutor(
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
             AgentAction.Create(request.ActionId, normalizedArguments));
         return new ComponentActionExecutionResult(
-            ComponentId: AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+            ComponentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
             Message: $"Queued AgentDialog action '{request.ActionId}' until a matching Dialog component is registered.");
@@ -245,13 +245,13 @@ internal sealed class NoOpFormActionExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentV1CapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
             request.ActionId,
             request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Form",
-            componentId: AgentComponentV1CapabilityProfile.AgentFormComponentId,
+            componentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             actionId: request.ActionId,
             arguments: normalizedArguments,
             cancellationToken);
@@ -265,7 +265,7 @@ internal sealed class NoOpFormActionExecutor(
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
             AgentAction.Create(request.ActionId, normalizedArguments));
         return new ComponentActionExecutionResult(
-            ComponentId: AgentComponentV1CapabilityProfile.AgentFormComponentId,
+            ComponentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
             Message: $"Queued AgentForm action '{request.ActionId}' until a matching Form component is registered.");
@@ -282,13 +282,13 @@ internal sealed class NoOpNavigationActionExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             request.ActionId,
             request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "NavMenu",
-            componentId: AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+            componentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             actionId: request.ActionId,
             arguments: normalizedArguments,
             cancellationToken);
@@ -302,7 +302,7 @@ internal sealed class NoOpNavigationActionExecutor(
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
             AgentAction.Create(request.ActionId, normalizedArguments));
         return new ComponentActionExecutionResult(
-            ComponentId: AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+            ComponentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
             Message: $"Queued AgentNavMenu action '{request.ActionId}' until a matching NavMenu component is registered.");
@@ -319,13 +319,13 @@ internal sealed class NoOpTabsActionExecutor(
     {
         ArgumentNullException.ThrowIfNull(request);
         var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId,
+            AgentComponentCapabilityProfile.AgentTabsComponentId,
             request.ActionId,
             request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Tabs",
-            componentId: AgentComponentV1CapabilityProfile.AgentTabsComponentId,
+            componentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
             actionId: request.ActionId,
             arguments: normalizedArguments,
             cancellationToken);
@@ -339,7 +339,7 @@ internal sealed class NoOpTabsActionExecutor(
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
             AgentAction.Create(request.ActionId, normalizedArguments));
         return new ComponentActionExecutionResult(
-            ComponentId: AgentComponentV1CapabilityProfile.AgentTabsComponentId,
+            ComponentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
             Message: $"Queued AgentTabs action '{request.ActionId}' until a matching Tabs component is registered.");

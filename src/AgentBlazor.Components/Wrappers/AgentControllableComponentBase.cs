@@ -17,7 +17,7 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
 
     [Inject]
-    private IComponentActionArgumentResolver? ActionArgumentResolver { get; set; }
+    protected IComponentActionArgumentResolver? ActionArgumentResolver { get; set; }
 
     [Inject]
     private ILoggerFactory? LoggerFactory { get; set; }

@@ -34,9 +34,9 @@ public static class ComponentActionArgumentNormalizer
         string actionId,
         IDictionary<string, object?> arguments)
     {
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
             {
                 PromoteAlias(arguments, "column", "field", "property");
                 PromoteAlias(arguments, "operator", "op", "comparison");
@@ -44,7 +44,7 @@ public static class ComponentActionArgumentNormalizer
                 return;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
             {
                 PromoteAlias(arguments, "column", "field", "property");
                 PromoteAlias(arguments, "direction", "order", "sortDirection");
@@ -58,16 +58,16 @@ public static class ComponentActionArgumentNormalizer
                 return;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSetPageActionId, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridGoToPageActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSetPageActionId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(actionId, AgentComponentCapabilityProfile.DataGridGoToPageActionId, StringComparison.OrdinalIgnoreCase))
             {
                 PromoteAlias(arguments, "pageIndex", "index", "page");
                 PromoteAlias(arguments, "pageSize", "size", "limit");
                 return;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(actionId, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
             {
                 PromoteAlias(arguments, "rowKey", "row", "rowId", "id", "key");
             }
@@ -75,23 +75,23 @@ public static class ComponentActionArgumentNormalizer
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            (string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(actionId, AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(actionId, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase)))
         {
             PromoteAlias(arguments, "uri", "url", "target", "route", "path", "destination", "href");
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
         {
             PromoteAlias(arguments, "index", "tab", "tabIndex", "value", "page", "panel");
             return;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
         {
             PromoteAlias(arguments, "field", "column", "name", "property", "key");
             PromoteAlias(arguments, "value", "fieldValue", "input", "field_value");
@@ -103,15 +103,15 @@ public static class ComponentActionArgumentNormalizer
         string actionId,
         IDictionary<string, object?> arguments)
     {
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase) &&
             arguments.TryGetValue("index", out var indexRaw) &&
             TryParseIndex(indexRaw, out var parsedIndex))
         {
             arguments["index"] = parsedIndex;
         }
 
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             CoerceBoolean(arguments, "replaceHistory");
             CoerceBoolean(arguments, "openInNewTab");

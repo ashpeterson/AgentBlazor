@@ -110,7 +110,7 @@ internal sealed class IntentResolver : IIntentResolver
     {
         // Check if navigation component is available
         var navComponent = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (navComponent is null)
         {
@@ -160,13 +160,13 @@ internal sealed class IntentResolver : IIntentResolver
         ComponentCapability navComponent)
     {
         var navAction = navComponent.Actions.FirstOrDefault(a =>
-            string.Equals(a.ActionId, AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
 
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["uri"] = uri
@@ -224,7 +224,7 @@ internal sealed class IntentResolver : IIntentResolver
         UserPreferences? preferences)
     {
         var dataGrid = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (dataGrid is null)
         {
@@ -232,7 +232,7 @@ internal sealed class IntentResolver : IIntentResolver
         }
 
         var filterAction = dataGrid.Actions.FirstOrDefault(a =>
-            string.Equals(a.ActionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
 
         if (filterAction is null)
         {
@@ -252,8 +252,8 @@ internal sealed class IntentResolver : IIntentResolver
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridFilterActionId,
             Arguments = args,
             RequiresApproval = filterAction.RequiresApproval,
             Reason = "Filter data grid"
@@ -267,7 +267,7 @@ internal sealed class IntentResolver : IIntentResolver
         UserPreferences? preferences)
     {
         var dataGrid = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (dataGrid is null)
         {
@@ -275,7 +275,7 @@ internal sealed class IntentResolver : IIntentResolver
         }
 
         var sortAction = dataGrid.Actions.FirstOrDefault(a =>
-            string.Equals(a.ActionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase));
 
         if (sortAction is null)
         {
@@ -310,7 +310,7 @@ internal sealed class IntentResolver : IIntentResolver
         // Use preference if no column specified
         if (!args.ContainsKey("column") && preferences is not null)
         {
-            var preferredColumn = preferences.GetPreferredSortColumn(AgentComponentV1CapabilityProfile.AgentDataGridComponentId);
+            var preferredColumn = preferences.GetPreferredSortColumn(AgentComponentCapabilityProfile.AgentDataGridComponentId);
             if (!string.IsNullOrEmpty(preferredColumn))
             {
                 args["column"] = preferredColumn;
@@ -318,7 +318,7 @@ internal sealed class IntentResolver : IIntentResolver
 
             if (!args.ContainsKey("direction"))
             {
-                var preferredDirection = preferences.GetPreferredSortDirection(AgentComponentV1CapabilityProfile.AgentDataGridComponentId);
+                var preferredDirection = preferences.GetPreferredSortDirection(AgentComponentCapabilityProfile.AgentDataGridComponentId);
                 if (!string.IsNullOrEmpty(preferredDirection))
                 {
                     args["direction"] = preferredDirection;
@@ -329,8 +329,8 @@ internal sealed class IntentResolver : IIntentResolver
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.DataGridSortActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            ActionId = AgentComponentCapabilityProfile.DataGridSortActionId,
             Arguments = args,
             RequiresApproval = sortAction.RequiresApproval,
             Reason = "Sort data grid"
@@ -343,7 +343,7 @@ internal sealed class IntentResolver : IIntentResolver
         IReadOnlyList<ComponentCapability> allowedComponents)
     {
         var tabs = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (tabs is null)
         {
@@ -351,7 +351,7 @@ internal sealed class IntentResolver : IIntentResolver
         }
 
         var switchAction = tabs.Actions.FirstOrDefault(a =>
-            string.Equals(a.ActionId, AgentComponentV1CapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.ActionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase));
 
         if (switchAction is null)
         {
@@ -373,8 +373,8 @@ internal sealed class IntentResolver : IIntentResolver
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-            ActionId = AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            ComponentId = AgentComponentCapabilityProfile.AgentTabsComponentId,
+            ActionId = AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             Arguments = args,
             RequiresApproval = switchAction.RequiresApproval,
             Reason = "Switch tab"
@@ -387,7 +387,7 @@ internal sealed class IntentResolver : IIntentResolver
         IReadOnlyList<ComponentCapability> allowedComponents)
     {
         var dialog = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (dialog is null)
         {
@@ -396,11 +396,11 @@ internal sealed class IntentResolver : IIntentResolver
 
         var actionId = classification.PrimaryIntent.ToLowerInvariant() switch
         {
-            "close_dialog" => AgentComponentV1CapabilityProfile.DialogCloseActionId,
-            "confirm_dialog" => AgentComponentV1CapabilityProfile.DialogConfirmActionId,
-            _ when userMessage.Contains("close", StringComparison.OrdinalIgnoreCase) => AgentComponentV1CapabilityProfile.DialogCloseActionId,
-            _ when userMessage.Contains("confirm", StringComparison.OrdinalIgnoreCase) => AgentComponentV1CapabilityProfile.DialogConfirmActionId,
-            _ => AgentComponentV1CapabilityProfile.DialogOpenActionId
+            "close_dialog" => AgentComponentCapabilityProfile.DialogCloseActionId,
+            "confirm_dialog" => AgentComponentCapabilityProfile.DialogConfirmActionId,
+            _ when userMessage.Contains("close", StringComparison.OrdinalIgnoreCase) => AgentComponentCapabilityProfile.DialogCloseActionId,
+            _ when userMessage.Contains("confirm", StringComparison.OrdinalIgnoreCase) => AgentComponentCapabilityProfile.DialogConfirmActionId,
+            _ => AgentComponentCapabilityProfile.DialogOpenActionId
         };
 
         var action = dialog.Actions.FirstOrDefault(a =>
@@ -414,7 +414,7 @@ internal sealed class IntentResolver : IIntentResolver
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
             ActionId = actionId,
             RequiresApproval = action.RequiresApproval,
             Reason = $"Dialog action: {actionId}"
@@ -427,7 +427,7 @@ internal sealed class IntentResolver : IIntentResolver
         IReadOnlyList<ComponentCapability> allowedComponents)
     {
         var form = allowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase));
 
         if (form is null)
         {
@@ -436,13 +436,13 @@ internal sealed class IntentResolver : IIntentResolver
 
         var actionId = classification.PrimaryIntent.ToLowerInvariant() switch
         {
-            "submit" => AgentComponentV1CapabilityProfile.FormSubmitActionId,
-            "reset" => AgentComponentV1CapabilityProfile.FormResetActionId,
-            "set_field" => AgentComponentV1CapabilityProfile.FormSetFieldActionId,
-            _ when userMessage.Contains("submit", StringComparison.OrdinalIgnoreCase) => AgentComponentV1CapabilityProfile.FormSubmitActionId,
-            _ when userMessage.Contains("reset", StringComparison.OrdinalIgnoreCase) => AgentComponentV1CapabilityProfile.FormResetActionId,
-            _ when userMessage.Contains("validate", StringComparison.OrdinalIgnoreCase) => AgentComponentV1CapabilityProfile.FormValidateActionId,
-            _ => AgentComponentV1CapabilityProfile.FormSetFieldActionId
+            "submit" => AgentComponentCapabilityProfile.FormSubmitActionId,
+            "reset" => AgentComponentCapabilityProfile.FormResetActionId,
+            "set_field" => AgentComponentCapabilityProfile.FormSetFieldActionId,
+            _ when userMessage.Contains("submit", StringComparison.OrdinalIgnoreCase) => AgentComponentCapabilityProfile.FormSubmitActionId,
+            _ when userMessage.Contains("reset", StringComparison.OrdinalIgnoreCase) => AgentComponentCapabilityProfile.FormResetActionId,
+            _ when userMessage.Contains("validate", StringComparison.OrdinalIgnoreCase) => AgentComponentCapabilityProfile.FormValidateActionId,
+            _ => AgentComponentCapabilityProfile.FormSetFieldActionId
         };
 
         var action = form.Actions.FirstOrDefault(a =>
@@ -456,7 +456,7 @@ internal sealed class IntentResolver : IIntentResolver
         var args = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
         // Extract field assignment if set_field
-        if (string.Equals(actionId, AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(actionId, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (classification.ExtractedEntities.TryGetValue("field", out var field))
                 args["field"] = field;
@@ -474,7 +474,7 @@ internal sealed class IntentResolver : IIntentResolver
         return new ResolvedIntent
         {
             Classification = classification,
-            ComponentId = AgentComponentV1CapabilityProfile.AgentFormComponentId,
+            ComponentId = AgentComponentCapabilityProfile.AgentFormComponentId,
             ActionId = actionId,
             Arguments = args,
             RequiresApproval = action.RequiresApproval,

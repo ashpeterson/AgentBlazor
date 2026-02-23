@@ -170,8 +170,8 @@ internal sealed class ResponseBuilder : IResponseBuilder
         var paramLower = missingParameter?.ToLowerInvariant() ?? string.Empty;
 
         // DataGrid sort
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
             paramLower == "column")
         {
             if (TrySuggestDataGridSort(userMessage, registeredComponents, out var column, out var direction))
@@ -191,8 +191,8 @@ internal sealed class ResponseBuilder : IResponseBuilder
         }
 
         // DataGrid filter
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
         {
             return paramLower switch
             {
@@ -206,7 +206,7 @@ internal sealed class ResponseBuilder : IResponseBuilder
         }
 
         // Navigation
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
             paramLower is "uri" or "url" or "target")
         {
             if (TryInferNavigationUri(userMessage, out var inferredUri))
@@ -217,14 +217,14 @@ internal sealed class ResponseBuilder : IResponseBuilder
         }
 
         // Tabs
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
             paramLower == "index")
         {
             return "Which tab should I switch to (for example first, second, or an explicit index)?";
         }
 
         // Form
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
         {
             return paramLower switch
             {

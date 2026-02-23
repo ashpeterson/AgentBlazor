@@ -99,33 +99,33 @@ public class ServiceRegistrationTests
         using var provider = services.BuildServiceProvider();
         var componentCatalog = provider.GetRequiredService<IComponentCapabilityCatalog>();
 
-        Assert.Equal("agentblazor.components.v1", AgentComponentV1CapabilityProfile.ProfileId);
+        Assert.Equal("agentblazor.components", AgentComponentCapabilityProfile.ProfileId);
 
-        foreach (var componentId in AgentComponentV1CapabilityProfile.ComponentIds)
+        foreach (var componentId in AgentComponentCapabilityProfile.ComponentIds)
         {
             Assert.True(componentCatalog.TryGet(componentId, out var capability));
             Assert.All(capability.Actions, action =>
                 Assert.False(string.IsNullOrWhiteSpace(action.InputSchema)));
         }
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentFormComponentId, out var form));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentFormComponentId, out var form));
         var submit = Assert.Single(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
         Assert.True(submit.RequiresApproval);
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, out var nav));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentNavMenuComponentId, out var nav));
         var navigateExternal = Assert.Single(nav.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase));
         Assert.True(navigateExternal.RequiresApproval);
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, out var grid));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentDataGridComponentId, out var grid));
         var filter = Assert.Single(grid.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
         Assert.False(filter.RequiresApproval);
     }
 
     [Fact]
-    public void UseAgentCapabilityPreset_V1Minimal_AddsExpectedSafeSubset()
+    public void UseAgentCapabilityPreset_Minimal_AddsExpectedSafeSubset()
     {
         var services = new ServiceCollection();
         services
@@ -133,24 +133,24 @@ public class ServiceRegistrationTests
             {
                 options.DefaultAgent.ComponentCatalogMode = ComponentCatalogMode.WhitelistOnly;
             })
-            .UseAgentCapabilityPreset(AgentCapabilityPreset.V1Minimal);
+            .UseAgentCapabilityPreset(AgentCapabilityPreset.Minimal);
 
         using var provider = services.BuildServiceProvider();
         var componentCatalog = provider.GetRequiredService<IComponentCapabilityCatalog>();
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentFormComponentId, out var form));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentFormComponentId, out var form));
         Assert.Contains(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, out var nav));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentNavMenuComponentId, out var nav));
         Assert.Contains(nav.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(nav.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -162,24 +162,24 @@ public class ServiceRegistrationTests
             {
                 options.DefaultAgent.ComponentCatalogMode = ComponentCatalogMode.WhitelistOnly;
             })
-            .UseAgentCapabilityPreset(AgentCapabilityPreset.V1Minimal)
+            .UseAgentCapabilityPreset(AgentCapabilityPreset.Minimal)
             .ConfigureComponentCatalog(catalog => catalog.AddComponent(
-                AgentComponentV1CapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.AgentFormComponentId,
                 "Custom AgentForm override.",
                 new ComponentActionCapability(
-                    AgentComponentV1CapabilityProfile.FormSubmitActionId,
+                    AgentComponentCapabilityProfile.FormSubmitActionId,
                     "Submit AgentForm via custom override.",
                     RequiresApproval: true,
-                    InputSchema: AgentComponentV1CapabilityProfile.FormSubmitInputSchema)));
+                    InputSchema: AgentComponentCapabilityProfile.FormSubmitInputSchema)));
 
         using var provider = services.BuildServiceProvider();
         var componentCatalog = provider.GetRequiredService<IComponentCapabilityCatalog>();
 
-        Assert.True(componentCatalog.TryGet(AgentComponentV1CapabilityProfile.AgentFormComponentId, out var form));
+        Assert.True(componentCatalog.TryGet(AgentComponentCapabilityProfile.AgentFormComponentId, out var form));
         Assert.Contains(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase));
         var submit = Assert.Single(form.Actions, static a =>
-            a.ActionId.Equals(AgentComponentV1CapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+            a.ActionId.Equals(AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
         Assert.True(submit.RequiresApproval);
     }
 
@@ -189,11 +189,11 @@ public class ServiceRegistrationTests
         var catalog = DefaultShippedComponents.CreateCatalog();
         var allowedComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId
+            AgentComponentCapabilityProfile.AgentDialogComponentId
         };
         var allowedActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            $"{AgentComponentV1CapabilityProfile.AgentDialogComponentId}.{AgentComponentV1CapabilityProfile.DialogOpenActionId}"
+            $"{AgentComponentCapabilityProfile.AgentDialogComponentId}.{AgentComponentCapabilityProfile.DialogOpenActionId}"
         };
 
         var evaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
@@ -205,15 +205,15 @@ public class ServiceRegistrationTests
         Assert.Single(evaluation.AllowedComponents);
 
         var dialog = Assert.Single(evaluation.AllowedComponents);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentDialogComponentId, dialog.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDialogComponentId, dialog.ComponentId);
         var onlyAction = Assert.Single(dialog.Actions);
-        Assert.Equal(AgentComponentV1CapabilityProfile.DialogOpenActionId, onlyAction.ActionId, ignoreCase: true);
+        Assert.Equal(AgentComponentCapabilityProfile.DialogOpenActionId, onlyAction.ActionId, ignoreCase: true);
 
         Assert.Contains(
-            $"{AgentComponentV1CapabilityProfile.AgentDialogComponentId}.{AgentComponentV1CapabilityProfile.DialogCloseActionId}",
+            $"{AgentComponentCapabilityProfile.AgentDialogComponentId}.{AgentComponentCapabilityProfile.DialogCloseActionId}",
             evaluation.BlockedActionKeys);
         Assert.Contains(
-            $"{AgentComponentV1CapabilityProfile.AgentFormComponentId}.{AgentComponentV1CapabilityProfile.FormValidateActionId}",
+            $"{AgentComponentCapabilityProfile.AgentFormComponentId}.{AgentComponentCapabilityProfile.FormValidateActionId}",
             evaluation.BlockedActionKeys);
     }
 
@@ -223,20 +223,20 @@ public class ServiceRegistrationTests
         Assert.Equal(
             AgentBlazorTier.Free,
             AgentComponentTierBoundaries.GetRequiredTier(
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId));
 
         Assert.Equal(
             AgentBlazorTier.Paid,
             AgentComponentTierBoundaries.GetRequiredTier(
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-                AgentComponentV1CapabilityProfile.DataGridSetPageActionId));
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridSetPageActionId));
 
         Assert.Equal(
             AgentBlazorTier.Premium,
             AgentComponentTierBoundaries.GetRequiredTier(
-                AgentComponentV1CapabilityProfile.AgentFormComponentId,
-                AgentComponentV1CapabilityProfile.FormSubmitActionId));
+                AgentComponentCapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.FormSubmitActionId));
     }
 
     [Fact]
@@ -294,11 +294,11 @@ public class ServiceRegistrationTests
         var navigationResult = await navigationExecutor.ExecuteAsync(new NavigationActionRequest("navigate_to"));
         var tabsResult = await tabsExecutor.ExecuteAsync(new TabsActionRequest("switch_tab"));
 
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentDataGridComponentId, dataGridResult.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentDialogComponentId, dialogResult.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentFormComponentId, formResult.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, navigationResult.ComponentId);
-        Assert.Equal(AgentComponentV1CapabilityProfile.AgentTabsComponentId, tabsResult.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDataGridComponentId, dataGridResult.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDialogComponentId, dialogResult.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentFormComponentId, formResult.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentNavMenuComponentId, navigationResult.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentTabsComponentId, tabsResult.ComponentId);
     }
 
     [Fact]
@@ -343,11 +343,11 @@ public class ServiceRegistrationTests
         registry.Register(new TypedStubAgentControllable(
             agentId: "supplier-grid",
             componentType: "DataGrid",
-            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+            supportedActionId: AgentComponentCapabilityProfile.DataGridFilterActionId));
 
         var executor = provider.GetRequiredService<IDataGridActionExecutor>();
         var result = await executor.ExecuteAsync(new DataGridActionRequest(
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["agentId"] = "supplier-grid"
@@ -368,7 +368,7 @@ public class ServiceRegistrationTests
         var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
 
         var result = await tabsExecutor.ExecuteAsync(new TabsActionRequest(
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["agentId"] = "workspace-tabs"
@@ -390,12 +390,12 @@ public class ServiceRegistrationTests
         registry.Register(new TypedStubAgentControllable(
             agentId: "supplier-grid-a",
             componentType: "DataGrid",
-            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+            supportedActionId: AgentComponentCapabilityProfile.DataGridFilterActionId));
 
         var executor = provider.GetRequiredService<IDataGridActionExecutor>();
         var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
         var result = await executor.ExecuteAsync(new DataGridActionRequest(
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["agentId"] = "supplier-grid-missing",
@@ -420,7 +420,7 @@ public class ServiceRegistrationTests
         var intents = provider.GetRequiredService<IAgentNavigationIntentService>();
 
         var result = await executor.ExecuteAsync(new DataGridActionRequest(
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["agentId"] = "supplier-grid-missing"
@@ -443,43 +443,43 @@ public class ServiceRegistrationTests
         registry.Register(new TypedStubAgentControllable(
             agentId: "grid-a",
             componentType: "DataGrid",
-            supportedActionId: AgentComponentV1CapabilityProfile.DataGridFilterActionId));
+            supportedActionId: AgentComponentCapabilityProfile.DataGridFilterActionId));
         registry.Register(new TypedStubAgentControllable(
             agentId: "dialog-a",
             componentType: "Dialog",
-            supportedActionId: AgentComponentV1CapabilityProfile.DialogOpenActionId));
+            supportedActionId: AgentComponentCapabilityProfile.DialogOpenActionId));
         registry.Register(new TypedStubAgentControllable(
             agentId: "form-a",
             componentType: "Form",
-            supportedActionId: AgentComponentV1CapabilityProfile.FormValidateActionId));
+            supportedActionId: AgentComponentCapabilityProfile.FormValidateActionId));
         registry.Register(new TypedStubAgentControllable(
             agentId: "nav-a",
             componentType: "NavMenu",
-            supportedActionId: AgentComponentV1CapabilityProfile.NavigationNavigateToActionId));
+            supportedActionId: AgentComponentCapabilityProfile.NavigationNavigateToActionId));
         registry.Register(new TypedStubAgentControllable(
             agentId: "tabs-a",
             componentType: "Tabs",
-            supportedActionId: AgentComponentV1CapabilityProfile.TabsSwitchTabActionId));
+            supportedActionId: AgentComponentCapabilityProfile.TabsSwitchTabActionId));
 
         var dataGrid = await provider.GetRequiredService<IDataGridActionExecutor>().ExecuteAsync(
             new DataGridActionRequest(
-                AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId,
                 new Dictionary<string, object?> { ["agentId"] = "grid-a" }));
         var dialog = await provider.GetRequiredService<IDialogActionExecutor>().ExecuteAsync(
             new DialogActionRequest(
-                AgentComponentV1CapabilityProfile.DialogOpenActionId,
+                AgentComponentCapabilityProfile.DialogOpenActionId,
                 new Dictionary<string, object?> { ["agentId"] = "dialog-a" }));
         var form = await provider.GetRequiredService<IFormActionExecutor>().ExecuteAsync(
             new FormActionRequest(
-                AgentComponentV1CapabilityProfile.FormValidateActionId,
+                AgentComponentCapabilityProfile.FormValidateActionId,
                 new Dictionary<string, object?> { ["agentId"] = "form-a" }));
         var nav = await provider.GetRequiredService<INavigationActionExecutor>().ExecuteAsync(
             new NavigationActionRequest(
-                AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+                AgentComponentCapabilityProfile.NavigationNavigateToActionId,
                 new Dictionary<string, object?> { ["agentId"] = "nav-a" }));
         var tabs = await provider.GetRequiredService<ITabsActionExecutor>().ExecuteAsync(
             new TabsActionRequest(
-                AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+                AgentComponentCapabilityProfile.TabsSwitchTabActionId,
                 new Dictionary<string, object?> { ["agentId"] = "tabs-a" }));
 
         Assert.Equal("grid-a", dataGrid.Message);
@@ -504,24 +504,24 @@ public class ServiceRegistrationTests
         var executor = provider.GetRequiredService<IComponentActionExecutor>();
 
         var grid = await executor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             "test"));
         var dialog = await executor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentDialogComponentId,
-            AgentComponentV1CapabilityProfile.DialogOpenActionId,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
             "test"));
         var form = await executor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            AgentComponentV1CapabilityProfile.FormValidateActionId,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormValidateActionId,
             "test"));
         var nav = await executor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             "test"));
         var tabs = await executor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            AgentComponentCapabilityProfile.AgentTabsComponentId,
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             "test"));
 
         Assert.Equal("custom-grid", grid.Message);
@@ -581,7 +581,7 @@ public class ServiceRegistrationTests
             _ = request;
             _ = cancellationToken;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
                 "stub",
                 Succeeded: true,
                 Message: "custom-grid"));
@@ -597,7 +597,7 @@ public class ServiceRegistrationTests
             _ = request;
             _ = cancellationToken;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentDialogComponentId,
+                AgentComponentCapabilityProfile.AgentDialogComponentId,
                 "stub",
                 Succeeded: true,
                 Message: "custom-dialog"));
@@ -613,7 +613,7 @@ public class ServiceRegistrationTests
             _ = request;
             _ = cancellationToken;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.AgentFormComponentId,
                 "stub",
                 Succeeded: true,
                 Message: "custom-form"));
@@ -629,7 +629,7 @@ public class ServiceRegistrationTests
             _ = request;
             _ = cancellationToken;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.AgentNavMenuComponentId,
                 "stub",
                 Succeeded: true,
                 Message: "custom-nav"));
@@ -645,7 +645,7 @@ public class ServiceRegistrationTests
             _ = request;
             _ = cancellationToken;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentTabsComponentId,
+                AgentComponentCapabilityProfile.AgentTabsComponentId,
                 "stub",
                 Succeeded: true,
                 Message: "custom-tabs"));

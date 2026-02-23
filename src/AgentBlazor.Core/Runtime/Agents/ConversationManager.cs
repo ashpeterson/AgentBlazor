@@ -424,8 +424,8 @@ internal sealed class ConversationManager : IConversationManager
         var componentType = GetComponentType(componentId);
 
         // DataGrid filter
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (paramLower == "column")
             {
@@ -447,8 +447,8 @@ internal sealed class ConversationManager : IConversationManager
         }
 
         // DataGrid sort
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase))
         {
             if (paramLower == "column")
             {
@@ -462,7 +462,7 @@ internal sealed class ConversationManager : IConversationManager
         }
 
         // Navigation
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase))
         {
             if (paramLower is "uri" or "url" or "target")
             {
@@ -471,14 +471,14 @@ internal sealed class ConversationManager : IConversationManager
         }
 
         // Tabs
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
             paramLower == "index")
         {
             return "Which tab would you like to switch to? (first, second, third, or a number)";
         }
 
         // Form
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
         {
             if (paramLower == "field")
             {
@@ -504,7 +504,7 @@ internal sealed class ConversationManager : IConversationManager
         var suggestions = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
         // Try to infer suggested values from context
-        if (string.Equals(componentId, AgentComponentV1CapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase))
         {
             // Infer operator for filter
             if (missingParameter.Equals("operator", StringComparison.OrdinalIgnoreCase))

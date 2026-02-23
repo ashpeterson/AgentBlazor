@@ -33,8 +33,8 @@ public class ComponentActionArgumentNormalizerTests
         };
 
         var normalized = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             arguments,
             reason: "show me all suppliers that are high risk");
 
@@ -49,8 +49,8 @@ public class ComponentActionArgumentNormalizerTests
     public void Normalize_AppliesCanonicalAliasesAcrossComponents()
     {
         var nav = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
             new Dictionary<string, object?>
             {
                 ["route"] = "/supplier-onboarding",
@@ -62,8 +62,8 @@ public class ComponentActionArgumentNormalizerTests
         Assert.True(Assert.IsType<bool>(nav["replaceHistory"]));
 
         var gridFilter = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             new Dictionary<string, object?>
             {
                 ["field"] = "RiskScore",
@@ -76,8 +76,8 @@ public class ComponentActionArgumentNormalizerTests
         Assert.Equal(70, Assert.IsType<int>(gridFilter["value"]));
 
         var formSetField = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentFormComponentId,
-            AgentComponentV1CapabilityProfile.FormSetFieldActionId,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSetFieldActionId,
             new Dictionary<string, object?>
             {
                 ["name"] = "SupplierName",
@@ -88,8 +88,8 @@ public class ComponentActionArgumentNormalizerTests
         Assert.Equal("Contoso", formSetField["value"]?.ToString());
 
         var tabs = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentTabsComponentId,
-            AgentComponentV1CapabilityProfile.TabsSwitchTabActionId,
+            AgentComponentCapabilityProfile.AgentTabsComponentId,
+            AgentComponentCapabilityProfile.TabsSwitchTabActionId,
             new Dictionary<string, object?>
             {
                 ["tab"] = "second"
@@ -102,8 +102,8 @@ public class ComponentActionArgumentNormalizerTests
     public void Normalize_DataGridSort_PromotesOperatorDirectionAlias()
     {
         var normalized = ComponentActionArgumentNormalizer.Normalize(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridSortActionId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridSortActionId,
             new Dictionary<string, object?>
             {
                 ["field"] = "RiskScore",
@@ -136,8 +136,8 @@ public class ComponentActionArgumentNormalizerTests
         var capturing = provider.GetRequiredService<CapturingDataGridExecutor>();
 
         var result = await componentExecutor.ExecuteAsync(new PlannedComponentAction(
-            AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
-            AgentComponentV1CapabilityProfile.DataGridFilterActionId,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
             "normalize json only",
             new Dictionary<string, object?>
             {
@@ -164,7 +164,7 @@ public class ComponentActionArgumentNormalizerTests
             _ = cancellationToken;
             LastRequest = request;
             return Task.FromResult(new ComponentActionExecutionResult(
-                AgentComponentV1CapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId,
                 request.ActionId,
                 Succeeded: true,
                 Message: "captured"));

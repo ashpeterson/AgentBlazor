@@ -17,7 +17,7 @@ public static class DefaultShippedComponents
             "AgentChatPanel",
             "Docked full-height chat panel for persistent side-by-side workflows.");
 
-        AgentComponentV1CapabilityProfile.Apply(builder);
+        AgentComponentCapabilityProfile.Apply(builder);
 
         return catalog;
     }

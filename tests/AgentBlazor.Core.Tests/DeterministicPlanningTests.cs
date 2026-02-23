@@ -18,7 +18,7 @@ public class DeterministicPlanningTests
     #region Service Registration Tests
 
     [Fact]
-    public void Services_DefaultMode_UsesStandardRuntime()
+    public void Services_DefaultMode_UsesDeterministicRuntime()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new JsonPlanChatClient("""{"steps":[]}"""));
@@ -27,7 +27,7 @@ public class DeterministicPlanningTests
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
-        Assert.IsType<AgentRuntime>(runtime);
+        Assert.IsType<DeterministicAgentRuntime>(runtime);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public class DeterministicPlanningTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new JsonPlanChatClient("""{"steps":[]}"""));
-        services.AddAgentBlazorServices().UseDeterministicRuntime();
+        services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -48,7 +48,7 @@ public class DeterministicPlanningTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new JsonPlanChatClient("""{"steps":[]}"""));
-        services.AddAgentBlazorServices().UseDeterministicRuntime();
+        services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
 
@@ -622,7 +622,7 @@ public class DeterministicPlanningTests
             services.AddSingleton<IComponentActionExecutor>(new SuccessfulActionExecutor());
         }
 
-        services.AddAgentBlazorServices().UseDeterministicRuntime();
+        services.AddAgentBlazorServices();
         return services;
     }
 

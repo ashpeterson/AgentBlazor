@@ -3,15 +3,26 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Options;
+using Microsoft.Extensions.Options;
 
 namespace AgentBlazor.Core.Runtime.Routing;
 
 /// <summary>
 /// In-memory implementation of IRouteRegistry with fuzzy matching support.
+/// When constructed with options, scans options.AssembliesToScan for [Route] pages on first use.
 /// </summary>
 internal sealed class InMemoryRouteRegistry : IRouteRegistry
 {
     private readonly ConcurrentDictionary<string, RouteDefinition> _routes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IOptions<AgentBlazorOptions>? _options;
+    private bool _scanned;
+    private readonly object _scanLock = new();
+
+    public InMemoryRouteRegistry(IOptions<AgentBlazorOptions>? options = null)
+    {
+        _options = options;
+    }
 
     public void Register(RouteDefinition route)
     {
@@ -23,6 +34,7 @@ internal sealed class InMemoryRouteRegistry : IRouteRegistry
     public bool TryResolve(string intent, out RouteMatch match)
     {
         match = default!;
+        EnsureScanned();
 
         if (string.IsNullOrWhiteSpace(intent))
             return false;
@@ -35,10 +47,15 @@ internal sealed class InMemoryRouteRegistry : IRouteRegistry
         return true;
     }
 
-    public IReadOnlyCollection<RouteDefinition> GetAll() => _routes.Values.ToArray();
+    public IReadOnlyCollection<RouteDefinition> GetAll()
+    {
+        EnsureScanned();
+        return _routes.Values.ToArray();
+    }
 
     public IReadOnlyList<RouteMatch> ResolveAll(string intent, int maxResults = 5)
     {
+        EnsureScanned();
         if (string.IsNullOrWhiteSpace(intent))
             return [];
 
@@ -93,6 +110,7 @@ internal sealed class InMemoryRouteRegistry : IRouteRegistry
 
     public bool HasRoute(string path)
     {
+        EnsureScanned();
         var normalized = NormalizePath(path);
         return _routes.ContainsKey(normalized);
     }
@@ -104,6 +122,27 @@ internal sealed class InMemoryRouteRegistry : IRouteRegistry
     }
 
     public void Clear() => _routes.Clear();
+
+    private void EnsureScanned()
+    {
+        if (_scanned || _options?.Value?.AssembliesToScan is not { Count: > 0 })
+        {
+            if (_options is not null)
+                _scanned = true;
+            return;
+        }
+        lock (_scanLock)
+        {
+            if (_scanned)
+                return;
+            foreach (var assembly in _options!.Value!.AssembliesToScan)
+            {
+                if (assembly is not null)
+                    ScanAssembly(assembly);
+            }
+            _scanned = true;
+        }
+    }
 
     /// <summary>
     /// Scans an assembly for Blazor page components and registers their routes.
