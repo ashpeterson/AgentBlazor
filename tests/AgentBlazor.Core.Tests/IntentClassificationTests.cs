@@ -1,7 +1,7 @@
 using AgentBlazor.Core.Runtime.Intent;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
-using Microsoft.Extensions.Options;
+using MsOptions = Microsoft.Extensions.Options.Options;
 
 namespace AgentBlazor.Core.Tests;
 
@@ -129,7 +129,7 @@ public class IntentClassificationTests
 
     private static KeywordIntentClassifier CreateClassifier()
     {
-        var options = Options.Create(new IntentClassificationOptions
+        var options = MsOptions.Create(new IntentClassificationOptions
         {
             MinConfidenceThreshold = 0.6f,
             UseLlmFallback = false

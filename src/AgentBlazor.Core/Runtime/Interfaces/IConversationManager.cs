@@ -6,7 +6,7 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 /// <summary>
 /// Manages conversation state, history, and pending clarifications for agent sessions.
 /// </summary>
-public interface IConversationManager
+internal interface IConversationManager
 {
     /// <summary>
     /// Gets the conversation history for a session.
@@ -113,7 +113,7 @@ public interface IConversationManager
 /// <summary>
 /// Represents a pending clarification waiting for user input.
 /// </summary>
-public sealed record PendingClarification
+internal sealed record PendingClarification
 {
     /// <summary>
     /// The component ID awaiting clarification.

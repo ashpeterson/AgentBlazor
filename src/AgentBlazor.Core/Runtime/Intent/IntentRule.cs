@@ -5,7 +5,7 @@ namespace AgentBlazor.Core.Runtime.Intent;
 /// <summary>
 /// Defines a rule for matching user intent based on keywords.
 /// </summary>
-public sealed class IntentRule
+internal sealed class IntentRule
 {
     /// <summary>
     /// The intent name this rule matches (e.g., "navigate", "filter", "sort").
@@ -327,7 +327,7 @@ public sealed class IntentRule
 /// <summary>
 /// Pattern for extracting entities from user messages.
 /// </summary>
-public sealed class EntityExtractionPattern
+internal sealed class EntityExtractionPattern
 {
     /// <summary>
     /// The name of the entity to extract (e.g., "column", "value", "uri").

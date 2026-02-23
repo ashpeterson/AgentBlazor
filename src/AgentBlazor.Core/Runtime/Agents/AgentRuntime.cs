@@ -9,6 +9,7 @@ using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Preferences;
+using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Telemetry;
@@ -32,6 +33,8 @@ internal sealed class AgentRuntime(
     IIntentResolver? intentResolver = null,
     IUserPreferenceService? userPreferenceService = null,
     IResponseBuilder? responseBuilder = null,
+    IOptions<PromptTracingOptions>? tracingOptions = null,
+    IPromptTraceStore? traceStore = null,
     ILogger<AgentRuntime>? logger = null,
     IChatClient? chatClient = null,
     IAgentBlazorEntitlementService? entitlementService = null) : IAgentRuntime
@@ -49,11 +52,17 @@ internal sealed class AgentRuntime(
             throw new ArgumentException("User message is required.", nameof(request));
         }
 
+        // Initialize tracing if enabled
+        var traceBuilder = new PromptTraceBuilder(tracingOptions);
+
         var hasContext = request.Context is { Count: > 0 };
         var providerConfigured = chatClient is not null;
         var tierName = entitlementService?.CurrentTier.ToString();
 
         var registration = ResolveAgent(request.AgentName);
+
+        // Record entry point for tracing
+        traceBuilder.RecordEntry(request, registration?.Name);
         if (registration is null)
         {
             await TrackRunEventAsync(new AgentBlazorRunTelemetryEvent
@@ -386,6 +395,16 @@ internal sealed class AgentRuntime(
                 executionResultCount: executionResultSnapshot.Length,
                 failedExecutionCount: CountFailedExecutionResults(executionResultSnapshot)));
 
+            // Record trace for successful completion
+            if (traceBuilder.IsEnabled)
+            {
+                traceBuilder
+                    .RecordPlanning(plannedActionSnapshot, tools.Count)
+                    .RecordExecution(executionResultSnapshot)
+                    .RecordSuccess(text);
+                await StoreTraceAsync(traceBuilder, cancellationToken);
+            }
+
             return response;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -397,6 +416,13 @@ internal sealed class AgentRuntime(
                 executionResultCount: executionResults?.Count ?? 0,
                 failedExecutionCount: CountFailedExecutionResults(executionResults),
                 detail: "Run canceled."));
+
+            // Record trace for canceled request
+            if (traceBuilder.IsEnabled)
+            {
+                traceBuilder.RecordCanceled();
+                await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            }
             throw;
         }
         catch (Exception ex)
@@ -408,6 +434,13 @@ internal sealed class AgentRuntime(
                 executionResultCount: executionResults?.Count ?? 0,
                 failedExecutionCount: CountFailedExecutionResults(executionResults),
                 detail: ex.Message));
+
+            // Record trace for failed request
+            if (traceBuilder.IsEnabled)
+            {
+                traceBuilder.RecordFailure(ex.Message);
+                await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            }
             throw;
         }
     }
@@ -3353,6 +3386,28 @@ internal sealed class AgentRuntime(
                 "Telemetry sink failed while recording runtime event {TelemetryKind} for {AgentName}.",
                 telemetryEvent.Kind,
                 telemetryEvent.AgentName);
+        }
+    }
+
+    private async Task StoreTraceAsync(PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
+    {
+        if (traceStore is null || !traceBuilder.IsEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            var trace = traceBuilder.Build();
+            if (trace is not null)
+            {
+                await traceStore.StoreAsync(trace, cancellationToken);
+                logger?.LogDebug("Stored prompt trace {TraceId}", trace.TraceId);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to store prompt trace {TraceId}", traceBuilder.TraceId);
         }
     }
 

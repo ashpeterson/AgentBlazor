@@ -83,7 +83,7 @@ public sealed record UserPreferences
 /// <summary>
 /// Represents a single action record for preference tracking.
 /// </summary>
-public sealed record ActionRecord
+internal sealed record ActionRecord
 {
     /// <summary>
     /// The component ID.

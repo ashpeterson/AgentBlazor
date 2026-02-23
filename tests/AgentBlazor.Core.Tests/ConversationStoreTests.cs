@@ -1,7 +1,7 @@
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Options;
-using Microsoft.Extensions.Options;
+using MsOptions = Microsoft.Extensions.Options.Options;
 
 namespace AgentBlazor.Core.Tests;
 
@@ -59,7 +59,7 @@ public class ConversationStoreTests
     [Fact]
     public async Task AppendTurnAsync_TruncatesWhenMaxTurnsExceeded()
     {
-        var options = Options.Create(new ConversationOptions
+        var options = MsOptions.Create(new ConversationOptions
         {
             MaxTurnsPerSession = 3,
             SessionTimeout = TimeSpan.FromHours(1)
@@ -138,7 +138,7 @@ public class ConversationStoreTests
 
     private static InMemoryConversationStore CreateStore()
     {
-        var options = Options.Create(new ConversationOptions
+        var options = MsOptions.Create(new ConversationOptions
         {
             MaxTurnsPerSession = 50,
             SessionTimeout = TimeSpan.FromHours(24)

@@ -8,7 +8,7 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 /// <summary>
 /// Plans and builds component actions from user intents and resolved actions.
 /// </summary>
-public interface IActionPlanner
+internal interface IActionPlanner
 {
     /// <summary>
     /// Builds AI tools from available component capabilities.
@@ -83,7 +83,7 @@ public interface IActionPlanner
 /// <summary>
 /// Represents a fallback action resolved from structured tool directives.
 /// </summary>
-public readonly record struct FallbackAction(
+internal readonly record struct FallbackAction(
     string ComponentId,
     string ActionId,
     bool RequiresApproval,

@@ -10,8 +10,10 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Intent;
+using AgentBlazor.Core.Runtime.Planning;
 using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Core.Runtime.Routing;
+using AgentBlazor.Core.Runtime.Tracing;
 
 namespace AgentBlazor.Services;
 
@@ -49,7 +51,14 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
         services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
         services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
-        services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
+
+        // Deterministic runtime with structured JSON planning
+        // Uses Plan → Validate → Execute flow with no fallbacks or heuristics
+        services.TryAddSingleton<IStructuredActionPlanner, StructuredActionPlanner>();
+        services.TryAddSingleton<IPlanValidator, PlanValidator>();
+        services.TryAddSingleton<IPlanExecutor, PlanExecutor>();
+        services.TryAddSingleton<IAgentRuntime, DeterministicAgentRuntime>();
+
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
 
@@ -70,6 +79,11 @@ public static class AgentBlazorServiceCollectionExtensions
         // Action planning and response building
         services.TryAddSingleton<IActionPlanner, ActionPlanner>();
         services.TryAddSingleton<IResponseBuilder, ResponseBuilder>();
+
+        // Prompt tracing (opt-in via EnablePromptTracing)
+        services.AddOptions<PromptTracingOptions>();
+        services.TryAddSingleton<IPromptTraceStore, InMemoryPromptTraceStore>();
+        services.TryAddSingleton<IPromptTraceService, PromptTraceService>();
 
         return new AgentBlazorBuilder(services, store);
     }

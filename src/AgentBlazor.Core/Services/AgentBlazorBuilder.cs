@@ -1,5 +1,6 @@
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
+using AgentBlazor.Options;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentBlazor.Services;
@@ -38,6 +39,22 @@ public sealed class AgentBlazorBuilder
     {
         _store.ComponentCatalogConfigurators.Add(builder =>
             AgentCapabilityPresets.Apply(builder, preset));
+        return this;
+    }
+
+    /// <summary>
+    /// Enables prompt tracing for observability and debugging.
+    /// When enabled, all prompt requests are traced through the pipeline with timing and results.
+    /// </summary>
+    /// <param name="configure">Optional configuration for tracing options.</param>
+    /// <returns>The builder for chaining.</returns>
+    public AgentBlazorBuilder EnablePromptTracing(Action<PromptTracingOptions>? configure = null)
+    {
+        Services.Configure<PromptTracingOptions>(options =>
+        {
+            options.Enabled = true;
+            configure?.Invoke(options);
+        });
         return this;
     }
 }

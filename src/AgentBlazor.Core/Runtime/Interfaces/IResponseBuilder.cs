@@ -9,7 +9,7 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 /// <summary>
 /// Builds prompts, instructions, and responses for agent interactions.
 /// </summary>
-public interface IResponseBuilder
+internal interface IResponseBuilder
 {
     /// <summary>
     /// Builds the user prompt with context and registered components.

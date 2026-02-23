@@ -11,7 +11,7 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 /// Resolves user intents into actionable component operations by combining
 /// intent classification, route resolution, and user preferences.
 /// </summary>
-public interface IIntentResolver
+internal interface IIntentResolver
 {
     /// <summary>
     /// Resolves the user's intent into a concrete action to execute.
@@ -68,7 +68,7 @@ public interface IIntentResolver
 /// <summary>
 /// Represents a fully resolved intent ready for action planning.
 /// </summary>
-public sealed record ResolvedIntent
+internal sealed record ResolvedIntent
 {
     /// <summary>
     /// The underlying intent classification.
