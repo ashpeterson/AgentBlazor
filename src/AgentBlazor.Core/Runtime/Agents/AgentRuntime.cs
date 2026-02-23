@@ -124,6 +124,13 @@ internal sealed class AgentRuntime(
         var conversationKey = BuildConversationKey(request, registration.Name);
         var hasRegisteredComponents = registeredComponentSnapshots.Count > 0;
         var sessionId = request.GetEffectiveSessionId();
+
+        logger?.LogInformation(
+            "[AgentFlow] RunTurn started: UserMessage='{UserMessage}', RegisteredComponentCount={Count}, RegisteredIds=[{Ids}], SessionId={SessionId}",
+            request.UserMessage.Trim().Length > 80 ? request.UserMessage.Trim()[..80] + "…" : request.UserMessage.Trim(),
+            registeredComponentSnapshots.Count,
+            string.Join(", ", registeredComponentSnapshots.Select(static s => s.AgentId)),
+            sessionId);
         var userId = request.GetEffectiveUserId();
 
         // Get conversation history and user preferences if available
@@ -277,6 +284,12 @@ internal sealed class AgentRuntime(
                 ? "Run completed."
                 : agentResponse.Text.Trim();
 
+            logger?.LogInformation(
+                "[AgentFlow] Agent response received: TextLength={Len}, PlannedCount={Planned}, ResultsCount={Results}",
+                text?.Length ?? 0,
+                plannedActions.Count,
+                executionResults.Count);
+
             if (plannedActions.IsEmpty && executionResults.IsEmpty)
             {
                 var fallbackActions = ResolveStructuredToolActions(text, allowedComponents);
@@ -323,7 +336,24 @@ internal sealed class AgentRuntime(
                         text = $"Executed {fallbackActions.Count} action(s).";
                     }
                 }
+                else
+                {
+                    logger?.LogInformation("[AgentFlow] No tool calls and no fallback actions; trying intent-only navigation+filter.");
+                    await TryExecuteIntentOnlyNavigationAndFilterAsync(
+                        request.UserMessage,
+                        allowedComponents,
+                        registeredComponentSnapshots,
+                        plannedActions,
+                        executionResults,
+                        cancellationToken);
+                }
             }
+
+            logger?.LogInformation(
+                "[AgentFlow] Before continuation: PlannedCount={Planned}, ResultsCount={Results}, ResultsSummary=[{Summary}]",
+                plannedActions.Count,
+                executionResults.Count,
+                string.Join("; ", executionResults.Select(static r => $"{r.ComponentId}.{r.ActionId} Succeeded={r.Succeeded} Msg={r.Message}")));
 
             await TryExecuteNavigationContinuationAsync(
                 request.UserMessage,
@@ -357,6 +387,11 @@ internal sealed class AgentRuntime(
 
             var plannedActionSnapshot = plannedActions.ToArray();
             var executionResultSnapshot = executionResults.ToArray();
+            logger?.LogInformation(
+                "[AgentFlow] RunTurn finished: PlannedCount={Planned}, ResultsCount={Results}, Results=[{Summary}]",
+                plannedActionSnapshot.Length,
+                executionResultSnapshot.Length,
+                string.Join("; ", executionResultSnapshot.Select(static r => $"{r.ComponentId}.{r.ActionId} Ok={r.Succeeded} '{r.Message}'")));
             UpdatePendingClarification(
                 conversationKey,
                 request.UserMessage,
@@ -1154,6 +1189,72 @@ internal sealed class AgentRuntime(
         return builder.ToString().Trim();
     }
 
+    private async Task TryExecuteIntentOnlyNavigationAndFilterAsync(
+        string userMessage,
+        IReadOnlyList<ComponentCapability> allowedComponents,
+        IReadOnlyList<RegisteredComponentSnapshot> registeredComponentSnapshots,
+        ConcurrentQueue<PlannedComponentAction> plannedActions,
+        ConcurrentQueue<ComponentActionExecutionResult> executionResults,
+        CancellationToken cancellationToken)
+    {
+        logger?.LogInformation("[AgentFlow] IntentOnly: entered for UserMessage='{Msg}'", userMessage?.Trim().Length > 60 ? userMessage.Trim()[..60] + "…" : userMessage?.Trim());
+        if (string.IsNullOrWhiteSpace(userMessage))
+        {
+            logger?.LogInformation("[AgentFlow] IntentOnly: skipped (empty message).");
+            return;
+        }
+
+        if (!TryInferNavigationUri(userMessage, out var uri))
+        {
+            logger?.LogInformation("[AgentFlow] IntentOnly: skipped (no URI inferred from message).");
+            return;
+        }
+        logger?.LogInformation("[AgentFlow] IntentOnly: inferred Uri={Uri}", uri);
+
+        if (!TryInferPostNavigationAction(userMessage, allowedComponents, registeredComponentSnapshots, out var filterAction))
+        {
+            logger?.LogInformation("[AgentFlow] IntentOnly: skipped (no post-navigation action inferred).");
+            return;
+        }
+        logger?.LogInformation(
+            "[AgentFlow] IntentOnly: inferred filter {ComponentId}.{ActionId}, executing nav then filter.",
+            filterAction.ComponentId,
+            filterAction.ActionId);
+
+        var navPlanned = new PlannedComponentAction(
+            AgentComponentV1CapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentV1CapabilityProfile.NavigationNavigateToActionId,
+            $"{BuildToolInvocationReason(userMessage)} (intent-only navigation)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["uri"] = uri });
+        plannedActions.Enqueue(navPlanned);
+        var navResult = await executor.ExecuteAsync(navPlanned, cancellationToken);
+        executionResults.Enqueue(navResult);
+        logger?.LogInformation(
+            "[AgentFlow] IntentOnly: nav result Succeeded={Succeeded} Message={Message}",
+            navResult.Succeeded,
+            navResult.Message);
+
+        var filterArgs = BuildToolArgumentsWithContext(userMessage, filterAction.ComponentId, filterAction.ActionId, registeredComponentSnapshots, filterAction.Arguments);
+        logger?.LogInformation(
+            "[AgentFlow] IntentOnly: filter args column={Column} operator={Op} value={Value}",
+            filterArgs.TryGetValue("column", out var c) ? c?.ToString() ?? "(null)" : "(missing)",
+            filterArgs.TryGetValue("operator", out var o) ? o?.ToString() ?? "(null)" : "(missing)",
+            filterArgs.TryGetValue("value", out var v) ? v?.ToString() ?? "(null)" : "(missing)");
+
+        var filterPlanned = new PlannedComponentAction(
+            filterAction.ComponentId,
+            filterAction.ActionId,
+            $"{BuildToolInvocationReason(userMessage)} (intent-only filter)",
+            filterArgs);
+        plannedActions.Enqueue(filterPlanned);
+        var filterResult = await executor.ExecuteAsync(filterPlanned, cancellationToken);
+        executionResults.Enqueue(filterResult);
+        logger?.LogInformation(
+            "[AgentFlow] IntentOnly: filter result Succeeded={Succeeded} Message={Message}",
+            filterResult.Succeeded,
+            filterResult.Message);
+    }
+
     private async Task TryExecuteNavigationContinuationAsync(
         string userMessage,
         IReadOnlyList<ComponentCapability> allowedComponents,
@@ -1170,8 +1271,14 @@ internal sealed class AgentRuntime(
                 executionResults,
                 out var followUpAction))
         {
+            logger?.LogInformation("[AgentFlow] Continuation: none inferred for this turn.");
             return;
         }
+
+        logger?.LogInformation(
+            "[AgentFlow] Continuation inferred: {ComponentId}.{ActionId} (building planned action).",
+            followUpAction.ComponentId,
+            followUpAction.ActionId);
 
         var planned = new PlannedComponentAction(
             followUpAction.ComponentId,
@@ -1202,9 +1309,11 @@ internal sealed class AgentRuntime(
 
         executionResults.Enqueue(result);
         logger?.LogInformation(
-            "Applied navigation continuation action {ComponentId}.{ActionId}.",
+            "[AgentFlow] Continuation applied: {ComponentId}.{ActionId} Succeeded={Succeeded} Message={Message}",
             followUpAction.ComponentId,
-            followUpAction.ActionId);
+            followUpAction.ActionId,
+            result.Succeeded,
+            result.Message);
     }
 
     private static bool TryInferNavigationContinuationAction(
@@ -1742,6 +1851,36 @@ internal sealed class AgentRuntime(
         return token.Length > 0;
     }
 
+    private static bool TryInferRiskFilterArguments(string userMessage, out string column, out string @operator, out object value)
+    {
+        column = string.Empty;
+        @operator = string.Empty;
+        value = 0;
+        if (string.IsNullOrWhiteSpace(userMessage))
+        {
+            return false;
+        }
+
+        var msg = userMessage.Trim();
+        if (ContainsAny(msg, "high risk", "highest risk"))
+        {
+            column = "RiskScore";
+            @operator = "gte";
+            value = 70;
+            return true;
+        }
+
+        if (ContainsAny(msg, "low risk", "lowest risk"))
+        {
+            column = "RiskScore";
+            @operator = "lte";
+            value = 30;
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool IsPotentialEntityKey(string token)
         => System.Text.RegularExpressions.Regex.IsMatch(
             token,
@@ -2227,14 +2366,23 @@ internal sealed class AgentRuntime(
                 arguments["rowKey"] = rowKey;
             }
 
-            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
-                TryExtractEntityKeyToken(userMessage, out var filterEntityKey))
+            if (string.Equals(actionId, AgentComponentV1CapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase))
             {
-                AddIfMissing(arguments, "operator", "eq");
-                AddIfMissing(arguments, "value", filterEntityKey);
-                if (!arguments.ContainsKey("column"))
+                // Infer risk-based filter so "show me high risk suppliers" works from any page (e.g. home)
+                if (!arguments.ContainsKey("column") && TryInferRiskFilterArguments(userMessage, out var riskColumn, out var riskOperator, out var riskValue))
                 {
-                    arguments["column"] = InferDataGridIdentityColumn(registeredComponentSnapshots, userMessage);
+                    arguments["column"] = riskColumn;
+                    arguments["operator"] = riskOperator;
+                    arguments["value"] = riskValue;
+                }
+                else if (TryExtractEntityKeyToken(userMessage, out var filterEntityKey))
+                {
+                    AddIfMissing(arguments, "operator", "eq");
+                    AddIfMissing(arguments, "value", filterEntityKey);
+                    if (!arguments.ContainsKey("column"))
+                    {
+                        arguments["column"] = InferDataGridIdentityColumn(registeredComponentSnapshots, userMessage);
+                    }
                 }
             }
 

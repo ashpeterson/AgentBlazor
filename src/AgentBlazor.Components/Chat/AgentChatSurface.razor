@@ -1,35 +1,44 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Agents
+@using AgentBlazor.Components.Chat
+@implements IDisposable
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Interfaces
 @using AgentBlazor.Runtime
+@using Microsoft.JSInterop
 @inject IAgentRegistry AgentRegistry
 @inject IAgentRuntime AgentRuntime
+@inject IJSRuntime JSRuntime
 
-<section class="ab-chat-surface">
+<section class="ab-chat-surface @(Theme?.CssClass) @CssClass" data-theme="@(Theme?.DataTheme)" style="@_themeStyle" aria-label="@(Title ?? "Chat")">
     @if (!string.IsNullOrWhiteSpace(Title))
     {
-        <header class="ab-chat-surface__header">@Title</header>
+        <header class="ab-chat-surface__header" id="@HeaderId">@Title</header>
     }
 
     @if (!string.IsNullOrWhiteSpace(Description))
     {
-        <p class="ab-chat-surface__body">@Description</p>
+        <p class="ab-chat-surface__body" id="@DescriptionId">@Description</p>
     }
 
     @if (_timeline.Count > 0)
     {
-        <div class="ab-chat-surface__timeline">
+        <div id="@TimelineId"
+             class="ab-chat-surface__timeline"
+             role="log"
+             aria-live="polite"
+             aria-label="Conversation">
             @foreach (var item in _timeline)
             {
-                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role">
+                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role"
+                         aria-label="@item.RoleLabel">
                     <div class="ab-chat-surface__item-role">@item.RoleLabel</div>
                     <div class="ab-chat-surface__item-text">@item.Text</div>
 
                     @if (item.PlannedActions.Count > 0)
                     {
-                        <ul class="ab-chat-surface__actions">
+                        <ul class="ab-chat-surface__actions" aria-label="Planned actions">
                             @foreach (var action in item.PlannedActions)
                             {
                                 <li>@action.ComponentId.@action.ActionId</li>
@@ -39,7 +48,7 @@
 
                     @if (item.ExecutionResults.Count > 0)
                     {
-                        <ul class="ab-chat-surface__results">
+                        <ul class="ab-chat-surface__results" aria-label="Results">
                             @foreach (var result in item.ExecutionResults)
                             {
                                 <li>@result.Message</li>
@@ -53,19 +62,40 @@
 
     <EditForm class="ab-chat-surface__controls" Model="@this" FormName="@EffectiveFormName" OnValidSubmit="SendAsync">
         <label class="ab-chat-surface__label" for="@AgentSelectId">Agent</label>
-        <select id="@AgentSelectId" class="ab-chat-surface__select" @bind="_selectedAgent">
+        <select id="@AgentSelectId"
+                class="ab-chat-surface__select"
+                @bind="_selectedAgent"
+                aria-describedby="@DescriptionId"
+                disabled="@_isBusy">
+            @if (_agentNames.Count == 0)
+            {
+                <option value="">No agents registered</option>
+            }
             @foreach (var agent in _agentNames)
             {
                 <option value="@agent">@agent</option>
             }
         </select>
 
-        <label class="ab-chat-surface__label" for="@PromptId">Prompt</label>
-        <textarea id="@PromptId" class="ab-chat-surface__input" rows="3" @bind="_prompt"
-                  placeholder="Type an instruction like 'open the chat widget'"></textarea>
+        <label class="ab-chat-surface__label" for="@PromptId">Message</label>
+        <textarea id="@PromptId"
+                  ref="_promptRef"
+                  class="ab-chat-surface__input"
+                  rows="3"
+                  @bind="_prompt"
+                  @bind:event="oninput"
+                  placeholder="@Placeholder"
+                  aria-describedby="@DescriptionId"
+                  aria-label="Message input"
+                  disabled="@_isBusy"></textarea>
 
-        <button type="submit" class="ab-chat-surface__submit" disabled="@_isBusy">
-            @(_isBusy ? "Running..." : "Send")
+        <button type="submit"
+                id="@SubmitButtonId"
+                class="ab-chat-surface__submit"
+                disabled="@(_isBusy || !_canSubmit)"
+                aria-busy="@_isBusy"
+                aria-label="@(_isBusy ? "Sending..." : "Send message")">
+            @(_isBusy ? "Sending…" : "Send")
         </button>
     </EditForm>
 </section>
@@ -76,6 +106,8 @@
     private string _prompt = string.Empty;
     private string? _selectedAgent;
     private bool _isBusy;
+    private bool _scrollRequested;
+    private ElementReference _promptRef;
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
 
     [Parameter]
@@ -90,14 +122,30 @@
     [Parameter]
     public string? DefaultAgentName { get; set; }
 
+    [Parameter]
+    public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
+
+    [Parameter]
+    public ChatTheme? Theme { get; set; }
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)
             ? $"agent-chat-surface-{_instanceId}"
             : FormName;
 
     private string AgentSelectId => $"ab-agent-select-{_instanceId}";
-
     private string PromptId => $"ab-agent-prompt-{_instanceId}";
+    private string SubmitButtonId => $"ab-agent-submit-{_instanceId}";
+    private string TimelineId => $"ab-chat-timeline-{_instanceId}";
+    private string HeaderId => $"ab-chat-header-{_instanceId}";
+    private string DescriptionId => $"ab-chat-description-{_instanceId}";
+
+    private bool _canSubmit => !string.IsNullOrWhiteSpace(_prompt.Trim());
+
+    private string? _themeStyle => Theme?.GetStyleString();
 
     protected override void OnInitialized()
     {
@@ -115,22 +163,63 @@
         _selectedAgent ??= _agentNames.FirstOrDefault();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.attachEnterSubmit", PromptId, SubmitButtonId);
+            }
+            catch
+            {
+                // JS may be unavailable (e.g. prerender); ignore
+            }
+        }
+
+        if (_scrollRequested)
+        {
+            _scrollRequested = false;
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.scrollToBottom", TimelineId);
+            }
+            catch
+            {
+                // JS may be unavailable (e.g. prerender); ignore
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            _ = JSRuntime.InvokeVoidAsync("AgentBlazor.chat.detachEnterSubmit", PromptId);
+        }
+        catch
+        {
+            // Ignore when JS or component already torn down
+        }
+    }
+
     private async Task SendAsync()
     {
         if (_isBusy)
-        {
             return;
-        }
 
         var message = _prompt.Trim();
         if (message.Length == 0)
-        {
             return;
-        }
+
+        if (_agentNames.Count == 0)
+            return;
 
         _timeline.Add(ChatTimelineItem.User(message));
         _prompt = string.Empty;
         _isBusy = true;
+        _scrollRequested = true;
+        StateHasChanged();
 
         try
         {
@@ -139,10 +228,20 @@
                 _selectedAgent,
                 SessionId: _instanceId));
             _timeline.Add(ChatTimelineItem.Agent(response));
+            _scrollRequested = true;
         }
         finally
         {
             _isBusy = false;
+        }
+
+        try
+        {
+            await _promptRef.FocusAsync();
+        }
+        catch
+        {
+            // Focus may fail in some hosts
         }
     }
 

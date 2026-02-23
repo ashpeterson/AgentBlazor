@@ -24,7 +24,9 @@
                    Hover="true"
                    Bordered="true"
                    Striped="true"
-                   RowKeyProperty="SupplierId">
+                   RowKeyProperty="SupplierId"
+                   ColumnAliases="@_columnAliases"
+                   ValueMappings="@_valueMappings">
         <Columns>
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
@@ -49,6 +51,23 @@
 
 @code {
     private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
+
+    private static readonly IReadOnlyDictionary<string, string> _columnAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Risk Level"] = "RiskScore",
+        ["Risk Score"] = "RiskScore",
+        ["Risk"] = "RiskScore"
+    };
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, object?>> _valueMappings = new Dictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["RiskScore"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["High"] = 70,
+            ["Medium"] = 50,
+            ["Low"] = 30
+        }
+    };
 
     private static Color RiskColor(int score) => score switch
     {

@@ -1,28 +1,32 @@
 @namespace AgentBlazor.Components
+@using AgentBlazor.Components.Chat
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Runtime
 @implements IDisposable
 @inject IAgentChatWidgetState WidgetState
 
-<section class="ab-chat-widget" style="@HostStyle">
+<section class="ab-chat-widget @(Theme?.CssClass)" data-theme="@(Theme?.DataTheme)" style="@HostStyle" aria-label="Chat widget">
     @if (WidgetState.IsOpen)
     {
-        <div class="ab-chat-widget__window" role="dialog" aria-label="Agent chat widget">
+        <div class="ab-chat-widget__window" role="dialog" aria-modal="true" aria-label="@(Title ?? "Agent chat")">
             <header class="ab-chat-widget__window-header">
-                <span>@(Title ?? "Agent Assistant")</span>
+                <span id="@HeaderLabelId">@(Title ?? "Agent Assistant")</span>
                 <button type="button"
                         class="ab-chat-widget__icon-btn"
                         @onclick="Close"
                         aria-label="Minimize chat widget">
-                    &minus;
+                    <span aria-hidden="true">&minus;</span>
                 </button>
             </header>
 
             <div class="ab-chat-widget__window-body">
                 <AgentChatSurface Title="@Title"
-                                  Description="@Description"
-                                  FormName="@FormName"
-                                  DefaultAgentName="@DefaultAgentName" />
+                                 Description="@Description"
+                                 FormName="@FormName"
+                                 DefaultAgentName="@DefaultAgentName"
+                                 Placeholder="@Placeholder"
+                                 Theme="@Theme"
+                                 CssClass="@CssClass" />
             </div>
         </div>
     }
@@ -31,8 +35,8 @@
         <button type="button"
                 class="ab-chat-widget__bubble"
                 @onclick="Open"
-                aria-label="Open agent chat widget">
-            <span class="ab-chat-widget__bubble-label">@BubbleLabel</span>
+                aria-label="@(BubbleAriaLabel ?? "Open agent chat")">
+            <span class="ab-chat-widget__bubble-label" aria-hidden="true">@BubbleLabel</span>
         </button>
     }
 </section>
@@ -49,6 +53,9 @@
     public string BubbleLabel { get; set; } = "Ask Agent";
 
     [Parameter]
+    public string? BubbleAriaLabel { get; set; }
+
+    [Parameter]
     public string Width { get; set; } = "360px";
 
     [Parameter]
@@ -61,13 +68,33 @@
     public string Bottom { get; set; } = "1.25rem";
 
     [Parameter]
+    public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
+
+    [Parameter]
+    public ChatTheme? Theme { get; set; }
+
+    [Parameter]
     public string? FormName { get; set; }
 
     [Parameter]
     public string? DefaultAgentName { get; set; }
 
-    private string HostStyle =>
-        $"--ab-chat-widget-width:{Width};--ab-chat-widget-height:{Height};--ab-chat-widget-right:{Right};--ab-chat-widget-bottom:{Bottom};";
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    private string HeaderLabelId => $"ab-chat-widget-header-{_instanceId}";
+
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
+
+    private string HostStyle
+    {
+        get
+        {
+            var vars = $"--ab-chat-widget-width:{Width};--ab-chat-widget-height:{Height};--ab-chat-widget-right:{Right};--ab-chat-widget-bottom:{Bottom};";
+            var themeStyle = Theme?.GetStyleString();
+            return string.IsNullOrEmpty(themeStyle) ? vars : vars + " " + themeStyle;
+        }
+    }
 
     protected override void OnInitialized()
     {

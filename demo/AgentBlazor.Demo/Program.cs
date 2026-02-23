@@ -1,8 +1,14 @@
 using AgentBlazor;
 using AgentBlazor.Demo.Components;
+using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Ensure [AgentFlow] logs are visible when running prompts
+builder.Logging.AddFilter("AgentBlazor.Core.Runtime.Agents.AgentRuntime", LogLevel.Information);
+builder.Logging.AddFilter("AgentBlazor.Core.Runtime.Interfaces.InMemoryAgentNavigationIntentService", LogLevel.Information);
+builder.Logging.AddFilter("AgentBlazor", LogLevel.Information);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
