@@ -105,6 +105,8 @@
 
     public override string ComponentType => "DataGrid";
 
+    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentDataGridComponentId;
+
     public override ComponentCapability GetCapability()
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware data grid wrapper.");

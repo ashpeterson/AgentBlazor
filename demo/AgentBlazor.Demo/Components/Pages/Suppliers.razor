@@ -24,8 +24,7 @@
                    Hover="true"
                    Bordered="true"
                    Striped="true"
-                   RowKeyProperty="SupplierId"
-                   ValueMappings="@_valueMappings">
+                   RowKeyProperty="SupplierId">
         <Columns>
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
             <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
@@ -49,25 +48,7 @@
                  Description="Ask me to navigate, filter, sort, or focus suppliers." />
 
 @code {
-    /// <summary>
-    /// Declares which agent components this page hosts so the runtime can navigate here when the agent targets them.
-    /// Discovered at startup via AgentPageDiscovery; no Program.cs configuration needed.
-    /// </summary>
-    public static string[] AgentComponentIds { get; } = [AgentComponentCapabilityProfile.AgentDataGridComponentId];
-
     private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
-
-    /// <summary>Maps semantic filter values to concrete values so "high" → 70 for RiskScore (used when applying queued agent actions).</summary>
-    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, object?>> _valueMappings =
-        new Dictionary<string, IReadOnlyDictionary<string, object?>>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["RiskScore"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["high"] = 70,
-                ["medium"] = 50,
-                ["low"] = 30
-            }
-        };
 
     private static Color RiskColor(int score) => score switch
     {

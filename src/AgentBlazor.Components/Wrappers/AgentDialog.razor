@@ -39,6 +39,8 @@
 
     public override string ComponentType => "Dialog";
 
+    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentDialogComponentId;
+
     public override ComponentCapability GetCapability()
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware dialog wrapper.");

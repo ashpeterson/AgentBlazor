@@ -72,6 +72,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.AddOptions<IntentClassificationOptions>();
         services.TryAddSingleton<IIntentClassifier, KeywordIntentClassifier>();
         services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();
+        services.TryAddSingleton<IComponentRouteRegistry, InMemoryComponentRouteRegistry>();
         services.TryAddSingleton<IIntentResolver, IntentResolver>();
 
         // User preferences

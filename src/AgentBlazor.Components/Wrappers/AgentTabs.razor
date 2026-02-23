@@ -25,6 +25,8 @@
 
     public override string ComponentType => "Tabs";
 
+    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentTabsComponentId;
+
     public override ComponentCapability GetCapability()
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware tabs wrapper.");

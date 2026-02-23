@@ -28,6 +28,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
     private readonly IAgentRegistry _agentRegistry;
     private readonly IComponentCapabilityCatalog _componentCatalog;
     private readonly IAgentComponentRegistry? _componentRegistry;
+    private readonly IComponentRouteRegistry _componentRouteRegistry;
+    private readonly IRouteRegistry _routeRegistry;
     private readonly IOptions<AgentBlazorOptions> _options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink;
     private readonly IOptions<PromptTracingOptions>? _tracingOptions;
@@ -41,6 +43,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
         IAgentRegistry agentRegistry,
         IComponentCapabilityCatalog componentCatalog,
         IAgentComponentRegistry? componentRegistry,
+        IComponentRouteRegistry componentRouteRegistry,
+        IRouteRegistry routeRegistry,
         IOptions<AgentBlazorOptions> options,
         IAgentBlazorTelemetrySink telemetrySink,
         IOptions<PromptTracingOptions>? tracingOptions = null,
@@ -53,6 +57,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
         _agentRegistry = agentRegistry;
         _componentCatalog = componentCatalog;
         _componentRegistry = componentRegistry;
+        _componentRouteRegistry = componentRouteRegistry;
+        _routeRegistry = routeRegistry;
         _options = options;
         _telemetrySink = telemetrySink;
         _tracingOptions = tracingOptions;
@@ -94,13 +100,18 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
             // PHASE 1: PLAN
             _logger?.LogInformation("Phase 1: Planning for request: {Request}", request.UserMessage);
 
+            var availableRoutes = _routeRegistry.GetAll()
+                .Select(r => new AvailableRoute { Path = r.Path, Description = r.Description, Aliases = r.Aliases })
+                .ToList();
+
             var planRequest = new ActionPlanRequest
             {
                 UserMessage = request.UserMessage,
                 SessionId = sessionId,
                 UserId = request.GetEffectiveUserId(),
                 AvailableComponents = allowedComponents,
-                MountedComponents = mountedComponents
+                MountedComponents = mountedComponents,
+                AvailableRoutes = availableRoutes
             };
 
             var plan = await _planner.PlanAsync(planRequest, cancellationToken);
@@ -127,7 +138,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
 
             _logger?.LogInformation("Plan created with {StepCount} steps", plan.Steps.Count);
 
-            plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents);
+            plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents, request.UserMessage);
 
             // PHASE 2: VALIDATE
             _logger?.LogInformation("Phase 2: Validating plan");
@@ -325,11 +336,11 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
     }
 
     /// <summary>
-    /// When the plan's first step targets a component that is not mounted, prepend a navigate_to step
-    /// using the route from UnmountedComponentRoutes (if configured). Ensures deterministic navigation
-    /// without relying on the LLM to always output navigate first.
+    /// When the plan's first step targets a component that is not mounted, prepend a navigate_to step.
+    /// Uses (1) component route registry if the user has visited that page, else (2) intent→route
+    /// by resolving the user message against registered [Route] pages so navigation works without visiting first.
     /// </summary>
-    private ActionPlan EnsureNavigationWhenTargetUnmounted(ActionPlan plan, IReadOnlyList<MountedComponentState> mountedComponents)
+    private ActionPlan EnsureNavigationWhenTargetUnmounted(ActionPlan plan, IReadOnlyList<MountedComponentState> mountedComponents, string userMessage)
     {
         if (plan.Steps.Count == 0) return plan;
 
@@ -348,19 +359,12 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
             return plan;
         }
 
-        var routes = _options.Value.UnmountedComponentRoutes;
-        if (routes.Count == 0)
+        var route = ResolveRouteForUnmountedComponent(first.ComponentId, userMessage);
+        if (string.IsNullOrWhiteSpace(route))
         {
             _logger?.LogDebug(
-                "Skipping navigation prepend: UnmountedComponentRoutes is empty (no assemblies scanned or no AgentComponentIds on pages).");
-            return plan;
-        }
-
-        if (!TryGetRouteForComponent(first.ComponentId, routes, out var route) || string.IsNullOrWhiteSpace(route))
-        {
-            _logger?.LogDebug(
-                "Skipping navigation prepend: no route configured for component {ComponentId}. Mounted count={MountedCount}, Route keys=[{RouteKeys}]",
-                first.ComponentId, mountedComponents.Count, string.Join(", ", routes.Keys));
+                "Skipping navigation prepend: no route for component {ComponentId} (tried registry and intent→route). Mounted count={MountedCount}",
+                first.ComponentId, mountedComponents.Count);
             return plan;
         }
 
@@ -384,17 +388,35 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime
         return plan with { Steps = newSteps };
     }
 
-    private static bool TryGetRouteForComponent(string componentId, IDictionary<string, string> routes, out string? route)
+    /// <summary>
+    /// Resolves the route for an unmounted component: first from mount-time registry, then by resolving user message against [Route] pages (intent→route).
+    /// </summary>
+    private string? ResolveRouteForUnmountedComponent(string componentId, string userMessage)
     {
-        if (routes.TryGetValue(componentId, out route) && !string.IsNullOrWhiteSpace(route))
-            return true;
-        var componentType = componentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
-            ? componentId[5..]
-            : componentId;
-        if (routes.TryGetValue(componentType, out route) && !string.IsNullOrWhiteSpace(route))
-            return true;
-        route = null;
-        return false;
+        if (_componentRouteRegistry.TryGetRoute(componentId, out var fromRegistry) && !string.IsNullOrWhiteSpace(fromRegistry))
+        {
+            return fromRegistry;
+        }
+
+        var matches = _routeRegistry.ResolveAll(userMessage, maxResults: 3);
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var best = matches[0];
+        if (best.Confidence < 0.2f)
+        {
+            _logger?.LogDebug(
+                "Intent→route best match for \"{UserMessage}\" is {Path} with confidence {Confidence}; requiring >= 0.2.",
+                userMessage, best.Path, best.Confidence);
+            return null;
+        }
+
+        _logger?.LogDebug(
+            "Intent→route: \"{UserMessage}\" → {Path} (confidence {Confidence}, method {Method})",
+            userMessage, best.Path, best.Confidence, best.MatchMethod);
+        return best.Path;
     }
 
     private static bool IsComponentTypeMounted(string componentId, IReadOnlyList<MountedComponentState> mountedComponents)

@@ -39,6 +39,8 @@
 
     public override string ComponentType => "Form";
 
+    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentFormComponentId;
+
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)
             ? $"agent-form-{_instanceId}"

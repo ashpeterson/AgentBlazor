@@ -47,8 +47,8 @@ public sealed class AgentBlazorRegistrationOptions
     }
 
     /// <summary>
-    /// Adds an assembly to the list scanned at startup for routes and agent pages
-    /// ([Route] types, AgentComponentIds, etc.). If never called, the entry assembly is scanned by default.
+    /// Adds an assembly to the list scanned at startup for [Route] pages (used for intent→route and planner).
+    /// If never called, the entry assembly is scanned by default.
     /// </summary>
     public void AddAssemblyToScan(Assembly assembly)
     {
@@ -80,7 +80,6 @@ public sealed class AgentBlazorRegistrationOptions
         foreach (var assembly in assembliesToScan)
         {
             options.AssembliesToScan.Add(assembly);
-            AgentPageDiscovery.DiscoverAgentPages(assembly, options.UnmountedComponentRoutes);
         }
 
         if (!string.IsNullOrWhiteSpace(AgentName))

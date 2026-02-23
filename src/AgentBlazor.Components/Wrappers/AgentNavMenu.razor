@@ -21,6 +21,8 @@
 
     public override string ComponentType => "NavMenu";
 
+    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentNavMenuComponentId;
+
     public override ComponentCapability GetCapability()
     {
         var capability = new ComponentCapability(AgentId, "Agent-aware navigation menu wrapper.");
