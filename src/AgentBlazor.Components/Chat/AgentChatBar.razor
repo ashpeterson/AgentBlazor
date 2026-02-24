@@ -3,8 +3,10 @@
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Interfaces
+@implements IDisposable
 @using MudBlazor
 @inject IAgentRuntime AgentRuntime
+@inject IAgentDeferredActionEvents DeferredActionEvents
 
 <div class="ab-chat-bar @(Theme?.CssClass) @CssClass" data-theme="@(Theme?.DataTheme)" style="@_themeStyle">
     <div class="ab-chat-bar__input-wrap">
@@ -53,7 +55,7 @@
             @foreach (var item in _timeline)
             {
                 <article class="ab-chat-bar__message ab-chat-bar__message--@item.Role">
-                    <div class="ab-chat-bar__message-role">@(item.Role == "user" ? "You" : "Agent")</div>
+                    <div class="ab-chat-bar__message-role">@GetRoleLabel(item.Role)</div>
                     <div class="ab-chat-bar__message-text">@item.Text</div>
                     @if (item.PlannedActions.Count > 0)
                     {
@@ -66,6 +68,14 @@
                             }
                         </div>
                     }
+                </article>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_streamingResponseText))
+            {
+                <article class="ab-chat-bar__message ab-chat-bar__message--assistant">
+                    <div class="ab-chat-bar__message-role">@(_streamingAgentName ?? "Agent")</div>
+                    <div class="ab-chat-bar__message-text">@_streamingResponseText</div>
                 </article>
             }
 
@@ -85,6 +95,8 @@
     private bool _isBusy;
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private readonly List<ChatBarTimelineItem> _timeline = [];
+    private string _streamingResponseText = string.Empty;
+    private string? _streamingAgentName;
 
     /// <summary>
     /// Placeholder text for the input field.
@@ -166,6 +178,16 @@
 
     private string? _themeStyle => Theme?.GetStyleString();
 
+    protected override void OnInitialized()
+    {
+        DeferredActionEvents.DeferredActionCompleted += HandleDeferredActionCompleted;
+    }
+
+    public void Dispose()
+    {
+        DeferredActionEvents.DeferredActionCompleted -= HandleDeferredActionCompleted;
+    }
+
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_prompt) && !_isBusy)
@@ -188,6 +210,8 @@
         var message = _prompt.Trim();
         _prompt = string.Empty;
         _isBusy = true;
+        _streamingResponseText = string.Empty;
+        _streamingAgentName = null;
         StateHasChanged();
 
         // Add user message to timeline
@@ -197,7 +221,7 @@
 
         try
         {
-            var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+            var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 AgentName,
                 SessionId: _sessionId));
@@ -212,6 +236,8 @@
         }
         catch (Exception ex)
         {
+            _streamingResponseText = string.Empty;
+            _streamingAgentName = null;
             _timeline.Add(new ChatBarTimelineItem("assistant", $"Error: {ex.Message}", []));
             await OnError.InvokeAsync(ex);
         }
@@ -239,6 +265,74 @@
     /// Clear the conversation timeline.
     /// </summary>
     public void Clear() => ClearTimeline();
+
+    private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
+    {
+        if (AgentRuntime is not IAgentRuntimeStreaming streamingRuntime)
+        {
+            return await AgentRuntime.RunTurnAsync(request);
+        }
+
+        _streamingResponseText = string.Empty;
+        _streamingAgentName = null;
+
+        AgentTurnResponse? finalResponse = null;
+        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(request))
+        {
+            if (streamEvent.Kind == AgentTurnStreamEventKind.TextDelta &&
+                !string.IsNullOrEmpty(streamEvent.TextDelta))
+            {
+                _streamingAgentName ??= streamEvent.AgentName;
+                _streamingResponseText += streamEvent.TextDelta;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.RunFinished &&
+                streamEvent.Response is not null)
+            {
+                finalResponse = streamEvent.Response;
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.RunError)
+            {
+                throw new InvalidOperationException(streamEvent.ErrorMessage ?? "Streaming run failed.");
+            }
+        }
+
+        _streamingResponseText = string.Empty;
+        _streamingAgentName = null;
+
+        return finalResponse
+            ?? throw new InvalidOperationException("Streaming completed without a final response.");
+    }
+
+    private void HandleDeferredActionCompleted(DeferredComponentActionEvent actionEvent)
+    {
+        _ = InvokeAsync(() =>
+        {
+            _timeline.Add(new ChatBarTimelineItem("activity", FormatDeferredActionMessage(actionEvent), []));
+            StateHasChanged();
+        });
+    }
+
+    private static string FormatDeferredActionMessage(DeferredComponentActionEvent actionEvent)
+    {
+        var componentId = actionEvent.ComponentType.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? actionEvent.ComponentType
+            : $"Agent{actionEvent.ComponentType}";
+        var status = actionEvent.Succeeded ? "applied" : "failed";
+        return $"Deferred action {status}: {componentId}.{actionEvent.ActionId}. {actionEvent.Message}";
+    }
+
+    private static string GetRoleLabel(string role) =>
+        role switch
+        {
+            "user" => "You",
+            "activity" => "Activity",
+            _ => "Agent"
+        };
 
     private sealed record ChatBarTimelineItem(
         string Role,

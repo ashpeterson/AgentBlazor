@@ -268,7 +268,7 @@ internal sealed class NoOpFormActionExecutor(
             ComponentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             ActionId: request.ActionId,
             Succeeded: true,
-            Message: $"Queued AgentForm action '{request.ActionId}' until a matching Form component is registered.");
+            Message: $"Queued AgentForm action '{request.ActionId}'. It will apply automatically when the form mounts (for example after opening the dialog).");
     }
 }
 

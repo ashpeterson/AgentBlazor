@@ -69,7 +69,10 @@ public sealed record PlanValidationResult
         if (firstInvalid.MissingParameters.Count > 0)
         {
             var param = firstInvalid.MissingParameters[0];
-            return $"What value should I use for '{param}' in {firstInvalid.Step.ComponentId}.{firstInvalid.Step.ActionId}?";
+            return BuildUserFriendlyClarification(
+                firstInvalid.Step.ComponentId,
+                firstInvalid.Step.ActionId,
+                param);
         }
 
         if (firstInvalid.Errors.Count > 0)
@@ -78,5 +81,57 @@ public sealed record PlanValidationResult
         }
 
         return "I couldn't understand that request. Can you be more specific?";
+    }
+
+    private static string BuildUserFriendlyClarification(string componentId, string actionId, string missingParam)
+    {
+        // DataGrid sort
+        if (string.Equals(componentId, "AgentDataGrid", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, "sort", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(missingParam, "column", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Which column should I sort by?";
+        }
+
+        // DataGrid filter
+        if (string.Equals(componentId, "AgentDataGrid", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(actionId, "filter", StringComparison.OrdinalIgnoreCase))
+        {
+            return missingParam.ToLowerInvariant() switch
+            {
+                "column" => "Which column should I filter?",
+                "operator" => "Which filter operator should I use (for example >=, <=, eq, contains)?",
+                "value" => "What value should I filter by?",
+                _ => $"What should I use for '{missingParam}' in the filter?"
+            };
+        }
+
+        // Navigation
+        if (string.Equals(componentId, "AgentNavMenu", StringComparison.OrdinalIgnoreCase) &&
+            missingParam.ToLowerInvariant() is "uri" or "url" or "target")
+        {
+            return "Which route should I navigate to?";
+        }
+
+        // Tabs
+        if (string.Equals(componentId, "AgentTabs", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(missingParam, "index", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Which tab should I switch to?";
+        }
+
+        // Form
+        if (string.Equals(componentId, "AgentForm", StringComparison.OrdinalIgnoreCase))
+        {
+            return missingParam.ToLowerInvariant() switch
+            {
+                "field" => "Which form field should I set?",
+                "value" => "What value should I set for that field?",
+                _ => $"What should I use for '{missingParam}'?"
+            };
+        }
+
+        // Generic fallback
+        return $"What should I use for '{missingParam}'?";
     }
 }

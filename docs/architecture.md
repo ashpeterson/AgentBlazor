@@ -51,6 +51,7 @@ Advance from baseline Phase 5 to pilot hardening:
 - telemetry sink exporter integrations (OpenTelemetry/App Insights/custom pipelines)
 - richer run/thread observability views in demo and docs
 - package/release hardening for private preview feedback loops
+- generative UI spec + Razor renderer surface for Blazor-native dynamic workflows
 
 ## Phase 2 Runtime (Framework-Native)
 
@@ -94,3 +95,6 @@ Advance from baseline Phase 5 to pilot hardening:
 ## Reference Index
 
 - See `docs/spec-references.md` for AG-UI and Microsoft Agent Framework source/spec links used by this repository.
+- Capability matrix (shipped vs roadmap): `docs/agentblazor-capability-matrix.md`
+- Product push roadmap: `docs/agentblazor-push-roadmap-q2-2026.md`
+- Positioning + docs IA: `docs/agentblazor-positioning-and-docs-ia.md`

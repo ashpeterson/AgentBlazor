@@ -41,6 +41,7 @@ public static class ComponentActionArgumentNormalizer
                 PromoteAlias(arguments, "column", "field", "property");
                 PromoteAlias(arguments, "operator", "op", "comparison");
                 PromoteAlias(arguments, "value", "fieldValue", "threshold", "query", "term");
+                NormalizeFilterOperator(arguments);
                 return;
             }
 
@@ -86,7 +87,7 @@ public static class ComponentActionArgumentNormalizer
         if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentTabsComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(actionId, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
         {
-            PromoteAlias(arguments, "index", "tab", "tabIndex", "value", "page", "panel");
+            PromoteAlias(arguments, "index", "tab", "tabIndex", "tab_index", "value", "page", "panel");
             return;
         }
 
@@ -263,6 +264,40 @@ public static class ComponentActionArgumentNormalizer
         string.Equals(value, "ascending", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(value, "desc", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(value, "descending", StringComparison.OrdinalIgnoreCase);
+
+    private static void NormalizeFilterOperator(IDictionary<string, object?> arguments)
+    {
+        if (!arguments.TryGetValue("operator", out var raw) || raw is null)
+        {
+            return;
+        }
+
+        var op = raw.ToString()?.Trim();
+        if (string.IsNullOrWhiteSpace(op))
+        {
+            return;
+        }
+
+        var normalized = op.ToLowerInvariant() switch
+        {
+            "<" or "lt" => "lt",
+            "<=" or "le" or "lte" => "lte",
+            ">" or "gt" => "gt",
+            ">=" or "ge" or "gte" => "gte",
+            "=" or "==" or "eq" or "equals" => "eq",
+            "!=" or "<>" or "neq" or "ne" or "notequals" => "neq",
+            "contains" or "like" or "includes" => "contains",
+            "startswith" or "starts" or "prefix" => "startsWith",
+            "endswith" or "ends" or "suffix" => "endsWith",
+            "in" => "in",
+            "notin" or "not_in" or "nin" => "notin",
+            "isnull" or "is_null" or "null" => "isnull",
+            "notnull" or "not_null" or "isnotnull" => "notnull",
+            _ => op // Keep original if not recognized
+        };
+
+        arguments["operator"] = normalized;
+    }
 
     private static string? NormalizeSortDirection(string value) =>
         value.Trim().ToLowerInvariant() switch

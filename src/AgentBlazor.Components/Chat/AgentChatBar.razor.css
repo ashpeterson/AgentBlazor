@@ -162,6 +162,12 @@
     background: rgba(224, 58, 88, 0.05);
 }
 
+.ab-chat-bar__message--activity {
+    border-style: dashed;
+    border-color: var(--ab-chat-bar-border);
+    background: rgba(255, 255, 255, 0.03);
+}
+
 .ab-chat-bar__message-role {
     font-size: 0.75rem;
     font-weight: 700;
@@ -176,6 +182,10 @@
 
 .ab-chat-bar__message--assistant .ab-chat-bar__message-role {
     color: var(--ab-chat-bar-accent);
+}
+
+.ab-chat-bar__message--activity .ab-chat-bar__message-role {
+    color: var(--ab-chat-bar-text-muted);
 }
 
 .ab-chat-bar__message-text {

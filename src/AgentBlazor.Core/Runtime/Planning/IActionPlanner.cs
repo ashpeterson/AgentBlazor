@@ -7,6 +7,11 @@ namespace AgentBlazor.Core.Runtime.Planning;
 public interface IStructuredActionPlanner
 {
     /// <summary>
+    /// Whether a backing chat provider/client is configured.
+    /// </summary>
+    bool IsProviderConfigured { get; }
+
+    /// <summary>
     /// Produces a structured action plan from the user's request.
     /// The LLM must return a JSON plan, not freeform text with tool calls.
     /// </summary>

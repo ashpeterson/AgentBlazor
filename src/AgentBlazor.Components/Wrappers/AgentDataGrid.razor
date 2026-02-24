@@ -455,9 +455,15 @@
         if (string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(action.Name, AgentComponentCapabilityProfile.DataGridSelectRowActionId, StringComparison.OrdinalIgnoreCase))
         {
+            var inferredRowSelection = false;
             if (!TryGetStringParameter(action, "rowKey", out var rowKey))
             {
-                return ActionResult.Failure($"Action '{action.Name}' requires 'rowKey' parameter.");
+                if (!TryInferRowKeyFromCurrentView(out rowKey))
+                {
+                    return ActionResult.Failure($"Action '{action.Name}' requires 'rowKey' parameter.");
+                }
+
+                inferredRowSelection = true;
             }
 
             // Find and select the item - MudBlazor handles the visual highlighting
@@ -477,7 +483,10 @@
                 await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
             }
 
-            return await CompleteAndRefreshAsync(ActionResult.Success($"Selected row '{FocusedRowKey}'."));
+            return await CompleteAndRefreshAsync(ActionResult.Success(
+                inferredRowSelection
+                    ? $"Selected row '{FocusedRowKey}' (inferred from current view)."
+                    : $"Selected row '{FocusedRowKey}'."));
         }
 
         return ActionResult.Unknown(action.Name);
@@ -539,6 +548,77 @@
             }
 
             current++;
+        }
+
+        return false;
+    }
+
+    private bool TryInferRowKeyFromCurrentView(out string rowKey)
+    {
+        rowKey = string.Empty;
+        if (string.IsNullOrWhiteSpace(RowKeyProperty))
+        {
+            return false;
+        }
+
+        var filteredRows = ApplyFilter(Items ?? []).ToArray();
+        if (filteredRows.Length == 0)
+        {
+            return false;
+        }
+
+        IEnumerable<TItem> candidates = filteredRows;
+        if (!string.IsNullOrWhiteSpace(SortColumn))
+        {
+            candidates = ApplySort(filteredRows);
+        }
+        else if (TryInferExtremaSortFromFilter(out var descending))
+        {
+            candidates = descending
+                ? filteredRows.OrderByDescending(item => ResolveComparableSortKey(item, FilterColumn!))
+                : filteredRows.OrderBy(item => ResolveComparableSortKey(item, FilterColumn!));
+        }
+        else if (filteredRows.Length > 1)
+        {
+            return false;
+        }
+
+        var selected = candidates.FirstOrDefault();
+        if (selected is null ||
+            !TryGetPropertyValue(selected, RowKeyProperty, out var raw) ||
+            string.IsNullOrWhiteSpace(raw?.ToString()))
+        {
+            return false;
+        }
+
+        rowKey = raw!.ToString()!;
+        return true;
+    }
+
+    private bool TryInferExtremaSortFromFilter(out bool descending)
+    {
+        descending = false;
+        if (string.IsNullOrWhiteSpace(FilterColumn) || string.IsNullOrWhiteSpace(FilterOperator))
+        {
+            return false;
+        }
+
+        if (ResolveProperty(typeof(TItem), FilterColumn!) is null)
+        {
+            return false;
+        }
+
+        var normalized = FilterOperator!.Trim().ToLowerInvariant();
+        if (normalized is "gt" or ">" or "gte" or ">=")
+        {
+            descending = true;
+            return true;
+        }
+
+        if (normalized is "lt" or "<" or "lte" or "<=")
+        {
+            descending = false;
+            return true;
         }
 
         return false;

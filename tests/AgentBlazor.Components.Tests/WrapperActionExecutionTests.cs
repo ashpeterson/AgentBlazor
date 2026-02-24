@@ -223,8 +223,62 @@ public class WrapperActionExecutionTests
         }));
 
         Assert.True(result.Succeeded);
-        Assert.Equal("Name", grid.FilterColumn);
-        Assert.Contains("Applied filter Name contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("SupplierName", grid.FilterColumn);
+        Assert.Contains("Applied filter SupplierName contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AgentDataGrid_SelectRow_WithoutRowKey_InferFromHighRiskFilter_SelectsHighestRiskRow()
+    {
+        var rows = new[]
+        {
+            new SupplierRow("S1", "EMEA", 72),
+            new SupplierRow("S2", "APAC", 91),
+            new SupplierRow("S3", "NA", 80)
+        };
+
+        var grid = new AgentDataGrid<SupplierRow>
+        {
+            AgentId = "supplier-grid",
+            Items = rows,
+            RowKeyProperty = nameof(SupplierRow.SupplierId)
+        };
+
+        var filter = await grid.ExecuteActionAsync(AgentAction.Create("filter", new Dictionary<string, object?>
+        {
+            ["column"] = "RiskScore",
+            ["operator"] = "gte",
+            ["value"] = 70
+        }));
+        var select = await grid.ExecuteActionAsync(AgentAction.Create("select_row"));
+
+        Assert.True(filter.Succeeded);
+        Assert.True(select.Succeeded);
+        Assert.Equal("S2", grid.FocusedRowKey);
+        Assert.Contains("inferred from current view", select.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AgentDataGrid_SelectRow_WithoutRowKey_FailsWhenSelectionIsAmbiguous()
+    {
+        var rows = new[]
+        {
+            new SupplierRow("S1", "EMEA", 30),
+            new SupplierRow("S2", "APAC", 10),
+            new SupplierRow("S3", "NA", 80)
+        };
+
+        var grid = new AgentDataGrid<SupplierRow>
+        {
+            AgentId = "supplier-grid",
+            Items = rows,
+            RowKeyProperty = nameof(SupplierRow.SupplierId)
+        };
+
+        var result = await grid.ExecuteActionAsync(AgentAction.Create("select_row"));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("requires 'rowKey' parameter", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -267,6 +321,59 @@ public class WrapperActionExecutionTests
         Assert.False(observedValidation);
     }
 
+    [Fact]
+    public async Task AgentForm_SetField_ResolvesNaturalFieldHint_ToCanonicalProperty()
+    {
+        var model = new SupplierFormModel
+        {
+            SupplierName = "Contoso",
+            RequestedBudget = 1000m
+        };
+
+        var form = new AgentForm
+        {
+            AgentId = "supplier-form",
+            Model = model
+        };
+
+        var result = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
+        {
+            ["field"] = "name",
+            ["value"] = "Ash"
+        }));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Ash", model.SupplierName);
+        Assert.Contains("SupplierName", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AgentForm_SetField_FailsWhenFieldHintIsAmbiguous()
+    {
+        var model = new PersonFormModel
+        {
+            FirstName = "Ada",
+            LastName = "Lovelace"
+        };
+
+        var form = new AgentForm
+        {
+            AgentId = "person-form",
+            Model = model
+        };
+
+        var result = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
+        {
+            ["field"] = "name",
+            ["value"] = "Ash"
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("ambiguous", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Ada", model.FirstName);
+        Assert.Equal("Lovelace", model.LastName);
+    }
+
     private sealed record SupplierRow(string SupplierId, string Region, int RiskScore);
 
     private sealed record RegionOnlyRow(string SupplierId, string Region);
@@ -278,6 +385,13 @@ public class WrapperActionExecutionTests
         public string SupplierName { get; set; } = string.Empty;
 
         public decimal RequestedBudget { get; set; }
+    }
+
+    private sealed class PersonFormModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+
+        public string LastName { get; set; } = string.Empty;
     }
 }
 

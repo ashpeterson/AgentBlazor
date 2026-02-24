@@ -29,6 +29,9 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     [Inject]
     private ILoggerFactory? LoggerFactory { get; set; }
 
+    [Inject]
+    private IAgentDeferredActionEvents? DeferredActionEvents { get; set; }
+
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = string.Empty;
 
@@ -88,6 +91,13 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
             _logger?.LogInformation(
                 "[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} applied {ActionName} Succeeded={Succeeded} Message={Message}",
                 ComponentType, AgentId, action.Name, result.Succeeded, result.Message);
+            DeferredActionEvents?.Publish(new DeferredComponentActionEvent(
+                ComponentType: ComponentType,
+                AgentId: AgentId,
+                ActionId: action.Name,
+                Succeeded: result.Succeeded,
+                Message: result.Message,
+                OccurredAt: DateTimeOffset.UtcNow));
             if (!result.Succeeded)
             {
                 _logger?.LogWarning(

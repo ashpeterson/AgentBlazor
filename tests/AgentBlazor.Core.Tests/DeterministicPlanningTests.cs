@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
+using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -400,6 +402,46 @@ public class DeterministicPlanningTests
     }
 
     [Fact]
+    public async Task Runtime_ClarificationFollowUp_UsesConversationHistoryAndMountedColumns()
+    {
+        var services = new ServiceCollection();
+        var chatClient = new ClarificationAwareChatClient();
+        services.AddSingleton<IChatClient>(chatClient);
+        services.AddSingleton<IComponentActionExecutor>(new SuccessfulActionExecutor());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new StubRegisteredComponent(
+            "supplier-grid",
+            "DataGrid",
+            new ComponentState
+            {
+                ["columns"] = new[] { "SupplierName", "RiskScore", "Region" }
+            }));
+
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["agentblazor.session_id"] = "deterministic-clarify-history"
+        };
+
+        var first = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "sort suppliers from highest to lowest risk",
+            Context: context));
+        var second = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "risk",
+            Context: context));
+
+        Assert.Contains("Which column should I sort by?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.True(chatClient.FirstPromptIncludedMountedColumns);
+        Assert.True(chatClient.SecondPromptIncludedConversationHistory);
+        Assert.Single(second.ExecutionResults);
+        Assert.True(second.ExecutionResults[0].Succeeded);
+        Assert.Equal("Done.", second.ResponseText);
+    }
+
+    [Fact]
     public async Task Runtime_ValidPlan_ExecutesAndReturnsResults()
     {
         var services = CreateDeterministicServices("""
@@ -451,6 +493,40 @@ public class DeterministicPlanningTests
         Assert.Equal("Completed 2 actions.", response.ResponseText);
         Assert.Equal(2, response.PlannedActions.Count);
         Assert.Equal(2, response.ExecutionResults.Count);
+    }
+
+    [Fact]
+    public async Task Runtime_FormActionWithUnmountedForm_InsertsDialogOpenBeforeSetField()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentNavMenu",
+                        "actionId": "navigate_to",
+                        "arguments": { "uri": "/demo/onboarding" }
+                    },
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "set_field",
+                        "arguments": { "field": "name", "value": "Ash" }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open onboarding and set name to ash"));
+
+        Assert.Equal(3, response.PlannedActions.Count);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentNavMenuComponentId, response.PlannedActions[0].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.NavigationNavigateToActionId, response.PlannedActions[0].ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDialogComponentId, response.PlannedActions[1].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.DialogOpenActionId, response.PlannedActions[1].ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentFormComponentId, response.PlannedActions[2].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.FormSetFieldActionId, response.PlannedActions[2].ActionId);
+        Assert.Equal("Completed 3 actions.", response.ResponseText);
     }
 
     [Fact]
@@ -522,6 +598,71 @@ public class DeterministicPlanningTests
 
         Assert.False(response.ExecutionResults[0].Succeeded);
         Assert.Contains("failed", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Runtime_Streaming_EmitsDeltasAndFinalResponse()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDialog",
+                        "actionId": "open",
+                        "arguments": {}
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var streamingRuntime = Assert.IsAssignableFrom<IAgentRuntimeStreaming>(runtime);
+
+        var events = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(new AgentTurnRequest("open dialog")))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.NotEmpty(events);
+        Assert.Equal(AgentTurnStreamEventKind.RunStarted, events[0].Kind);
+        Assert.Equal(AgentTurnStreamEventKind.RunFinished, events[^1].Kind);
+        Assert.NotNull(events[^1].Response);
+        Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.TextDelta);
+
+        var streamedText = string.Concat(events
+            .Where(static e => e.Kind == AgentTurnStreamEventKind.TextDelta)
+            .Select(static e => e.TextDelta));
+        Assert.Equal(events[^1].Response!.ResponseText, streamedText);
+    }
+
+    [Fact]
+    public async Task Runtime_Streaming_ProviderMissing_EmitsFinalResponse()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var streamingRuntime = Assert.IsAssignableFrom<IAgentRuntimeStreaming>(runtime);
+
+        AgentTurnResponse? finalResponse = null;
+        var streamedText = new StringBuilder();
+        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(new AgentTurnRequest("open dialog")))
+        {
+            if (streamEvent.Kind == AgentTurnStreamEventKind.TextDelta)
+            {
+                streamedText.Append(streamEvent.TextDelta);
+            }
+            else if (streamEvent.Kind == AgentTurnStreamEventKind.RunFinished)
+            {
+                finalResponse = streamEvent.Response;
+            }
+        }
+
+        Assert.NotNull(finalResponse);
+        Assert.Contains("No provider is configured", finalResponse!.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No provider is configured", streamedText.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     #endregion
@@ -722,6 +863,117 @@ public class DeterministicPlanningTests
                     Message: "Cancelled");
             }
         }
+    }
+
+    private sealed class ClarificationAwareChatClient : IChatClient
+    {
+        private int _callCount;
+
+        public bool FirstPromptIncludedMountedColumns { get; private set; }
+        public bool SecondPromptIncludedConversationHistory { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var messageArray = messages.ToArray();
+            _callCount++;
+
+            if (_callCount == 1)
+            {
+                var systemPrompt = GetCombinedText(messageArray.First(static m => m.Role == ChatRole.System));
+                FirstPromptIncludedMountedColumns =
+                    systemPrompt.Contains("RiskScore", StringComparison.OrdinalIgnoreCase) &&
+                    !systemPrompt.Contains("System.String[]", StringComparison.OrdinalIgnoreCase);
+
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """
+                    {
+                        "steps": [],
+                        "needsClarification": true,
+                        "clarificationQuestion": "Which column should I sort by?"
+                    }
+                    """)));
+            }
+
+            var hasPriorUserTurn = messageArray.Any(m =>
+                m.Role == ChatRole.User &&
+                GetCombinedText(m).Contains("sort suppliers from highest to lowest risk", StringComparison.OrdinalIgnoreCase));
+            var hasPriorAssistantTurn = messageArray.Any(m =>
+                m.Role == ChatRole.Assistant &&
+                GetCombinedText(m).Contains("Which column should I sort by?", StringComparison.OrdinalIgnoreCase));
+            SecondPromptIncludedConversationHistory = hasPriorUserTurn && hasPriorAssistantTurn;
+
+            var secondResponse = SecondPromptIncludedConversationHistory
+                ? """
+                  {
+                      "steps": [
+                          {
+                              "componentId": "AgentDataGrid",
+                              "actionId": "sort",
+                              "arguments": {
+                                  "column": "RiskScore",
+                                  "direction": "desc"
+                              }
+                          }
+                      ]
+                  }
+                  """
+                : """
+                  {
+                      "steps": [],
+                      "needsClarification": true,
+                      "clarificationQuestion": "Which column should I sort by?"
+                  }
+                  """;
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, secondResponse)));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text ?? string.Empty);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+
+        private static string GetCombinedText(ChatMessage message)
+        {
+            var contentText = string.Concat(message.Contents
+                .OfType<TextContent>()
+                .Select(static content => content.Text ?? string.Empty));
+
+            if (!string.IsNullOrWhiteSpace(contentText))
+            {
+                return contentText;
+            }
+
+            return message.Text ?? string.Empty;
+        }
+    }
+
+    private sealed class StubRegisteredComponent(
+        string agentId,
+        string componentType,
+        ComponentState state) : IAgentControllable
+    {
+        public string AgentId { get; } = agentId;
+        public string ComponentType { get; } = componentType;
+
+        public ComponentCapability GetCapability() =>
+            new(AgentId, "Stub component");
+
+        public ComponentState GetCurrentState() => state;
+
+        public Task<ActionResult> ExecuteActionAsync(
+            AgentAction action,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ActionResult.Success("stub"));
     }
 
     #endregion

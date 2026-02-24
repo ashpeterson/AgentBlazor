@@ -16,7 +16,7 @@ namespace AgentBlazor.Core.Runtime.Planning;
 /// </summary>
 internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 {
-    private readonly IChatClient _chatClient;
+    private readonly IChatClient? _chatClient;
     private readonly ILogger<StructuredActionPlanner>? _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -25,8 +25,10 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    public bool IsProviderConfigured => _chatClient is not null;
+
     public StructuredActionPlanner(
-        IChatClient chatClient,
+        IChatClient? chatClient = null,
         ILogger<StructuredActionPlanner>? logger = null)
     {
         _chatClient = chatClient;
@@ -37,6 +39,12 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         ActionPlanRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (_chatClient is null)
+        {
+            return ActionPlan.NeedsClarification(
+                "No provider is configured. Register an AgentBlazor provider chat client.");
+        }
+
         var systemPrompt = BuildSystemPrompt(request);
         var userPrompt = BuildUserPrompt(request);
 
@@ -57,20 +65,56 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             messages.Insert(messages.Count - 1, new ChatMessage(role, turn.Content));
         }
 
-        var response = await _chatClient.GetResponseAsync(
-            messages,
-            new ChatOptions
+        var collectedSteps = new List<PlannedStep>();
+        ChatResponse response;
+
+        var chatOptions = new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.Json,
+            Temperature = 0.0f // Zero temperature for maximum determinism
+        };
+
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+
+            var toolCallPlan = TryBuildPlanFromFunctionCalls(response, request.AvailableComponents);
+            if (toolCallPlan is not null)
             {
-                ResponseFormat = ChatResponseFormat.Json,
-                Temperature = 0.0f // Zero temperature for maximum determinism
-            },
-            cancellationToken);
+                collectedSteps.AddRange(toolCallPlan.Steps);
+            }
+            else
+            {
+                var directiveText = response.Text?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(directiveText) &&
+                    TryBuildPlanFromDirectiveJson(directiveText, request.AvailableComponents, out var directivePlan))
+                {
+                    collectedSteps.AddRange(directivePlan.Steps);
+                }
+            }
 
-        var responseText = response.Text?.Trim() ?? string.Empty;
+            if (response.FinishReason != ChatFinishReason.ToolCalls)
+            {
+                if (collectedSteps.Count > 0)
+                {
+                    _logger?.LogDebug("Planner collected {StepCount} tool call step(s)", collectedSteps.Count);
+                    return new ActionPlan { Steps = collectedSteps };
+                }
 
-        _logger?.LogDebug("LLM response: {Response}", responseText);
+                var responseText = response.Text?.Trim() ?? string.Empty;
+                _logger?.LogDebug("LLM response: {Response}", responseText);
+                return ParsePlanResponse(responseText, request.AvailableComponents);
+            }
+        }
 
-        return ParsePlanResponse(responseText);
+        if (collectedSteps.Count > 0)
+        {
+            _logger?.LogDebug("Planner hit tool-call loop limit and collected {StepCount} step(s)", collectedSteps.Count);
+            return new ActionPlan { Steps = collectedSteps };
+        }
+
+        _logger?.LogWarning("Planner hit tool-call loop limit without actionable output.");
+        return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
     }
 
     private static string BuildSystemPrompt(ActionPlanRequest request)
@@ -127,6 +171,8 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("- If a required parameter cannot be determined from the request, set needsClarification=true.");
         sb.AppendLine("- Do NOT guess, infer, or make up parameter values that aren't in the request.");
         sb.AppendLine("- For 'column' parameters, use exact column names from MOUNTED COMPONENT STATE if available.");
+        sb.AppendLine("- For AgentForm.set_field, if the user provides a semantic field hint (e.g. \"name\", \"email\"), pass it directly as 'field'; runtime will resolve to the canonical model property.");
+        sb.AppendLine("- For AgentForm.set_field, ask clarification only when either field or value is missing.");
         sb.AppendLine();
 
         sb.AppendLine("## Rule 4: NAVIGATION LOGIC (CRITICAL)");
@@ -134,6 +180,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("- If the target component type is NOT mounted, you MUST navigate first:");
         sb.AppendLine("  1. First step: AgentNavMenu.navigate_to with uri from AVAILABLE ROUTES");
         sb.AppendLine("  2. Second step: The actual component action");
+        sb.AppendLine("- For form field actions on dialog-based pages, include AgentDialog.open before AgentForm.set_field.");
         sb.AppendLine("- If target component IS mounted, do NOT add navigation.");
         sb.AppendLine();
 
@@ -145,12 +192,16 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("  - \"contains\", \"includes\", \"has\" → operator: \"contains\"");
         sb.AppendLine("  - \"starts with\", \"begins with\" → operator: \"startswith\"");
         sb.AppendLine("  - \"empty\", \"blank\", \"missing\" → operator: \"isnull\"");
+        sb.AppendLine("- For ranking phrases like \"highest\"/\"lowest\", prefer sort (desc/asc) on the target column.");
+        sb.AppendLine("- If user asks to \"focus\" the highest/lowest row, add a follow-up select_row action (rowKey may be omitted for runtime inference).");
         sb.AppendLine("- For subjective terms (\"high risk\", \"low priority\"), pass the semantic value and let the app interpret it.");
         sb.AppendLine();
 
         sb.AppendLine("## Rule 6: CLARIFICATION");
         sb.AppendLine("- If the request is ambiguous, vague, or missing critical information, ask for clarification.");
         sb.AppendLine("- Good clarification questions are specific: \"Which column should I filter?\" not \"What do you want?\"");
+        sb.AppendLine("- Use CONVERSATION HISTORY: if the latest user message is a short clarification answer, combine it with the prior question.");
+        sb.AppendLine("- For column clarifications, map close matches from user text to the nearest mounted column name (for example \"risk\" -> \"RiskScore\").");
         sb.AppendLine();
 
         // ═══════════════════════════════════════════════════════════════════
@@ -405,7 +456,9 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         return $"USER REQUEST: {request.UserMessage}";
     }
 
-    private ActionPlan ParsePlanResponse(string responseText)
+    private ActionPlan ParsePlanResponse(
+        string responseText,
+        IReadOnlyList<AvailableComponent> availableComponents)
     {
         if (string.IsNullOrWhiteSpace(responseText))
         {
@@ -439,6 +492,11 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 
             if (parsed.Steps is null || parsed.Steps.Count == 0)
             {
+                if (TryBuildPlanFromDirectiveJson(responseText, availableComponents, out var directivePlan))
+                {
+                    return directivePlan;
+                }
+
                 return ActionPlan.Empty();
             }
 
@@ -464,6 +522,195 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             _logger?.LogWarning(ex, "Failed to parse planner response: {Response}", responseText);
             return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
         }
+    }
+
+    private ActionPlan? TryBuildPlanFromFunctionCalls(
+        ChatResponse response,
+        IReadOnlyList<AvailableComponent> availableComponents)
+    {
+        if (response.Messages.Count == 0)
+        {
+            return null;
+        }
+
+        var toolMap = BuildToolNameMap(availableComponents);
+        var steps = new List<PlannedStep>();
+
+        foreach (var message in response.Messages)
+        {
+            foreach (var content in message.Contents.OfType<FunctionCallContent>())
+            {
+                if (!TryResolveTool(content.Name, toolMap, out var resolved))
+                {
+                    continue;
+                }
+
+                var args = content.Arguments?.ToDictionary(
+                    static kv => kv.Key,
+                    static kv => kv.Value,
+                    StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                steps.Add(new PlannedStep
+                {
+                    ComponentId = resolved.ComponentId,
+                    ActionId = resolved.ActionId,
+                    Arguments = args
+                });
+            }
+        }
+
+        return steps.Count == 0
+            ? null
+            : new ActionPlan { Steps = steps };
+    }
+
+    private bool TryBuildPlanFromDirectiveJson(
+        string responseText,
+        IReadOnlyList<AvailableComponent> availableComponents,
+        out ActionPlan plan)
+    {
+        plan = ActionPlan.Empty();
+        var toolMap = BuildToolNameMap(availableComponents);
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseText);
+            if (!TryReadDirective(document.RootElement, toolMap, out var step))
+            {
+                return false;
+            }
+
+            plan = new ActionPlan { Steps = [step] };
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReadDirective(
+        JsonElement element,
+        IReadOnlyDictionary<string, (string ComponentId, string ActionId)> toolMap,
+        out PlannedStep step)
+    {
+        step = default!;
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!element.TryGetProperty("name", out var nameProp) || nameProp.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        var rawToolName = nameProp.GetString();
+        if (string.IsNullOrWhiteSpace(rawToolName) ||
+            !TryResolveTool(rawToolName, toolMap, out var resolved))
+        {
+            return false;
+        }
+
+        var arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (element.TryGetProperty("arguments", out var argsProp) &&
+            argsProp.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in argsProp.EnumerateObject())
+            {
+                arguments[property.Name] = ConvertJsonValue(property.Value);
+            }
+        }
+
+        step = new PlannedStep
+        {
+            ComponentId = resolved.ComponentId,
+            ActionId = resolved.ActionId,
+            Arguments = arguments
+        };
+
+        return true;
+    }
+
+    private static object? ConvertJsonValue(JsonElement value) =>
+        value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.TryGetInt64(out var l) ? l : value.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            JsonValueKind.Array => value.EnumerateArray().Select(ConvertJsonValue).ToArray(),
+            JsonValueKind.Object => value.EnumerateObject()
+                .ToDictionary(static p => p.Name, static p => ConvertJsonValue(p.Value), StringComparer.OrdinalIgnoreCase),
+            _ => value.ToString()
+        };
+
+    private static IReadOnlyDictionary<string, (string ComponentId, string ActionId)> BuildToolNameMap(
+        IReadOnlyList<AvailableComponent> availableComponents)
+    {
+        var map = new Dictionary<string, (string ComponentId, string ActionId)>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var component in availableComponents)
+        {
+            foreach (var action in component.Actions)
+            {
+                var toolName = BuildComponentToolName(component.ComponentId, action.ActionId);
+                map[toolName] = (component.ComponentId, action.ActionId);
+            }
+        }
+
+        return map;
+    }
+
+    private static bool TryResolveTool(
+        string toolName,
+        IReadOnlyDictionary<string, (string ComponentId, string ActionId)> toolMap,
+        out (string ComponentId, string ActionId) resolved)
+    {
+        resolved = default;
+        var trimmed = toolName?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return false;
+        }
+
+        if (toolMap.TryGetValue(trimmed, out resolved))
+        {
+            return true;
+        }
+
+        var sanitized = SanitizeToolName(trimmed);
+        if (toolMap.TryGetValue(sanitized, out resolved))
+        {
+            return true;
+        }
+
+        var actionMatches = toolMap
+            .Where(kv =>
+                string.Equals(kv.Value.ActionId, trimmed, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(SanitizeToolName(kv.Value.ActionId), sanitized, StringComparison.OrdinalIgnoreCase) ||
+                sanitized.EndsWith($"_{SanitizeToolName(kv.Value.ActionId)}", StringComparison.OrdinalIgnoreCase))
+            .Select(kv => kv.Value)
+            .Distinct()
+            .ToArray();
+        if (actionMatches.Length == 1)
+        {
+            resolved = actionMatches[0];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string BuildComponentToolName(string componentId, string actionId) =>
+        SanitizeToolName($"agentblazor_{componentId}_{actionId}");
+
+    private static string SanitizeToolName(string value)
+    {
+        var chars = value.Select(static ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '_').ToArray();
+        return new string(chars);
     }
 
     private static string StripCodeFences(string text)

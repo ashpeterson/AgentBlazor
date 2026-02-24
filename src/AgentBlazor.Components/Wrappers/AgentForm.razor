@@ -183,16 +183,24 @@
                 return ActionResult.Failure("Action 'set_field' requires 'field' parameter.");
             }
 
+            var resolvedField = ResolveFieldName(Model.GetType(), field);
+            if (resolvedField is null)
+            {
+                var available = string.Join(", ", GetSettableFieldNames(Model.GetType()));
+                return ActionResult.Failure(
+                    $"Field '{field}' was not found or is ambiguous on form model '{Model.GetType().Name}'. Available fields: {available}.");
+            }
+
             if (!action.Parameters.TryGetValue("value", out var raw))
             {
                 action.Parameters.TryGetValue("fieldValue", out raw);
             }
-            if (!TrySetFieldValue(Model, field, Normalize(raw), out var message))
+            if (!TrySetFieldValue(Model, resolvedField, Normalize(raw), out var message))
             {
                 return ActionResult.Failure(message);
             }
 
-            _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, field));
+            _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, resolvedField));
             await RequestComponentRefreshAsync();
             return ActionResult.Success(message);
         }
@@ -321,6 +329,141 @@
         property.SetValue(model, converted);
         message = $"Set field '{property.Name}' to '{converted}'.";
         return true;
+    }
+
+    private static string[] GetSettableFieldNames(Type modelType) =>
+        modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(static property => property.CanWrite && property.GetIndexParameters().Length == 0)
+            .Select(static property => property.Name)
+            .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string? ResolveFieldName(Type modelType, string fieldHint)
+    {
+        var properties = modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(static property => property.CanWrite && property.GetIndexParameters().Length == 0)
+            .ToArray();
+        if (properties.Length == 0)
+        {
+            return null;
+        }
+
+        var direct = properties.FirstOrDefault(property =>
+            string.Equals(property.Name, fieldHint, StringComparison.OrdinalIgnoreCase));
+        if (direct is not null)
+        {
+            return direct.Name;
+        }
+
+        var normalizedHint = NormalizeIdentifier(fieldHint);
+        if (normalizedHint.Length == 0)
+        {
+            return null;
+        }
+
+        var normalizedMatches = properties
+            .Where(property => string.Equals(
+                NormalizeIdentifier(property.Name),
+                normalizedHint,
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (normalizedMatches.Length == 1)
+        {
+            return normalizedMatches[0].Name;
+        }
+
+        var hintTokens = SplitIdentifierTokens(fieldHint);
+        if (hintTokens.Count == 0)
+        {
+            return null;
+        }
+
+        var scored = properties
+            .Select(property =>
+            {
+                var propertyTokens = SplitIdentifierTokens(property.Name);
+                var score = propertyTokens.Count(token =>
+                    hintTokens.Contains(token, StringComparer.OrdinalIgnoreCase));
+                var normalizedProperty = NormalizeIdentifier(property.Name);
+                if (normalizedProperty.Contains(normalizedHint, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedHint.Contains(normalizedProperty, StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 1;
+                }
+
+                return (property.Name, score);
+            })
+            .Where(static candidate => candidate.score > 0)
+            .OrderByDescending(static candidate => candidate.score)
+            .ThenBy(static candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (scored.Length == 0)
+        {
+            return null;
+        }
+
+        if (scored.Length > 1 && scored[0].score == scored[1].score)
+        {
+            return null;
+        }
+
+        return scored[0].Name;
+    }
+
+    private static string NormalizeIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+    }
+
+    private static List<string> SplitIdentifierTokens(string value)
+    {
+        var tokens = new List<string>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return tokens;
+        }
+
+        var builder = new System.Text.StringBuilder();
+        char? previous = null;
+        foreach (var ch in value)
+        {
+            if (!char.IsLetterOrDigit(ch))
+            {
+                Flush();
+                previous = null;
+                continue;
+            }
+
+            if (previous is not null &&
+                char.IsLower(previous.Value) &&
+                char.IsUpper(ch))
+            {
+                Flush();
+            }
+
+            builder.Append(char.ToLowerInvariant(ch));
+            previous = ch;
+        }
+
+        Flush();
+        return tokens;
+
+        void Flush()
+        {
+            if (builder.Length == 0)
+            {
+                return;
+            }
+
+            tokens.Add(builder.ToString());
+            builder.Clear();
+        }
     }
 
     private static object? Normalize(object? value)

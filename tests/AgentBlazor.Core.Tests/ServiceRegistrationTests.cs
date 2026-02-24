@@ -275,6 +275,43 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void AddAgentBlazorServices_RegistersDeferredActionEvents_ByDefault()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var deferredEvents = provider.GetRequiredService<IAgentDeferredActionEvents>();
+
+        Assert.NotNull(deferredEvents);
+    }
+
+    [Fact]
+    public void DeferredActionEvents_PublishesCompletionNotifications()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var deferredEvents = provider.GetRequiredService<IAgentDeferredActionEvents>();
+
+        DeferredComponentActionEvent? observed = null;
+        deferredEvents.DeferredActionCompleted += actionEvent => observed = actionEvent;
+
+        var expected = new DeferredComponentActionEvent(
+            ComponentType: "Form",
+            AgentId: "supplier-form",
+            ActionId: "set_field",
+            Succeeded: true,
+            Message: "Set SupplierName to ash.",
+            OccurredAt: DateTimeOffset.UtcNow);
+
+        deferredEvents.Publish(expected);
+
+        Assert.Equal(expected, observed);
+    }
+
+    [Fact]
     public async Task AddAgentBlazorServices_RegistersAgentActionExecutors_ByDefault()
     {
         var services = new ServiceCollection();

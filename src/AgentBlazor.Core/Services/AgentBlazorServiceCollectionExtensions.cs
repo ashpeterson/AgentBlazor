@@ -62,6 +62,7 @@ public static class AgentBlazorServiceCollectionExtensions
 
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
+        services.TryAddSingleton<IAgentDeferredActionEvents, AgentDeferredActionEvents>();
         services.TryAddSingleton<IComponentActionArgumentResolver, ComponentActionArgumentResolver>();
 
         // Conversation management

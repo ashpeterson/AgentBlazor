@@ -102,6 +102,12 @@
     background: var(--ab-chat-assistant-bg);
 }
 
+.ab-chat-surface__item--activity {
+    border-style: dashed;
+    border-color: var(--ab-chat-border-muted);
+    background: var(--ab-chat-bg-elevated);
+}
+
 .ab-chat-surface__item-role {
     font-size: 0.6875rem;
     font-weight: 700;

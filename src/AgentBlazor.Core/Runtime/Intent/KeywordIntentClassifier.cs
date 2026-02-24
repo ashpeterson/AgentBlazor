@@ -142,6 +142,7 @@ internal sealed class KeywordIntentClassifier : IIntentClassifier
         string userMessage,
         IReadOnlyList<ComponentCapability> availableActions)
     {
+        var shouldFilterByAvailableActions = availableActions.Count > 0;
         var allowedActionKeys = new HashSet<string>(
             availableActions.SelectMany(c => c.Actions.Select(a => $"{c.ComponentId}.{a.ActionId}")),
             StringComparer.OrdinalIgnoreCase);
@@ -153,7 +154,7 @@ internal sealed class KeywordIntentClassifier : IIntentClassifier
         {
             // Skip rules for actions not available
             var actionKey = $"{rule.ComponentId}.{rule.ActionId}";
-            if (!allowedActionKeys.Contains(actionKey))
+            if (shouldFilterByAvailableActions && !allowedActionKeys.Contains(actionKey))
                 continue;
 
             if (!rule.Matches(userMessage))
@@ -190,6 +191,7 @@ internal sealed class KeywordIntentClassifier : IIntentClassifier
         string userMessage,
         IReadOnlyList<ComponentCapability> availableActions)
     {
+        var shouldFilterByAvailableActions = availableActions.Count > 0;
         var allowedActionKeys = new HashSet<string>(
             availableActions.SelectMany(c => c.Actions.Select(a => $"{c.ComponentId}.{a.ActionId}")),
             StringComparer.OrdinalIgnoreCase);
@@ -199,7 +201,7 @@ internal sealed class KeywordIntentClassifier : IIntentClassifier
         foreach (var rule in _rules.OrderByDescending(r => r.Priority))
         {
             var actionKey = $"{rule.ComponentId}.{rule.ActionId}";
-            if (!allowedActionKeys.Contains(actionKey))
+            if (shouldFilterByAvailableActions && !allowedActionKeys.Contains(actionKey))
                 continue;
 
             if (!rule.Matches(userMessage))
