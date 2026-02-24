@@ -12,7 +12,9 @@
              Hover="Hover"
              Bordered="Bordered"
              Striped="Striped"
-             RowClassFunc="ComputedRowClassFunc"
+             SelectedItem="_selectedItem"
+             SelectedItemChanged="OnSelectedItemChanged"
+             RowClassFunc="RowClassFunc"
              id="@AgentId"
              data-ab-type="datagrid"
              data-ab-agentid="@AgentId"
@@ -95,25 +97,51 @@
     [Parameter]
     public Func<TItem, int, string>? RowClassFunc { get; set; }
 
-    /// <summary>
-    /// Combines user-provided RowClassFunc with focused row highlighting.
-    /// </summary>
-    private string ComputedRowClassFunc(TItem item, int index)
-    {
-        var userClass = RowClassFunc?.Invoke(item, index) ?? string.Empty;
+    private TItem? _selectedItem;
 
-        if (!string.IsNullOrWhiteSpace(FocusedRowKey) && !string.IsNullOrWhiteSpace(RowKeyProperty))
+    /// <summary>
+    /// Handles selection changes from user clicks on the grid.
+    /// </summary>
+    private async Task OnSelectedItemChanged(TItem? item)
+    {
+        _selectedItem = item;
+
+        // Sync FocusedRowKey with selection
+        if (item is not null && !string.IsNullOrWhiteSpace(RowKeyProperty))
+        {
+            if (TryGetPropertyValue(item, RowKeyProperty, out var keyValue))
+            {
+                FocusedRowKey = keyValue?.ToString();
+                await FocusedRowKeyChanged.InvokeAsync(FocusedRowKey);
+            }
+        }
+        else
+        {
+            FocusedRowKey = null;
+            await FocusedRowKeyChanged.InvokeAsync(null);
+        }
+    }
+
+    /// <summary>
+    /// Finds and selects the item matching the given row key.
+    /// </summary>
+    private TItem? FindItemByKey(string rowKey)
+    {
+        if (string.IsNullOrWhiteSpace(RowKeyProperty) || Items is null)
+        {
+            return default;
+        }
+
+        foreach (var item in Items)
         {
             if (TryGetPropertyValue(item, RowKeyProperty, out var keyValue) &&
-                string.Equals(keyValue?.ToString(), FocusedRowKey, StringComparison.OrdinalIgnoreCase))
+                string.Equals(keyValue?.ToString(), rowKey, StringComparison.OrdinalIgnoreCase))
             {
-                return string.IsNullOrWhiteSpace(userClass)
-                    ? "ab-datagrid-row--focused"
-                    : $"{userClass} ab-datagrid-row--focused";
+                return item;
             }
         }
 
-        return userClass;
+        return default;
     }
 
     /// <summary>Optional display/LLM column names to canonical property names (e.g. "Risk Level" → "RiskScore"). Used by schema resolution when applying queued actions.</summary>
@@ -432,6 +460,14 @@
                 return ActionResult.Failure($"Action '{action.Name}' requires 'rowKey' parameter.");
             }
 
+            // Find and select the item - MudBlazor handles the visual highlighting
+            var item = FindItemByKey(rowKey);
+            if (item is null)
+            {
+                return ActionResult.Failure($"Row with key '{rowKey}' not found.");
+            }
+
+            _selectedItem = item;
             FocusedRowKey = rowKey;
             await FocusedRowKeyChanged.InvokeAsync(FocusedRowKey);
 
@@ -441,7 +477,7 @@
                 await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
             }
 
-            return await CompleteAndRefreshAsync(ActionResult.Success($"Focused row '{FocusedRowKey}'."));
+            return await CompleteAndRefreshAsync(ActionResult.Success($"Selected row '{FocusedRowKey}'."));
         }
 
         return ActionResult.Unknown(action.Name);
