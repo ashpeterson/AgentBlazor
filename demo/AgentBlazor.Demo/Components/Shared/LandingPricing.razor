@@ -1,0 +1,87 @@
+@using MudBlazor
+
+<section class="landing-pricing" id="pricing">
+    <div class="landing-pricing__container">
+        <div class="landing-pricing__header">
+            <h2 class="landing-pricing__title">Pricing Plans</h2>
+            <p class="landing-pricing__subtitle">
+                Choose the plan that fits your needs. Start free, scale as you grow.
+            </p>
+        </div>
+
+        <div class="landing-pricing__grid">
+            @* Starter Plan *@
+            <article class="landing-plan">
+                <div class="landing-plan__header">
+                    <h3 class="landing-plan__name">Starter</h3>
+                    <div class="landing-plan__price">
+                        <span class="landing-plan__amount">Free</span>
+                    </div>
+                    <p class="landing-plan__desc">Perfect for trying out AgentBlazor</p>
+                </div>
+                <ul class="landing-plan__features">
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Up to 3 agent components</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Basic action planning</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Community support</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> MIT licensed</li>
+                </ul>
+                <MudButton Href="demo"
+                           Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           FullWidth="true">
+                    Get Started
+                </MudButton>
+            </article>
+
+            @* Pro Plan *@
+            <article class="landing-plan landing-plan--featured">
+                <div class="landing-plan__badge">Most Popular</div>
+                <div class="landing-plan__header">
+                    <h3 class="landing-plan__name">Pro</h3>
+                    <div class="landing-plan__price">
+                        <span class="landing-plan__amount">$49</span>
+                        <span class="landing-plan__period">/month</span>
+                    </div>
+                    <p class="landing-plan__desc">For teams building production apps</p>
+                </div>
+                <ul class="landing-plan__features">
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Unlimited agent components</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Advanced action planning</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Approval workflows</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Priority email support</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Custom component support</li>
+                </ul>
+                <MudButton Href="#contact"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true">
+                    Start Free Trial
+                </MudButton>
+            </article>
+
+            @* Enterprise Plan *@
+            <article class="landing-plan">
+                <div class="landing-plan__header">
+                    <h3 class="landing-plan__name">Enterprise</h3>
+                    <div class="landing-plan__price">
+                        <span class="landing-plan__amount">Custom</span>
+                    </div>
+                    <p class="landing-plan__desc">For large organizations</p>
+                </div>
+                <ul class="landing-plan__features">
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Everything in Pro</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Dedicated support</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Custom integrations</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> SLA guarantees</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> On-premise deployment</li>
+                </ul>
+                <MudButton Href="#contact"
+                           Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           FullWidth="true">
+                    Contact Sales
+                </MudButton>
+            </article>
+        </div>
+    </div>
+</section>

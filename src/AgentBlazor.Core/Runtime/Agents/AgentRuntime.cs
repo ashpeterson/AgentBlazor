@@ -8,6 +8,7 @@ using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Internal;
 using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Licensing;
@@ -37,8 +38,10 @@ internal sealed class AgentRuntime(
     IPromptTraceStore? traceStore = null,
     ILogger<AgentRuntime>? logger = null,
     IChatClient? chatClient = null,
-    IAgentBlazorEntitlementService? entitlementService = null) : IAgentRuntime
+    IAgentBlazorEntitlementService? entitlementService = null,
+    IInternalPageStructureRegistry? pageStructureRegistry = null) : IAgentRuntime
 {
+    private readonly IInternalPageStructureRegistry? _pageStructureRegistry = pageStructureRegistry;
     // Legacy support: keep internal clarifications for backward compatibility
     // when IConversationManager is not available
     private readonly ConcurrentDictionary<string, PendingClarification> _pendingClarifications =
@@ -179,6 +182,7 @@ internal sealed class AgentRuntime(
 
         ConcurrentQueue<PlannedComponentAction>? plannedActions = null;
         ConcurrentQueue<ComponentActionExecutionResult>? executionResults = null;
+        var pendingApprovals = new List<PendingApproval>();
 
         try
         {
@@ -228,6 +232,7 @@ internal sealed class AgentRuntime(
                 registeredComponentSnapshots,
                 plannedActions,
                 executionResults,
+                pendingApprovals,
                 cancellationToken);
             if (tools.Count == 0)
             {
@@ -267,7 +272,7 @@ internal sealed class AgentRuntime(
                     Description = registration.Description,
                     ChatOptions = new ChatOptions
                     {
-                        Instructions = BuildInstructions(registration, allowedComponents, registeredComponentSnapshots),
+                        Instructions = BuildInstructions(registration, allowedComponents, registeredComponentSnapshots, _pageStructureRegistry),
                         Tools = tools,
                         ToolMode = ChatToolMode.Auto
                     }
@@ -369,6 +374,25 @@ internal sealed class AgentRuntime(
                 executionResults,
                 cancellationToken);
 
+            string? clarificationQuestion = null;
+            if (plannedActions.IsEmpty && executionResults.IsEmpty)
+            {
+                logger?.LogInformation("[AgentFlow] No actions executed after all fallbacks. Checking for clarification intent in response.");
+                var clarificationResult = TryParseClarificationIntent(text, allowedComponents);
+                if (clarificationResult is { } question)
+                {
+                    logger?.LogInformation("[AgentFlow] Agent requested clarification: {Question}", question);
+                    clarificationQuestion = question;
+                    text = string.Empty;
+                }
+                else if (!string.IsNullOrWhiteSpace(text) && text.Length < 200 && !text.Contains("executed", StringComparison.OrdinalIgnoreCase))
+                {
+                    logger?.LogInformation("[AgentFlow] Agent returned non-actionable text. Forcing clarification request.");
+                    clarificationQuestion = BuildForcedClarificationRequest(request.UserMessage, allowedComponents, registeredComponentSnapshots, _pageStructureRegistry);
+                    text = clarificationQuestion;
+                }
+            }
+
             if (blockedActionKeys.Length > 0 &&
                 plannedActions.IsEmpty &&
                 executionResults.IsEmpty)
@@ -421,7 +445,13 @@ internal sealed class AgentRuntime(
                 AgentName: registration.Name,
                 ResponseText: text,
                 PlannedActions: plannedActionSnapshot,
-                ExecutionResults: executionResultSnapshot);
+                ExecutionResults: executionResultSnapshot)
+            {
+                RequiresClarification = clarificationQuestion is not null,
+                ClarificationQuestion = clarificationQuestion,
+                RequiresApproval = pendingApprovals.Count > 0,
+                PendingApprovals = pendingApprovals
+            };
 
             await TrackRunEventAsync(CreateRunEvent(
                 AgentBlazorRunEventKind.Finished,
@@ -511,6 +541,7 @@ internal sealed class AgentRuntime(
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponentSnapshots,
         ConcurrentQueue<PlannedComponentAction> plannedActions,
         ConcurrentQueue<ComponentActionExecutionResult> executionResults,
+        List<PendingApproval> pendingApprovals,
         CancellationToken cancellationToken)
     {
         var tools = new List<AITool>();
@@ -580,6 +611,11 @@ internal sealed class AgentRuntime(
                             ActionId: actionId,
                             Succeeded: false,
                             Message: $"Approval required for {componentId}.{actionId}.");
+                        pendingApprovals.Add(new PendingApproval(
+                            componentId,
+                            actionId,
+                            action.Description ?? $"{componentId}.{actionId}",
+                            arguments.Count == 0 ? new Dictionary<string, object?>() : new Dictionary<string, object?>(arguments)));
                     }
                     else
                     {
@@ -1080,6 +1116,130 @@ internal sealed class AgentRuntime(
         return text[(firstNewLine + 1)..^3].Trim();
     }
 
+    private static string? TryParseClarificationIntent(
+        string responseText,
+        IReadOnlyList<ComponentCapability> allowedComponents)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            return null;
+        }
+
+        var trimmed = responseText.Trim();
+        if (!trimmed.StartsWith('{'))
+        {
+            if (trimmed.Contains("?", StringComparison.Ordinal) &&
+                trimmed.Length < 300 &&
+                !trimmed.Contains("tool", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.Contains("filter", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.Contains("sort", StringComparison.OrdinalIgnoreCase) &&
+                !trimmed.Contains("navigat", StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed;
+            }
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("intent", out var intentProp) &&
+                string.Equals(intentProp.GetString(), "clarification", StringComparison.OrdinalIgnoreCase))
+            {
+                if (root.TryGetProperty("question", out var questionProp))
+                {
+                    return questionProp.GetString();
+                }
+            }
+
+            if (root.TryGetProperty("clarificationQuestion", out var clarProp))
+            {
+                return clarProp.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    private static string BuildForcedClarificationRequest(
+        string userMessage,
+        IReadOnlyList<ComponentCapability> allowedComponents,
+        IReadOnlyList<RegisteredComponentSnapshot> registeredComponents,
+        IInternalPageStructureRegistry? pageStructureRegistry)
+    {
+        var message = userMessage.ToLowerInvariant();
+        var currentComponents = pageStructureRegistry?.GetCurrentPageComponents() ?? [];
+
+        if (message.Contains("filter") || message.Contains("search") || message.Contains("find"))
+        {
+            var hasFilterAction = registeredComponents.Any(c =>
+                c.Actions.Contains("filter", StringComparer.OrdinalIgnoreCase));
+            
+            var columns = currentComponents
+                .SelectMany(c => c.Columns)
+                .Select(col => col.Name)
+                .Distinct()
+                .Take(5)
+                .ToList();
+            
+            if (hasFilterAction)
+            {
+                if (columns.Count > 0)
+                {
+                    return $"Which column should I filter by? Available columns: {string.Join(", ", columns)}";
+                }
+                return "Which column should I filter by, and what value should I search for?";
+            }
+            return "Which column should I filter by?";
+        }
+
+        if (message.Contains("sort") || message.Contains("order"))
+        {
+            var hasSortAction = registeredComponents.Any(c =>
+                c.Actions.Contains("sort", StringComparer.OrdinalIgnoreCase));
+            
+            var columns = currentComponents
+                .SelectMany(c => c.Columns.Where(col => col.Sortable))
+                .Select(col => col.Name)
+                .Distinct()
+                .Take(5)
+                .ToList();
+            
+            if (hasSortAction)
+            {
+                if (columns.Count > 0)
+                {
+                    return $"Which column should I sort by? Available sortable columns: {string.Join(", ", columns)}";
+                }
+                return "Which column should I sort by, and in what direction (ascending or descending)?";
+            }
+            return "Which column should I sort by?";
+        }
+
+        if (message.Contains("navigat") || message.Contains("go to") || message.Contains("open"))
+        {
+            var routes = pageStructureRegistry?.GetKnownRoutes() ?? [];
+            if (routes.Count > 0)
+            {
+                return $"Which page would you like to navigate to? Available: {string.Join(", ", routes.Take(5))}";
+            }
+            return "Which page or section would you like to navigate to?";
+        }
+
+        if (message.Contains("tab") || message.Contains("switch"))
+        {
+            return "Which tab would you like to switch to?";
+        }
+
+        return "I couldn't determine what you'd like me to do. Could you provide more details? " +
+               "For example: 'Filter suppliers by risk score > 70' or 'Navigate to the suppliers page'.";
+    }
+
     private static string BuildPrompt(
         AgentTurnRequest request,
         IReadOnlyList<RegisteredComponentSnapshot> registeredComponents)
@@ -1128,7 +1288,8 @@ internal sealed class AgentRuntime(
     private static string BuildInstructions(
         AgentRegistration registration,
         IReadOnlyList<ComponentCapability> allowedComponents,
-        IReadOnlyList<RegisteredComponentSnapshot> registeredComponents)
+        IReadOnlyList<RegisteredComponentSnapshot> registeredComponents,
+        IInternalPageStructureRegistry? pageStructureRegistry)
     {
         var builder = new StringBuilder();
 
@@ -1138,8 +1299,25 @@ internal sealed class AgentRuntime(
         builder.AppendLine("For multi-step requests, execute all required tools in the same turn (for example navigate, then filter/sort/select).");
         builder.AppendLine("Do not stop after navigation when the user also requested work on the destination surface.");
         builder.AppendLine("You can call component tools even before the destination component is mounted; runtime will queue them.");
-        builder.AppendLine("If required action parameters are missing or ambiguous, ask a concise clarifying question before calling a tool.");
         builder.AppendLine("When sorting or filtering, include explicit column/operator/value arguments.");
+        builder.AppendLine();
+        builder.AppendLine("CRITICAL: You MUST either execute a tool OR ask a clarifying question. NEVER return text-only responses without doing either.");
+        builder.AppendLine("If you cannot determine required parameters from context, ask a SPECIFIC clarifying question.");
+        builder.AppendLine("Examples of mandatory clarification:");
+        builder.AppendLine("  - 'Which column should I filter by?' (not just 'filter the data')");
+        builder.AppendLine("  - 'What value should I search for in the [column] field?'");
+        builder.AppendLine("  - 'Which tab do you want to switch to?'");
+        builder.AppendLine("  - 'Should I filter for suppliers with risk score above or below 70?'");
+        builder.AppendLine("Do NOT guess parameters. Ask instead of guessing.");
+        builder.AppendLine();
+        builder.AppendLine("When you need clarification, respond with ONLY this JSON structure (no other text):");
+        builder.AppendLine("{");
+        builder.AppendLine("  \"intent\": \"clarification\",");
+        builder.AppendLine("  \"question\": \"Your specific question here\",");
+        builder.AppendLine("  \"understood\": \"What you understood so far\"");
+        builder.AppendLine("}");
+
+
         if (!string.IsNullOrWhiteSpace(registration.Instructions))
         {
             builder.AppendLine(registration.Instructions);
@@ -1185,6 +1363,54 @@ internal sealed class AgentRuntime(
                 }
             }
         }
+
+        builder.AppendLine();
+        builder.AppendLine("Available routes for navigation:");
+        
+        if (pageStructureRegistry is not null)
+        {
+            var knownRoutes = pageStructureRegistry.GetKnownRoutes();
+            if (knownRoutes.Count > 0)
+            {
+                foreach (var route in knownRoutes.Distinct())
+                {
+                    builder.AppendLine($"- {route}");
+                }
+            }
+            else
+            {
+                builder.AppendLine("- /: Home page");
+                builder.AppendLine("- /suppliers: Suppliers list");
+                builder.AppendLine("- /suppliers/: Individual supplier");
+            }
+            
+            var currentPageComponents = pageStructureRegistry.GetCurrentPageComponents();
+            if (currentPageComponents.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Current page components:");
+                foreach (var comp in currentPageComponents.Take(10))
+                {
+                    builder.AppendLine($"- {comp.Id} ({comp.Type})");
+                    if (comp.Columns.Count > 0)
+                    {
+                        builder.AppendLine($"  columns: {string.Join(", ", comp.Columns.Select(c => c.Name))}");
+                    }
+                    if (comp.AvailableActions.Count > 0)
+                    {
+                        builder.AppendLine($"  actions: {string.Join(", ", comp.AvailableActions)}");
+                    }
+                }
+            }
+        }
+        else
+        {
+            builder.AppendLine("- /: Home page");
+            builder.AppendLine("- /suppliers: Suppliers list");
+            builder.AppendLine("- /suppliers/: Individual supplier");
+        }
+        
+        builder.AppendLine("Use navigate_to action with 'uri' parameter.");
 
         return builder.ToString().Trim();
     }

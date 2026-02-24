@@ -1,18 +1,18 @@
-@page "/workspace"
-@page "/agent-nav-tabs-demo"
+@page "/demo/workspace"
+@layout DemoLayout
 @using AgentBlazor.Components
 @using MudBlazor
 
-<PageTitle>Workspace</PageTitle>
+<PageTitle>Workspace — AgentBlazor Demo</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Workspace</MudText>
 
 <MudGrid>
     <MudItem xs="12" md="3">
         <AgentNavMenu AgentId="workspace-nav" Dense="true">
-            <MudNavLink Href="/suppliers" Match="NavLinkMatch.Prefix">Suppliers</MudNavLink>
-            <MudNavLink Href="/supplier-onboarding" Match="NavLinkMatch.Prefix">Onboarding</MudNavLink>
-            <MudNavLink Href="/workspace" Match="NavLinkMatch.Prefix">Workspace</MudNavLink>
+            <MudNavLink Href="/demo/suppliers" Match="NavLinkMatch.Prefix">Suppliers</MudNavLink>
+            <MudNavLink Href="/demo/onboarding" Match="NavLinkMatch.Prefix">Onboarding</MudNavLink>
+            <MudNavLink Href="/demo/workspace" Match="NavLinkMatch.Prefix">Workspace</MudNavLink>
         </AgentNavMenu>
     </MudItem>
     <MudItem xs="12" md="9">
@@ -30,4 +30,5 @@
     </MudItem>
 </MudGrid>
 
-<AgentChatWidget />
+<AgentChatWidget Title="Workspace Agent"
+                 Description="Ask me to switch tabs or navigate to other pages." />

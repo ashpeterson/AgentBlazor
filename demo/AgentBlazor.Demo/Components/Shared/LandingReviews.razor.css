@@ -1,0 +1,119 @@
+/* ── Reviews Section ────────────────────────────── */
+
+.landing-reviews {
+    padding: 6rem 2rem;
+    background: var(--ab-bg);
+}
+
+.landing-reviews__container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.landing-reviews__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.landing-reviews__title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    color: var(--ab-ink);
+    margin: 0 0 1rem;
+}
+
+.landing-reviews__subtitle {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--ab-ink-muted);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* ── Reviews Grid ───────────────────────────────── */
+
+.landing-reviews__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2rem;
+}
+
+/* ── Review Card ────────────────────────────────── */
+
+.landing-review {
+    padding: 2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border);
+    background: var(--ab-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.landing-review__stars {
+    display: flex;
+    gap: 0.25rem;
+    color: #fbbf24;
+}
+
+.landing-review__quote {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--ab-ink);
+    margin: 0;
+    flex: 1;
+}
+
+.landing-review__author {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ab-border);
+}
+
+.landing-review__avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ab-accent) 0%, #ff6b8a 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.landing-review__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.landing-review__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ab-ink);
+}
+
+.landing-review__role {
+    font-size: 0.85rem;
+    color: var(--ab-ink-muted);
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 600px) {
+    .landing-reviews {
+        padding: 4rem 1.25rem;
+    }
+
+    .landing-reviews__grid {
+        gap: 1.5rem;
+    }
+
+    .landing-review {
+        padding: 1.5rem;
+    }
+}

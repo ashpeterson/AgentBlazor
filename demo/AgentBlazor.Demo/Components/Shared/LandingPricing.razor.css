@@ -1,0 +1,156 @@
+/* ── Pricing Section ────────────────────────────── */
+
+.landing-pricing {
+    padding: 6rem 2rem;
+    background: var(--ab-bg-soft);
+}
+
+.landing-pricing__container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.landing-pricing__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.landing-pricing__title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    color: var(--ab-ink);
+    margin: 0 0 1rem;
+}
+
+.landing-pricing__subtitle {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--ab-ink-muted);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* ── Pricing Grid ───────────────────────────────── */
+
+.landing-pricing__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    align-items: start;
+}
+
+/* ── Plan Card ──────────────────────────────────── */
+
+.landing-plan {
+    position: relative;
+    padding: 2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border);
+    background: var(--ab-surface);
+    display: flex;
+    flex-direction: column;
+}
+
+.landing-plan--featured {
+    border-color: var(--ab-accent);
+    box-shadow: 0 0 40px rgba(224, 58, 88, 0.15);
+    transform: scale(1.02);
+}
+
+.landing-plan__badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.35rem 1rem;
+    border-radius: 999px;
+    background: var(--ab-accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.landing-plan__header {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--ab-border);
+    margin-bottom: 1.5rem;
+}
+
+.landing-plan__name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ab-ink);
+    margin: 0 0 0.75rem;
+}
+
+.landing-plan__price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.landing-plan__amount {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--ab-ink);
+}
+
+.landing-plan__period {
+    font-size: 1rem;
+    color: var(--ab-ink-muted);
+}
+
+.landing-plan__desc {
+    font-size: 0.9rem;
+    color: var(--ab-ink-muted);
+    margin: 0;
+}
+
+/* ── Features List ──────────────────────────────── */
+
+.landing-plan__features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2rem;
+    flex: 1;
+}
+
+.landing-plan__features li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+    color: var(--ab-ink-muted);
+}
+
+.landing-plan__features li ::deep .mud-icon-root {
+    color: var(--ab-accent);
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 900px) {
+    .landing-plan--featured {
+        transform: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .landing-pricing {
+        padding: 4rem 1.25rem;
+    }
+
+    .landing-pricing__grid {
+        gap: 1.5rem;
+    }
+
+    .landing-plan {
+        padding: 1.5rem;
+    }
+}

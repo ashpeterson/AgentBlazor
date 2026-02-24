@@ -1,0 +1,41 @@
+@using MudBlazor
+
+<footer class="landing-footer">
+    <div class="landing-footer__container">
+        <div class="landing-footer__brand">
+            <a href="" class="landing-footer__logo">
+                <img src="logo.png" alt="AgentBlazor" />
+                <span>AgentBlazor</span>
+            </a>
+            <p class="landing-footer__tagline">
+                Agent-first UI framework for Blazor applications.
+            </p>
+        </div>
+
+        <nav class="landing-footer__links">
+            <div class="landing-footer__col">
+                <h4>Product</h4>
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="demo">Demo</a>
+            </div>
+            <div class="landing-footer__col">
+                <h4>Resources</h4>
+                <a href="https://docs.agentblazor.dev" target="_blank" rel="noopener">Documentation</a>
+                <a href="https://github.com/agentblazor" target="_blank" rel="noopener">GitHub</a>
+                <a href="#contact">Support</a>
+            </div>
+            <div class="landing-footer__col">
+                <h4>Company</h4>
+                <a href="#contact">Contact</a>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+            </div>
+        </nav>
+    </div>
+
+    <div class="landing-footer__bottom">
+        <p>&copy; @DateTime.Now.Year AgentBlazor. All rights reserved.</p>
+        <p>Built with <MudIcon Icon="@Icons.Material.Filled.Favorite" Size="Size.Small" /> using Blazor and MudBlazor</p>
+    </div>
+</footer>

@@ -1,0 +1,97 @@
+/* ── Features Section ───────────────────────────── */
+
+.landing-features {
+    padding: 6rem 2rem;
+    background: var(--ab-bg);
+}
+
+.landing-features__container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.landing-features__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.landing-features__title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    color: var(--ab-ink);
+    margin: 0 0 1rem;
+}
+
+.landing-features__subtitle {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--ab-ink-muted);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* ── Feature Grid ───────────────────────────────── */
+
+.landing-features__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+/* ── Feature Card ───────────────────────────────── */
+
+.landing-feature {
+    padding: 2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border);
+    background: var(--ab-surface);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.landing-feature:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    border-color: var(--ab-border-strong);
+}
+
+.landing-feature__icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    background: rgba(224, 58, 88, 0.1);
+    color: var(--ab-accent);
+    margin-bottom: 1.25rem;
+}
+
+.landing-feature__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ab-ink);
+    margin: 0 0 0.75rem;
+}
+
+.landing-feature__desc {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--ab-ink-muted);
+    margin: 0;
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 600px) {
+    .landing-features {
+        padding: 4rem 1.25rem;
+    }
+
+    .landing-features__grid {
+        gap: 1.5rem;
+    }
+
+    .landing-feature {
+        padding: 1.5rem;
+    }
+}

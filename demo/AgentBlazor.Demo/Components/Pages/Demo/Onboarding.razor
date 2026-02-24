@@ -1,10 +1,10 @@
-@page "/supplier-onboarding"
-@page "/agent-dialog-form-demo"
+@page "/demo/onboarding"
+@layout DemoLayout
 @using System.ComponentModel.DataAnnotations
 @using AgentBlazor.Components
 @using MudBlazor
 
-<PageTitle>Supplier Onboarding</PageTitle>
+<PageTitle>Supplier Onboarding — AgentBlazor Demo</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Supplier Onboarding</MudText>
 
@@ -51,7 +51,8 @@
     </DialogActions>
 </AgentDialog>
 
-<AgentChatWidget />
+<AgentChatWidget Title="Onboarding Agent"
+                 Description="Ask me to open the form or fill in supplier details." />
 
 @code {
     private AgentDialog? _dialog;

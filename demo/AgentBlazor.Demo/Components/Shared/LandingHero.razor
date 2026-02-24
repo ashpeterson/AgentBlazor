@@ -1,0 +1,35 @@
+@using MudBlazor
+
+<section class="landing-hero" id="hero">
+    <div class="landing-hero__bg">
+        <div class="landing-hero__orb landing-hero__orb--1"></div>
+        <div class="landing-hero__orb landing-hero__orb--2"></div>
+        <div class="landing-hero__orb landing-hero__orb--3"></div>
+        <div class="landing-hero__grid"></div>
+    </div>
+
+    <div class="landing-hero__content">
+        <h1 class="landing-hero__title">
+            Agent-First<br />
+            <span class="landing-hero__accent">UI Framework</span>
+        </h1>
+        <p class="landing-hero__subtitle">
+            Build intelligent Blazor applications where AI agents understand and control your UI components
+            through natural language. No complex integrations required.
+        </p>
+        <div class="landing-hero__cta">
+            <MudButton Href="demo"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       EndIcon="@Icons.Material.Filled.ArrowForward">
+                Try the Demo
+            </MudButton>
+            <MudButton Href="#features"
+                       Variant="Variant.Outlined"
+                       Size="Size.Large">
+                Learn More
+            </MudButton>
+        </div>
+    </div>
+</section>

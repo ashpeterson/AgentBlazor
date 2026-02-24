@@ -1,0 +1,193 @@
+@page "/demo"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Core.Runtime.Agents
+@using MudBlazor
+@inject IAgentRuntime AgentRuntime
+@inject NavigationManager Navigation
+
+<PageTitle>AgentBlazor Demo</PageTitle>
+
+<div class="demo-home">
+    <!-- Hero Section -->
+    <section class="demo-home__hero">
+        <div class="demo-home__hero-bg">
+            <div class="demo-home__orb demo-home__orb--1"></div>
+            <div class="demo-home__orb demo-home__orb--2"></div>
+            <div class="demo-home__grid"></div>
+        </div>
+
+        <div class="demo-home__hero-content">
+            <h1 class="demo-home__title">
+                Talk to your <span class="demo-home__accent">Supplier Platform</span>
+            </h1>
+            <p class="demo-home__subtitle">
+                Use natural language to filter data, navigate pages, switch tabs, and control UI components.
+            </p>
+
+            <!-- Prompt Bar -->
+            <div class="demo-home__prompt-bar">
+                <div class="demo-home__prompt-input-wrap">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="demo-home__prompt-icon" />
+                    <input type="text"
+                           class="demo-home__prompt-input"
+                           placeholder="Try: show me high risk suppliers"
+                           @bind="_prompt"
+                           @bind:event="oninput"
+                           @onkeydown="HandleKeyDown"
+                           disabled="@_isBusy" />
+                    <button class="demo-home__prompt-send"
+                            @onclick="SendAsync"
+                            disabled="@(_isBusy || string.IsNullOrWhiteSpace(_prompt))">
+                        @if (_isBusy)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Inherit" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Send" />
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="demo-home__suggestions">
+                <button class="demo-home__chip" @onclick="@(() => SendPrompt("show me high risk suppliers"))">
+                    show me high risk suppliers
+                </button>
+                <button class="demo-home__chip" @onclick="@(() => SendPrompt("go to workspace and switch to Risk tab"))">
+                    go to workspace → Risk tab
+                </button>
+                <button class="demo-home__chip" @onclick="@(() => SendPrompt("navigate to onboarding"))">
+                    open onboarding
+                </button>
+                <button class="demo-home__chip" @onclick="@(() => SendPrompt("sort suppliers by risk descending"))">
+                    sort by risk ↓
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Response Section (shows after sending a message) -->
+    @if (_responses.Count > 0)
+    {
+        <section class="demo-home__responses">
+            <h2 class="demo-home__responses-title">Conversation</h2>
+            <div class="demo-home__timeline">
+                @foreach (var item in _responses)
+                {
+                    <article class="demo-home__message demo-home__message--@item.Role">
+                        <div class="demo-home__message-role">@(item.Role == "user" ? "You" : "Agent")</div>
+                        <div class="demo-home__message-text">@item.Text</div>
+                        @if (item.Actions.Count > 0)
+                        {
+                            <div class="demo-home__message-actions">
+                                @foreach (var action in item.Actions)
+                                {
+                                    <span class="demo-home__action-chip">
+                                        @action.ComponentId.@action.ActionId
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+            <button class="demo-home__clear" @onclick="ClearConversation">
+                <MudIcon Icon="@Icons.Material.Filled.Delete" Size="Size.Small" />
+                Clear conversation
+            </button>
+        </section>
+    }
+
+    <!-- Quick Links -->
+    <section class="demo-home__links">
+        <a href="demo/suppliers" class="demo-home__link-card">
+            <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Large" />
+            <span>Suppliers Grid</span>
+            <small>Filter, sort, and focus rows</small>
+        </a>
+        <a href="demo/workspace" class="demo-home__link-card">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" />
+            <span>Workspace</span>
+            <small>Navigate tabs and pages</small>
+        </a>
+        <a href="demo/onboarding" class="demo-home__link-card">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Large" />
+            <span>Onboarding</span>
+            <small>Forms and dialogs</small>
+        </a>
+        <a href="demo/status" class="demo-home__link-card">
+            <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Size="Size.Large" />
+            <span>Status</span>
+            <small>Runtime telemetry</small>
+        </a>
+    </section>
+</div>
+
+@code {
+    private string _prompt = string.Empty;
+    private bool _isBusy;
+    private readonly string _sessionId = Guid.NewGuid().ToString("N");
+    private readonly List<ChatItem> _responses = [];
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_prompt) && !_isBusy)
+        {
+            await SendAsync();
+        }
+    }
+
+    private async Task SendPrompt(string prompt)
+    {
+        _prompt = prompt;
+        await SendAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_prompt) || _isBusy)
+            return;
+
+        var message = _prompt.Trim();
+        _prompt = string.Empty;
+        _isBusy = true;
+        StateHasChanged();
+
+        // Add user message
+        _responses.Add(new ChatItem("user", message, []));
+
+        try
+        {
+            var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+                message,
+                AgentName: null,
+                SessionId: _sessionId));
+
+            // Add agent response
+            _responses.Add(new ChatItem(
+                "assistant",
+                response.ResponseText,
+                response.PlannedActions.Select(a => new ActionInfo(a.ComponentId, a.ActionId)).ToList()));
+        }
+        catch (Exception ex)
+        {
+            _responses.Add(new ChatItem("assistant", $"Error: {ex.Message}", []));
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void ClearConversation()
+    {
+        _responses.Clear();
+    }
+
+    private sealed record ChatItem(string Role, string Text, List<ActionInfo> Actions);
+    private sealed record ActionInfo(string ComponentId, string ActionId);
+}

@@ -1,0 +1,59 @@
+@using MudBlazor
+
+<section class="landing-features" id="features">
+    <div class="landing-features__container">
+        <div class="landing-features__header">
+            <h2 class="landing-features__title">What We Do</h2>
+            <p class="landing-features__subtitle">
+                AgentBlazor bridges the gap between AI agents and your Blazor UI components,
+                enabling natural language control of complex interfaces.
+            </p>
+        </div>
+
+        <div class="landing-features__grid">
+            <article class="landing-feature">
+                <div class="landing-feature__icon">
+                    <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Large" />
+                </div>
+                <h3 class="landing-feature__title">Natural Language Control</h3>
+                <p class="landing-feature__desc">
+                    Users interact with your app through conversational commands.
+                    "Show me high risk suppliers" becomes a filter action automatically.
+                </p>
+            </article>
+
+            <article class="landing-feature">
+                <div class="landing-feature__icon">
+                    <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" />
+                </div>
+                <h3 class="landing-feature__title">Smart Components</h3>
+                <p class="landing-feature__desc">
+                    Drop-in replacements for MudBlazor components that expose their capabilities
+                    to AI agents. DataGrids, Forms, Dialogs, and more.
+                </p>
+            </article>
+
+            <article class="landing-feature">
+                <div class="landing-feature__icon">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Large" />
+                </div>
+                <h3 class="landing-feature__title">Intelligent Planning</h3>
+                <p class="landing-feature__desc">
+                    Our action planner interprets user intent, understands context,
+                    and generates multi-step execution plans when needed.
+                </p>
+            </article>
+
+            <article class="landing-feature">
+                <div class="landing-feature__icon">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" />
+                </div>
+                <h3 class="landing-feature__title">Built-in Guardrails</h3>
+                <p class="landing-feature__desc">
+                    Approval workflows for sensitive actions, clarification requests
+                    when intent is ambiguous, and full audit trails.
+                </p>
+            </article>
+        </div>
+    </div>
+</section>

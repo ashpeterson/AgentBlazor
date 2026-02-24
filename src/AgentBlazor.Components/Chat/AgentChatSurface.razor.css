@@ -197,3 +197,112 @@
     opacity: 0.65;
     cursor: not-allowed;
 }
+
+.ab-chat-surface__item--clarification {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.ab-chat-surface__item--clarification .ab-chat-surface__item-role {
+    color: #d97706;
+}
+
+.ab-chat-surface__clarification-input {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ab-chat-surface__clarification-input .ab-chat-surface__input {
+    min-height: 2.5rem;
+}
+
+.ab-chat-surface__item--approval {
+    border-color: #dc2626;
+    background: #fef2f2;
+}
+
+.ab-chat-surface__item--approval .ab-chat-surface__item-role {
+    color: #dc2626;
+}
+
+.ab-chat-surface__approval-list {
+    margin: 0.75rem 0;
+    padding-left: 1.25rem;
+    color: var(--ab-chat-text);
+    font-size: 0.9rem;
+}
+
+.ab-chat-surface__approval-list li {
+    margin-bottom: 0.25rem;
+}
+
+.ab-chat-surface__approval-params {
+    color: var(--ab-chat-text-muted);
+    font-size: 0.85rem;
+}
+
+.ab-chat-surface__approval-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.ab-chat-surface__submit--approve {
+    background: #16a34a;
+}
+
+.ab-chat-surface__submit--approve:hover:not(:disabled) {
+    background: #15803d;
+}
+
+.ab-chat-surface__submit--deny {
+    background: #dc2626;
+}
+
+.ab-chat-surface__submit--deny:hover:not(:disabled) {
+    background: #b91c1c;
+}
+
+.ab-chat-surface__state {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.ab-chat-surface__state--thinking {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.ab-chat-surface__state--waitingforapproval {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.ab-chat-surface__state--waitingforclarification {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.ab-chat-surface__state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3b82f6;
+    animation: ab-chat-surface__state-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ab-chat-surface__state-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.ab-chat-surface__state-icon {
+    font-size: 1rem;
+}

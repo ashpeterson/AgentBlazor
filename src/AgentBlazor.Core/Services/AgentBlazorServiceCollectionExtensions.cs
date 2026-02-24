@@ -14,6 +14,7 @@ using AgentBlazor.Core.Runtime.Planning;
 using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Core.Runtime.Routing;
 using AgentBlazor.Core.Runtime.Tracing;
+using AgentBlazor.Core.Runtime.Internal;
 
 namespace AgentBlazor.Services;
 
@@ -74,6 +75,9 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();
         services.TryAddSingleton<IComponentRouteRegistry, InMemoryComponentRouteRegistry>();
         services.TryAddSingleton<IIntentResolver, IntentResolver>();
+
+        // Internal page structure registry (not exposed to public API - for demo/internal use)
+        services.TryAddSingleton<IInternalPageStructureRegistry, InMemoryPageStructureRegistry>();
 
         // User preferences
         services.TryAddSingleton<IUserPreferenceService, InMemoryUserPreferenceService>();

@@ -45,6 +45,12 @@ public sealed record ActionPlanRequest
     /// Planner uses this to output navigate_to with the correct uri when the user is not on the target page.
     /// </summary>
     public IReadOnlyList<AvailableRoute> AvailableRoutes { get; init; } = [];
+
+    /// <summary>
+    /// The current route/URL the user is on. Helps the planner understand context
+    /// and avoid unnecessary navigation when already on the correct page.
+    /// </summary>
+    public string? CurrentRoute { get; init; }
 }
 
 /// <summary>

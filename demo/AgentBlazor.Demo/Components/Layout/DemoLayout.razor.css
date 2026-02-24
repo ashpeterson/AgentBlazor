@@ -1,0 +1,156 @@
+/* ── Demo App Shell ─────────────────────────────── */
+
+.demo-app {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1rem;
+    padding: 1rem;
+    color: var(--ab-ink);
+    background: var(--ab-bg);
+}
+
+.demo-app__sidebar {
+    position: sticky;
+    top: 1.1rem;
+    align-self: start;
+}
+
+.demo-app__main {
+    min-width: 0;
+}
+
+/* ── Top Bar ────────────────────────────────────── */
+
+.demo-app__topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.2rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--ab-border);
+    background: rgba(8, 10, 20, 0.85);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.demo-app__back {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ab-ink-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.demo-app__back:hover {
+    color: var(--ab-ink);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--ab-border);
+}
+
+.demo-app__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-app__brand-logo {
+    width: 1.9rem;
+    height: 1.9rem;
+    object-fit: contain;
+    border-radius: 0.35rem;
+    filter: drop-shadow(0 0 6px rgba(220, 50, 60, 0.4));
+}
+
+.demo-app__brand-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ab-ink);
+}
+
+.demo-app__controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.demo-app__theme-select {
+    min-width: 11.3rem;
+}
+
+.demo-app__theme-select ::deep .mud-input-control {
+    margin-top: 0;
+}
+
+.demo-app__theme-select ::deep .mud-input-slot {
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+/* ── Content ────────────────────────────────────── */
+
+.demo-app__content {
+    padding: 1.25rem 0.2rem 2rem;
+}
+
+/* ── Error UI ───────────────────────────────────── */
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff6dc;
+    color: #6e4a00;
+    bottom: 0;
+    box-shadow: 0 -6px 28px rgba(22, 28, 45, 0.15);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.8rem 1.3rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.9rem;
+    top: 0.55rem;
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 980px) {
+    .demo-app {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+        padding: 0.7rem;
+    }
+
+    .demo-app__sidebar {
+        position: static;
+    }
+
+    .demo-app__topbar {
+        padding: 0.8rem 0.95rem;
+        flex-wrap: wrap;
+    }
+
+    .demo-app__controls {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .demo-app__theme-select {
+        min-width: 100%;
+    }
+}

@@ -1,4 +1,0 @@
-::deep .supplier-row--focused td {
-    background-color: rgba(var(--mud-palette-primary-rgb), 0.12) !important;
-    font-weight: 600;
-}

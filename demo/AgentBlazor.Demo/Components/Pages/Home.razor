@@ -1,142 +1,16 @@
 @page "/"
 @layout LandingLayout
 @using AgentBlazor.Demo.Components.Layout
+@using AgentBlazor.Demo.Components.Shared
 
 <PageTitle>AgentBlazor — Agent-first Blazor UI</PageTitle>
 
-<!-- ── Hero ──────────────────────────────────────── -->
-<section class="lp-hero">
-
-    <!-- Background orbs (CSS animated) -->
-    <div class="lp-hero__orb lp-hero__orb--1" aria-hidden="true"></div>
-    <div class="lp-hero__orb lp-hero__orb--2" aria-hidden="true"></div>
-    <div class="lp-hero__orb lp-hero__orb--3" aria-hidden="true"></div>
-
-    <!-- Dot grid overlay -->
-    <div class="lp-hero__grid" aria-hidden="true"></div>
-
-    <div class="lp-hero__content">
-
-        <span class="lp-hero__badge">
-            <span class="lp-hero__badge-dot"></span>
-            Agent-first Blazor &nbsp;·&nbsp; Private Preview
-        </span>
-
-        <h1 class="lp-hero__headline">
-            The agentic layer for your<br />
-            <span class="lp-hero__headline-accent">existing Blazor UI.</span>
-        </h1>
-
-        <p class="lp-hero__sub">
-            Agentic UI in 4 steps:
-            Install MudBlazor. 
-            Register AgentBlazor. 
-            Register your LLM provider.
-            Add your agent blazor components.
-            Boom your components are now agent-controllable instantly — filter grids, open dialogs, navigate pages — from a single prompt.
-        </p>
-
-        <!-- Embedded prompt bar (not fixed) -->
-        <div class="lp-hero__prompt-wrap">
-            <HomePromptBar />
-        </div>
-
-        <!-- Quick-access CTAs -->
-        <div class="lp-hero__ctas">
-            <a href="suppliers" class="lp-cta lp-cta--primary">Suppliers demo →</a>
-            <a href="workspace" class="lp-cta lp-cta--ghost">Workspace →</a>
-            <a href="agentblazor-status" class="lp-cta lp-cta--ghost">Status →</a>
-        </div>
-
-    </div>
-
-    <!-- Scroll hint -->
-    <div class="lp-hero__scroll-hint" aria-hidden="true">
-        <span></span>
-        <span class="lp-hero__scroll-label">explore demos</span>
-    </div>
-</section>
-
-<!-- ── Features ──────────────────────────────────── -->
-<section class="lp-features">
-
-    <div class="lp-features__intro">
-        <p class="lp-features__eyebrow">What the agent can do</p>
-        <h2 class="lp-features__heading">Live demos, running right now.</h2>
-        <p class="lp-features__sub">Every card below is a working page — no mocks, no videos.</p>
-    </div>
-
-    <div class="lp-features__grid">
-
-        <a href="suppliers" class="lp-card">
-            <div class="lp-card__glow" aria-hidden="true"></div>
-            <div class="lp-card__icon lp-card__icon--red">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <path d="M3 9h18M9 21V9"/>
-                </svg>
-            </div>
-            <div class="lp-card__body">
-                <h3>Supplier Grid</h3>
-                <p>Ask "show me high risk suppliers" and the agent filters the data grid — zero code on your end.</p>
-                <div class="lp-card__flow">
-                    <div class="lp-card__flow-item lp-card__flow-item--user">"show me high risk suppliers"</div>
-                    <div class="lp-card__flow-arrow">↓</div>
-                    <div class="lp-card__flow-item lp-card__flow-item--agent">navigate_to /suppliers · filter RiskScore ≥ 70</div>
-                </div>
-            </div>
-            <span class="lp-card__cta">Try it →</span>
-        </a>
-
-        <a href="workspace" class="lp-card">
-            <div class="lp-card__glow lp-card__glow--blue" aria-hidden="true"></div>
-            <div class="lp-card__icon lp-card__icon--blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                    <polyline points="9 22 9 12 15 12 15 22"/>
-                </svg>
-            </div>
-            <div class="lp-card__body">
-                <h3>Navigate + Tabs</h3>
-                <p>The agent understands your nav structure. One prompt navigates across pages and switches tabs.</p>
-                <div class="lp-card__flow">
-                    <div class="lp-card__flow-item lp-card__flow-item--user">"open workspace and switch to risk tab"</div>
-                    <div class="lp-card__flow-arrow">↓</div>
-                    <div class="lp-card__flow-item lp-card__flow-item--agent">navigate_to /workspace · switch_tab 1</div>
-                </div>
-            </div>
-            <span class="lp-card__cta">Try it →</span>
-        </a>
-
-        <a href="agentblazor-status" class="lp-card">
-            <div class="lp-card__glow lp-card__glow--green" aria-hidden="true"></div>
-            <div class="lp-card__icon lp-card__icon--green">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-            </div>
-            <div class="lp-card__body">
-                <h3>Telemetry &amp; Policy</h3>
-                <p>Every agent run is tracked. Tier gating, approval gates, and policy outcomes visible in real time.</p>
-                <div class="lp-card__flow">
-                    <div class="lp-card__flow-item lp-card__flow-item--user">run started · tools invoked · outcome</div>
-                    <div class="lp-card__flow-arrow">↓</div>
-                    <div class="lp-card__flow-item lp-card__flow-item--agent">IAgentBlazorTelemetrySink · tier: Free</div>
-                </div>
-            </div>
-            <span class="lp-card__cta">View status →</span>
-        </a>
-
-    </div>
-
-</section>
-
-<!-- ── Footer strip ───────────────────────────────── -->
-<footer class="lp-footer">
-    <span>Built with</span>
-    <a href="https://mudblazor.com" target="_blank" rel="noopener noreferrer">MudBlazor</a>
-    <span>·</span>
-    <a href="https://docs.ag-ui.com" target="_blank" rel="noopener noreferrer">AG-UI</a>
-    <span>·</span>
-    <a href="https://learn.microsoft.com/en-us/agent-framework/overview/" target="_blank" rel="noopener noreferrer">Microsoft Agent Framework</a>
-</footer>
+<div class="landing-page">
+    <LandingHero />
+    <LandingFeatures />
+    <LandingGetStarted />
+    <LandingPricing />
+    <LandingReviews />
+    <LandingContact />
+    <LandingFooter />
+</div>

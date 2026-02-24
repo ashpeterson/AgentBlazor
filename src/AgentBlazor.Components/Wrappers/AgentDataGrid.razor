@@ -12,7 +12,10 @@
              Hover="Hover"
              Bordered="Bordered"
              Striped="Striped"
-             RowClassFunc="RowClassFunc"
+             RowClassFunc="ComputedRowClassFunc"
+             id="@AgentId"
+             data-ab-type="datagrid"
+             data-ab-agentid="@AgentId"
              @attributes="AdditionalAttributes">
     <Columns>
         @Columns
@@ -92,6 +95,27 @@
     [Parameter]
     public Func<TItem, int, string>? RowClassFunc { get; set; }
 
+    /// <summary>
+    /// Combines user-provided RowClassFunc with focused row highlighting.
+    /// </summary>
+    private string ComputedRowClassFunc(TItem item, int index)
+    {
+        var userClass = RowClassFunc?.Invoke(item, index) ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(FocusedRowKey) && !string.IsNullOrWhiteSpace(RowKeyProperty))
+        {
+            if (TryGetPropertyValue(item, RowKeyProperty, out var keyValue) &&
+                string.Equals(keyValue?.ToString(), FocusedRowKey, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.IsNullOrWhiteSpace(userClass)
+                    ? "ab-datagrid-row--focused"
+                    : $"{userClass} ab-datagrid-row--focused";
+            }
+        }
+
+        return userClass;
+    }
+
     /// <summary>Optional display/LLM column names to canonical property names (e.g. "Risk Level" → "RiskScore"). Used by schema resolution when applying queued actions.</summary>
     [Parameter]
     public IReadOnlyDictionary<string, string>? ColumnAliases { get; set; }
@@ -137,6 +161,7 @@
     public override ComponentState GetCurrentState()
     {
         var columns = GetFilterableColumns();
+        var columnTypes = GetColumnTypes();
         var rowCount = Items switch
         {
             null => 0,
@@ -160,7 +185,9 @@
             ["currentPageIndex"] = CurrentPageIndex,
             ["pageSize"] = PageSize,
             ["focusedRowKey"] = FocusedRowKey,
-            ["columns"] = columns
+            ["columns"] = columns,
+            // NEW: Expose column types for intelligent operator selection
+            ["columnTypes"] = columnTypes
         };
         if (ColumnAliases is { Count: > 0 })
         {
@@ -171,6 +198,49 @@
             state[AgentBlazor.Core.Runtime.Components.ComponentActionArgumentResolver.StateKeyValueMappings] = ValueMappings;
         }
         return state;
+    }
+
+    /// <summary>
+    /// Gets column names mapped to their friendly type names.
+    /// </summary>
+    private static Dictionary<string, string> GetColumnTypes()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var prop in typeof(TItem).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!prop.CanRead || prop.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            result[prop.Name] = GetFriendlyTypeName(prop.PropertyType);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Converts a CLR type to a friendly type name for the LLM.
+    /// </summary>
+    private static string GetFriendlyTypeName(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type);
+        var effectiveType = underlyingType ?? type;
+
+        var typeName = effectiveType switch
+        {
+            _ when effectiveType == typeof(string) => "string",
+            _ when effectiveType == typeof(int) || effectiveType == typeof(long) || effectiveType == typeof(short) || effectiveType == typeof(byte) => "integer",
+            _ when effectiveType == typeof(decimal) || effectiveType == typeof(double) || effectiveType == typeof(float) => "number",
+            _ when effectiveType == typeof(bool) => "boolean",
+            _ when effectiveType == typeof(DateTime) || effectiveType == typeof(DateTimeOffset) => "datetime",
+            _ when effectiveType == typeof(DateOnly) => "date",
+            _ when effectiveType == typeof(TimeOnly) || effectiveType == typeof(TimeSpan) => "time",
+            _ when effectiveType == typeof(Guid) => "guid",
+            _ when effectiveType.IsEnum => "enum",
+            _ => "object"
+        };
+
+        return underlyingType is not null ? typeName + "?" : typeName;
     }
 
     public override async Task<ActionResult> ExecuteActionAsync(

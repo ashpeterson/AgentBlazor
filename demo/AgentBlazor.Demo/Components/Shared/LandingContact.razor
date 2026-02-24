@@ -1,0 +1,61 @@
+@using MudBlazor
+
+<section class="landing-contact" id="contact">
+    <div class="landing-contact__container">
+        <div class="landing-contact__content">
+            <h2 class="landing-contact__title">Get in Touch</h2>
+            <p class="landing-contact__subtitle">
+                Have questions about AgentBlazor? Want to discuss enterprise licensing?
+                We'd love to hear from you.
+            </p>
+
+            <div class="landing-contact__form">
+                <MudTextField T="string"
+                              Label="Your Name"
+                              Variant="Variant.Outlined"
+                              Class="landing-contact__field" />
+                <MudTextField T="string"
+                              Label="Email Address"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Class="landing-contact__field" />
+                <MudTextField T="string"
+                              Label="Message"
+                              Variant="Variant.Outlined"
+                              Lines="4"
+                              Class="landing-contact__field" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           EndIcon="@Icons.Material.Filled.Send"
+                           Class="landing-contact__submit">
+                    Send Message
+                </MudButton>
+            </div>
+        </div>
+
+        <div class="landing-contact__info">
+            <div class="landing-contact__card">
+                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Medium" />
+                <div>
+                    <h4>Email Us</h4>
+                    <p>hello@agentblazor.dev</p>
+                </div>
+            </div>
+            <div class="landing-contact__card">
+                <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Medium" />
+                <div>
+                    <h4>GitHub</h4>
+                    <p>github.com/agentblazor</p>
+                </div>
+            </div>
+            <div class="landing-contact__card">
+                <MudIcon Icon="@Icons.Material.Filled.Article" Size="Size.Medium" />
+                <div>
+                    <h4>Documentation</h4>
+                    <p>docs.agentblazor.dev</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

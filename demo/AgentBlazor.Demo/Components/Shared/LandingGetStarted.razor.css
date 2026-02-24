@@ -1,0 +1,237 @@
+/* ── Get Started Section ────────────────────────── */
+
+.landing-getstarted {
+    padding: 6rem 2rem;
+    background: var(--ab-bg);
+    border-top: 1px solid var(--ab-border);
+}
+
+.landing-getstarted__container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.landing-getstarted__header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.landing-getstarted__title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    color: var(--ab-ink);
+    margin: 0 0 1rem;
+}
+
+.landing-getstarted__subtitle {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--ab-ink-muted);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* ── Steps Container ────────────────────────────── */
+
+.landing-getstarted__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+/* ── Individual Step ────────────────────────────── */
+
+.landing-step {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.landing-step__number {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ab-accent) 0%, #ff6b8a 100%);
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    box-shadow: 0 4px 16px rgba(224, 58, 88, 0.3);
+}
+
+.landing-step__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.landing-step__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ab-ink);
+    margin: 0;
+}
+
+.landing-step__desc {
+    font-size: 0.95rem;
+    color: var(--ab-ink-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ── Code Block ─────────────────────────────────── */
+
+.landing-step__code {
+    margin-top: 0.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--ab-border);
+    background: #0a0d18;
+    overflow: hidden;
+}
+
+.landing-step__code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--ab-border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ab-ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.landing-step__copy {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--ab-ink-muted);
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.landing-step__copy:hover {
+    color: var(--ab-ink);
+}
+
+.landing-step__code pre {
+    margin: 0;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+}
+
+.landing-step__code code {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: #e8f0ff;
+}
+
+/* Code syntax highlighting */
+.code-keyword {
+    color: #c792ea;
+}
+
+.code-string {
+    color: #c3e88d;
+}
+
+.code-comment {
+    color: #546e7a;
+    font-style: italic;
+}
+
+.code-deleted {
+    color: #ff5370;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.code-added {
+    color: #c3e88d;
+}
+
+/* ── Result Badge ───────────────────────────────── */
+
+.landing-step__result {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background: rgba(46, 204, 135, 0.1);
+    border: 1px solid rgba(46, 204, 135, 0.2);
+    font-size: 0.9rem;
+    color: #2ecc87;
+}
+
+.landing-step__result em {
+    color: #fff;
+    font-style: normal;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+}
+
+/* ── CTA Section ────────────────────────────────── */
+
+.landing-getstarted__cta {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 4rem;
+    padding-top: 3rem;
+    border-top: 1px solid var(--ab-border);
+}
+
+.landing-getstarted__cta ::deep .mud-button-filled {
+    background: linear-gradient(135deg, #e03a58 0%, #d02a48 100%);
+    box-shadow: 0 4px 20px rgba(224, 58, 88, 0.4);
+}
+
+.landing-getstarted__cta ::deep .mud-button-outlined {
+    border-color: var(--ab-border-strong);
+    color: var(--ab-ink);
+}
+
+/* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 700px) {
+    .landing-getstarted {
+        padding: 4rem 1.25rem;
+    }
+
+    .landing-step {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .landing-step__number {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1rem;
+    }
+
+    .landing-step__code pre {
+        padding: 0.75rem 1rem;
+    }
+
+    .landing-step__code code {
+        font-size: 0.78rem;
+    }
+
+    .landing-getstarted__cta {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

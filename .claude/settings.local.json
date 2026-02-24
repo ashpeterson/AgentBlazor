@@ -3,7 +3,10 @@
     "allow": [
       "Bash(dotnet build:*)",
       "Bash(dotnet test:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:docs.ag-ui.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:arxiv.org)"
     ]
   }
 }

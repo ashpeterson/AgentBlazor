@@ -310,8 +310,24 @@ internal sealed class AgentBlazorHostedAgentFactory(
         builder.AppendLine("For multi-step requests, execute all required tools in the same turn (for example navigate, then filter/sort/select).");
         builder.AppendLine("Do not stop after navigation when the user also requested work on the destination surface.");
         builder.AppendLine("You can call component tools even before the destination component is mounted; runtime will queue them.");
-        builder.AppendLine("If required action parameters are missing or ambiguous, ask a concise clarifying question before calling a tool.");
         builder.AppendLine("When sorting or filtering, include explicit column/operator/value arguments.");
+        builder.AppendLine();
+        builder.AppendLine("CRITICAL: You MUST either execute a tool OR ask a clarifying question. NEVER return text-only responses without doing either.");
+        builder.AppendLine("If you cannot determine required parameters from context, ask a SPECIFIC clarifying question.");
+        builder.AppendLine("Examples of mandatory clarification:");
+        builder.AppendLine("  - 'Which column should I filter by?' (not just 'filter the data')");
+        builder.AppendLine("  - 'What value should I search for in the [column] field?'");
+        builder.AppendLine("  - 'Which tab do you want to switch to?'");
+        builder.AppendLine("  - 'Should I filter for suppliers with risk score above or below 70?'");
+        builder.AppendLine("Do NOT guess parameters. Ask instead of guessing.");
+        builder.AppendLine();
+        builder.AppendLine("When you need clarification, respond with ONLY this JSON structure (no other text):");
+        builder.AppendLine("{");
+        builder.AppendLine("  \"intent\": \"clarification\",");
+        builder.AppendLine("  \"question\": \"Your specific question here\",");
+        builder.AppendLine("  \"understood\": \"What you understood so far\"");
+        builder.AppendLine("}");
+
         if (!string.IsNullOrWhiteSpace(registration.Instructions))
         {
             builder.AppendLine(registration.Instructions);

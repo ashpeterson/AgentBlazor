@@ -5,7 +5,7 @@
 @inherits AgentControllableComponentBase
 @inject NavigationManager Navigation
 
-<MudNavMenu Dense="Dense" @attributes="AdditionalAttributes">
+<MudNavMenu Dense="Dense" id="@AgentId" data-ab-type="navmenu" data-ab-agentid="@AgentId" @attributes="AdditionalAttributes">
     @ChildContent
 </MudNavMenu>
 

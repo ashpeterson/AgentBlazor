@@ -74,6 +74,17 @@
     border-color: rgba(255, 255, 255, 0.1);
 }
 
+.lp__nav-cta {
+    background: linear-gradient(135deg, #e03a58 0%, #d02a48 100%);
+    color: #fff !important;
+    border-color: rgba(255, 100, 120, 0.3) !important;
+}
+
+.lp__nav-cta:hover {
+    background: linear-gradient(135deg, #ff4d6a 0%, #e03a58 100%);
+    box-shadow: 0 4px 16px rgba(224, 58, 88, 0.4);
+}
+
 /* Header end */
 
 .lp__header-end {

@@ -69,7 +69,7 @@
           "AgentBlazor.Licensing": "[1.0.0, )",
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )",
-          "Microsoft.Extensions.Options": "[10.0.0, )"
+          "Microsoft.Extensions.Options": "[10.0.2, )"
         }
       },
       "agentblazor.licensing": {
@@ -100,12 +100,12 @@
       },
       "Microsoft.Extensions.Options": {
         "type": "CentralTransitive",
-        "requested": "[10.0.0, )",
-        "resolved": "10.0.0",
-        "contentHash": "8oCAgXOow5XDrY9HaXX1QmH3ORsyZO/ANVHBlhLyCeWTH5Sg4UuqZeOTWJi6484M+LqSx0RqQXDJtdYy2BNiLQ==",
+        "requested": "[10.0.2, )",
+        "resolved": "10.0.2",
+        "contentHash": "1De2LJjmxdqopI5AYC5dIhoZQ79AR5ayywxNF1rXrXFtKQfbQOV9+n/IsZBa7qWlr0MqoGpW8+OY2v/57udZOA==",
         "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0",
-          "Microsoft.Extensions.Primitives": "10.0.0"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
+          "Microsoft.Extensions.Primitives": "10.0.2"
         }
       }
     }

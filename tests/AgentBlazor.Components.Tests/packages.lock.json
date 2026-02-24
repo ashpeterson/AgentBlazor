@@ -584,7 +584,7 @@
           "AgentBlazor.Licensing": "[1.0.0, )",
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )",
-          "Microsoft.Extensions.Options": "[10.0.0, )"
+          "Microsoft.Extensions.Options": "[10.0.2, )"
         }
       },
       "agentblazor.defaultagent": {
@@ -600,8 +600,7 @@
           "AgentBlazor.DefaultAgent": "[1.0.0, )",
           "AgentBlazor.Licensing": "[1.0.0, )",
           "AgentBlazor.ProviderAdapters": "[1.0.0, )",
-          "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )",
-          "MudBlazor": "[8.15.0, )"
+          "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"
         }
       },
       "agentblazor.licensing": {
@@ -702,7 +701,7 @@
       },
       "Microsoft.Extensions.Options": {
         "type": "CentralTransitive",
-        "requested": "[10.0.0, )",
+        "requested": "[10.0.2, )",
         "resolved": "10.0.2",
         "contentHash": "1De2LJjmxdqopI5AYC5dIhoZQ79AR5ayywxNF1rXrXFtKQfbQOV9+n/IsZBa7qWlr0MqoGpW8+OY2v/57udZOA==",
         "dependencies": {

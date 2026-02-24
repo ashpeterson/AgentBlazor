@@ -1,0 +1,34 @@
+/* ── Demo Sidebar Nav ──────────────────────────── */
+
+::deep .mud-nav-menu {
+    padding: 0.5rem 0.4rem;
+}
+
+::deep .mud-nav-link {
+    border-radius: 0.65rem;
+    margin: 0.1rem 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--ab-nav-link);
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+::deep .mud-nav-link:hover {
+    background: var(--ab-nav-link-hover);
+    color: #ffffff;
+    transform: translateX(2px);
+}
+
+::deep .mud-nav-link.active {
+    background: linear-gradient(90deg, var(--ab-nav-active-bg-start), var(--ab-nav-active-bg-end));
+    color: var(--ab-nav-active-ink);
+}
+
+::deep .mud-nav-link .mud-icon-root {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+::deep .mud-nav-link.active .mud-icon-root {
+    opacity: 1;
+}
