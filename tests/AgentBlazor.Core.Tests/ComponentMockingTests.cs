@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -458,7 +459,8 @@ public class ComponentMockingTests
                     return Task.FromResult(ActionResult.Success("Filters cleared"));
 
                 case "go_to_page":
-                    if (action.TryGetParameter<int>("page", out var page))
+                    if (action.TryGetParameter<int>("page", out var page) ||
+                        action.TryGetParameter<int>("pageIndex", out page))
                     {
                         CurrentPage = page;
                     }
@@ -466,6 +468,11 @@ public class ComponentMockingTests
 
                 case "select_row":
                     if (action.TryGetParameter<int>("row_index", out var rowIndex))
+                    {
+                        SelectedRowIndex = rowIndex;
+                    }
+                    else if (action.TryGetParameter<string>("rowKey", out var rowKey) &&
+                             int.TryParse(rowKey, out rowIndex))
                     {
                         SelectedRowIndex = rowIndex;
                     }
@@ -712,7 +719,8 @@ public class ComponentMockingTests
             switch (action.Name.ToLowerInvariant())
             {
                 case "switch_tab":
-                    if (action.TryGetParameter<int>("tab_index", out var tabIndex))
+                    if (action.TryGetParameter<int>("tab_index", out var tabIndex) ||
+                        action.TryGetParameter<int>("index", out tabIndex))
                     {
                         if (tabIndex < 0 || tabIndex >= _tabCount)
                         {
@@ -733,27 +741,109 @@ public class ComponentMockingTests
 
     #region Mock Chat Clients
 
+    private static string BuildPlanJson(
+        string toolName,
+        IDictionary<string, object?>? arguments = null)
+    {
+        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
+        {
+            return """{"steps":[]}""";
+        }
+
+        var payload = new
+        {
+            steps = new[]
+            {
+                new
+                {
+                    componentId,
+                    actionId,
+                    arguments = arguments ?? new Dictionary<string, object?>()
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static string BuildMultiStepPlanJson(IEnumerable<(string ToolName, IDictionary<string, object?> Arguments)> invocations)
+    {
+        var steps = new List<object>();
+        foreach (var invocation in invocations)
+        {
+            if (!TryResolveToolName(invocation.ToolName, out var componentId, out var actionId))
+            {
+                continue;
+            }
+
+            steps.Add(new
+            {
+                componentId,
+                actionId,
+                arguments = invocation.Arguments
+            });
+        }
+
+        return JsonSerializer.Serialize(new { steps });
+    }
+
+    private static bool TryResolveToolName(
+        string toolName,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = string.Empty;
+        actionId = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(toolName))
+        {
+            return false;
+        }
+
+        return toolName.ToLowerInvariant() switch
+        {
+            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
+            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
+            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
+            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
+            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
+            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
+            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
+            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
+            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
+            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
+            _ => false
+        };
+    }
+
+    private static bool Resolve(
+        string resolvedComponentId,
+        string resolvedActionId,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = resolvedComponentId;
+        actionId = resolvedActionId;
+        return true;
+    }
+
     private sealed class MockToolChatClient(
         string functionName,
         IDictionary<string, object?>? arguments = null) : IChatClient
     {
         private readonly IDictionary<string, object?> _arguments = arguments ?? new Dictionary<string, object?>();
-        private int _callCount;
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-            if (callNumber % 2 == 1)
-            {
-                var functionCall = new FunctionCallContent($"call_mock_{callNumber}", functionName, _arguments);
-                var callMessage = new ChatMessage(ChatRole.Assistant, [functionCall]);
-                return Task.FromResult(new ChatResponse([callMessage]) { FinishReason = ChatFinishReason.ToolCalls });
-            }
-
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Action completed.")));
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                BuildPlanJson(functionName, _arguments))));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -761,21 +851,10 @@ public class ComponentMockingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-            if (callNumber % 2 == 1)
-            {
-                yield return new ChatResponseUpdate
-                {
-                    Contents = [new FunctionCallContent($"call_mock_{callNumber}", functionName, _arguments)],
-                    Role = ChatRole.Assistant,
-                    FinishReason = ChatFinishReason.ToolCalls
-                };
-            }
-            else
-            {
-                yield return new ChatResponseUpdate(ChatRole.Assistant, "Action completed.");
-            }
-
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
             await Task.CompletedTask;
         }
 
@@ -785,49 +864,30 @@ public class ComponentMockingTests
 
     private sealed class MultiFieldFormChatClient : IChatClient
     {
-        private int _callCount;
-
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-
-            // First call: set supplierName
-            if (callNumber == 1)
-            {
-                var call = new FunctionCallContent("call_1", "agentblazor_agentform_set_field",
-                    new Dictionary<string, object?>
-                    {
-                        ["field"] = "supplierName",
-                        ["value"] = "Acme Corp",
-                        ["target"] = "supplier-form"
-                    });
-                return Task.FromResult(new ChatResponse([new ChatMessage(ChatRole.Assistant, [call])])
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            var json = BuildMultiStepPlanJson(
+            [
+                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
                 {
-                    FinishReason = ChatFinishReason.ToolCalls
-                });
-            }
-
-            // Second call: set riskLevel
-            if (callNumber == 2)
-            {
-                var call = new FunctionCallContent("call_2", "agentblazor_agentform_set_field",
-                    new Dictionary<string, object?>
-                    {
-                        ["field"] = "riskLevel",
-                        ["value"] = "Low",
-                        ["target"] = "supplier-form"
-                    });
-                return Task.FromResult(new ChatResponse([new ChatMessage(ChatRole.Assistant, [call])])
+                    ["field"] = "supplierName",
+                    ["value"] = "Acme Corp",
+                    ["target"] = "supplier-form"
+                }),
+                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
                 {
-                    FinishReason = ChatFinishReason.ToolCalls
-                });
-            }
-
-            // Final response
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Both fields have been set.")));
+                    ["field"] = "riskLevel",
+                    ["value"] = "Low",
+                    ["target"] = "supplier-form"
+                })
+            ]);
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -835,16 +895,25 @@ public class ComponentMockingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-            foreach (var msg in response.Messages)
-            {
-                yield return new ChatResponseUpdate
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            var json = BuildMultiStepPlanJson(
+            [
+                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
                 {
-                    Contents = msg.Contents,
-                    Role = msg.Role,
-                    FinishReason = response.FinishReason
-                };
-            }
+                    ["field"] = "supplierName",
+                    ["value"] = "Acme Corp",
+                    ["target"] = "supplier-form"
+                }),
+                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
+                {
+                    ["field"] = "riskLevel",
+                    ["value"] = "Low",
+                    ["target"] = "supplier-form"
+                })
+            ]);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, json);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;

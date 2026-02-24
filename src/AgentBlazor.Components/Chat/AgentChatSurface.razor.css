@@ -134,6 +134,12 @@
     font-size: 0.8125rem;
 }
 
+.ab-chat-surface__generated-ui {
+    margin-top: 0.65rem;
+    border-top: 1px solid var(--ab-chat-border-muted);
+    padding-top: 0.65rem;
+}
+
 .ab-chat-surface__controls {
     display: grid;
     gap: 0.5rem;

@@ -70,8 +70,18 @@ Optional persistent docked chat:
     <div class="flex-grow-1">
         @* App content *@
     </div>
-    <AgentChatPanel Width="350px" />
+    <AgentChatPanel Width="350px" EnableGeneratedUi="true" />
 </div>
+```
+
+Optional generative UI surface (v0 scaffold):
+
+```razor
+@using AgentBlazor.Core.Components
+
+<AgentGenerativeSurface Document="@GeneratedDocument"
+                        AgentName="AgentBlazor UI Agent"
+                        ForwardActionsToRuntime="true" />
 ```
 
 ## 5. Add AG-UI Endpoint (optional, for hosted AG-UI stream clients)

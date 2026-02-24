@@ -77,6 +77,20 @@
                             }
                         </ul>
                     }
+
+                    @if (item.GeneratedUi is not null)
+                    {
+                        <div class="ab-chat-surface__generated-ui">
+                            <AgentGenerativeSurface Document="@item.GeneratedUi"
+                                                    AgentName="@item.RoleLabel"
+                                                    SessionId="@_instanceId"
+                                                    ForwardActionsToRuntime="true"
+                                                    ShowRuntimeResponses="false"
+                                                    OnActionInvoked="HandleGeneratedActionInvokedAsync"
+                                                    OnRuntimeResponseReceived="HandleGeneratedRuntimeResponseAsync"
+                                                    OnError="HandleGeneratedUiErrorAsync" />
+                        </div>
+                    }
                 </article>
             }
 
@@ -233,6 +247,9 @@
     [Parameter]
     public string? CssClass { get; set; }
 
+    [Parameter]
+    public bool EnableGeneratedUi { get; set; }
+
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)
             ? $"agent-chat-surface-{_instanceId}"
@@ -346,7 +363,8 @@
             var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 _selectedAgent,
-                SessionId: _instanceId));
+                SessionId: _instanceId,
+                Context: CreateRequestContext()));
 
             if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
             {
@@ -410,7 +428,8 @@
             var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 fullMessage,
                 _selectedAgent,
-                SessionId: _instanceId));
+                SessionId: _instanceId,
+                Context: CreateRequestContext()));
 
             _timeline.Add(ChatTimelineItem.Agent(response));
             _agentState = AgentState.Idle;
@@ -439,7 +458,7 @@
             .Select(static approval => $"{approval.ComponentId}.{approval.ActionId}")
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var approvalContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["agentblazor.approvals"] = string.Join(",", approvalKeys)
         };
@@ -459,7 +478,7 @@
                 "Approve the pending actions.",
                 _selectedAgent,
                 SessionId: _instanceId,
-                Context: context));
+                Context: CreateRequestContext(approvalContext)));
 
             _timeline.Add(ChatTimelineItem.Agent(response));
             _agentState = AgentState.Idle;
@@ -547,21 +566,68 @@
         return $"Deferred action {status}: {componentId}.{actionEvent.ActionId}. {actionEvent.Message}";
     }
 
+    private IDictionary<string, string>? CreateRequestContext(IReadOnlyDictionary<string, string>? additional = null)
+    {
+        Dictionary<string, string>? context = null;
+
+        if (EnableGeneratedUi)
+        {
+            context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+            };
+        }
+
+        if (additional is not null)
+        {
+            context ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in additional)
+            {
+                context[pair.Key] = pair.Value;
+            }
+        }
+
+        return context;
+    }
+
+    private Task HandleGeneratedActionInvokedAsync(AgentUiActionInvocation invocation)
+    {
+        _timeline.Add(ChatTimelineItem.Activity(
+            $"Generated UI action invoked: {invocation.BlockId}.{invocation.Action.Id}."));
+        _scrollRequested = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleGeneratedRuntimeResponseAsync(AgentTurnResponse response)
+    {
+        _timeline.Add(ChatTimelineItem.Agent(response));
+        _scrollRequested = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleGeneratedUiErrorAsync(Exception exception)
+    {
+        _timeline.Add(ChatTimelineItem.Activity($"Generated UI action failed: {exception.Message}"));
+        _scrollRequested = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
     private sealed record ChatTimelineItem(
         string Role,
         string RoleLabel,
         string Text,
         IReadOnlyList<PlannedComponentAction> PlannedActions,
-        IReadOnlyList<ComponentActionExecutionResult> ExecutionResults)
+        IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
+        AgentUiDocument? GeneratedUi)
     {
         public static ChatTimelineItem User(string text) =>
-            new("user", "User", text, [], []);
+            new("user", "User", text, [], [], null);
 
         public static ChatTimelineItem Agent(AgentTurnResponse response) =>
-            new("assistant", response.AgentName, response.ResponseText, response.PlannedActions, response.ExecutionResults);
+            new("assistant", response.AgentName, response.ResponseText, response.PlannedActions, response.ExecutionResults, response.GeneratedUi);
 
         public static ChatTimelineItem Activity(string text) =>
-            new("activity", "Activity", text, [], []);
+            new("activity", "Activity", text, [], [], null);
     }
 
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);

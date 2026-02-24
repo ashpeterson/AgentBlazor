@@ -39,7 +39,7 @@ public class ComponentActionArgumentNormalizerTests
             reason: "show me all suppliers that are high risk");
 
         Assert.Equal("RiskScore", normalized["column"]?.ToString());
-        Assert.Equal(">=", normalized["operator"]?.ToString());
+        Assert.Equal("gte", normalized["operator"]?.ToString());
         Assert.Equal(70, Assert.IsType<int>(normalized["value"]));
         Assert.True(Assert.IsType<bool>(normalized["active"]));
         Assert.Null(normalized["notes"]);
@@ -72,7 +72,7 @@ public class ComponentActionArgumentNormalizerTests
             });
 
         Assert.Equal("RiskScore", gridFilter["column"]?.ToString());
-        Assert.Equal(">=", gridFilter["operator"]?.ToString());
+        Assert.Equal("gte", gridFilter["operator"]?.ToString());
         Assert.Equal(70, Assert.IsType<int>(gridFilter["value"]));
 
         var formSetField = ComponentActionArgumentNormalizer.Normalize(
@@ -149,7 +149,7 @@ public class ComponentActionArgumentNormalizerTests
         Assert.True(result.Succeeded);
         Assert.NotNull(capturing.LastRequest);
         Assert.Equal("RiskScore", capturing.LastRequest!.Arguments!["column"]?.ToString());
-        Assert.Equal(">=", capturing.LastRequest.Arguments!["operator"]?.ToString());
+        Assert.Equal("gte", capturing.LastRequest.Arguments!["operator"]?.ToString());
         Assert.Equal(70, Assert.IsType<int>(capturing.LastRequest.Arguments!["value"]));
     }
 

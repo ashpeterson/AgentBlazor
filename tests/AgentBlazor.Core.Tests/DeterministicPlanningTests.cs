@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -467,6 +468,81 @@ public class DeterministicPlanningTests
     }
 
     [Fact]
+    public async Task Runtime_GenerativeUiDisabled_DoesNotAttachGeneratedUiDocument()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDialog",
+                        "actionId": "open",
+                        "arguments": {}
+                    }
+                ],
+                "generatedUi": {
+                    "specVersion": "agentblazor.ui.v0",
+                    "blocks": [
+                        {
+                            "id": "summary",
+                            "kind": "Card",
+                            "title": "Summary",
+                            "description": "Open dialog"
+                        }
+                    ]
+                }
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog"));
+
+        Assert.Null(response.GeneratedUi);
+    }
+
+    [Fact]
+    public async Task Runtime_GenerativeUiEnabled_AttachesGeneratedUiDocument()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "set_field",
+                        "arguments": { "field": "SupplierName", "value": "Ash" }
+                    }
+                ],
+                "generatedUi": {
+                    "specVersion": "agentblazor.ui.v0",
+                    "blocks": [
+                        {
+                            "id": "supplier-summary",
+                            "kind": "Card",
+                            "title": "Supplier Update",
+                            "description": "SupplierName will be set to Ash."
+                        }
+                    ]
+                }
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+        };
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "set supplier name to ash",
+            Context: context));
+
+        Assert.NotNull(response.GeneratedUi);
+        var block = Assert.Single(response.GeneratedUi!.Blocks);
+        Assert.Equal(AgentUiBlockKind.Card, block.Kind);
+        Assert.Equal("supplier-summary", block.Id);
+    }
+
+    [Fact]
     public async Task Runtime_MultiStepPlan_ExecutesAllSteps()
     {
         var services = CreateDeterministicServices("""
@@ -548,7 +624,7 @@ public class DeterministicPlanningTests
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("go somewhere"));
 
-        Assert.Contains("uri", response.ResponseText);  // Should mention missing parameter
+        Assert.Contains("navigate", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(response.PlannedActions);
     }
 

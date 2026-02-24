@@ -28,6 +28,7 @@ public sealed record ActionPlanRequest
     public required string UserMessage { get; init; }
     public required string SessionId { get; init; }
     public string? UserId { get; init; }
+    public bool GenerateUi { get; init; }
 
     /// <summary>
     /// Available components and their actions.

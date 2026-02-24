@@ -25,6 +25,7 @@
                                  FormName="@FormName"
                                  DefaultAgentName="@DefaultAgentName"
                                  Placeholder="@Placeholder"
+                                 EnableGeneratedUi="@EnableGeneratedUi"
                                  Theme="@Theme"
                                  CssClass="@CssClass" />
             </div>
@@ -81,6 +82,9 @@
 
     [Parameter]
     public string? CssClass { get; set; }
+
+    [Parameter]
+    public bool EnableGeneratedUi { get; set; }
 
     private string HeaderLabelId => $"ab-chat-widget-header-{_instanceId}";
 

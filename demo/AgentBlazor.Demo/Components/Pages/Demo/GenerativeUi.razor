@@ -1,0 +1,62 @@
+@page "/demo/generative-ui"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Demo.Models
+@using MudBlazor
+
+<PageTitle>Generative UI — AgentBlazor Demo</PageTitle>
+
+<section class="gen-ui-demo">
+    <header class="gen-ui-demo__header">
+        <MudText Typo="Typo.h5">Generative UI Playground</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Prompt the agent, then use generated UI actions to continue the workflow.
+        </MudText>
+    </header>
+
+    <MudStack Row="true" Spacing="1" Class="mb-3">
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Try: "show highest risk supplier"
+        </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Then click "Run again" in generated UI
+        </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Or use generated "Apply form values"
+        </MudChip>
+    </MudStack>
+
+    <div class="gen-ui-demo__grid">
+        <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__panel">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Supplier Context</MudText>
+
+            <AgentDataGrid TItem="SupplierRow"
+                           AgentId="gen-ui-supplier-grid"
+                           Items="@_suppliers"
+                           Dense="true"
+                           Hover="true"
+                           Bordered="true"
+                           Striped="true"
+                           RowKeyProperty="SupplierId">
+                <Columns>
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                    <PropertyColumn T="SupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                    <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+                </Columns>
+            </AgentDataGrid>
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__panel gen-ui-demo__chat">
+            <AgentChatSurface Title="Generative UI Agent"
+                              Description="Generated UI mode is enabled for this chat."
+                              EnableGeneratedUi="true"
+                              Placeholder="Ask for suppliers, form updates, or workflow summaries..." />
+        </MudPaper>
+    </div>
+</section>
+
+@code {
+    private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
+}

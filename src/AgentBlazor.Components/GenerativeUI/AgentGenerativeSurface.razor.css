@@ -1,0 +1,143 @@
+.ab-generative-surface {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ab-generative-surface__empty {
+    border: 1px dashed #b7c1cc;
+    border-radius: 10px;
+    padding: 0.75rem;
+    color: #617082;
+    background: #f8fafc;
+}
+
+.ab-generative-surface__error {
+    border: 1px solid #ef4444;
+    border-radius: 10px;
+    padding: 0.75rem;
+    color: #991b1b;
+    background: #fef2f2;
+}
+
+.ab-generative-surface__block {
+    border: 1px solid #d8e0e8;
+    border-radius: 12px;
+    padding: 0.85rem;
+    background: #fff;
+}
+
+.ab-generative-surface__title {
+    margin: 0;
+    font-size: 1rem;
+    color: #122033;
+}
+
+.ab-generative-surface__description {
+    margin: 0.4rem 0 0.75rem;
+    color: #4f5f73;
+    font-size: 0.9rem;
+}
+
+.ab-generative-surface__form {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.ab-generative-surface__label {
+    display: grid;
+    gap: 0.25rem;
+    color: #25364a;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.ab-generative-surface__input {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    font: inherit;
+    font-size: 0.92rem;
+    color: #122033;
+}
+
+.ab-generative-surface__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+
+.ab-generative-surface__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+}
+
+.ab-generative-surface__action {
+    border: 0;
+    border-radius: 8px;
+    padding: 0.46rem 0.82rem;
+    background: #0f6bdc;
+    color: #fff;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ab-generative-surface__action:hover:not(:disabled) {
+    background: #0b58b8;
+}
+
+.ab-generative-surface__action:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.ab-generative-surface__table-wrap {
+    overflow-x: auto;
+}
+
+.ab-generative-surface__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.87rem;
+}
+
+.ab-generative-surface__table th,
+.ab-generative-surface__table td {
+    border: 1px solid #d8e0e8;
+    padding: 0.46rem 0.55rem;
+    text-align: left;
+}
+
+.ab-generative-surface__table th {
+    background: #f8fafc;
+    color: #243448;
+}
+
+.ab-generative-surface__responses {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.ab-generative-surface__response {
+    border: 1px solid #dbe3ec;
+    border-radius: 10px;
+    padding: 0.65rem 0.72rem;
+    background: #f8fbff;
+}
+
+.ab-generative-surface__response-agent {
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #4c5c6f;
+    margin-bottom: 0.2rem;
+}
+
+.ab-generative-surface__response-text {
+    color: #13263b;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}

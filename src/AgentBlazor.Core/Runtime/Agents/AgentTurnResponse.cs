@@ -1,4 +1,5 @@
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Components;
 
 namespace AgentBlazor.Core.Runtime.Agents;
 
@@ -12,6 +13,7 @@ public sealed record AgentTurnResponse(
     public string? ClarificationQuestion { get; init; }
     public bool RequiresApproval { get; init; }
     public IReadOnlyList<PendingApproval> PendingApprovals { get; init; } = [];
+    public AgentUiDocument? GeneratedUi { get; init; }
 }
 
 public sealed record PendingApproval(

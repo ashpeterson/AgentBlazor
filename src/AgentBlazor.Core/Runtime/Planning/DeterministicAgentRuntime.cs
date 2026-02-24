@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -144,7 +145,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
 
         if (registration is null)
         {
-            var noAgentResponse = await HandleNoAgentAsync(request, traceBuilder, cancellationToken);
+            var noAgentResponse = await HandleNoAgentAsync(traceBuilder, cancellationToken);
             await StoreConversationTurnAsync(sessionId, request.UserMessage, noAgentResponse, cancellationToken);
             await EmitTextDeltasAsync(noAgentResponse.AgentName, noAgentResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(noAgentResponse, emitEvent);
@@ -193,6 +194,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 UserMessage = request.UserMessage,
                 SessionId = sessionId,
                 UserId = request.GetEffectiveUserId(),
+                GenerateUi = IsGeneratedUiRequested(request.Context),
                 AvailableComponents = allowedComponents,
                 MountedComponents = mountedComponents,
                 ConversationHistory = conversationHistory,
@@ -205,11 +207,13 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             if (plan.RequiresClarification)
             {
                 _logger?.LogInformation("Plan requires clarification: {Question}", plan.ClarificationNeeded);
-                var clarificationResponse = await BuildClarificationResponseAsync(
-                    registration.Name,
-                    plan.ClarificationNeeded!,
-                    traceBuilder,
-                    cancellationToken);
+                var clarificationResponse = AttachPlannedGeneratedUi(
+                    await BuildClarificationResponseAsync(
+                        registration.Name,
+                        plan.ClarificationNeeded!,
+                        traceBuilder,
+                        cancellationToken),
+                    plan);
                 await StoreConversationTurnAsync(sessionId, request.UserMessage, clarificationResponse, cancellationToken);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
                 {
@@ -225,10 +229,12 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             if (plan.IsEmpty)
             {
                 _logger?.LogInformation("Plan is empty - no actions identified");
-                var emptyPlanResponse = await BuildEmptyPlanResponseAsync(
-                    registration.Name,
-                    traceBuilder,
-                    cancellationToken);
+                var emptyPlanResponse = AttachPlannedGeneratedUi(
+                    await BuildEmptyPlanResponseAsync(
+                        registration.Name,
+                        traceBuilder,
+                        cancellationToken),
+                    plan);
                 await StoreConversationTurnAsync(sessionId, request.UserMessage, emptyPlanResponse, cancellationToken);
                 await EmitTextDeltasAsync(emptyPlanResponse.AgentName, emptyPlanResponse.ResponseText, emitEvent);
                 await EmitRunFinishedAsync(emptyPlanResponse, emitEvent);
@@ -268,7 +274,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                     await StoreTraceAsync(traceBuilder, cancellationToken);
                 }
 
-                var approvalResponse = new AgentTurnResponse(
+                var approvalResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
                     AgentName: registration.Name,
                     ResponseText: approvalResponseText,
                     PlannedActions: plannedActions,
@@ -276,7 +282,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 {
                     RequiresApproval = true,
                     PendingApprovals = pendingApprovals
-                };
+                }, plan);
                 await StoreConversationTurnAsync(sessionId, request.UserMessage, approvalResponse, cancellationToken);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
                 {
@@ -318,11 +324,11 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                     await StoreTraceAsync(traceBuilder, cancellationToken);
                 }
 
-                var validationResponse = new AgentTurnResponse(
+                var validationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
                     AgentName: registration.Name,
                     ResponseText: clarificationText,
                     PlannedActions: [],
-                    ExecutionResults: validationFailures);
+                    ExecutionResults: validationFailures), plan);
                 await StoreConversationTurnAsync(sessionId, request.UserMessage, validationResponse, cancellationToken);
                 await EmitExecutionResultsAsync(validationFailures, emitEvent);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
@@ -387,11 +393,11 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 executionResult.SuccessCount,
                 executionResult.StepResults.Count);
 
-            var successResponse = new AgentTurnResponse(
+            var successResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
                 AgentName: registration.Name,
                 ResponseText: responseText,
                 PlannedActions: plannedActions,
-                ExecutionResults: executionResults);
+                ExecutionResults: executionResults), plan);
             await StoreConversationTurnAsync(sessionId, request.UserMessage, successResponse, cancellationToken);
             await EmitTextDeltasAsync(successResponse.AgentName, successResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(successResponse, emitEvent);
@@ -877,6 +883,32 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         return $"Completed {result.SuccessCount} of {result.StepResults.Count} actions. {failures[0].Message}";
     }
 
+    private static AgentTurnResponse AttachPlannedGeneratedUi(
+        AgentTurnResponse response,
+        ActionPlan plan)
+    {
+        return plan.GeneratedUi is null
+            ? response
+            : response with { GeneratedUi = plan.GeneratedUi };
+    }
+
+    private static bool IsGeneratedUiRequested(IDictionary<string, string>? context)
+    {
+        if (context is null ||
+            !context.TryGetValue(AgentGenerativeUiSpec.GenerateUiContextKey, out var raw) ||
+            string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        if (bool.TryParse(raw, out var asBool))
+        {
+            return asBool;
+        }
+
+        return false;
+    }
+
     private async Task<AgentTurnResponse> BuildProviderMissingResponseAsync(
         string agentName,
         PromptTraceBuilder traceBuilder,
@@ -898,7 +930,6 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
     }
 
     private async Task<AgentTurnResponse> HandleNoAgentAsync(
-        AgentTurnRequest request,
         PromptTraceBuilder traceBuilder,
         CancellationToken cancellationToken)
     {

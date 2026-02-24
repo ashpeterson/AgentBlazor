@@ -46,8 +46,8 @@ Status legend:
 
 | Capability | Status | Notes |
 |---|---|---|
-| Blazor-native generative UI spec (`UI.Spec`) | `Planned` | Roadmap Week 2 |
-| Razor renderer for generated UI blocks | `Planned` | Roadmap Week 2 |
+| Blazor-native generative UI spec (`UI.Spec`) | `In Progress` | v0 contract scaffolded (`AgentGenerativeUiSpec`) |
+| Razor renderer for generated UI blocks | `In Progress` | `AgentGenerativeSurface` renders card/form/table blocks |
 | End-to-end generative UI reference scenario | `Planned` | Roadmap Weeks 2 + 6 |
 
 ## Integrations and Distribution
@@ -63,7 +63,7 @@ Status legend:
 
 - `docs/quickstart.md`
 - `docs/architecture.md`
+- `docs/generative-ui-spec-v0.md`
 - `docs/mudblazor-capability-taxonomy.md`
 - `docs/pricing-tiers.md`
 - `docs/agentblazor-push-roadmap-q2-2026.md`
-

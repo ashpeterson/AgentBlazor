@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -529,27 +530,83 @@ public class PromptTracingTests
 
     #region Test Doubles
 
+    private static string BuildPlanJson(
+        string toolName,
+        IDictionary<string, object?>? arguments = null)
+    {
+        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
+        {
+            return """{"steps":[]}""";
+        }
+
+        var payload = new
+        {
+            steps = new[]
+            {
+                new
+                {
+                    componentId,
+                    actionId,
+                    arguments = arguments ?? new Dictionary<string, object?>()
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static bool TryResolveToolName(
+        string toolName,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = string.Empty;
+        actionId = string.Empty;
+
+        return toolName.ToLowerInvariant() switch
+        {
+            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
+            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
+            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
+            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
+            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
+            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
+            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
+            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
+            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
+            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
+            _ => false
+        };
+    }
+
+    private static bool Resolve(
+        string resolvedComponentId,
+        string resolvedActionId,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = resolvedComponentId;
+        actionId = resolvedActionId;
+        return true;
+    }
+
     private sealed class TracingToolThenTextChatClient(
         string functionName,
         IDictionary<string, object?>? arguments = null) : IChatClient
     {
         private readonly IDictionary<string, object?> _arguments = arguments ?? new Dictionary<string, object?>();
-        private int _callCount;
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-            if (callNumber % 2 == 1)
-            {
-                var functionCall = new FunctionCallContent($"call_trace_{callNumber}", functionName, _arguments);
-                var callMessage = new ChatMessage(ChatRole.Assistant, [functionCall]);
-                return Task.FromResult(new ChatResponse([callMessage]) { FinishReason = ChatFinishReason.ToolCalls });
-            }
-
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Completed.")));
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                BuildPlanJson(functionName, _arguments))));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -557,21 +614,10 @@ public class PromptTracingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-            if (callNumber % 2 == 1)
-            {
-                yield return new ChatResponseUpdate
-                {
-                    Contents = [new FunctionCallContent($"call_trace_{callNumber}", functionName, _arguments)],
-                    Role = ChatRole.Assistant,
-                    FinishReason = ChatFinishReason.ToolCalls
-                };
-            }
-            else
-            {
-                yield return new ChatResponseUpdate(ChatRole.Assistant, "Completed.");
-            }
-
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
             await Task.CompletedTask;
         }
 

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using AgentBlazor.Core.Components;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -65,56 +66,16 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             messages.Insert(messages.Count - 1, new ChatMessage(role, turn.Content));
         }
 
-        var collectedSteps = new List<PlannedStep>();
-        ChatResponse response;
-
         var chatOptions = new ChatOptions
         {
             ResponseFormat = ChatResponseFormat.Json,
             Temperature = 0.0f // Zero temperature for maximum determinism
         };
 
-        for (var attempt = 0; attempt < 8; attempt++)
-        {
-            response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-
-            var toolCallPlan = TryBuildPlanFromFunctionCalls(response, request.AvailableComponents);
-            if (toolCallPlan is not null)
-            {
-                collectedSteps.AddRange(toolCallPlan.Steps);
-            }
-            else
-            {
-                var directiveText = response.Text?.Trim() ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(directiveText) &&
-                    TryBuildPlanFromDirectiveJson(directiveText, request.AvailableComponents, out var directivePlan))
-                {
-                    collectedSteps.AddRange(directivePlan.Steps);
-                }
-            }
-
-            if (response.FinishReason != ChatFinishReason.ToolCalls)
-            {
-                if (collectedSteps.Count > 0)
-                {
-                    _logger?.LogDebug("Planner collected {StepCount} tool call step(s)", collectedSteps.Count);
-                    return new ActionPlan { Steps = collectedSteps };
-                }
-
-                var responseText = response.Text?.Trim() ?? string.Empty;
-                _logger?.LogDebug("LLM response: {Response}", responseText);
-                return ParsePlanResponse(responseText, request.AvailableComponents);
-            }
-        }
-
-        if (collectedSteps.Count > 0)
-        {
-            _logger?.LogDebug("Planner hit tool-call loop limit and collected {StepCount} step(s)", collectedSteps.Count);
-            return new ActionPlan { Steps = collectedSteps };
-        }
-
-        _logger?.LogWarning("Planner hit tool-call loop limit without actionable output.");
-        return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
+        var response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+        var responseText = response.Text?.Trim() ?? string.Empty;
+        _logger?.LogDebug("LLM response: {Response}", responseText);
+        return ParsePlanResponse(responseText, request.GenerateUi);
     }
 
     private static string BuildSystemPrompt(ActionPlanRequest request)
@@ -145,8 +106,19 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
     }
   ],
   ""needsClarification"": false,
-  ""clarificationQuestion"": ""string (only if needsClarification is true)""
-}");
+  ""clarificationQuestion"": ""string (only if needsClarification is true)"",");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": []
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -158,6 +130,15 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("## Rule 1: OUTPUT FORMAT");
         sb.AppendLine("- Output ONLY valid JSON. No markdown fences, no explanatory text outside JSON.");
         sb.AppendLine("- The \"reasoning\" field goes INSIDE the JSON, not outside.");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine("- Include a top-level \"generatedUi\" object that matches the schema when UI output is useful.");
+            sb.AppendLine("- Use only block kinds Card, Form, or Table.");
+        }
+        else
+        {
+            sb.AppendLine("- Set \"generatedUi\" to null.");
+        }
         sb.AppendLine();
 
         sb.AppendLine("## Rule 2: COMPONENT VALIDATION");
@@ -453,21 +434,18 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 
     private static string BuildUserPrompt(ActionPlanRequest request)
     {
-        return $"USER REQUEST: {request.UserMessage}";
+        return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: {(request.GenerateUi ? "true" : "false")}";
     }
 
     private ActionPlan ParsePlanResponse(
         string responseText,
-        IReadOnlyList<AvailableComponent> availableComponents)
+        bool generateUi)
     {
         if (string.IsNullOrWhiteSpace(responseText))
         {
             _logger?.LogWarning("Empty response from planner");
             return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
         }
-
-        // Strip code fences if present (defensive)
-        responseText = StripCodeFences(responseText);
 
         try
         {
@@ -487,17 +465,13 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             if (parsed.NeedsClarification)
             {
                 return ActionPlan.NeedsClarification(
-                    parsed.ClarificationQuestion ?? "Can you provide more details?");
+                    parsed.ClarificationQuestion ?? "Can you provide more details?",
+                    NormalizeGeneratedUi(parsed.GeneratedUi, generateUi));
             }
 
             if (parsed.Steps is null || parsed.Steps.Count == 0)
             {
-                if (TryBuildPlanFromDirectiveJson(responseText, availableComponents, out var directivePlan))
-                {
-                    return directivePlan;
-                }
-
-                return ActionPlan.Empty();
+                return ActionPlan.Empty(NormalizeGeneratedUi(parsed.GeneratedUi, generateUi));
             }
 
             var steps = parsed.Steps
@@ -514,7 +488,8 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             return new ActionPlan
             {
                 Steps = steps,
-                Confidence = parsed.Confidence ?? 1.0
+                Confidence = parsed.Confidence ?? 1.0,
+                GeneratedUi = NormalizeGeneratedUi(parsed.GeneratedUi, generateUi)
             };
         }
         catch (JsonException ex)
@@ -524,216 +499,22 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         }
     }
 
-    private ActionPlan? TryBuildPlanFromFunctionCalls(
-        ChatResponse response,
-        IReadOnlyList<AvailableComponent> availableComponents)
+    private AgentUiDocument? NormalizeGeneratedUi(AgentUiDocument? generatedUi, bool generateUi)
     {
-        if (response.Messages.Count == 0)
+        if (!generateUi || generatedUi is null)
         {
             return null;
         }
 
-        var toolMap = BuildToolNameMap(availableComponents);
-        var steps = new List<PlannedStep>();
-
-        foreach (var message in response.Messages)
+        if (generatedUi.TryValidate(out var validationError))
         {
-            foreach (var content in message.Contents.OfType<FunctionCallContent>())
-            {
-                if (!TryResolveTool(content.Name, toolMap, out var resolved))
-                {
-                    continue;
-                }
-
-                var args = content.Arguments?.ToDictionary(
-                    static kv => kv.Key,
-                    static kv => kv.Value,
-                    StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-                steps.Add(new PlannedStep
-                {
-                    ComponentId = resolved.ComponentId,
-                    ActionId = resolved.ActionId,
-                    Arguments = args
-                });
-            }
+            return generatedUi;
         }
 
-        return steps.Count == 0
-            ? null
-            : new ActionPlan { Steps = steps };
-    }
-
-    private bool TryBuildPlanFromDirectiveJson(
-        string responseText,
-        IReadOnlyList<AvailableComponent> availableComponents,
-        out ActionPlan plan)
-    {
-        plan = ActionPlan.Empty();
-        var toolMap = BuildToolNameMap(availableComponents);
-
-        try
-        {
-            using var document = JsonDocument.Parse(responseText);
-            if (!TryReadDirective(document.RootElement, toolMap, out var step))
-            {
-                return false;
-            }
-
-            plan = new ActionPlan { Steps = [step] };
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static bool TryReadDirective(
-        JsonElement element,
-        IReadOnlyDictionary<string, (string ComponentId, string ActionId)> toolMap,
-        out PlannedStep step)
-    {
-        step = default!;
-
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!element.TryGetProperty("name", out var nameProp) || nameProp.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        var rawToolName = nameProp.GetString();
-        if (string.IsNullOrWhiteSpace(rawToolName) ||
-            !TryResolveTool(rawToolName, toolMap, out var resolved))
-        {
-            return false;
-        }
-
-        var arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        if (element.TryGetProperty("arguments", out var argsProp) &&
-            argsProp.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var property in argsProp.EnumerateObject())
-            {
-                arguments[property.Name] = ConvertJsonValue(property.Value);
-            }
-        }
-
-        step = new PlannedStep
-        {
-            ComponentId = resolved.ComponentId,
-            ActionId = resolved.ActionId,
-            Arguments = arguments
-        };
-
-        return true;
-    }
-
-    private static object? ConvertJsonValue(JsonElement value) =>
-        value.ValueKind switch
-        {
-            JsonValueKind.String => value.GetString(),
-            JsonValueKind.Number => value.TryGetInt64(out var l) ? l : value.GetDouble(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Array => value.EnumerateArray().Select(ConvertJsonValue).ToArray(),
-            JsonValueKind.Object => value.EnumerateObject()
-                .ToDictionary(static p => p.Name, static p => ConvertJsonValue(p.Value), StringComparer.OrdinalIgnoreCase),
-            _ => value.ToString()
-        };
-
-    private static IReadOnlyDictionary<string, (string ComponentId, string ActionId)> BuildToolNameMap(
-        IReadOnlyList<AvailableComponent> availableComponents)
-    {
-        var map = new Dictionary<string, (string ComponentId, string ActionId)>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var component in availableComponents)
-        {
-            foreach (var action in component.Actions)
-            {
-                var toolName = BuildComponentToolName(component.ComponentId, action.ActionId);
-                map[toolName] = (component.ComponentId, action.ActionId);
-            }
-        }
-
-        return map;
-    }
-
-    private static bool TryResolveTool(
-        string toolName,
-        IReadOnlyDictionary<string, (string ComponentId, string ActionId)> toolMap,
-        out (string ComponentId, string ActionId) resolved)
-    {
-        resolved = default;
-        var trimmed = toolName?.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            return false;
-        }
-
-        if (toolMap.TryGetValue(trimmed, out resolved))
-        {
-            return true;
-        }
-
-        var sanitized = SanitizeToolName(trimmed);
-        if (toolMap.TryGetValue(sanitized, out resolved))
-        {
-            return true;
-        }
-
-        var actionMatches = toolMap
-            .Where(kv =>
-                string.Equals(kv.Value.ActionId, trimmed, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(SanitizeToolName(kv.Value.ActionId), sanitized, StringComparison.OrdinalIgnoreCase) ||
-                sanitized.EndsWith($"_{SanitizeToolName(kv.Value.ActionId)}", StringComparison.OrdinalIgnoreCase))
-            .Select(kv => kv.Value)
-            .Distinct()
-            .ToArray();
-        if (actionMatches.Length == 1)
-        {
-            resolved = actionMatches[0];
-            return true;
-        }
-
-        return false;
-    }
-
-    private static string BuildComponentToolName(string componentId, string actionId) =>
-        SanitizeToolName($"agentblazor_{componentId}_{actionId}");
-
-    private static string SanitizeToolName(string value)
-    {
-        var chars = value.Select(static ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '_').ToArray();
-        return new string(chars);
-    }
-
-    private static string StripCodeFences(string text)
-    {
-        var trimmed = text.Trim();
-
-        // Handle ```json or ``` at start
-        if (trimmed.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstNewLine = trimmed.IndexOf('\n');
-            if (firstNewLine > 0)
-            {
-                trimmed = trimmed[(firstNewLine + 1)..];
-            }
-        }
-
-        // Handle ``` at end
-        if (trimmed.EndsWith("```", StringComparison.Ordinal))
-        {
-            trimmed = trimmed[..^3];
-        }
-
-        return trimmed.Trim();
+        _logger?.LogWarning(
+            "Planner returned invalid generatedUi payload. Validation error: {ValidationError}",
+            validationError ?? "unknown");
+        return null;
     }
 
     // Internal DTOs for JSON deserialization
@@ -744,6 +525,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         public bool NeedsClarification { get; set; }
         public string? ClarificationQuestion { get; set; }
         public double? Confidence { get; set; }
+        public AgentUiDocument? GeneratedUi { get; set; }
     }
 
     private sealed class PlannerStep

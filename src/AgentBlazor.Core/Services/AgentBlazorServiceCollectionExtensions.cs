@@ -83,10 +83,6 @@ public static class AgentBlazorServiceCollectionExtensions
         // User preferences
         services.TryAddSingleton<IUserPreferenceService, InMemoryUserPreferenceService>();
 
-        // Action planning and response building
-        services.TryAddSingleton<IActionPlanner, ActionPlanner>();
-        services.TryAddSingleton<IResponseBuilder, ResponseBuilder>();
-
         // Prompt tracing (opt-in via EnablePromptTracing)
         services.AddOptions<PromptTracingOptions>();
         services.TryAddSingleton<IPromptTraceStore, InMemoryPromptTraceStore>();

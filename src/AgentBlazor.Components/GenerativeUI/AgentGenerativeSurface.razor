@@ -1,0 +1,395 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Components
+@using AgentBlazor.Core.Runtime.Agents
+@using AgentBlazor.Core.Runtime.Interfaces
+@using System.Text.Json
+@inject IAgentRuntime AgentRuntime
+
+<section class="ab-generative-surface @CssClass" aria-label="Generated UI surface">
+    @if (Document is null)
+    {
+        <div class="ab-generative-surface__empty">No generated UI available yet.</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_validationError))
+    {
+        <div class="ab-generative-surface__error">@_validationError</div>
+    }
+    else
+    {
+        @foreach (var block in Document.Blocks)
+        {
+            <article class="ab-generative-surface__block">
+                @if (!string.IsNullOrWhiteSpace(block.Title))
+                {
+                    <h3 class="ab-generative-surface__title">@block.Title</h3>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(block.Description))
+                {
+                    <p class="ab-generative-surface__description">@block.Description</p>
+                }
+
+                @if (block.Kind == AgentUiBlockKind.Card)
+                {
+                    @RenderCardBlock(block)
+                }
+                else if (block.Kind == AgentUiBlockKind.Form)
+                {
+                    @RenderFormBlock(block)
+                }
+                else if (block.Kind == AgentUiBlockKind.Table)
+                {
+                    @RenderTableBlock(block)
+                }
+            </article>
+        }
+    }
+
+    @if (_runtimeResponses.Count > 0)
+    {
+        <section class="ab-generative-surface__responses" aria-label="Agent responses">
+            @foreach (var response in _runtimeResponses)
+            {
+                <article class="ab-generative-surface__response">
+                    <div class="ab-generative-surface__response-agent">@response.AgentName</div>
+                    <div class="ab-generative-surface__response-text">@response.ResponseText</div>
+                </article>
+            }
+        </section>
+    }
+</section>
+
+@code {
+    private readonly Dictionary<string, Dictionary<string, string?>> _formValues = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<AgentTurnResponse> _runtimeResponses = [];
+    private readonly string _instanceSessionId = Guid.NewGuid().ToString("N");
+    private string? _validationError;
+    private bool _isBusy;
+
+    [Parameter]
+    public AgentUiDocument? Document { get; set; }
+
+    [Parameter]
+    public string? AgentName { get; set; }
+
+    [Parameter]
+    public string? SessionId { get; set; }
+
+    [Parameter]
+    public bool ForwardActionsToRuntime { get; set; }
+
+    [Parameter]
+    public bool ShowRuntimeResponses { get; set; } = true;
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentUiActionInvocation> OnActionInvoked { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentTurnResponse> OnRuntimeResponseReceived { get; set; }
+
+    [Parameter]
+    public EventCallback<Exception> OnError { get; set; }
+
+    private string EffectiveSessionId => string.IsNullOrWhiteSpace(SessionId)
+        ? _instanceSessionId
+        : SessionId;
+
+    protected override void OnParametersSet()
+    {
+        _validationError = null;
+
+        if (Document is null)
+        {
+            _formValues.Clear();
+            return;
+        }
+
+        if (!Document.TryValidate(out var error))
+        {
+            _validationError = error;
+            return;
+        }
+
+        SynchronizeFormState();
+    }
+
+    private void SynchronizeFormState()
+    {
+        if (Document is null)
+        {
+            return;
+        }
+
+        var activeFormIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var formBlock in Document.Blocks.Where(static block => block.Kind == AgentUiBlockKind.Form))
+        {
+            activeFormIds.Add(formBlock.Id);
+
+            if (!_formValues.TryGetValue(formBlock.Id, out var values))
+            {
+                values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                _formValues[formBlock.Id] = values;
+            }
+
+            var activeFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var field in formBlock.Fields)
+            {
+                activeFieldNames.Add(field.Name);
+                if (!values.ContainsKey(field.Name))
+                {
+                    values[field.Name] = field.Value;
+                }
+            }
+
+            foreach (var staleKey in values.Keys.Where(key => !activeFieldNames.Contains(key)).ToArray())
+            {
+                values.Remove(staleKey);
+            }
+        }
+
+        foreach (var staleBlockId in _formValues.Keys.Where(key => !activeFormIds.Contains(key)).ToArray())
+        {
+            _formValues.Remove(staleBlockId);
+        }
+    }
+
+    private RenderFragment RenderCardBlock(AgentUiBlock block) => builder =>
+    {
+        if (block.Actions.Count == 0)
+        {
+            return;
+        }
+
+        var sequence = 0;
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
+        foreach (var action in block.Actions)
+        {
+            var capturedAction = action;
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
+            builder.AddAttribute(sequence++, "disabled", _isBusy);
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => InvokeActionAsync(block.Id, capturedAction, null)));
+            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderFormBlock(AgentUiBlock block) => builder =>
+    {
+        var sequence = 0;
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "ab-generative-surface__form");
+
+        foreach (var field in block.Fields)
+        {
+            var capturedField = field;
+            builder.OpenElement(sequence++, "label");
+            builder.AddAttribute(sequence++, "class", "ab-generative-surface__label");
+            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedField.Label) ? capturedField.Name : capturedField.Label);
+            builder.OpenElement(sequence++, "input");
+            builder.AddAttribute(sequence++, "class", "ab-generative-surface__input");
+            builder.AddAttribute(sequence++, "type", string.IsNullOrWhiteSpace(capturedField.Type) ? "text" : capturedField.Type);
+            builder.AddAttribute(sequence++, "placeholder", capturedField.Placeholder);
+            builder.AddAttribute(sequence++, "required", capturedField.Required);
+            builder.AddAttribute(sequence++, "disabled", _isBusy);
+            builder.AddAttribute(sequence++, "value", GetFormFieldValue(block.Id, capturedField.Name));
+            builder.AddAttribute(sequence++, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(this, args =>
+                SetFormFieldValue(block.Id, capturedField.Name, args.Value?.ToString())));
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        if (block.Actions.Count > 0)
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
+            foreach (var action in block.Actions)
+            {
+                var capturedAction = action;
+                builder.OpenElement(sequence++, "button");
+                builder.AddAttribute(sequence++, "type", "button");
+                builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
+                builder.AddAttribute(sequence++, "disabled", _isBusy);
+                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () =>
+                    InvokeActionAsync(block.Id, capturedAction, GetFormPayload(block.Id))));
+                builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderTableBlock(AgentUiBlock block) => builder =>
+    {
+        var sequence = 0;
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "ab-generative-surface__table-wrap");
+        builder.OpenElement(sequence++, "table");
+        builder.AddAttribute(sequence++, "class", "ab-generative-surface__table");
+
+        builder.OpenElement(sequence++, "thead");
+        builder.OpenElement(sequence++, "tr");
+        foreach (var column in block.Columns)
+        {
+            builder.OpenElement(sequence++, "th");
+            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(column.Header) ? column.Key : column.Header);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "tbody");
+        foreach (var row in block.Rows)
+        {
+            builder.OpenElement(sequence++, "tr");
+            foreach (var column in block.Columns)
+            {
+                row.TryGetValue(column.Key, out var value);
+                builder.OpenElement(sequence++, "td");
+                builder.AddContent(sequence++, value?.ToString());
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+
+        builder.CloseElement();
+        builder.CloseElement();
+
+        if (block.Actions.Count > 0)
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
+            foreach (var action in block.Actions)
+            {
+                var capturedAction = action;
+                builder.OpenElement(sequence++, "button");
+                builder.AddAttribute(sequence++, "type", "button");
+                builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
+                builder.AddAttribute(sequence++, "disabled", _isBusy);
+                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => InvokeActionAsync(block.Id, capturedAction, null)));
+                builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+    };
+
+    private IReadOnlyDictionary<string, object?> GetFormPayload(string blockId)
+    {
+        if (!_formValues.TryGetValue(blockId, out var values))
+        {
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return values.ToDictionary(
+            static pair => pair.Key,
+            static pair => (object?)pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private string? GetFormFieldValue(string blockId, string fieldName)
+    {
+        if (!_formValues.TryGetValue(blockId, out var values))
+        {
+            return null;
+        }
+
+        return values.TryGetValue(fieldName, out var value) ? value : null;
+    }
+
+    private void SetFormFieldValue(string blockId, string fieldName, string? value)
+    {
+        if (!_formValues.TryGetValue(blockId, out var values))
+        {
+            values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            _formValues[blockId] = values;
+        }
+
+        values[fieldName] = value;
+    }
+
+    private async Task InvokeActionAsync(
+        string blockId,
+        AgentUiAction action,
+        IReadOnlyDictionary<string, object?>? payload)
+    {
+        var invocationPayload = new Dictionary<string, object?>(
+            action.Arguments,
+            StringComparer.OrdinalIgnoreCase);
+
+        if (payload is not null)
+        {
+            foreach (var pair in payload)
+            {
+                invocationPayload[pair.Key] = pair.Value;
+            }
+        }
+
+        invocationPayload["blockId"] = blockId;
+
+        var invocation = new AgentUiActionInvocation(blockId, action, invocationPayload);
+        await OnActionInvoked.InvokeAsync(invocation);
+
+        if (!ForwardActionsToRuntime || string.IsNullOrWhiteSpace(action.Prompt))
+        {
+            return;
+        }
+
+        try
+        {
+            _isBusy = true;
+            var runtimePrompt = BuildForwardPrompt(action.Prompt, invocationPayload);
+            var runtimeContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString,
+                [AgentGenerativeUiSpec.BlockIdContextKey] = blockId,
+                [AgentGenerativeUiSpec.ActionIdContextKey] = action.Id
+            };
+            var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+                runtimePrompt,
+                AgentName,
+                SessionId: EffectiveSessionId,
+                Context: runtimeContext));
+
+            if (ShowRuntimeResponses)
+            {
+                _runtimeResponses.Add(response);
+            }
+
+            await OnRuntimeResponseReceived.InvokeAsync(response);
+        }
+        catch (Exception ex)
+        {
+            await OnError.InvokeAsync(ex);
+        }
+        finally
+        {
+            _isBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string BuildForwardPrompt(
+        string basePrompt,
+        IReadOnlyDictionary<string, object?> payload)
+    {
+        if (payload.Count == 0)
+        {
+            return basePrompt;
+        }
+
+        var payloadJson = JsonSerializer.Serialize(payload, AgentGenerativeUiSpec.JsonOptions);
+        return $"{basePrompt}\n\nUse this action payload:\n{payloadJson}";
+    }
+}

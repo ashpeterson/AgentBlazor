@@ -55,10 +55,12 @@ AgentBlazor is the Blazor/.NET-first agentic UI platform for teams that need pro
   - Acceptance criteria:
   - Schema supports cards, forms, data tables, actions, and layout hints.
   - Versioned contract + compatibility notes documented.
+  - Current artifact: `docs/generative-ui-spec-v0.md`
 - `AB-PUSH-011` Build Razor renderer for v0 schema
   - Acceptance criteria:
   - Can render at least 3 block types from streamed/returned spec payloads.
   - Rendering supports action callbacks into existing action executors.
+  - Current artifact: `src/AgentBlazor.Components/GenerativeUI/AgentGenerativeSurface.razor`
 - `AB-PUSH-012` Add demo page "Generative UI in Blazor"
   - Acceptance criteria:
   - End-to-end flow: prompt -> generated UI blocks -> user action -> agent continuation.

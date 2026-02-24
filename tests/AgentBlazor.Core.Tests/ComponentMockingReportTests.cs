@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -405,7 +406,8 @@ public class ComponentMockingReportTests
 
         private Task<ActionResult> HandleGoToPage(AgentAction action)
         {
-            if (action.TryGetParameter<int>("page", out var page))
+            if (action.TryGetParameter<int>("page", out var page) ||
+                action.TryGetParameter<int>("pageIndex", out page))
                 CurrentPage = page;
             return Task.FromResult(ActionResult.Success($"Navigated to page {CurrentPage}"));
         }
@@ -413,6 +415,9 @@ public class ComponentMockingReportTests
         private Task<ActionResult> HandleSelectRow(AgentAction action)
         {
             if (action.TryGetParameter<int>("row_index", out var idx))
+                SelectedRowIndex = idx;
+            else if (action.TryGetParameter<string>("rowKey", out var rowKey) &&
+                     int.TryParse(rowKey, out idx))
                 SelectedRowIndex = idx;
             return Task.FromResult(ActionResult.Success($"Selected row {SelectedRowIndex}"));
         }
@@ -577,7 +582,10 @@ public class ComponentMockingReportTests
 
             if (action.Name.Equals("switch_tab", StringComparison.OrdinalIgnoreCase))
             {
-                if (action.TryGetParameter<int>("tab_index", out var idx) && idx >= 0 && idx < _tabCount)
+                if ((action.TryGetParameter<int>("tab_index", out var idx) ||
+                     action.TryGetParameter<int>("index", out idx)) &&
+                    idx >= 0 &&
+                    idx < _tabCount)
                 {
                     ActiveTabIndex = idx;
                     return Task.FromResult(ActionResult.Success($"Switched to tab {idx}"));
@@ -592,26 +600,77 @@ public class ComponentMockingReportTests
 
     #region Mock Chat Client
 
+    private static string BuildPlanJson(string toolName, IDictionary<string, object?> arguments)
+    {
+        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
+        {
+            return """{"steps":[]}""";
+        }
+
+        var payload = new
+        {
+            steps = new[]
+            {
+                new
+                {
+                    componentId,
+                    actionId,
+                    arguments
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static bool TryResolveToolName(
+        string toolName,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = string.Empty;
+        actionId = string.Empty;
+
+        return toolName.ToLowerInvariant() switch
+        {
+            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
+            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
+            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
+            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
+            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
+            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
+            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
+            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
+            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
+            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
+            _ => false
+        };
+    }
+
+    private static bool Resolve(
+        string resolvedComponentId,
+        string resolvedActionId,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = resolvedComponentId;
+        actionId = resolvedActionId;
+        return true;
+    }
+
     private sealed class ScenarioToolChatClient(string toolName, IDictionary<string, object?> arguments) : IChatClient
     {
-        private int _callCount;
-
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            var callNumber = Interlocked.Increment(ref _callCount);
-            if (callNumber % 2 == 1)
-            {
-                var functionCall = new FunctionCallContent($"call_{callNumber}", toolName, arguments);
-                return Task.FromResult(new ChatResponse([new ChatMessage(ChatRole.Assistant, [functionCall])])
-                {
-                    FinishReason = ChatFinishReason.ToolCalls
-                });
-            }
-
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Action completed successfully.")));
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                BuildPlanJson(toolName, arguments))));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -619,16 +678,11 @@ public class ComponentMockingReportTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-            foreach (var msg in response.Messages)
-            {
-                yield return new ChatResponseUpdate
-                {
-                    Contents = msg.Contents,
-                    Role = msg.Role,
-                    FinishReason = response.FinishReason
-                };
-            }
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(toolName, arguments));
+            await Task.CompletedTask;
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;

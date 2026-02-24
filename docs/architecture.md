@@ -96,5 +96,6 @@ Advance from baseline Phase 5 to pilot hardening:
 
 - See `docs/spec-references.md` for AG-UI and Microsoft Agent Framework source/spec links used by this repository.
 - Capability matrix (shipped vs roadmap): `docs/agentblazor-capability-matrix.md`
+- Generative UI contract v0: `docs/generative-ui-spec-v0.md`
 - Product push roadmap: `docs/agentblazor-push-roadmap-q2-2026.md`
 - Positioning + docs IA: `docs/agentblazor-positioning-and-docs-ia.md`
