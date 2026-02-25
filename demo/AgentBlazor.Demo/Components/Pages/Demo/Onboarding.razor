@@ -32,15 +32,58 @@
                               For="@(() => _model.ContactEmail)"
                               @bind-Value="_model.ContactEmail" />
                 <MudTextField T="string"
+                              Label="Contact phone"
+                              For="@(() => _model.ContactPhone)"
+                              @bind-Value="_model.ContactPhone" />
+                <MudTextField T="string"
                               Label="Risk tier"
                               For="@(() => _model.RiskTier)"
                               @bind-Value="_model.RiskTier" />
+                <MudTextField T="string"
+                              Label="Country"
+                              For="@(() => _model.Country)"
+                              @bind-Value="_model.Country" />
+                <MudTextField T="string"
+                              Label="Category"
+                              For="@(() => _model.Category)"
+                              @bind-Value="_model.Category" />
+                <MudTextField T="string"
+                              Label="Payment terms"
+                              For="@(() => _model.PaymentTerms)"
+                              @bind-Value="_model.PaymentTerms" />
+                <MudTextField T="string"
+                              Label="Preferred currency"
+                              For="@(() => _model.PreferredCurrency)"
+                              @bind-Value="_model.PreferredCurrency" />
                 <MudNumericField T="decimal"
                                  Label="Requested budget"
                                  For="@(() => _model.RequestedBudget)"
                                  @bind-Value="_model.RequestedBudget"
                                  Adornment="Adornment.End"
                                  AdornmentText="USD" />
+                <MudNumericField T="decimal"
+                                 Label="Expected monthly spend"
+                                 For="@(() => _model.ExpectedMonthlySpend)"
+                                 @bind-Value="_model.ExpectedMonthlySpend"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="USD" />
+                <MudNumericField T="int"
+                                 Label="Priority (1-5)"
+                                 For="@(() => _model.Priority)"
+                                 @bind-Value="_model.Priority" />
+                <MudCheckBox T="bool"
+                             Label="Sanctions screened"
+                             For="@(() => _model.SanctionsScreened)"
+                             @bind-Value="_model.SanctionsScreened" />
+                <MudCheckBox T="bool"
+                             Label="NDA required"
+                             For="@(() => _model.NdaRequired)"
+                             @bind-Value="_model.NdaRequired" />
+                <MudTextField T="string"
+                              Label="Notes"
+                              Lines="2"
+                              For="@(() => _model.Notes)"
+                              @bind-Value="_model.Notes" />
             </ChildContent>
         </AgentForm>
     </DialogContent>
@@ -52,7 +95,7 @@
 </AgentDialog>
 
 <AgentChatWidget Title="Onboarding Agent"
-                 Description="Ask me to open the form or fill in supplier details." />
+                 Description="Ask me to open the form and fill supplier details across multiple fields." />
 
 @code {
     private AgentDialog? _dialog;
@@ -72,10 +115,38 @@
         [Required, EmailAddress]
         public string ContactEmail { get; set; } = string.Empty;
 
+        [Phone]
+        public string ContactPhone { get; set; } = string.Empty;
+
         [Required]
         public string RiskTier { get; set; } = string.Empty;
 
+        [Required]
+        public string Country { get; set; } = string.Empty;
+
+        [Required]
+        public string Category { get; set; } = string.Empty;
+
+        [Required]
+        public string PaymentTerms { get; set; } = string.Empty;
+
+        [Required]
+        public string PreferredCurrency { get; set; } = "USD";
+
         [Range(typeof(decimal), "0.01", "1000000000")]
         public decimal RequestedBudget { get; set; }
+
+        [Range(typeof(decimal), "0", "1000000000")]
+        public decimal ExpectedMonthlySpend { get; set; }
+
+        [Range(1, 5)]
+        public int Priority { get; set; } = 3;
+
+        public bool SanctionsScreened { get; set; }
+
+        public bool NdaRequired { get; set; }
+
+        [StringLength(500)]
+        public string Notes { get; set; } = string.Empty;
     }
 }

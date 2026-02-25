@@ -127,7 +127,7 @@ internal sealed class IntentRule
             IntentName = "filter",
             ComponentId = AgentComponentCapabilityProfile.AgentDataGridComponentId,
             ActionId = AgentComponentCapabilityProfile.DataGridFilterActionId,
-            Keywords = ["filter", "show only", "only show", "where", "with", "having", "high risk", "highest risk", "low risk", "lowest risk", "find", "search for"],
+            Keywords = ["filter", "show only", "only show", "where", "with", "having", "find", "search for"],
             BaseConfidence = 0.75f,
             Priority = 8,
             EntityPatterns =

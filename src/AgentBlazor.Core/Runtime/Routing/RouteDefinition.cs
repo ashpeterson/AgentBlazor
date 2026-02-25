@@ -6,7 +6,7 @@ namespace AgentBlazor.Core.Runtime.Routing;
 public sealed record RouteDefinition
 {
     /// <summary>
-    /// The route path (e.g., "/suppliers", "/settings/profile").
+    /// The route path (e.g., "/orders", "/settings/profile").
     /// </summary>
     public required string Path { get; init; }
 

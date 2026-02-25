@@ -1,6 +1,7 @@
 .gen-ui-demo {
     display: grid;
     gap: 1rem;
+    max-width: 980px;
 }
 
 .gen-ui-demo__header {
@@ -8,27 +9,12 @@
     gap: 0.35rem;
 }
 
-.gen-ui-demo__grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-    gap: 1rem;
-    min-height: 0;
-}
-
-.gen-ui-demo__panel {
-    min-height: 0;
-}
-
 .gen-ui-demo__chat {
-    height: min(75vh, 760px);
+    height: min(78vh, 820px);
     overflow: hidden;
 }
 
 @media (max-width: 1100px) {
-    .gen-ui-demo__grid {
-        grid-template-columns: 1fr;
-    }
-
     .gen-ui-demo__chat {
         height: min(70vh, 680px);
     }

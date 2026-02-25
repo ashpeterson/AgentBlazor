@@ -43,6 +43,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
     private readonly IPlanExecutor _executor;
     private readonly IAgentRegistry _agentRegistry;
     private readonly IComponentCapabilityCatalog _componentCatalog;
+    private readonly IAgentUiToolCatalog _uiToolCatalog;
     private readonly IConversationManager? _conversationManager;
     private readonly IAgentComponentRegistry? _componentRegistry;
     private readonly IComponentRouteRegistry _componentRouteRegistry;
@@ -75,6 +76,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         IPlanExecutor executor,
         IAgentRegistry agentRegistry,
         IComponentCapabilityCatalog componentCatalog,
+        IAgentUiToolCatalog uiToolCatalog,
         IConversationManager? conversationManager,
         IAgentComponentRegistry? componentRegistry,
         IComponentRouteRegistry componentRouteRegistry,
@@ -90,6 +92,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         _executor = executor;
         _agentRegistry = agentRegistry;
         _componentCatalog = componentCatalog;
+        _uiToolCatalog = uiToolCatalog;
         _conversationManager = conversationManager;
         _componentRegistry = componentRegistry;
         _componentRouteRegistry = componentRouteRegistry;
@@ -340,9 +343,11 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
 
             _logger?.LogInformation("Plan created with {StepCount} steps", plan.Steps.Count);
 
+            plan = NormalizePlanComponentTargets(plan, mountedComponents, allowedComponents);
             plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents, request.UserMessage);
             plan = EnsureDialogOpenBeforeUnmountedFormAction(plan, mountedComponents, allowedComponents);
             plan = NormalizePlanArguments(plan);
+            plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
             var plannedActions = CreatePlannedActions(plan);
             await EmitPlannedActionsAsync(plannedActions, emitEvent);
             var runtimeContext = request.Context is null
@@ -720,6 +725,30 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             return fromRegistry;
         }
 
+        // Dialog/Form workflows should not guess routes from free-text intent.
+        // Use paired route hints if one side is known.
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentDialogComponentId, out var formPairRoute) &&
+                !string.IsNullOrWhiteSpace(formPairRoute))
+            {
+                return formPairRoute;
+            }
+
+            return null;
+        }
+
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentFormComponentId, out var dialogPairRoute) &&
+                !string.IsNullOrWhiteSpace(dialogPairRoute))
+            {
+                return dialogPairRoute;
+            }
+
+            return null;
+        }
+
         var matches = _routeRegistry.ResolveAll(userMessage, maxResults: 3);
         if (matches.Count == 0)
         {
@@ -752,7 +781,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
 
     /// <summary>
     /// If a form action is planned while no Form component is mounted, prepend/open a dialog step before the first form step.
-    /// This enables one-turn flows like "open onboarding and set name" where forms live inside dialogs.
+    /// This enables one-turn flows where form elements are hosted inside dialogs.
     /// </summary>
     private static ActionPlan EnsureDialogOpenBeforeUnmountedFormAction(
         ActionPlan plan,
@@ -839,6 +868,182 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             .ToArray();
 
         return plan with { Steps = normalizedSteps };
+    }
+
+    private ActionPlan NormalizePlanComponentTargets(
+        ActionPlan plan,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (plan.Steps.Count == 0)
+        {
+            return plan;
+        }
+
+        var mountedByAgentId = mountedComponents.ToDictionary(
+            static mounted => mounted.AgentId,
+            StringComparer.OrdinalIgnoreCase);
+        var normalizedSteps = new List<PlannedStep>(plan.Steps.Count);
+        var changed = false;
+
+        foreach (var step in plan.Steps)
+        {
+            var stepChanged = false;
+            var componentId = step.ComponentId?.Trim() ?? string.Empty;
+            var targetAgentId = string.IsNullOrWhiteSpace(step.TargetAgentId)
+                ? null
+                : step.TargetAgentId.Trim();
+
+            if (!string.IsNullOrWhiteSpace(targetAgentId) &&
+                mountedByAgentId.TryGetValue(targetAgentId, out var targetedComponent))
+            {
+                var canonicalFromTarget = ResolveAllowedComponentIdForType(
+                    targetedComponent.ComponentType,
+                    allowedComponents);
+                if (!string.IsNullOrWhiteSpace(canonicalFromTarget) &&
+                    !string.Equals(componentId, canonicalFromTarget, StringComparison.OrdinalIgnoreCase))
+                {
+                    componentId = canonicalFromTarget;
+                    stepChanged = true;
+                }
+            }
+
+            if (!IsAllowedComponent(componentId, allowedComponents))
+            {
+                if (mountedByAgentId.TryGetValue(componentId, out var referencedInstance))
+                {
+                    var canonicalFromInstance = ResolveAllowedComponentIdForType(
+                        referencedInstance.ComponentType,
+                        allowedComponents);
+                    if (!string.IsNullOrWhiteSpace(canonicalFromInstance))
+                    {
+                        componentId = canonicalFromInstance;
+                        targetAgentId ??= referencedInstance.AgentId;
+                        stepChanged = true;
+                    }
+                }
+                else
+                {
+                    var canonicalByType = ResolveAllowedComponentIdForType(componentId, allowedComponents);
+                    if (!string.IsNullOrWhiteSpace(canonicalByType))
+                    {
+                        componentId = canonicalByType;
+                        stepChanged = true;
+                    }
+                }
+            }
+
+            if (stepChanged)
+            {
+                changed = true;
+                normalizedSteps.Add(step with
+                {
+                    ComponentId = componentId,
+                    TargetAgentId = targetAgentId
+                });
+                continue;
+            }
+
+            normalizedSteps.Add(step);
+        }
+
+        if (!changed)
+        {
+            return plan;
+        }
+
+        _logger?.LogDebug("Normalized plan component targets using mounted component instances.");
+        return plan with { Steps = normalizedSteps };
+    }
+
+    private static bool IsAllowedComponent(
+        string componentId,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        return allowedComponents.Any(component =>
+            string.Equals(component.ComponentId, componentId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ResolveAllowedComponentIdForType(
+        string? componentTypeOrId,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (string.IsNullOrWhiteSpace(componentTypeOrId))
+        {
+            return null;
+        }
+
+        var raw = componentTypeOrId.Trim();
+        var exact = allowedComponents.FirstOrDefault(component =>
+            string.Equals(component.ComponentId, raw, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null)
+        {
+            return exact.ComponentId;
+        }
+
+        var typeName = raw.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? raw[5..]
+            : raw;
+        var prefixed = $"Agent{typeName}";
+        var prefixedMatch = allowedComponents.FirstOrDefault(component =>
+            string.Equals(component.ComponentId, prefixed, StringComparison.OrdinalIgnoreCase));
+        if (prefixedMatch is not null)
+        {
+            return prefixedMatch.ComponentId;
+        }
+
+        var bySuffix = allowedComponents.FirstOrDefault(component =>
+            component.ComponentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(component.ComponentId[5..], typeName, StringComparison.OrdinalIgnoreCase));
+        return bySuffix?.ComponentId;
+    }
+
+    private ActionPlan EnforceGeneratedUiActionPolicies(
+        ActionPlan plan,
+        GeneratedUiActionInvocation? generatedUiAction,
+        string userMessage)
+    {
+        if (generatedUiAction is null || plan.Steps.Count == 0)
+        {
+            return plan;
+        }
+
+        if (IsExplicitSubmitIntent(userMessage) || IsExplicitSubmitIntent(generatedUiAction.ActionId))
+        {
+            return plan;
+        }
+
+        var filteredSteps = plan.Steps
+            .Where(static step =>
+                !(string.Equals(step.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+                  string.Equals(step.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        if (filteredSteps.Length == plan.Steps.Count)
+        {
+            return plan;
+        }
+
+        _logger?.LogInformation(
+            "Removed {RemovedCount} AgentForm.submit step(s) for generated UI action '{ActionId}' because submit was not explicitly requested.",
+            plan.Steps.Count - filteredSteps.Length,
+            generatedUiAction.ActionId);
+
+        return plan with { Steps = filteredSteps };
+    }
+
+    private static bool IsExplicitSubmitIntent(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return text.Contains("submit", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("save", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("confirm", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("finalize", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("send", StringComparison.OrdinalIgnoreCase);
     }
 
     private static ComponentActionExecutionResult[] BuildValidationFailureExecutionResults(PlanValidationResult validationResult) =>
@@ -1013,13 +1218,30 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             : $"Completed {appliedCount} actions.";
     }
 
-    private static AgentTurnResponse AttachPlannedGeneratedUi(
+    private AgentTurnResponse AttachPlannedGeneratedUi(
         AgentTurnResponse response,
         ActionPlan plan)
     {
-        return plan.GeneratedUi is null
-            ? response
-            : response with { GeneratedUi = plan.GeneratedUi };
+        if (plan.UiToolCalls.Count == 0)
+        {
+            return response;
+        }
+
+        var generatedUi = _uiToolCatalog.BuildDocument(plan.UiToolCalls, out var renderErrors);
+        if (generatedUi is null)
+        {
+            if (renderErrors.Count > 0)
+            {
+                _logger?.LogWarning(
+                    "Generated UI rendering failed for {ToolCallCount} tool calls. Errors: {Errors}",
+                    plan.UiToolCalls.Count,
+                    string.Join("; ", renderErrors));
+            }
+
+            return response;
+        }
+
+        return response with { GeneratedUi = generatedUi };
     }
 
     private static bool IsGeneratedUiRequested(IDictionary<string, string>? context)

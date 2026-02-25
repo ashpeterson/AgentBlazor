@@ -7,17 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace AgentBlazor.Core.Runtime.Planning;
 
 /// <summary>
-/// LLM-based action planner that produces structured JSON plans using research-backed
-/// prompting techniques: few-shot examples, chain-of-thought reasoning, and strict schema enforcement.
-///
-/// Based on findings from:
-/// - CAAP (Context-Aware Action Planning): Few-shot + CoT achieves 94.4% accuracy
-/// - AG-UI Protocol: Typed state + event-based actions
-/// - Microsoft.Extensions.AI: Native JSON schema enforcement
+/// LLM planner that emits deterministic action plans.
+/// The model can only choose known components/actions and known generated-UI tools.
 /// </summary>
 internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 {
     private readonly IChatClient? _chatClient;
+    private readonly IAgentUiToolCatalog _uiToolCatalog;
     private readonly ILogger<StructuredActionPlanner>? _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -30,9 +26,11 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 
     public StructuredActionPlanner(
         IChatClient? chatClient = null,
+        IAgentUiToolCatalog? uiToolCatalog = null,
         ILogger<StructuredActionPlanner>? logger = null)
     {
         _chatClient = chatClient;
+        _uiToolCatalog = uiToolCatalog ?? new DefaultAgentUiToolCatalog();
         _logger = logger;
     }
 
@@ -57,7 +55,6 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             new(ChatRole.User, userPrompt)
         };
 
-        // Add conversation history if present (last 10 turns for context)
         foreach (var turn in request.ConversationHistory.TakeLast(10))
         {
             var role = turn.Role.Equals("user", StringComparison.OrdinalIgnoreCase)
@@ -69,7 +66,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         var chatOptions = new ChatOptions
         {
             ResponseFormat = ChatResponseFormat.Json,
-            Temperature = 0.0f // Zero temperature for maximum determinism
+            Temperature = 0.0f
         };
 
         var response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
@@ -78,668 +75,176 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         return ParsePlanResponse(responseText, request.GenerateUi);
     }
 
-    private static string BuildSystemPrompt(ActionPlanRequest request)
+    private string BuildSystemPrompt(ActionPlanRequest request)
     {
         var sb = new StringBuilder();
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 1: ROLE AND TASK DEFINITION
-        // ═══════════════════════════════════════════════════════════════════
         sb.AppendLine("# ROLE");
-        sb.AppendLine("You are a UI Action Planner. Your task is to convert natural language requests into structured JSON action plans that control UI components.");
+        sb.AppendLine("You are a deterministic UI action planner.");
+        sb.AppendLine("You must return only valid JSON.");
         sb.AppendLine();
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 2: OUTPUT SCHEMA (upfront for clarity)
-        // ═══════════════════════════════════════════════════════════════════
         sb.AppendLine("# OUTPUT SCHEMA");
-        sb.AppendLine("You MUST output valid JSON matching this exact schema:");
+        sb.AppendLine("Return JSON matching this schema:");
         sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""Brief explanation of your interpretation and plan"",
-  ""steps"": [
+        sb.AppendLine("""
+{
+  "reasoning": "brief explanation",
+  "steps": [
     {
-      ""componentId"": ""string - must match an AVAILABLE COMPONENT"",
-      ""actionId"": ""string - must match an action for that component"",
-      ""arguments"": { ""paramName"": ""value"" },
-      ""targetAgentId"": ""string (optional) - specific component instance""
+      "componentId": "must match an available component id",
+      "actionId": "must match an action on that component",
+      "arguments": {},
+      "targetAgentId": "optional specific component instance"
     }
   ],
-  ""needsClarification"": false,
-  ""clarificationQuestion"": ""string (only if needsClarification is true)"",");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": []
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
+  "needsClarification": false,
+  "clarificationQuestion": "only when needsClarification=true",
+  "confidence": 1.0,
+  "uiToolCalls": [
+    {
+      "toolId": "must match an available generated-ui tool id",
+      "arguments": {}
+    }
+  ]
+}
+""");
         sb.AppendLine("```");
         sb.AppendLine();
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 3: CRITICAL RULES
-        // ═══════════════════════════════════════════════════════════════════
-        sb.AppendLine("# CRITICAL RULES");
+        sb.AppendLine("# HARD RULES");
+        sb.AppendLine("- Output raw JSON only. No markdown wrappers.");
+        sb.AppendLine("- Use only available component ids and action ids listed below.");
+        sb.AppendLine("- Include all required parameters.");
+        sb.AppendLine("- If required parameters are missing, set needsClarification=true with a specific question.");
+        sb.AppendLine("- Do not invent routes, columns, or action names.");
+        sb.AppendLine("- For rank intents (highest/lowest), use sort desc/asc and add select_row if user says focus/open top item.");
+        sb.AppendLine("- For AgentForm.set_field, semantic field hints are allowed; runtime resolves canonical fields.");
         sb.AppendLine();
-        sb.AppendLine("## Rule 1: OUTPUT FORMAT");
-        sb.AppendLine("- Output ONLY valid JSON. No markdown fences, no explanatory text outside JSON.");
-        sb.AppendLine("- The \"reasoning\" field goes INSIDE the JSON, not outside.");
+
         if (request.GenerateUi)
         {
-            sb.AppendLine("- GENERATE_UI is true, so generatedUi is REQUIRED and MUST be non-null.");
-            sb.AppendLine("- generatedUi.blocks MUST contain at least one block.");
-            sb.AppendLine("- Use only block kinds Card, Form, or Table.");
+            sb.AppendLine("# GENERATED UI RULES");
+            sb.AppendLine("- uiToolCalls is REQUIRED and should usually contain at least one tool call.");
+            sb.AppendLine("- Use only generated-ui tools listed below.");
+            sb.AppendLine("- Do not emit freeform generated UI blocks.");
+            sb.AppendLine("- For GENERATED_UI_ACTION payloads, treat payload values as authoritative and emit executable steps.");
+            sb.AppendLine("- Ignore payload metadata keys: blockId, actionId.");
+            sb.AppendLine("- For generated UI follow-up actions that populate forms, do not include AgentForm.submit unless the user explicitly asks to submit.");
+            sb.AppendLine("- uiToolCalls should typically return a confirmation or follow-up tool after execution.");
+            sb.AppendLine();
         }
         else
         {
-            sb.AppendLine("- Set \"generatedUi\" to null.");
-        }
-        sb.AppendLine();
-
-        sb.AppendLine("## Rule 2: COMPONENT VALIDATION");
-        sb.AppendLine("- Only use componentId values from AVAILABLE COMPONENTS below.");
-        sb.AppendLine("- Only use actionId values listed for that specific component.");
-        sb.AppendLine("- Case matters: use exact casing as shown.");
-        sb.AppendLine();
-
-        sb.AppendLine("## Rule 3: PARAMETER HANDLING");
-        sb.AppendLine("- All REQUIRED parameters must be provided with non-empty values.");
-        sb.AppendLine("- If a required parameter cannot be determined from the request, set needsClarification=true.");
-        sb.AppendLine("- Do NOT guess, infer, or make up parameter values that aren't in the request.");
-        sb.AppendLine("- For 'column' parameters, use exact column names from MOUNTED COMPONENT STATE if available.");
-        sb.AppendLine("- For AgentForm.set_field, if the user provides a semantic field hint (e.g. \"name\", \"email\"), pass it directly as 'field'; runtime will resolve to the canonical model property.");
-        sb.AppendLine("- For AgentForm.set_field, ask clarification only when either field or value is missing.");
-        sb.AppendLine();
-
-        sb.AppendLine("## Rule 4: NAVIGATION LOGIC (CRITICAL)");
-        sb.AppendLine("- Check MOUNTED COMPONENTS to see what's on the current page.");
-        sb.AppendLine("- If the target component type is NOT mounted, you MUST navigate first:");
-        sb.AppendLine("  1. First step: AgentNavMenu.navigate_to with uri from AVAILABLE ROUTES");
-        sb.AppendLine("  2. Second step: The actual component action");
-        sb.AppendLine("- For form field actions on dialog-based pages, include AgentDialog.open before AgentForm.set_field.");
-        sb.AppendLine("- If target component IS mounted, do NOT add navigation.");
-        sb.AppendLine();
-
-        sb.AppendLine("## Rule 5: SEMANTIC INTERPRETATION");
-        sb.AppendLine("- Map natural language to filter operators:");
-        sb.AppendLine("  - \"high\", \"above\", \"more than\", \"greater\" → operator: \"gte\" or \"gt\"");
-        sb.AppendLine("  - \"low\", \"below\", \"less than\", \"under\" → operator: \"lte\" or \"lt\"");
-        sb.AppendLine("  - \"is\", \"equals\", \"exactly\" → operator: \"eq\"");
-        sb.AppendLine("  - \"contains\", \"includes\", \"has\" → operator: \"contains\"");
-        sb.AppendLine("  - \"starts with\", \"begins with\" → operator: \"startswith\"");
-        sb.AppendLine("  - \"empty\", \"blank\", \"missing\" → operator: \"isnull\"");
-        sb.AppendLine("- For ranking phrases like \"highest\"/\"lowest\", prefer sort (desc/asc) on the target column.");
-        sb.AppendLine("- If user asks to \"focus\" the highest/lowest row, add a follow-up select_row action (rowKey may be omitted for runtime inference).");
-        sb.AppendLine("- For subjective terms (\"high risk\", \"low priority\"), pass the semantic value and let the app interpret it.");
-        sb.AppendLine();
-
-        sb.AppendLine("## Rule 6: CLARIFICATION");
-        sb.AppendLine("- If the request is ambiguous, vague, or missing critical information, ask for clarification.");
-        sb.AppendLine("- Good clarification questions are specific: \"Which column should I filter?\" not \"What do you want?\"");
-        sb.AppendLine("- Use CONVERSATION HISTORY: if the latest user message is a short clarification answer, combine it with the prior question.");
-        sb.AppendLine("- For column clarifications, map close matches from user text to the nearest mounted column name (for example \"risk\" -> \"RiskScore\").");
-        sb.AppendLine();
-
-        if (request.GenerateUi)
-        {
-            sb.AppendLine("## Rule 7: GENERATED UI QUALITY");
-            sb.AppendLine("- generatedUi.specVersion MUST be \"agentblazor.ui.v0\".");
-            sb.AppendLine("- Use generated UI to provide a useful next step for the user, not just static text.");
-            sb.AppendLine("- Every block should have clear title/description tied to the user request.");
-            sb.AppendLine("- Prefer at least one action button with a non-empty prompt so user can continue the workflow.");
-            sb.AppendLine("- Action prompts should be instruction-like (imperative) and ready to execute.");
-            sb.AppendLine("- Runtime forwards generated action payload in a typed GENERATED_UI_ACTION object; use prompts that can consume those payload values.");
-            sb.AppendLine("- Form blocks MUST include fields, and each field name should align to known model fields when available.");
-            sb.AppendLine("- Table blocks MUST include columns and may include rows when context contains concrete values.");
-            sb.AppendLine("- If steps are empty and no clarification is needed, still return a summary card block explaining the outcome.");
-            sb.AppendLine();
-
-            sb.AppendLine("## Rule 8: GENERATED ACTION FORWARDING");
-            sb.AppendLine("- If GENERATED_UI_ACTION is provided in the request payload, treat its payload as authoritative data for this turn.");
-            sb.AppendLine("- For generated apply actions, create executable steps instead of returning an unchanged draft UI.");
-            sb.AppendLine("- For form payloads, emit one AgentForm.set_field step per payload key/value.");
-            sb.AppendLine("- Ignore metadata payload keys: blockId, actionId.");
-            sb.AppendLine("- If target form is not mounted, include navigation and dialog-open steps before set_field steps.");
-            sb.AppendLine("- For forwarded actions, generatedUi should usually be a confirmation card, not a repeated draft form.");
+            sb.AppendLine("# GENERATED UI RULES");
+            sb.AppendLine("- uiToolCalls must be an empty array when GENERATE_UI is false.");
             sb.AppendLine();
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 4: FEW-SHOT EXAMPLES
-        // ═══════════════════════════════════════════════════════════════════
-        sb.AppendLine("# EXAMPLES");
-        sb.AppendLine();
-
-        // Example 1: Simple filter on mounted component
-        sb.AppendLine("## Example 1: Filter on mounted DataGrid");
-        sb.AppendLine("User: \"Show suppliers with high risk\"");
-        sb.AppendLine("Context: DataGrid is mounted with columns [Name, Risk, Status]");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""User wants to filter suppliers by risk level. DataGrid is mounted. Using 'gte' for 'high' semantic value."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""filter"",
-      ""arguments"": { ""column"": ""Risk"", ""operator"": ""gte"", ""value"": ""high"" }
-    }
-  ],
-  ""needsClarification"": false,");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""risk-filter-summary"",
-        ""kind"": ""Card"",
-        ""title"": ""High Risk Filter Applied"",
-        ""description"": ""Filtered suppliers where Risk is high."",
-        ""actions"": [
-          {
-            ""id"": ""focusHighest"",
-            ""label"": ""Focus Highest Risk Row"",
-            ""prompt"": ""Focus the highest risk supplier in the current grid.""
-          }
-        ]
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        // Example 2: Navigation required
-        sb.AppendLine("## Example 2: Action on unmounted component (navigation required)");
-        sb.AppendLine("User: \"Go to suppliers and filter by name Smith\"");
-        sb.AppendLine("Context: NO DataGrid mounted, /suppliers route available");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""User wants to see suppliers filtered by name. No DataGrid mounted, so navigate first."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentNavMenu"",
-      ""actionId"": ""navigate_to"",
-      ""arguments"": { ""uri"": ""/suppliers"" }
-    },
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""filter"",
-      ""arguments"": { ""column"": ""Name"", ""operator"": ""contains"", ""value"": ""Smith"" }
-    }
-  ],
-  ""needsClarification"": false,");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""supplier-filter-followup"",
-        ""kind"": ""Card"",
-        ""title"": ""Supplier Search Ready"",
-        ""description"": ""Navigating and filtering suppliers by name 'Smith'."",
-        ""actions"": [
-          {
-            ""id"": ""sortByRisk"",
-            ""label"": ""Sort by Risk Desc"",
-            ""prompt"": ""Sort suppliers by RiskScore descending.""
-          }
-        ]
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        // Example 3: Multiple actions
-        sb.AppendLine("## Example 3: Multiple related actions");
-        sb.AppendLine("User: \"Sort by date descending and go to page 2\"");
-        sb.AppendLine("Context: DataGrid mounted with columns [Date, Name, Amount]");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""Two actions: sort and pagination. Both on mounted DataGrid."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""sort"",
-      ""arguments"": { ""column"": ""Date"", ""direction"": ""desc"" }
-    },
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""go_to_page"",
-      ""arguments"": { ""pageIndex"": 1 }
-    }
-  ],
-  ""needsClarification"": false,");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""paging-summary"",
-        ""kind"": ""Card"",
-        ""title"": ""Sorted and Paged"",
-        ""description"": ""Sorted Date descending and moved to page 2."",
-        ""actions"": [
-          {
-            ""id"": ""returnFirstPage"",
-            ""label"": ""Go to Page 1"",
-            ""prompt"": ""Go to page 1 in the current data grid.""
-          }
-        ]
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        // Example 4: Clarification needed
-        sb.AppendLine("## Example 4: Clarification needed");
-        sb.AppendLine("User: \"Filter the data\"");
-        sb.AppendLine("Context: DataGrid mounted with columns [Name, Date, Status, Amount]");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""User wants to filter but didn't specify column, operator, or value."",
-  ""steps"": [],
-  ""needsClarification"": true,
-  ""clarificationQuestion"": ""Which column would you like to filter, and what value should I filter for?"",");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""clarification-help"",
-        ""kind"": ""Card"",
-        ""title"": ""Need One More Detail"",
-        ""description"": ""Please tell me the column and value to filter.""
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        // Example 5: Form field
-        sb.AppendLine("## Example 5: Form field interaction");
-        sb.AppendLine("User: \"Set the customer name to John Doe\"");
-        sb.AppendLine("Context: Form mounted with fields [customerName, email, phone]");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""User wants to set a form field. Form is mounted, field name maps to customerName."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentForm"",
-      ""actionId"": ""set_field"",
-      ""arguments"": { ""field"": ""customerName"", ""value"": ""John Doe"" }
-    }
-  ],
-  ""needsClarification"": false,");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""customer-form-review"",
-        ""kind"": ""Form"",
-        ""title"": ""Customer Draft"",
-        ""description"": ""Review and apply customer details."",
-        ""fields"": [
-          { ""name"": ""customerName"", ""label"": ""Customer Name"", ""type"": ""text"", ""value"": ""John Doe"", ""required"": true },
-          { ""name"": ""email"", ""label"": ""Email"", ""type"": ""text"" }
-        ],
-        ""actions"": [
-          {
-            ""id"": ""applyDraft"",
-            ""label"": ""Apply Form Values"",
-            ""prompt"": ""Set form fields using the action payload values.""
-          }
-        ]
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        // Example 6: Tab switching
-        sb.AppendLine("## Example 6: Tab switching");
-        sb.AppendLine("User: \"Go to the second tab\"");
-        sb.AppendLine("Context: Tabs component mounted with 3 tabs");
-        sb.AppendLine("```json");
-        sb.AppendLine(@"{
-  ""reasoning"": ""User wants second tab. Tabs are 0-indexed, so second tab is index 1."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentTabs"",
-      ""actionId"": ""switch_tab"",
-      ""arguments"": { ""index"": 1 }
-    }
-  ],
-  ""needsClarification"": false,");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine(@"  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""tab-navigation-summary"",
-        ""kind"": ""Card"",
-        ""title"": ""Tab Updated"",
-        ""description"": ""Switched to tab 2."",
-        ""actions"": [
-          {
-            ""id"": ""goBackTab"",
-            ""label"": ""Back to Tab 1"",
-            ""prompt"": ""Switch to tab index 0.""
-          }
-        ]
-      }
-    ]
-  }");
-        }
-        else
-        {
-            sb.AppendLine(@"  ""generatedUi"": null");
-        }
-        sb.AppendLine(@"}");
-        sb.AppendLine("```");
-        sb.AppendLine();
-
-        if (request.GenerateUi)
-        {
-            // Example 7: Supplier ranking with generated follow-up controls
-            sb.AppendLine("## Example 7: Highest risk supplier workflow");
-            sb.AppendLine("User: \"Show the highest risk supplier\"");
-            sb.AppendLine("Context: DataGrid mounted with columns [SupplierName, RiskScore, Region]");
-            sb.AppendLine("```json");
-            sb.AppendLine(@"{
-  ""reasoning"": ""Need highest risk supplier, so sort RiskScore descending and focus top row."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""sort"",
-      ""arguments"": { ""column"": ""RiskScore"", ""direction"": ""desc"" }
-    },
-    {
-      ""componentId"": ""AgentDataGrid"",
-      ""actionId"": ""select_row"",
-      ""arguments"": {}
-    }
-  ],
-  ""needsClarification"": false,
-  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""highest-risk-controls"",
-        ""kind"": ""Card"",
-        ""title"": ""Highest Risk Supplier Focus"",
-        ""description"": ""RiskScore sorted descending and top row focused."",
-        ""actions"": [
-          {
-            ""id"": ""refreshHighestRisk"",
-            ""label"": ""Run Again"",
-            ""prompt"": ""Refresh focus on the highest risk supplier in the current grid.""
-          },
-          {
-            ""id"": ""showOnlyHighRisk"",
-            ""label"": ""Filter High Risk"",
-            ""prompt"": ""Filter the grid to high risk suppliers using RiskScore.""
-          }
-        ]
-      }
-    ]
-  }
-}");
-            sb.AppendLine("```");
-            sb.AppendLine();
-
-            // Example 8: Generated form driving a workflow
-            sb.AppendLine("## Example 8: Generated form for onboarding workflow");
-            sb.AppendLine("User: \"Create an onboarding draft for supplier Ash\"");
-            sb.AppendLine("Context: /demo/onboarding route exists");
-            sb.AppendLine("```json");
-            sb.AppendLine(@"{
-  ""reasoning"": ""Provide a generated form so user can confirm values, then forward payload to runtime."",
-  ""steps"": [],
-  ""needsClarification"": false,
-  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""onboarding-draft"",
-        ""kind"": ""Form"",
-        ""title"": ""Supplier Onboarding Draft"",
-        ""description"": ""Review details, then apply to onboarding form."",
-        ""fields"": [
-          { ""name"": ""SupplierName"", ""label"": ""Supplier Name"", ""type"": ""text"", ""value"": ""Ash"", ""required"": true },
-          { ""name"": ""RiskTier"", ""label"": ""Risk Tier"", ""type"": ""text"", ""value"": ""High"" }
-        ],
-        ""actions"": [
-          {
-            ""id"": ""applyOnboardingDraft"",
-            ""label"": ""Apply form values"",
-            ""prompt"": ""Open onboarding and set supplier onboarding form fields using the action payload values.""
-          }
-        ]
-      }
-    ]
-  }
-}");
-            sb.AppendLine("```");
-            sb.AppendLine();
-
-            // Example 9: Forwarded generated action with payload
-            sb.AppendLine("## Example 9: Apply generated form payload");
-            sb.AppendLine("User request includes GENERATED_UI_ACTION payload:");
-            sb.AppendLine(@"{");
-            sb.AppendLine(@"  ""blockId"": ""onboarding-draft"",");
-            sb.AppendLine(@"  ""actionId"": ""applyOnboardingDraft"",");
-            sb.AppendLine(@"  ""prompt"": ""Open onboarding and set supplier onboarding form fields using the action payload values."",");
-            sb.AppendLine(@"  ""payload"": { ""SupplierName"": ""Ash"", ""RiskTier"": ""High"", ""blockId"": ""onboarding-draft"" }");
-            sb.AppendLine(@"}");
-            sb.AppendLine("```json");
-            sb.AppendLine(@"{
-  ""reasoning"": ""This is a forwarded generated action with explicit payload values. Navigate/open if needed, then apply each form field from payload."",
-  ""steps"": [
-    {
-      ""componentId"": ""AgentNavMenu"",
-      ""actionId"": ""navigate_to"",
-      ""arguments"": { ""uri"": ""/demo/onboarding"" }
-    },
-    {
-      ""componentId"": ""AgentDialog"",
-      ""actionId"": ""open"",
-      ""arguments"": {}
-    },
-    {
-      ""componentId"": ""AgentForm"",
-      ""actionId"": ""set_field"",
-      ""arguments"": { ""field"": ""SupplierName"", ""value"": ""Ash"" }
-    },
-    {
-      ""componentId"": ""AgentForm"",
-      ""actionId"": ""set_field"",
-      ""arguments"": { ""field"": ""RiskTier"", ""value"": ""High"" }
-    }
-  ],
-  ""needsClarification"": false,
-  ""generatedUi"": {
-    ""specVersion"": ""agentblazor.ui.v0"",
-    ""blocks"": [
-      {
-        ""id"": ""onboarding-apply-confirmation"",
-        ""kind"": ""Card"",
-        ""title"": ""Onboarding Values Applied"",
-        ""description"": ""Supplier form values were sent to onboarding.""
-      }
-    ]
-  }
-}");
-            sb.AppendLine("```");
-            sb.AppendLine();
-        }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 5: COMMON MISTAKES TO AVOID
-        // ═══════════════════════════════════════════════════════════════════
-        sb.AppendLine("# COMMON MISTAKES TO AVOID");
-        sb.AppendLine("❌ Adding navigation when component is already mounted");
-        sb.AppendLine("❌ Using 'asc' or 'desc' as filter operators (those are for sort)");
-        sb.AppendLine("❌ Guessing column names not in the component state");
-        sb.AppendLine("❌ Using page number 1 for first page (pages are 0-indexed)");
-        sb.AppendLine("❌ Leaving required parameters empty");
-        sb.AppendLine("❌ Adding markdown code fences to output");
-        sb.AppendLine("❌ Writing explanation text outside the JSON");
-        if (request.GenerateUi)
-        {
-            sb.AppendLine("❌ Returning generatedUi as null or with empty blocks when GENERATE_UI=true");
-            sb.AppendLine("❌ Omitting action prompts in generatedUi when follow-up actions are possible");
-        }
-        sb.AppendLine();
-
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 6: AVAILABLE COMPONENTS (from request)
-        // ═══════════════════════════════════════════════════════════════════
         sb.AppendLine("# AVAILABLE COMPONENTS");
-        sb.AppendLine();
-
         foreach (var component in request.AvailableComponents)
         {
-            sb.Append("## ").AppendLine(component.ComponentId);
-            sb.AppendLine(component.Description);
-            sb.AppendLine();
-            sb.AppendLine("Actions:");
-
+            sb.Append("- ").Append(component.ComponentId).Append(": ").AppendLine(component.Description);
             foreach (var action in component.Actions)
             {
-                sb.Append("### ").Append(action.ActionId);
+                sb.Append("  - ").Append(action.ActionId);
                 if (action.RequiresApproval)
-                    sb.Append(" ⚠️ REQUIRES APPROVAL");
-                sb.AppendLine();
-                sb.AppendLine(action.Description);
-
-                if (action.Parameters.Count > 0)
                 {
-                    sb.AppendLine("Parameters:");
-                    foreach (var param in action.Parameters)
-                    {
-                        var required = param.Required ? "REQUIRED" : "optional";
-                        sb.Append("  - ").Append(param.Name).Append(" (").Append(param.Type).Append(", ").Append(required).Append(')');
-                        if (!string.IsNullOrWhiteSpace(param.Description))
-                            sb.Append(": ").Append(param.Description);
-                        if (param.AllowedValues?.Count > 0)
-                        {
-                            sb.Append(" [allowed: ").Append(string.Join(", ", param.AllowedValues)).Append(']');
-                        }
-                        sb.AppendLine();
-                    }
+                    sb.Append(" [requires approval]");
                 }
-                sb.AppendLine();
+
+                sb.Append(": ").AppendLine(action.Description);
+                if (action.Parameters.Count == 0)
+                {
+                    continue;
+                }
+
+                sb.AppendLine("    parameters:");
+                foreach (var parameter in action.Parameters)
+                {
+                    sb.Append("      - ").Append(parameter.Name)
+                        .Append(" (").Append(parameter.Type).Append(", ")
+                        .Append(parameter.Required ? "required" : "optional").Append(')');
+                    if (!string.IsNullOrWhiteSpace(parameter.Description))
+                    {
+                        sb.Append(": ").Append(parameter.Description);
+                    }
+
+                    if (parameter.AllowedValues is { Count: > 0 })
+                    {
+                        sb.Append(" [allowed: ").Append(string.Join(", ", parameter.AllowedValues)).Append(']');
+                    }
+
+                    sb.AppendLine();
+                }
             }
         }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 7: CURRENT UI STATE (mounted components)
-        // ═══════════════════════════════════════════════════════════════════
-        sb.AppendLine("# CURRENT UI STATE");
         sb.AppendLine();
 
-        if (request.MountedComponents.Count > 0)
+        sb.AppendLine("# MOUNTED COMPONENTS");
+        if (request.MountedComponents.Count == 0)
         {
-            sb.AppendLine("## MOUNTED COMPONENTS (on current page):");
-            foreach (var mounted in request.MountedComponents)
-            {
-                sb.Append("- **").Append(mounted.AgentId).Append("** (type: ").Append(mounted.ComponentType).Append(')');
-                sb.AppendLine();
-                if (mounted.State.Count > 0)
-                {
-                    sb.AppendLine("  State:");
-                    foreach (var kv in mounted.State)
-                    {
-                        sb.Append("    - ").Append(kv.Key).Append(": ").AppendLine(kv.Value);
-                    }
-                }
-            }
-            sb.AppendLine();
-            sb.AppendLine("✓ Actions targeting these component TYPES do NOT need navigation.");
+            sb.AppendLine("- none");
         }
         else
         {
-            sb.AppendLine("## MOUNTED COMPONENTS: NONE");
-            sb.AppendLine("⚠️ No agent components on current page. Most actions will require navigation first.");
+            foreach (var mounted in request.MountedComponents)
+            {
+                sb.Append("- ").Append(mounted.AgentId)
+                    .Append(" (type: ").Append(mounted.ComponentType).Append(')')
+                    .AppendLine();
+
+                if (mounted.State.Count == 0)
+                {
+                    continue;
+                }
+
+                foreach (var state in mounted.State)
+                {
+                    sb.Append("  - ").Append(state.Key).Append(": ").AppendLine(state.Value);
+                }
+            }
         }
         sb.AppendLine();
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 8: AVAILABLE ROUTES
-        // ═══════════════════════════════════════════════════════════════════
         if (request.AvailableRoutes.Count > 0)
         {
             sb.AppendLine("# AVAILABLE ROUTES");
-            sb.AppendLine("Use these for AgentNavMenu.navigate_to:");
-            sb.AppendLine();
-            foreach (var r in request.AvailableRoutes)
+            foreach (var route in request.AvailableRoutes)
             {
-                sb.Append("- **").Append(r.Path).Append("**");
-                if (!string.IsNullOrWhiteSpace(r.Description))
-                    sb.Append(" — ").Append(r.Description);
-                if (r.Aliases.Count > 0)
-                    sb.Append(" (keywords: ").Append(string.Join(", ", r.Aliases.Take(5))).Append(')');
+                sb.Append("- ").Append(route.Path);
+                if (!string.IsNullOrWhiteSpace(route.Description))
+                {
+                    sb.Append(": ").Append(route.Description);
+                }
+
+                if (route.Aliases.Count > 0)
+                {
+                    sb.Append(" (keywords: ").Append(string.Join(", ", route.Aliases.Take(5))).Append(')');
+                }
+
                 sb.AppendLine();
             }
             sb.AppendLine();
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // SECTION 9: CHAIN-OF-THOUGHT INSTRUCTIONS
-        // ═══════════════════════════════════════════════════════════════════
-        sb.AppendLine("# REASONING PROCESS");
-        sb.AppendLine("Before outputting JSON, think through these steps (put reasoning in the \"reasoning\" field):");
-        sb.AppendLine("1. What is the user trying to accomplish?");
-        sb.AppendLine("2. Which component(s) and action(s) are needed?");
-        sb.AppendLine("3. Is the target component mounted? If not, add navigation step first.");
-        sb.AppendLine("4. What parameters are needed? Can I get them from the request or mounted state?");
-        sb.AppendLine("5. Are any required parameters missing? If so, ask for clarification.");
+        sb.AppendLine("# AVAILABLE GENERATED-UI TOOLS");
+        foreach (var tool in _uiToolCatalog.GetTools())
+        {
+            sb.Append("- ").Append(tool.ToolId).Append(": ").AppendLine(tool.Description);
+            sb.AppendLine("  inputSchema:");
+            sb.Append("  ").AppendLine(tool.InputSchema.Replace("\n", "\n  ", StringComparison.Ordinal));
+        }
         sb.AppendLine();
-        sb.AppendLine("Now output your JSON plan.");
+
+        sb.AppendLine("# CHECKLIST");
+        sb.AppendLine("1. Identify intent.");
+        sb.AppendLine("2. Choose component actions.");
+        sb.AppendLine("3. Add navigation first when target component is not mounted.");
+        sb.AppendLine("4. Ensure required params are present; otherwise ask clarification.");
+        sb.AppendLine("5. Add deterministic uiToolCalls only from allowed tools.");
+        sb.AppendLine();
+        sb.AppendLine("Return JSON now.");
 
         return sb.ToString();
     }
@@ -765,15 +270,13 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 
         if (request.GenerateUi)
         {
-            return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: true\nGENERATED_UI_REQUIREMENT: Return non-null generatedUi with at least one actionable block.";
+            return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: true\nGENERATED_UI_REQUIREMENT: uiToolCalls must include deterministic generated-ui tool(s).";
         }
 
         return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: false";
     }
 
-    private ActionPlan ParsePlanResponse(
-        string responseText,
-        bool generateUi)
+    private ActionPlan ParsePlanResponse(string responseText, bool generateUi)
     {
         if (string.IsNullOrWhiteSpace(responseText))
         {
@@ -790,32 +293,35 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
                 return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
             }
 
-            // Log reasoning for diagnostics
             if (!string.IsNullOrWhiteSpace(parsed.Reasoning))
             {
                 _logger?.LogDebug("Planner reasoning: {Reasoning}", parsed.Reasoning);
             }
 
+            var uiToolCalls = NormalizeUiToolCalls(parsed.UiToolCalls, generateUi);
+
             if (parsed.NeedsClarification)
             {
                 return ActionPlan.NeedsClarification(
                     parsed.ClarificationQuestion ?? "Can you provide more details?",
-                    NormalizeGeneratedUi(parsed.GeneratedUi, generateUi));
+                    uiToolCalls);
             }
 
             if (parsed.Steps is null || parsed.Steps.Count == 0)
             {
-                return ActionPlan.Empty(NormalizeGeneratedUi(parsed.GeneratedUi, generateUi));
+                return ActionPlan.Empty(uiToolCalls);
             }
 
             var steps = parsed.Steps
-                .Where(s => !string.IsNullOrWhiteSpace(s.ComponentId) && !string.IsNullOrWhiteSpace(s.ActionId))
-                .Select(s => new PlannedStep
+                .Where(step =>
+                    !string.IsNullOrWhiteSpace(step.ComponentId) &&
+                    !string.IsNullOrWhiteSpace(step.ActionId))
+                .Select(step => new PlannedStep
                 {
-                    ComponentId = s.ComponentId!,
-                    ActionId = s.ActionId!,
-                    Arguments = s.Arguments ?? new Dictionary<string, object?>(),
-                    TargetAgentId = s.TargetAgentId
+                    ComponentId = step.ComponentId!,
+                    ActionId = step.ActionId!,
+                    Arguments = step.Arguments ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+                    TargetAgentId = step.TargetAgentId
                 })
                 .ToList();
 
@@ -823,7 +329,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             {
                 Steps = steps,
                 Confidence = parsed.Confidence ?? 1.0,
-                GeneratedUi = NormalizeGeneratedUi(parsed.GeneratedUi, generateUi)
+                UiToolCalls = uiToolCalls
             };
         }
         catch (JsonException ex)
@@ -833,25 +339,43 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         }
     }
 
-    private AgentUiDocument? NormalizeGeneratedUi(AgentUiDocument? generatedUi, bool generateUi)
+    private IReadOnlyList<AgentUiToolCall> NormalizeUiToolCalls(
+        IReadOnlyList<PlannerUiToolCall>? uiToolCalls,
+        bool generateUi)
     {
-        if (!generateUi || generatedUi is null)
+        if (!generateUi || uiToolCalls is null || uiToolCalls.Count == 0)
         {
-            return null;
+            return [];
         }
 
-        if (generatedUi.TryValidate(out var validationError))
+        var knownToolIds = _uiToolCatalog.GetTools()
+            .Select(static tool => tool.ToolId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var normalized = new List<AgentUiToolCall>(uiToolCalls.Count);
+        foreach (var call in uiToolCalls)
         {
-            return generatedUi;
+            if (string.IsNullOrWhiteSpace(call.ToolId))
+            {
+                continue;
+            }
+
+            if (!knownToolIds.Contains(call.ToolId))
+            {
+                _logger?.LogWarning("Planner emitted unknown ui tool id '{ToolId}'. Ignoring.", call.ToolId);
+                continue;
+            }
+
+            normalized.Add(new AgentUiToolCall
+            {
+                ToolId = call.ToolId!,
+                Arguments = call.Arguments ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            });
         }
 
-        _logger?.LogWarning(
-            "Planner returned invalid generatedUi payload. Validation error: {ValidationError}",
-            validationError ?? "unknown");
-        return null;
+        return normalized;
     }
 
-    // Internal DTOs for JSON deserialization
     private sealed class PlannerResponse
     {
         public string? Reasoning { get; set; }
@@ -859,7 +383,7 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         public bool NeedsClarification { get; set; }
         public string? ClarificationQuestion { get; set; }
         public double? Confidence { get; set; }
-        public AgentUiDocument? GeneratedUi { get; set; }
+        public List<PlannerUiToolCall>? UiToolCalls { get; set; }
     }
 
     private sealed class PlannerStep
@@ -868,5 +392,11 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         public string? ActionId { get; set; }
         public Dictionary<string, object?>? Arguments { get; set; }
         public string? TargetAgentId { get; set; }
+    }
+
+    private sealed class PlannerUiToolCall
+    {
+        public string? ToolId { get; set; }
+        public Dictionary<string, object?>? Arguments { get; set; }
     }
 }

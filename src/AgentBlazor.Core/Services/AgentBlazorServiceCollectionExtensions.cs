@@ -15,6 +15,7 @@ using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Core.Runtime.Routing;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Runtime.Internal;
+using AgentBlazor.Core.Components;
 
 namespace AgentBlazor.Services;
 
@@ -52,6 +53,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
         services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
         services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
+        services.TryAddSingleton<IAgentUiToolCatalog, DefaultAgentUiToolCatalog>();
 
         // Deterministic runtime with structured JSON planning
         // Uses Plan → Validate → Execute flow with no fallbacks or heuristics

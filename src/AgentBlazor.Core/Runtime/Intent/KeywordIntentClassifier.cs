@@ -313,18 +313,6 @@ internal sealed class KeywordIntentClassifier : IIntentClassifier
                 entities["operator"] = "contains";
             else if (ContainsAny(userMessage, "equals", "equal to", "is", "="))
                 entities["operator"] = "eq";
-            else if (ContainsAny(userMessage, "high risk", "highest risk"))
-            {
-                entities["column"] ??= "RiskScore";
-                entities["operator"] = "gte";
-                entities["value"] ??= 70;
-            }
-            else if (ContainsAny(userMessage, "low risk", "lowest risk"))
-            {
-                entities["column"] ??= "RiskScore";
-                entities["operator"] = "lte";
-                entities["value"] ??= 30;
-            }
         }
 
         // Infer tab index

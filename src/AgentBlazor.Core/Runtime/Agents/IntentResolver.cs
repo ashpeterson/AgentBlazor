@@ -24,7 +24,7 @@ internal sealed class IntentResolver : IIntentResolver
     {
         "go", "to", "open", "show", "navigate", "take", "bring", "me", "the", "a", "an", "my", "all",
         "please", "page", "screen", "section", "view", "highest", "lowest", "high", "low",
-        "risk", "filtered", "filter", "sorted", "sort", "by"
+        "filtered", "filter", "sorted", "sort", "by"
     };
 
     public IntentResolver(

@@ -1,6 +1,10 @@
 using AgentBlazor;
 using AgentBlazor.Demo.Components;
+using AgentBlazor.Demo.Services;
+using AgentBlazor.Core.Components;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +41,14 @@ builder.Services.AddAgentBlazor(options =>
         options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
     }
 });
+
+if (bool.TryParse(Environment.GetEnvironmentVariable("AGENTBLAZOR_DEMO_DETERMINISTIC_E2E"), out var useDeterministicE2e) &&
+    useDeterministicE2e)
+{
+    builder.Services.Replace(ServiceDescriptor.Singleton<IChatClient, E2eDeterministicChatClient>());
+}
+
+builder.Services.Replace(ServiceDescriptor.Singleton<IAgentUiToolCatalog, DemoAgentUiToolCatalog>());
 
 var app = builder.Build();
 

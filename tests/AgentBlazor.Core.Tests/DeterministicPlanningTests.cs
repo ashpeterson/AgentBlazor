@@ -377,6 +377,38 @@ public class DeterministicPlanningTests
     }
 
     [Fact]
+    public async Task Executor_TargetAgentId_AddsAgentIdExecutionArgument()
+    {
+        var capturingExecutor = new CapturingActionExecutor();
+        var executor = new PlanExecutor(capturingExecutor);
+        var plan = new ActionPlan
+        {
+            Steps =
+            [
+                new PlannedStep
+                {
+                    ComponentId = "AgentDataGrid",
+                    ActionId = "sort",
+                    TargetAgentId = "gen-ui-supplier-grid",
+                    Arguments = new Dictionary<string, object?>
+                    {
+                        ["column"] = "RiskScore",
+                        ["direction"] = "desc"
+                    }
+                }
+            ]
+        };
+
+        var result = await executor.ExecuteAsync(plan, new PlanExecutionOptions());
+
+        Assert.True(result.Succeeded);
+        Assert.Single(capturingExecutor.ExecutedActions);
+        var executed = capturingExecutor.ExecutedActions[0];
+        var arguments = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(executed.Arguments);
+        Assert.Equal("gen-ui-supplier-grid", arguments["agentId"]?.ToString());
+    }
+
+    [Fact]
     public async Task Executor_CancellationRequested_StopsExecution()
     {
         var slowExecutor = new SlowActionExecutor(TimeSpan.FromSeconds(5));
@@ -510,17 +542,15 @@ public class DeterministicPlanningTests
                         "arguments": {}
                     }
                 ],
-                "generatedUi": {
-                    "specVersion": "agentblazor.ui.v0",
-                    "blocks": [
-                        {
-                            "id": "summary",
-                            "kind": "Card",
+                "uiToolCalls": [
+                    {
+                        "toolId": "summary.card",
+                        "arguments": {
                             "title": "Summary",
                             "description": "Open dialog"
                         }
-                    ]
-                }
+                    }
+                ]
             }
             """);
         using var provider = services.BuildServiceProvider();
@@ -543,17 +573,16 @@ public class DeterministicPlanningTests
                         "arguments": { "field": "SupplierName", "value": "Ash" }
                     }
                 ],
-                "generatedUi": {
-                    "specVersion": "agentblazor.ui.v0",
-                    "blocks": [
-                        {
-                            "id": "supplier-summary",
-                            "kind": "Card",
+                "uiToolCalls": [
+                    {
+                        "toolId": "summary.card",
+                        "arguments": {
+                            "blockId": "supplier-summary",
                             "title": "Supplier Update",
                             "description": "SupplierName will be set to Ash."
                         }
-                    ]
-                }
+                    }
+                ]
             }
             """);
         using var provider = services.BuildServiceProvider();
@@ -571,6 +600,105 @@ public class DeterministicPlanningTests
         var block = Assert.Single(response.GeneratedUi!.Blocks);
         Assert.Equal(AgentUiBlockKind.Card, block.Kind);
         Assert.Equal("supplier-summary", block.Id);
+    }
+
+    [Fact]
+    public async Task Runtime_ComponentInstanceIdAsComponentId_NormalizesToAllowedComponent()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "gen-ui-supplier-grid",
+                        "actionId": "sort",
+                        "arguments": { "column": "RiskScore", "direction": "desc" }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new StubRegisteredComponent(
+            "gen-ui-supplier-grid",
+            "DataGrid",
+            new ComponentState
+            {
+                ["columns"] = new[] { "SupplierName", "RiskScore", "Region" }
+            }));
+
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me highest risk supplier"));
+
+        Assert.Equal("Done.", response.ResponseText);
+        var planned = Assert.Single(response.PlannedActions);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDataGridComponentId, planned.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.DataGridSortActionId, planned.ActionId);
+        Assert.DoesNotContain("not available or not allowed", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Runtime_GeneratedUiFollowUpAction_StripsFormSubmitWhenNotExplicitlyRequested()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentNavMenu",
+                        "actionId": "navigate_to",
+                        "arguments": { "uri": "/demo/onboarding" }
+                    },
+                    {
+                        "componentId": "AgentDialog",
+                        "actionId": "open",
+                        "arguments": {}
+                    },
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "set_field",
+                        "arguments": { "field": "SupplierName", "value": "Ash" }
+                    },
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "submit",
+                        "arguments": {}
+                    }
+                ],
+                "uiToolCalls": [
+                    {
+                        "toolId": "action.confirmation",
+                        "arguments": {
+                            "title": "Draft Applied",
+                            "description": "Form values were applied."
+                        }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+        };
+        var generatedUiAction = new GeneratedUiActionInvocation(
+            BlockId: "record-draft",
+            ActionId: "applyDraftValues",
+            Prompt: "Apply draft values to the form fields.",
+            Payload: new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Name"] = "Ash",
+                ["Tier"] = "High"
+            });
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "Apply the draft values.",
+            Context: context,
+            GeneratedUiAction: generatedUiAction));
+
+        Assert.False(response.RequiresApproval);
+        Assert.DoesNotContain(response.PlannedActions, action =>
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -634,6 +762,67 @@ public class DeterministicPlanningTests
         Assert.Equal(AgentComponentCapabilityProfile.AgentFormComponentId, response.PlannedActions[2].ComponentId);
         Assert.Equal(AgentComponentCapabilityProfile.FormSetFieldActionId, response.PlannedActions[2].ActionId);
         Assert.Equal("Completed 3 actions.", response.ResponseText);
+    }
+
+    [Fact]
+    public async Task Runtime_FormActionWithoutKnownRoute_DoesNotPrependIntentNavigation()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "set_field",
+                        "arguments": { "field": "SupplierName", "value": "Ash" }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "create a new supplier named ash with email ash@test.com, risk tier is high and budget is 50000"));
+
+        Assert.Equal(2, response.PlannedActions.Count);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDialogComponentId, response.PlannedActions[0].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.DialogOpenActionId, response.PlannedActions[0].ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentFormComponentId, response.PlannedActions[1].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.FormSetFieldActionId, response.PlannedActions[1].ActionId);
+        Assert.DoesNotContain(response.PlannedActions, action =>
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Runtime_FormActionWithDialogRouteHint_PrependsNavigationToHintedRoute()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentForm",
+                        "actionId": "set_field",
+                        "arguments": { "field": "SupplierName", "value": "Ash" }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var componentRouteRegistry = provider.GetRequiredService<IComponentRouteRegistry>();
+        componentRouteRegistry.Register(AgentComponentCapabilityProfile.AgentDialogComponentId, "/demo/onboarding");
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("create a new supplier named ash"));
+
+        Assert.Equal(3, response.PlannedActions.Count);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentNavMenuComponentId, response.PlannedActions[0].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.NavigationNavigateToActionId, response.PlannedActions[0].ActionId);
+        Assert.Equal("/demo/onboarding", response.PlannedActions[0].Arguments?["uri"]?.ToString());
+        Assert.Equal(AgentComponentCapabilityProfile.AgentDialogComponentId, response.PlannedActions[1].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.DialogOpenActionId, response.PlannedActions[1].ActionId);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentFormComponentId, response.PlannedActions[2].ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.FormSetFieldActionId, response.PlannedActions[2].ActionId);
     }
 
     [Fact]

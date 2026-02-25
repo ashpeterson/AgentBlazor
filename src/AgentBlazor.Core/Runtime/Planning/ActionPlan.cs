@@ -11,22 +11,22 @@ public sealed record ActionPlan
     public required IReadOnlyList<PlannedStep> Steps { get; init; }
     public double Confidence { get; init; } = 1.0;
     public string? ClarificationNeeded { get; init; }
-    public AgentUiDocument? GeneratedUi { get; init; }
+    public IReadOnlyList<AgentUiToolCall> UiToolCalls { get; init; } = [];
 
     public bool RequiresClarification => !string.IsNullOrWhiteSpace(ClarificationNeeded);
     public bool IsEmpty => Steps.Count == 0 && !RequiresClarification;
 
-    public static ActionPlan Empty(AgentUiDocument? generatedUi = null) => new()
+    public static ActionPlan Empty(IReadOnlyList<AgentUiToolCall>? uiToolCalls = null) => new()
     {
         Steps = [],
-        GeneratedUi = generatedUi
+        UiToolCalls = uiToolCalls ?? []
     };
 
-    public static ActionPlan NeedsClarification(string question, AgentUiDocument? generatedUi = null) => new()
+    public static ActionPlan NeedsClarification(string question, IReadOnlyList<AgentUiToolCall>? uiToolCalls = null) => new()
     {
         Steps = [],
         ClarificationNeeded = question,
-        GeneratedUi = generatedUi
+        UiToolCalls = uiToolCalls ?? []
     };
 }
 

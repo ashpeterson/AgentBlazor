@@ -21,7 +21,7 @@ public interface IRouteRegistry
     /// <summary>
     /// Attempts to resolve a user intent to a route.
     /// </summary>
-    /// <param name="intent">The user's navigation intent (e.g., "suppliers", "go to settings").</param>
+    /// <param name="intent">The user's navigation intent (e.g., "orders", "go to settings").</param>
     /// <param name="match">The matched route if found.</param>
     /// <returns>True if a match was found.</returns>
     bool TryResolve(string intent, out RouteMatch match);

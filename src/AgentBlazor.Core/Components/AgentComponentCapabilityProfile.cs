@@ -208,7 +208,7 @@ public static class AgentComponentCapabilityProfile
             "operator": {
               "type": "string",
               "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "startswith", "endswith", "in", "notin", "isnull", "notnull"],
-              "description": "Filter operator. For threshold phrases (e.g. 'high risk', 'low risk') use gte or lte so the app can map semantic values; use eq only for exact match. Use the sort action for asc/desc ordering."
+              "description": "Filter operator. For threshold phrases (e.g. 'high', 'low') use gte or lte so the app can map semantic values; use eq only for exact match. Use the sort action for asc/desc ordering."
             },
             "value": {
               "description": "Filter value; use semantic terms (e.g. high, low) when the app maps them to numbers.",

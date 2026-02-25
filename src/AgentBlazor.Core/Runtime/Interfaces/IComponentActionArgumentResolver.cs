@@ -4,8 +4,8 @@ namespace AgentBlazor.Core.Runtime.Interfaces;
 
 /// <summary>
 /// Resolves action arguments against the target component's schema and semantics
-/// so that LLM- or intent-produced values (e.g. "Risk Level", "High") are mapped
-/// to the component's actual parameters (e.g. column "RiskScore", value 70).
+/// so that LLM- or intent-produced values (e.g. "Priority", "High") are mapped
+/// to the component's actual parameters (e.g. column "PriorityScore", value 70).
 /// Applied at dequeue/apply time when the component has real state (columns, aliases, value mappings).
 /// </summary>
 public interface IComponentActionArgumentResolver

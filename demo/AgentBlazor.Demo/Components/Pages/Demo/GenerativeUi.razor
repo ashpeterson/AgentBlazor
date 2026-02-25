@@ -1,7 +1,6 @@
 @page "/demo/generative-ui"
 @layout DemoLayout
 @using AgentBlazor.Components
-@using AgentBlazor.Demo.Models
 @using MudBlazor
 
 <PageTitle>Generative UI — AgentBlazor Demo</PageTitle>
@@ -24,39 +23,15 @@
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
             Try: "create an onboarding draft for supplier Ash"
         </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Try: "create a risk forecast chart for supplier Ash"
+        </MudChip>
     </MudStack>
 
-    <div class="gen-ui-demo__grid">
-        <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__panel">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Supplier Context</MudText>
-
-            <AgentDataGrid TItem="SupplierRow"
-                           AgentId="gen-ui-supplier-grid"
-                           Items="@_suppliers"
-                           Dense="true"
-                           Hover="true"
-                           Bordered="true"
-                           Striped="true"
-                           RowKeyProperty="SupplierId">
-                <Columns>
-                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
-                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
-                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
-                    <PropertyColumn T="SupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
-                    <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
-                </Columns>
-            </AgentDataGrid>
-        </MudPaper>
-
-        <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__panel gen-ui-demo__chat">
-            <AgentChatSurface Title="Generative UI Agent"
-                              Description="Generated UI mode is enabled for this chat."
-                              EnableGeneratedUi="true"
-                              Placeholder="Ask for suppliers, form updates, or workflow summaries..." />
-        </MudPaper>
-    </div>
+    <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__chat">
+        <AgentChatSurface Title="Generative UI Agent"
+                          Description="Generated UI mode is enabled for this chat."
+                          EnableGeneratedUi="true"
+                          Placeholder="Ask for a component (table, form, summary, forecast) and continue with generated actions..." />
+    </MudPaper>
 </section>
-
-@code {
-    private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
-}

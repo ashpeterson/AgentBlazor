@@ -80,20 +80,22 @@ Spec version constant:
                         OnActionInvoked="HandleGeneratedActionAsync" />
 ```
 
-For planner-generated UI documents in chat flows:
+For planner-generated UI in chat flows:
 
 ```razor
 <AgentChatSurface EnableGeneratedUi="true" />
 ```
 
-`EnableGeneratedUi="true"` injects `agentblazor.ui.generate=true` into turn context so the planner can return `generatedUi` and runtime can forward it as `GeneratedUi`.
+`EnableGeneratedUi="true"` injects `agentblazor.ui.generate=true` into turn context.
+The planner returns deterministic `uiToolCalls` (not freeform blocks), and runtime renders those calls into `AgentUiDocument` before forwarding it as `GeneratedUi`.
 
 ## Behavior
 
-1. Incoming document is validated via `AgentUiDocument.TryValidate(...)`.
-2. Form field values are tracked locally by block id and included in action payloads.
-3. Every action emits `OnActionInvoked` with `AgentUiActionInvocation`.
-4. When `ForwardActionsToRuntime=true` and action has `Prompt`, the component forwards to `IAgentRuntime`.
+1. Planner emits `uiToolCalls` using known tool ids from `IAgentUiToolCatalog`.
+2. Runtime renders tool calls to `AgentUiDocument` and validates via `AgentUiDocument.TryValidate(...)`.
+3. Form field values are tracked locally by block id and included in action payloads.
+4. Every action emits `OnActionInvoked` with `AgentUiActionInvocation`.
+5. When `ForwardActionsToRuntime=true` and action has `Prompt`, the component forwards to `IAgentRuntime`.
 
 ## Current Scope Limits (v0)
 

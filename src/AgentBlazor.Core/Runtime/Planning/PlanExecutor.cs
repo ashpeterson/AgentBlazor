@@ -94,7 +94,7 @@ internal sealed class PlanExecutor : IPlanExecutor
         try
         {
             // Convert to PlannedComponentAction for the executor
-            var executionArguments = BuildExecutionArguments(step.Arguments, options);
+            var executionArguments = BuildExecutionArguments(step, options);
             var plannedAction = new PlannedComponentAction(
                 step.ComponentId,
                 step.ActionId,
@@ -140,13 +140,19 @@ internal sealed class PlanExecutor : IPlanExecutor
     }
 
     private static IReadOnlyDictionary<string, object?> BuildExecutionArguments(
-        IReadOnlyDictionary<string, object?> source,
+        PlannedStep step,
         PlanExecutionOptions options)
     {
-        var merged = source.ToDictionary(
+        var merged = step.Arguments.ToDictionary(
             kv => kv.Key,
             kv => kv.Value,
             StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(step.TargetAgentId) &&
+            !merged.ContainsKey("agentId"))
+        {
+            merged["agentId"] = step.TargetAgentId;
+        }
 
         if (!string.IsNullOrWhiteSpace(options.SessionId) &&
             !merged.ContainsKey(AgentRuntimeContextKeys.SessionId))

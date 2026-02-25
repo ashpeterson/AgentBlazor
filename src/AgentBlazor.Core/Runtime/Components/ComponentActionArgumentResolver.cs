@@ -5,7 +5,7 @@ namespace AgentBlazor.Core.Runtime.Components;
 
 /// <summary>
 /// Default schema-aware argument resolver. Uses component state to map display/LLM names
-/// to canonical column names and semantic values to concrete values (e.g. "High" → 70 for RiskScore).
+/// to canonical column names and semantic values to concrete values (e.g. "High" → 70).
 /// Column names are resolved by: (1) exact match on discovered columns, (2) optional alias map,
 /// (3) deterministic discovery-based match (token overlap against reflected property names).
 /// </summary>
@@ -17,7 +17,7 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
     /// <summary>State key: optional display name or alias → canonical column name.</summary>
     public const string StateKeyColumnAliases = "columnAliases";
 
-    /// <summary>State key: per-column semantic value → canonical value (e.g. "RiskScore" → { "High" → 70 }).</summary>
+    /// <summary>State key: per-column semantic value → canonical value (e.g. "Priority" → { "High" → 70 }).</summary>
     public const string StateKeyValueMappings = "valueMappings";
 
     public IReadOnlyDictionary<string, object?> Resolve(
@@ -116,7 +116,7 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
     }
 
     /// <summary>Built-in semantic values for filter resolution when the app does not provide ValueMappings.
-    /// Enables "high risk", "low", etc. to work with zero app configuration.</summary>
+    /// Enables "high", "low", etc. to work with zero app configuration.</summary>
     private static readonly IReadOnlyDictionary<string, object> SemanticValueFallbacks =
         new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
@@ -166,7 +166,7 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
 
     /// <summary>
     /// When a filter value was resolved from a semantic term (e.g. "high" → 70), treat "eq" as "gte"
-    /// so that "high risk" shows rows with score >= 70 instead of exactly 70.
+    /// so that threshold language returns ranges rather than exact matches.
     /// </summary>
     private static void PromoteEqToGteForSemanticThreshold(IDictionary<string, object?> result)
     {
