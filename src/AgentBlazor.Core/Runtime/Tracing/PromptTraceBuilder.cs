@@ -261,6 +261,7 @@ internal sealed class PromptTraceBuilder
             ComponentId = result.ComponentId,
             ActionId = result.ActionId,
             Succeeded = result.Succeeded,
+            Outcome = result.Outcome,
             Message = result.Message,
             Duration = individualDurations is not null && index < individualDurations.Count
                 ? individualDurations[index]

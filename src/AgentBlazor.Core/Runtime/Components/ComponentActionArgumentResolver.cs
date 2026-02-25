@@ -98,136 +98,21 @@ public sealed class ComponentActionArgumentResolver : IComponentActionArgumentRe
     private static string? ResolveColumnName(string hint, ComponentState state, string[]? knownColumns = null)
     {
         var columns = knownColumns ?? GetStringArray(state, StateKeyColumns);
-        if (columns is not null && columns.Length > 0)
+        if (columns is null || columns.Length == 0)
         {
-            // 1) Exact match on discovered columns (from reflection on grid TItem)
-            var exact = columns.FirstOrDefault(c => string.Equals(c, hint, StringComparison.OrdinalIgnoreCase));
-            if (exact is not null)
-            {
-                return exact;
-            }
-
-            // 2) Optional alias map (app can override or add display-name → canonical)
-            var aliases = GetColumnAliases(state);
-            if (aliases is not null && aliases.TryGetValue(hint, out var mapped))
-            {
-                return mapped;
-            }
-            if (aliases is not null)
-            {
-                foreach (var (alias, canonical) in aliases)
-                {
-                    if (string.Equals(alias, hint, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return canonical;
-                    }
-                }
-            }
-
-            // 3) Deterministic discovery-based match: resolve LLM-style names (e.g. "riskLevel") to canonical property names (e.g. "RiskScore") using token overlap over reflected columns. No app configuration required.
-            if (TryResolveColumnByDiscovery(hint, columns, out var discovered))
-            {
-                return discovered;
-            }
+            return null;
         }
 
-        return null;
-    }
-
-    /// <summary>
-    /// Resolves a column hint to a canonical column name by token overlap over the discovered column list.
-    /// Deterministic: same hint and same column list always yield the same result.
-    /// </summary>
-    private static bool TryResolveColumnByDiscovery(string hint, string[] columns, out string? canonical)
-    {
-        canonical = null;
-        if (string.IsNullOrWhiteSpace(hint) || columns.Length == 0)
-        {
-            return false;
-        }
-
-        var hintTokens = GetIdentifierTokens(hint);
-        if (hintTokens.Count == 0)
-        {
-            return false;
-        }
-
-        int bestScore = -1;
-        string? bestColumn = null;
-
-        foreach (var column in columns)
-        {
-            var columnTokens = GetIdentifierTokens(column);
-            int score = 0;
-            foreach (var token in hintTokens)
-            {
-                if (columnTokens.Contains(token, StringComparer.OrdinalIgnoreCase))
-                {
-                    score++;
-                }
-            }
-            if (score > bestScore && score > 0)
-            {
-                bestScore = score;
-                bestColumn = column;
-            }
-            else if (score == bestScore && bestColumn is not null && string.Compare(column, bestColumn, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                bestColumn = column;
-            }
-        }
-
-        if (bestColumn is not null && bestScore > 0)
-        {
-            canonical = bestColumn;
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Splits an identifier into tokens (e.g. "riskLevel" → ["risk","level"], "RiskScore" → ["risk","score"]) for deterministic matching.
-    /// Splits on non-letter/digit and on camelCase boundaries (uppercase after lowercase).
-    /// </summary>
-    private static List<string> GetIdentifierTokens(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return [];
-        }
-
-        var tokens = new List<string>();
-        var current = new System.Text.StringBuilder();
-
-        for (int i = 0; i < value.Length; i++)
-        {
-            var c = value[i];
-            if (!char.IsLetterOrDigit(c))
-            {
-                if (current.Length > 0)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-                continue;
-            }
-
-            if (char.IsUpper(c) && current.Length > 0)
-            {
-                tokens.Add(current.ToString());
-                current.Clear();
-            }
-
-            current.Append(char.ToLowerInvariant(c));
-        }
-
-        if (current.Length > 0)
-        {
-            tokens.Add(current.ToString());
-        }
-
-        return tokens;
+        var aliases = GetColumnAliases(state);
+        var resolution = DeterministicEntityResolver.Resolve(
+            hint,
+            columns,
+            aliases,
+            minConfidence: 0.35,
+            ambiguityMargin: 0.06);
+        return resolution.Status is EntityResolutionStatus.Resolved
+            ? resolution.Value
+            : null;
     }
 
     /// <summary>Built-in semantic values for filter resolution when the app does not provide ValueMappings.

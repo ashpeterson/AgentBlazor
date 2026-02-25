@@ -7,4 +7,12 @@ public interface IAgentRuntimeStreaming
     IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
         AgentTurnRequest request,
         CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+        string runId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> StopRunAsync(
+        string runId,
+        CancellationToken cancellationToken = default);
 }

@@ -20,6 +20,13 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
       - name: Show .NET Info
         run: dotnet --info
 
@@ -43,3 +50,15 @@ jobs:
 
       - name: Test
         run: dotnet test AgentBlazor.slnx -c Release --no-build -nologo
+
+      - name: Install E2E Dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npm run install:browsers
+
+      - name: Run E2E Tests
+        working-directory: tests/e2e
+        run: npm run test:e2e

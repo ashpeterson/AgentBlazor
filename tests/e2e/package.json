@@ -1,0 +1,14 @@
+{
+  "name": "@agentblazor/e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test:e2e": "playwright test --config=playwright.config.cjs",
+    "test:e2e:headed": "playwright test --config=playwright.config.cjs --headed",
+    "install:browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

@@ -52,7 +52,7 @@
         var target = ResolveTarget(action);
         if (string.IsNullOrWhiteSpace(target))
         {
-            return Task.FromResult(ActionResult.Failure(
+            return Task.FromResult(ActionResult.NeedsClarification(
                 $"Action '{action.Name}' requires 'uri', 'url', or 'target' parameter."));
         }
 

@@ -2,7 +2,6 @@
 @using AgentBlazor.Core.Components
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Interfaces
-@using System.Text.Json
 @inject IAgentRuntime AgentRuntime
 
 <section class="ab-generative-surface @CssClass" aria-label="Generated UI surface">
@@ -349,18 +348,23 @@
         try
         {
             _isBusy = true;
-            var runtimePrompt = BuildForwardPrompt(action.Prompt, invocationPayload);
             var runtimeContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString,
                 [AgentGenerativeUiSpec.BlockIdContextKey] = blockId,
                 [AgentGenerativeUiSpec.ActionIdContextKey] = action.Id
             };
+            var generatedUiAction = new GeneratedUiActionInvocation(
+                BlockId: blockId,
+                ActionId: action.Id,
+                Prompt: action.Prompt,
+                Payload: new Dictionary<string, object?>(invocationPayload, StringComparer.OrdinalIgnoreCase));
             var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
-                runtimePrompt,
+                action.Prompt ?? string.Empty,
                 AgentName,
                 SessionId: EffectiveSessionId,
-                Context: runtimeContext));
+                Context: runtimeContext,
+                GeneratedUiAction: generatedUiAction));
 
             if (ShowRuntimeResponses)
             {
@@ -378,18 +382,5 @@
             _isBusy = false;
             await InvokeAsync(StateHasChanged);
         }
-    }
-
-    private static string BuildForwardPrompt(
-        string basePrompt,
-        IReadOnlyDictionary<string, object?> payload)
-    {
-        if (payload.Count == 0)
-        {
-            return basePrompt;
-        }
-
-        var payloadJson = JsonSerializer.Serialize(payload, AgentGenerativeUiSpec.JsonOptions);
-        return $"{basePrompt}\n\nUse this action payload:\n{payloadJson}";
     }
 }

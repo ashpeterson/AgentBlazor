@@ -8,7 +8,12 @@
 @inject IAgentRuntime AgentRuntime
 @inject IAgentDeferredActionEvents DeferredActionEvents
 
-<div class="ab-chat-bar @(Theme?.CssClass) @CssClass" data-theme="@(Theme?.DataTheme)" style="@_themeStyle">
+<div class="ab-chat-bar @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
+     data-theme="@(Theme?.DataTheme)"
+     data-style="@(Theme?.DataStyle)"
+     data-radius="@(Theme?.DataRadius)"
+     data-spacing="@(Theme?.DataSpacing)"
+     style="@_themeStyle">
     <div class="ab-chat-bar__input-wrap">
         @if (ShowIcon)
         {
@@ -68,6 +73,15 @@
                             }
                         </div>
                     }
+                    @if (item.ActivityMessages.Count > 0)
+                    {
+                        <ul class="ab-chat-bar__activity-list">
+                            @foreach (var activity in item.ActivityMessages)
+                            {
+                                <li>@activity.Text</li>
+                            }
+                        </ul>
+                    }
                 </article>
             }
 
@@ -76,6 +90,15 @@
                 <article class="ab-chat-bar__message ab-chat-bar__message--assistant">
                     <div class="ab-chat-bar__message-role">@(_streamingAgentName ?? "Agent")</div>
                     <div class="ab-chat-bar__message-text">@_streamingResponseText</div>
+                    @if (_streamingActivityMessages.Count > 0)
+                    {
+                        <ul class="ab-chat-bar__activity-list">
+                            @foreach (var activity in _streamingActivityMessages)
+                            {
+                                <li>@activity.Text</li>
+                            }
+                        </ul>
+                    }
                 </article>
             }
 
@@ -97,6 +120,10 @@
     private readonly List<ChatBarTimelineItem> _timeline = [];
     private string _streamingResponseText = string.Empty;
     private string? _streamingAgentName;
+    private string? _activeRunId;
+    private readonly List<ActivityMessage> _streamingActivityMessages = [];
+    private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
+        new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Placeholder text for the input field.
@@ -212,10 +239,12 @@
         _isBusy = true;
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
         StateHasChanged();
 
         // Add user message to timeline
-        _timeline.Add(new ChatBarTimelineItem("user", message, []));
+        _timeline.Add(new ChatBarTimelineItem("user", message, [], [], null));
 
         await OnMessageSent.InvokeAsync(message);
 
@@ -227,10 +256,18 @@
                 SessionId: _sessionId));
 
             // Add agent response to timeline
+            var runId = string.IsNullOrWhiteSpace(_activeRunId) ? null : _activeRunId;
             _timeline.Add(new ChatBarTimelineItem(
                 "assistant",
                 response.ResponseText,
-                response.PlannedActions));
+                response.PlannedActions,
+                _streamingActivityMessages.ToArray(),
+                runId));
+            if (!string.IsNullOrWhiteSpace(runId))
+            {
+                _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
+            }
+            _streamingActivityMessages.Clear();
 
             await OnResponseReceived.InvokeAsync(response);
         }
@@ -238,7 +275,8 @@
         {
             _streamingResponseText = string.Empty;
             _streamingAgentName = null;
-            _timeline.Add(new ChatBarTimelineItem("assistant", $"Error: {ex.Message}", []));
+            _streamingActivityMessages.Clear();
+            _timeline.Add(new ChatBarTimelineItem("assistant", $"Error: {ex.Message}", [], [], null));
             await OnError.InvokeAsync(ex);
         }
         finally
@@ -250,6 +288,9 @@
     private void ClearTimeline()
     {
         _timeline.Clear();
+        _assistantTimelineIndexByRunId.Clear();
+        _streamingActivityMessages.Clear();
+        _activeRunId = null;
     }
 
     /// <summary>
@@ -275,11 +316,39 @@
 
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
 
         AgentTurnResponse? finalResponse = null;
         await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(request))
         {
-            if (streamEvent.Kind == AgentTurnStreamEventKind.TextDelta &&
+            if (string.IsNullOrWhiteSpace(_activeRunId) &&
+                !string.IsNullOrWhiteSpace(streamEvent.RunId))
+            {
+                _activeRunId = streamEvent.RunId;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
+                streamEvent.PlannedAction is not null)
+            {
+                AddStreamingActivityMessage(
+                    BuildActivityKey(streamEvent.PlannedAction.ComponentId, streamEvent.PlannedAction.ActionId),
+                    FormatToolCallStartMessage(streamEvent.PlannedAction));
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
+                streamEvent.ExecutionResult is not null)
+            {
+                AddStreamingActivityMessage(
+                    BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId),
+                    FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.TextMessageContent &&
                 !string.IsNullOrEmpty(streamEvent.TextDelta))
             {
                 _streamingAgentName ??= streamEvent.AgentName;
@@ -310,11 +379,139 @@
 
     private void HandleDeferredActionCompleted(DeferredComponentActionEvent actionEvent)
     {
+        if (!IsDeferredEventForCurrentChat(actionEvent))
+        {
+            return;
+        }
+
         _ = InvokeAsync(() =>
         {
-            _timeline.Add(new ChatBarTimelineItem("activity", FormatDeferredActionMessage(actionEvent), []));
+            var message = FormatDeferredActionMessage(actionEvent);
+            var key = BuildActivityKey(actionEvent.ComponentType, actionEvent.ActionId);
+            if (!TryAttachActivityToAssociatedTurn(key, message, actionEvent.RunId))
+            {
+                _timeline.Add(new ChatBarTimelineItem("activity", message, [], [], actionEvent.RunId));
+            }
+
             StateHasChanged();
         });
+    }
+
+    private bool IsDeferredEventForCurrentChat(DeferredComponentActionEvent actionEvent)
+    {
+        if (!string.IsNullOrWhiteSpace(actionEvent.SessionId))
+        {
+            return string.Equals(actionEvent.SessionId, _sessionId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(actionEvent.RunId) &&
+            !string.IsNullOrWhiteSpace(_activeRunId))
+        {
+            return string.Equals(actionEvent.RunId, _activeRunId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private void AddStreamingActivityMessage(string key, string message)
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        UpsertActivityMessage(_streamingActivityMessages, key, message);
+    }
+
+    private bool TryAttachActivityToAssociatedTurn(string key, string message, string? runId)
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            if (_isBusy &&
+                !string.IsNullOrWhiteSpace(_activeRunId) &&
+                string.Equals(runId, _activeRunId, StringComparison.OrdinalIgnoreCase))
+            {
+                AddStreamingActivityMessage(key, message);
+                return true;
+            }
+
+            if (_assistantTimelineIndexByRunId.TryGetValue(runId, out var assistantIndex))
+            {
+                return TryAppendActivityToAssistantItem(assistantIndex, key, message);
+            }
+        }
+
+        if (_isBusy)
+        {
+            AddStreamingActivityMessage(key, message);
+            return true;
+        }
+
+        for (var index = _timeline.Count - 1; index >= 0; index--)
+        {
+            if (_timeline[index].Role != "assistant")
+            {
+                continue;
+            }
+
+            return TryAppendActivityToAssistantItem(index, key, message);
+        }
+
+        return false;
+    }
+
+    private bool TryAppendActivityToAssistantItem(int index, string key, string message)
+    {
+        if (index < 0 || index >= _timeline.Count)
+        {
+            return false;
+        }
+
+        var item = _timeline[index];
+        if (!string.Equals(item.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, key, message);
+        _timeline[index] = item with { ActivityMessages = updatedActivities };
+        return true;
+    }
+
+    private static string BuildActivityKey(string componentId, string actionId)
+    {
+        var normalizedComponent = (componentId ?? string.Empty).Trim();
+        var normalizedAction = (actionId ?? string.Empty).Trim();
+        return $"{normalizedComponent}.{normalizedAction}".ToLowerInvariant();
+    }
+
+    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message)
+    {
+        var index = target.FindIndex(activity =>
+            string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase));
+        var entry = new ActivityMessage(key, message);
+        if (index >= 0)
+        {
+            target[index] = entry;
+            return;
+        }
+
+        target.Add(entry);
+    }
+
+    private static IReadOnlyList<ActivityMessage> UpsertActivityMessage(
+        IReadOnlyList<ActivityMessage> source,
+        string key,
+        string message)
+    {
+        var copy = source.ToList();
+        UpsertActivityMessage(copy, key, message);
+        return copy;
     }
 
     private static string FormatDeferredActionMessage(DeferredComponentActionEvent actionEvent)
@@ -324,6 +521,23 @@
             : $"Agent{actionEvent.ComponentType}";
         var status = actionEvent.Succeeded ? "applied" : "failed";
         return $"Deferred action {status}: {componentId}.{actionEvent.ActionId}. {actionEvent.Message}";
+    }
+
+    private static string FormatToolCallStartMessage(PlannedComponentAction plannedAction)
+    {
+        return $"Executing {plannedAction.ComponentId}.{plannedAction.ActionId}...";
+    }
+
+    private static string FormatToolCallResultMessage(ComponentActionExecutionResult executionResult)
+    {
+        if (!string.IsNullOrWhiteSpace(executionResult.Message))
+        {
+            return executionResult.Message;
+        }
+
+        return executionResult.Succeeded
+            ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
+            : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
     }
 
     private static string GetRoleLabel(string role) =>
@@ -337,5 +551,9 @@
     private sealed record ChatBarTimelineItem(
         string Role,
         string Text,
-        IReadOnlyList<PlannedComponentAction> PlannedActions);
+        IReadOnlyList<PlannedComponentAction> PlannedActions,
+        IReadOnlyList<ActivityMessage> ActivityMessages,
+        string? RunId);
+
+    private sealed record ActivityMessage(string Key, string Text);
 }

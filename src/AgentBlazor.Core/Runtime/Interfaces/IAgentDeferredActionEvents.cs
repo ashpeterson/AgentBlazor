@@ -8,7 +8,9 @@ public sealed record DeferredComponentActionEvent(
     string ActionId,
     bool Succeeded,
     string Message,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? SessionId = null,
+    string? RunId = null);
 
 public interface IAgentDeferredActionEvents
 {

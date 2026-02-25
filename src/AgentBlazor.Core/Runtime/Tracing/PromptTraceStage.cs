@@ -1,3 +1,5 @@
+using AgentBlazor.Core.Runtime.Components;
+
 namespace AgentBlazor.Core.Runtime.Tracing;
 
 /// <summary>
@@ -217,6 +219,11 @@ internal sealed record PromptTraceExecutionResult
     /// Whether the execution succeeded.
     /// </summary>
     public required bool Succeeded { get; init; }
+
+    /// <summary>
+    /// Canonical action outcome.
+    /// </summary>
+    public required ActionOutcome Outcome { get; init; }
 
     /// <summary>
     /// Result or error message.

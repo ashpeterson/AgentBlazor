@@ -12,7 +12,13 @@
 @inject IAgentDeferredActionEvents DeferredActionEvents
 @inject IJSRuntime JSRuntime
 
-<section class="ab-chat-surface @(Theme?.CssClass) @CssClass" data-theme="@(Theme?.DataTheme)" style="@_themeStyle" aria-label="@(Title ?? "Chat")">
+<section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
+         data-theme="@(Theme?.DataTheme)"
+         data-style="@(Theme?.DataStyle)"
+         data-radius="@(Theme?.DataRadius)"
+         data-spacing="@(Theme?.DataSpacing)"
+         style="@_themeStyle"
+         aria-label="@(Title ?? "Chat")">
     @if (!string.IsNullOrWhiteSpace(Title))
     {
         <header class="ab-chat-surface__header" id="@HeaderId">@Title</header>
@@ -58,6 +64,16 @@
                     <div class="ab-chat-surface__item-role">@item.RoleLabel</div>
                     <div class="ab-chat-surface__item-text">@item.Text</div>
 
+                    @if (item.ActivityMessages.Count > 0)
+                    {
+                        <ul class="ab-chat-surface__results" aria-label="Activity">
+                            @foreach (var activity in item.ActivityMessages)
+                            {
+                                <li>@activity.Text</li>
+                            }
+                        </ul>
+                    }
+
                     @if (item.PlannedActions.Count > 0)
                     {
                         <ul class="ab-chat-surface__actions" aria-label="Planned actions">
@@ -100,6 +116,15 @@
                          aria-label="Assistant">
                     <div class="ab-chat-surface__item-role">@(_streamingAgentName ?? "Assistant")</div>
                     <div class="ab-chat-surface__item-text">@_streamingResponseText</div>
+                    @if (_streamingActivityMessages.Count > 0)
+                    {
+                        <ul class="ab-chat-surface__results" aria-label="Activity">
+                            @foreach (var activity in _streamingActivityMessages)
+                            {
+                                <li>@activity.Text</li>
+                            }
+                        </ul>
+                    }
                 </article>
             }
         </div>
@@ -121,6 +146,7 @@
                        disabled="@_isBusy"
                        @onkeydown="HandleClarificationKeyDown" />
                 <button type="button"
+                        id="@ClarificationSubmitButtonId"
                         class="ab-chat-surface__submit"
                         disabled="@(_isBusy || string.IsNullOrWhiteSpace(_clarificationResponse))"
                         @onclick="SubmitClarificationAsync">
@@ -185,7 +211,6 @@
 
         <label class="ab-chat-surface__label" for="@PromptId">Message</label>
         <textarea id="@PromptId"
-                  @ref="_promptRef"
                   class="ab-chat-surface__input"
                   rows="3"
                   @bind="_prompt"
@@ -213,14 +238,17 @@
     private string? _selectedAgent;
     private bool _isBusy;
     private bool _scrollRequested;
-    private ElementReference _promptRef;
+    private bool _clarificationShortcutAttached;
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
     private string _streamingResponseText = string.Empty;
     private string? _streamingAgentName;
+    private string? _activeRunId;
+    private readonly List<ActivityMessage> _streamingActivityMessages = [];
+    private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private PendingClarificationInfo? _pendingClarification;
     private string _clarificationResponse = string.Empty;
-    private string? _lastUserMessage;
     private readonly List<PendingApprovalInfo> _pendingApprovals = [];
     private AgentState _agentState = AgentState.Idle;
 
@@ -262,6 +290,7 @@
     private string HeaderId => $"ab-chat-header-{_instanceId}";
     private string DescriptionId => $"ab-chat-description-{_instanceId}";
     private string ClarificationInputId => $"ab-clarification-input-{_instanceId}";
+    private string ClarificationSubmitButtonId => $"ab-clarification-submit-{_instanceId}";
 
     private bool _canSubmit => !string.IsNullOrWhiteSpace(_prompt.Trim()) && _pendingClarification is null;
 
@@ -316,9 +345,23 @@
         {
             try
             {
-                await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.attachEnterSubmit", ClarificationInputId, $"ab-clarification-submit-{_instanceId}");
+                await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.attachEnterSubmit", ClarificationInputId, ClarificationSubmitButtonId);
+                _clarificationShortcutAttached = true;
             }
             catch { }
+        }
+        else if (_clarificationShortcutAttached)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.detachEnterSubmit", ClarificationInputId);
+            }
+            catch
+            {
+                // Ignore when JS or component already torn down
+            }
+
+            _clarificationShortcutAttached = false;
         }
     }
 
@@ -329,6 +372,7 @@
         try
         {
             _ = JSRuntime.InvokeVoidAsync("AgentBlazor.chat.detachEnterSubmit", PromptId);
+            _ = JSRuntime.InvokeVoidAsync("AgentBlazor.chat.detachEnterSubmit", ClarificationInputId);
         }
         catch
         {
@@ -349,10 +393,14 @@
             return;
 
         _timeline.Add(ChatTimelineItem.User(message));
-        _lastUserMessage = message;
         _prompt = string.Empty;
+        _pendingClarification = null;
+        _pendingApprovals.Clear();
+        _clarificationResponse = string.Empty;
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
@@ -360,33 +408,12 @@
 
         try
         {
-            var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
+            var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 _selectedAgent,
                 SessionId: _instanceId,
                 Context: CreateRequestContext()));
-
-            if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
-            {
-                _pendingClarification = new PendingClarificationInfo(
-                    response.ClarificationQuestion,
-                    message);
-                _timeline.Add(ChatTimelineItem.Agent(response));
-                _agentState = AgentState.WaitingForClarification;
-            }
-            else if (response.RequiresApproval && response.PendingApprovals.Count > 0)
-            {
-                _pendingApprovals.Clear();
-                _pendingApprovals.AddRange(response.PendingApprovals.Select(p => 
-                    new PendingApprovalInfo(p.ComponentId, p.ActionId, p.Description, p.Parameters)));
-                _timeline.Add(ChatTimelineItem.Agent(response));
-                _agentState = AgentState.WaitingForApproval;
-            }
-            else
-            {
-                _timeline.Add(ChatTimelineItem.Agent(response));
-                _agentState = AgentState.Idle;
-            }
+            ApplyTurnOutcome(message, turnOutcome);
             _scrollRequested = true;
         }
         finally
@@ -394,15 +421,6 @@
             _isBusy = false;
             if (_agentState == AgentState.Thinking)
                 _agentState = AgentState.Idle;
-        }
-
-        try
-        {
-            await _promptRef.FocusAsync();
-        }
-        catch
-        {
-            // Focus may fail in some hosts
         }
     }
 
@@ -414,25 +432,24 @@
         var fullMessage = $"{_pendingClarification.OriginalMessage} {_clarificationResponse}".Trim();
         
         _timeline.Add(ChatTimelineItem.User(_clarificationResponse));
-        var responseText = _clarificationResponse;
         _clarificationResponse = string.Empty;
         _pendingClarification = null;
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
         _isBusy = true;
         _scrollRequested = true;
         StateHasChanged();
 
         try
         {
-            var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
+            var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 fullMessage,
                 _selectedAgent,
                 SessionId: _instanceId,
                 Context: CreateRequestContext()));
-
-            _timeline.Add(ChatTimelineItem.Agent(response));
-            _agentState = AgentState.Idle;
+            ApplyTurnOutcome(fullMessage, turnOutcome);
             _scrollRequested = true;
         }
         finally
@@ -467,6 +484,8 @@
         _pendingApprovals.Clear();
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
@@ -474,14 +493,13 @@
 
         try
         {
-            var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
-                "Approve the pending actions.",
+            var approvalMessage = "Approve the pending actions.";
+            var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
+                approvalMessage,
                 _selectedAgent,
                 SessionId: _instanceId,
                 Context: CreateRequestContext(approvalContext)));
-
-            _timeline.Add(ChatTimelineItem.Agent(response));
-            _agentState = AgentState.Idle;
+            ApplyTurnOutcome(approvalMessage, turnOutcome);
             _scrollRequested = true;
         }
         finally
@@ -499,31 +517,82 @@
         _pendingApprovals.Clear();
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _activeRunId = null;
+        _streamingActivityMessages.Clear();
         _agentState = AgentState.Idle;
         _scrollRequested = true;
         StateHasChanged();
     }
 
-    private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
+    private async Task<StreamTurnOutcome> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
     {
         if (AgentRuntime is not IAgentRuntimeStreaming streamingRuntime)
         {
-            return await AgentRuntime.RunTurnAsync(request);
+            var immediateResponse = await AgentRuntime.RunTurnAsync(request);
+            return new StreamTurnOutcome(immediateResponse, ClarificationQuestion: null, PendingApprovals: [], RunId: null);
         }
 
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        _streamingActivityMessages.Clear();
 
         AgentTurnResponse? finalResponse = null;
+        string? clarificationQuestion = null;
+        var pendingApprovals = new List<PendingApproval>();
         await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(request))
         {
-            if (streamEvent.Kind == AgentTurnStreamEventKind.TextDelta &&
+            if (string.IsNullOrWhiteSpace(_activeRunId) &&
+                !string.IsNullOrWhiteSpace(streamEvent.RunId))
+            {
+                _activeRunId = streamEvent.RunId;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
+                streamEvent.PlannedAction is not null)
+            {
+                AddStreamingActivityMessage(
+                    BuildActivityKey(streamEvent.PlannedAction.ComponentId, streamEvent.PlannedAction.ActionId),
+                    FormatToolCallStartMessage(streamEvent.PlannedAction));
+                _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
+                streamEvent.ExecutionResult is not null)
+            {
+                AddStreamingActivityMessage(
+                    BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId),
+                    FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.TextMessageContent &&
                 !string.IsNullOrEmpty(streamEvent.TextDelta))
             {
                 _streamingAgentName ??= streamEvent.AgentName;
                 _streamingResponseText += streamEvent.TextDelta;
                 _scrollRequested = true;
                 await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ClarificationRequired &&
+                !string.IsNullOrWhiteSpace(streamEvent.ClarificationQuestion))
+            {
+                clarificationQuestion = streamEvent.ClarificationQuestion;
+                pendingApprovals.Clear();
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ApprovalRequired &&
+                streamEvent.PendingApprovals is { Count: > 0 })
+            {
+                clarificationQuestion = null;
+                pendingApprovals.Clear();
+                pendingApprovals.AddRange(streamEvent.PendingApprovals);
                 continue;
             }
 
@@ -543,18 +612,214 @@
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
 
-        return finalResponse
+        var response = finalResponse
             ?? throw new InvalidOperationException("Streaming completed without a final response.");
+        return new StreamTurnOutcome(
+            response,
+            clarificationQuestion,
+            pendingApprovals,
+            _activeRunId);
+    }
+
+    private void ApplyTurnOutcome(string sourceMessage, StreamTurnOutcome turnOutcome)
+    {
+        var response = turnOutcome.Response;
+        var runId = string.IsNullOrWhiteSpace(turnOutcome.RunId) ? null : turnOutcome.RunId;
+        var activityMessages = _streamingActivityMessages.ToArray();
+        _streamingActivityMessages.Clear();
+
+        _timeline.Add(ChatTimelineItem.Agent(response, runId, activityMessages));
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
+        }
+
+        if (!string.IsNullOrWhiteSpace(turnOutcome.ClarificationQuestion))
+        {
+            _pendingApprovals.Clear();
+            _pendingClarification = new PendingClarificationInfo(turnOutcome.ClarificationQuestion, sourceMessage);
+            _agentState = AgentState.WaitingForClarification;
+            return;
+        }
+
+        if (turnOutcome.PendingApprovals.Count > 0)
+        {
+            _pendingClarification = null;
+            SetPendingApprovals(turnOutcome.PendingApprovals);
+            _agentState = AgentState.WaitingForApproval;
+            return;
+        }
+
+        if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
+        {
+            _pendingApprovals.Clear();
+            _pendingClarification = new PendingClarificationInfo(
+                response.ClarificationQuestion,
+                sourceMessage);
+            _agentState = AgentState.WaitingForClarification;
+            return;
+        }
+
+        if (response.RequiresApproval && response.PendingApprovals.Count > 0)
+        {
+            _pendingClarification = null;
+            SetPendingApprovals(response.PendingApprovals);
+            _agentState = AgentState.WaitingForApproval;
+            return;
+        }
+
+        _pendingClarification = null;
+        _pendingApprovals.Clear();
+        _agentState = AgentState.Idle;
+    }
+
+    private void SetPendingApprovals(IReadOnlyList<PendingApproval> approvals)
+    {
+        _pendingApprovals.Clear();
+        _pendingApprovals.AddRange(approvals.Select(static approval =>
+            new PendingApprovalInfo(
+                approval.ComponentId,
+                approval.ActionId,
+                approval.Description,
+                approval.Parameters)));
     }
 
     private void HandleDeferredActionCompleted(DeferredComponentActionEvent actionEvent)
     {
+        if (!IsDeferredEventForCurrentChat(actionEvent))
+        {
+            return;
+        }
+
         _ = InvokeAsync(() =>
         {
-            _timeline.Add(ChatTimelineItem.Activity(FormatDeferredActionMessage(actionEvent)));
+            var message = FormatDeferredActionMessage(actionEvent);
+            var key = BuildActivityKey(actionEvent.ComponentType, actionEvent.ActionId);
+            if (!TryAttachActivityToAssociatedTurn(key, message, actionEvent.RunId))
+            {
+                _timeline.Add(ChatTimelineItem.Activity(message, actionEvent.RunId));
+            }
+
             _scrollRequested = true;
             StateHasChanged();
         });
+    }
+
+    private bool IsDeferredEventForCurrentChat(DeferredComponentActionEvent actionEvent)
+    {
+        if (!string.IsNullOrWhiteSpace(actionEvent.SessionId))
+        {
+            return string.Equals(actionEvent.SessionId, _instanceId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(actionEvent.RunId) &&
+            !string.IsNullOrWhiteSpace(_activeRunId))
+        {
+            return string.Equals(actionEvent.RunId, _activeRunId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private void AddStreamingActivityMessage(string key, string message)
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        UpsertActivityMessage(_streamingActivityMessages, key, message);
+    }
+
+    private bool TryAttachActivityToAssociatedTurn(string key, string message, string? runId)
+    {
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            if (_isBusy &&
+                !string.IsNullOrWhiteSpace(_activeRunId) &&
+                string.Equals(runId, _activeRunId, StringComparison.OrdinalIgnoreCase))
+            {
+                AddStreamingActivityMessage(key, message);
+                return true;
+            }
+
+            if (_assistantTimelineIndexByRunId.TryGetValue(runId, out var assistantIndex))
+            {
+                return TryAppendActivityToAssistantItem(assistantIndex, key, message);
+            }
+        }
+
+        if (_isBusy)
+        {
+            AddStreamingActivityMessage(key, message);
+            return true;
+        }
+
+        for (var index = _timeline.Count - 1; index >= 0; index--)
+        {
+            if (_timeline[index].Role != "assistant")
+            {
+                continue;
+            }
+
+            return TryAppendActivityToAssistantItem(index, key, message);
+        }
+
+        return false;
+    }
+
+    private bool TryAppendActivityToAssistantItem(int index, string key, string message)
+    {
+        if (index < 0 || index >= _timeline.Count)
+        {
+            return false;
+        }
+
+        var item = _timeline[index];
+        if (!string.Equals(item.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, key, message);
+        _timeline[index] = item with { ActivityMessages = updatedActivities };
+        return true;
+    }
+
+    private static string BuildActivityKey(string componentId, string actionId)
+    {
+        var normalizedComponent = (componentId ?? string.Empty).Trim();
+        var normalizedAction = (actionId ?? string.Empty).Trim();
+        return $"{normalizedComponent}.{normalizedAction}".ToLowerInvariant();
+    }
+
+    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message)
+    {
+        var index = target.FindIndex(activity =>
+            string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase));
+        var entry = new ActivityMessage(key, message);
+        if (index >= 0)
+        {
+            target[index] = entry;
+            return;
+        }
+
+        target.Add(entry);
+    }
+
+    private static IReadOnlyList<ActivityMessage> UpsertActivityMessage(
+        IReadOnlyList<ActivityMessage> source,
+        string key,
+        string message)
+    {
+        var copy = source.ToList();
+        UpsertActivityMessage(copy, key, message);
+        return copy;
     }
 
     private static string FormatDeferredActionMessage(DeferredComponentActionEvent actionEvent)
@@ -564,6 +829,23 @@
             : $"Agent{actionEvent.ComponentType}";
         var status = actionEvent.Succeeded ? "applied" : "failed";
         return $"Deferred action {status}: {componentId}.{actionEvent.ActionId}. {actionEvent.Message}";
+    }
+
+    private static string FormatToolCallStartMessage(PlannedComponentAction plannedAction)
+    {
+        return $"Executing {plannedAction.ComponentId}.{plannedAction.ActionId}...";
+    }
+
+    private static string FormatToolCallResultMessage(ComponentActionExecutionResult executionResult)
+    {
+        if (!string.IsNullOrWhiteSpace(executionResult.Message))
+        {
+            return executionResult.Message;
+        }
+
+        return executionResult.Succeeded
+            ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
+            : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
     }
 
     private IDictionary<string, string>? CreateRequestContext(IReadOnlyDictionary<string, string>? additional = null)
@@ -616,19 +898,40 @@
         string Role,
         string RoleLabel,
         string Text,
+        IReadOnlyList<ActivityMessage> ActivityMessages,
         IReadOnlyList<PlannedComponentAction> PlannedActions,
         IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
-        AgentUiDocument? GeneratedUi)
+        AgentUiDocument? GeneratedUi,
+        string? RunId)
     {
         public static ChatTimelineItem User(string text) =>
-            new("user", "User", text, [], [], null);
+            new("user", "User", text, [], [], [], null, null);
 
-        public static ChatTimelineItem Agent(AgentTurnResponse response) =>
-            new("assistant", response.AgentName, response.ResponseText, response.PlannedActions, response.ExecutionResults, response.GeneratedUi);
+        public static ChatTimelineItem Agent(
+            AgentTurnResponse response,
+            string? runId = null,
+            IReadOnlyList<ActivityMessage>? activityMessages = null) =>
+            new(
+                "assistant",
+                response.AgentName,
+                response.ResponseText,
+                activityMessages ?? [],
+                response.PlannedActions,
+                response.ExecutionResults,
+                response.GeneratedUi,
+                runId);
 
-        public static ChatTimelineItem Activity(string text) =>
-            new("activity", "Activity", text, [], [], null);
+        public static ChatTimelineItem Activity(string text, string? runId = null) =>
+            new("activity", "Activity", text, [], [], [], null, runId);
     }
+
+    private sealed record ActivityMessage(string Key, string Text);
+
+    private sealed record StreamTurnOutcome(
+        AgentTurnResponse Response,
+        string? ClarificationQuestion,
+        IReadOnlyList<PendingApproval> PendingApprovals,
+        string? RunId);
 
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);
     private sealed record PendingApprovalInfo(string ComponentId, string ActionId, string Description, IReadOnlyDictionary<string, object?> Parameters);

@@ -1,13 +1,25 @@
+using AgentBlazor.Core.Runtime.Components;
+
 namespace AgentBlazor.Runtime;
 
 public sealed record ActionResult(
-    bool Succeeded,
+    ActionOutcome Outcome,
     string Message)
 {
-    public static ActionResult Success(string message) => new(true, message);
+    public bool Succeeded => Outcome is ActionOutcome.Applied or ActionOutcome.Queued;
 
-    public static ActionResult Failure(string message) => new(false, message);
+    public static ActionResult Applied(string message) => new(ActionOutcome.Applied, message);
+
+    public static ActionResult Success(string message) => Applied(message);
+
+    public static ActionResult Queued(string message) => new(ActionOutcome.Queued, message);
+
+    public static ActionResult Blocked(string message) => new(ActionOutcome.Blocked, message);
+
+    public static ActionResult NeedsClarification(string message) => new(ActionOutcome.NeedsClarification, message);
+
+    public static ActionResult Failure(string message) => new(ActionOutcome.Failed, message);
 
     public static ActionResult Unknown(string actionName) =>
-        new(false, $"Unknown action '{actionName}'.");
+        new(ActionOutcome.Failed, $"Unknown action '{actionName}'.");
 }

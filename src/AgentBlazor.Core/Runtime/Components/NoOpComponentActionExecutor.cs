@@ -63,7 +63,7 @@ internal sealed class NoOpComponentActionExecutor(
             _ => Task.FromResult(new ComponentActionExecutionResult(
                 action.ComponentId,
                 action.ActionId,
-                Succeeded: false,
+                Outcome: ActionOutcome.Failed,
                 Message:
                 $"No executor mapping is registered for '{action.ComponentId}.{action.ActionId}'. " +
                 $"Register a custom {nameof(IComponentActionExecutor)} or use supported AgentBlazor component capability actions."))

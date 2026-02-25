@@ -38,7 +38,8 @@ internal sealed class InMemoryComponentRouteRegistry : IComponentRouteRegistry
 
     public void Unregister(string componentId)
     {
-        if (!string.IsNullOrWhiteSpace(componentId))
-            _componentToPath.TryRemove(componentId, out _);
+        // Keep the last known route to support deterministic navigation and deferred-action routing
+        // even when a component is not currently mounted.
+        _ = componentId;
     }
 }

@@ -71,6 +71,30 @@ internal static class RegisteredComponentActionExecutorBridge
         => TryGetString(arguments, "agentId") ??
            TryGetString(arguments, "target");
 
+    public static PendingActionOptions BuildPendingOptions(
+        IComponentRouteRegistry componentRouteRegistry,
+        string componentId)
+    {
+        ArgumentNullException.ThrowIfNull(componentRouteRegistry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
+
+        if (componentRouteRegistry.TryGetRoute(componentId, out var route) && !string.IsNullOrWhiteSpace(route))
+        {
+            return new PendingActionOptions
+            {
+                TimeToLive = TimeSpan.FromMinutes(10),
+                Dependency = PendingActionDependency.NavigationCompletion,
+                RequiredRoutePath = route
+            };
+        }
+
+        return new PendingActionOptions
+        {
+            TimeToLive = TimeSpan.FromMinutes(5),
+            Dependency = PendingActionDependency.ComponentRegistration
+        };
+    }
+
     public static async Task<(bool Handled, ComponentActionExecutionResult Result)> TryExecuteAsync(
         IAgentComponentRegistry componentRegistry,
         string expectedComponentType,
@@ -91,7 +115,7 @@ internal static class RegisteredComponentActionExecutorBridge
             return (false, new ComponentActionExecutionResult(
                 ComponentId: componentId,
                 ActionId: actionId,
-                Succeeded: false,
+                Outcome: ActionOutcome.Failed,
                 Message: $"No registered {expectedComponentType} component is available for action '{actionId}'."));
         }
 
@@ -100,7 +124,7 @@ internal static class RegisteredComponentActionExecutorBridge
         return (true, new ComponentActionExecutionResult(
             ComponentId: componentId,
             ActionId: actionId,
-            Succeeded: execution.Succeeded,
+            Outcome: execution.Outcome,
             Message: execution.Message));
     }
 
@@ -117,6 +141,24 @@ internal static class RegisteredComponentActionExecutorBridge
                 string.Equals(targeted.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
             {
                 return targeted;
+            }
+
+            var typedCandidates = componentRegistry.GetAll()
+                .Where(component => string.Equals(component.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(component => component.AgentId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (typedCandidates.Length > 0)
+            {
+                var resolution = DeterministicEntityResolver.Resolve(
+                    agentId,
+                    typedCandidates.Select(static candidate => candidate.AgentId),
+                    minConfidence: 0.7,
+                    ambiguityMargin: 0.05);
+                if (resolution.Status is EntityResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(resolution.Value))
+                {
+                    return typedCandidates.FirstOrDefault(candidate =>
+                        string.Equals(candidate.AgentId, resolution.Value, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             // If a specific target is requested, do not execute on a different instance.
@@ -163,7 +205,8 @@ internal static class RegisteredComponentActionExecutorBridge
 
 internal sealed class NoOpDataGridActionExecutor(
     IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService) : IDataGridActionExecutor
+    IAgentNavigationIntentService navigationIntentService,
+    IComponentRouteRegistry componentRouteRegistry) : IDataGridActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         DataGridActionRequest request,
@@ -189,18 +232,22 @@ internal sealed class NoOpDataGridActionExecutor(
         navigationIntentService.Enqueue(
             "DataGrid",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments));
+            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
+                componentRouteRegistry,
+                AgentComponentCapabilityProfile.AgentDataGridComponentId));
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
             ActionId: request.ActionId,
-            Succeeded: true,
+            Outcome: ActionOutcome.Queued,
             Message: $"Queued AgentDataGrid action '{request.ActionId}' until a matching DataGrid component is registered.");
     }
 }
 
 internal sealed class NoOpDialogActionExecutor(
     IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService) : IDialogActionExecutor
+    IAgentNavigationIntentService navigationIntentService,
+    IComponentRouteRegistry componentRouteRegistry) : IDialogActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         DialogActionRequest request,
@@ -226,18 +273,22 @@ internal sealed class NoOpDialogActionExecutor(
         navigationIntentService.Enqueue(
             "Dialog",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments));
+            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
+                componentRouteRegistry,
+                AgentComponentCapabilityProfile.AgentDialogComponentId));
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
             ActionId: request.ActionId,
-            Succeeded: true,
+            Outcome: ActionOutcome.Queued,
             Message: $"Queued AgentDialog action '{request.ActionId}' until a matching Dialog component is registered.");
     }
 }
 
 internal sealed class NoOpFormActionExecutor(
     IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService) : IFormActionExecutor
+    IAgentNavigationIntentService navigationIntentService,
+    IComponentRouteRegistry componentRouteRegistry) : IFormActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         FormActionRequest request,
@@ -263,18 +314,22 @@ internal sealed class NoOpFormActionExecutor(
         navigationIntentService.Enqueue(
             "Form",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments));
+            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
+                componentRouteRegistry,
+                AgentComponentCapabilityProfile.AgentFormComponentId));
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             ActionId: request.ActionId,
-            Succeeded: true,
+            Outcome: ActionOutcome.Queued,
             Message: $"Queued AgentForm action '{request.ActionId}'. It will apply automatically when the form mounts (for example after opening the dialog).");
     }
 }
 
 internal sealed class NoOpNavigationActionExecutor(
     IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService) : INavigationActionExecutor
+    IAgentNavigationIntentService navigationIntentService,
+    IComponentRouteRegistry componentRouteRegistry) : INavigationActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         NavigationActionRequest request,
@@ -300,18 +355,22 @@ internal sealed class NoOpNavigationActionExecutor(
         navigationIntentService.Enqueue(
             "NavMenu",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments));
+            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
+                componentRouteRegistry,
+                AgentComponentCapabilityProfile.AgentNavMenuComponentId));
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             ActionId: request.ActionId,
-            Succeeded: true,
+            Outcome: ActionOutcome.Queued,
             Message: $"Queued AgentNavMenu action '{request.ActionId}' until a matching NavMenu component is registered.");
     }
 }
 
 internal sealed class NoOpTabsActionExecutor(
     IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService) : ITabsActionExecutor
+    IAgentNavigationIntentService navigationIntentService,
+    IComponentRouteRegistry componentRouteRegistry) : ITabsActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         TabsActionRequest request,
@@ -337,11 +396,14 @@ internal sealed class NoOpTabsActionExecutor(
         navigationIntentService.Enqueue(
             "Tabs",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments));
+            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
+                componentRouteRegistry,
+                AgentComponentCapabilityProfile.AgentTabsComponentId));
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
             ActionId: request.ActionId,
-            Succeeded: true,
+            Outcome: ActionOutcome.Queued,
             Message: $"Queued AgentTabs action '{request.ActionId}' until a matching Tabs component is registered.");
     }
 }

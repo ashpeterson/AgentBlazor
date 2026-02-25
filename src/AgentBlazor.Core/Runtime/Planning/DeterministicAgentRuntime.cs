@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
@@ -28,6 +29,15 @@ namespace AgentBlazor.Core.Runtime.Planning;
 /// </summary>
 internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 {
+    private const string RunIdContextKey = AgentRuntimeContextKeys.RunId;
+    private const int MaxRetainedRuns = 200;
+
+    private readonly ConcurrentDictionary<string, StreamingRunState> _activeStreamingRuns =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, StreamingRunHistory> _completedStreamingRuns =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentQueue<string> _completedRunOrder = new();
+
     private readonly IStructuredActionPlanner _planner;
     private readonly IPlanValidator _validator;
     private readonly IPlanExecutor _executor;
@@ -42,6 +52,22 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
     private readonly IOptions<PromptTracingOptions>? _tracingOptions;
     private readonly IPromptTraceStore? _traceStore;
     private readonly ILogger<DeterministicAgentRuntime>? _logger;
+
+    private sealed class StreamingRunState
+    {
+        public required string RunId { get; init; }
+        public required CancellationTokenSource Cancellation { get; init; }
+        public required List<AgentTurnStreamEvent> EventLog { get; init; }
+        public required List<Channel<AgentTurnStreamEvent>> Subscribers { get; init; }
+        public required object Gate { get; init; }
+        public bool Completed { get; set; }
+        public long Sequence { get; set; }
+    }
+
+    private sealed record StreamingRunHistory(
+        string RunId,
+        IReadOnlyList<AgentTurnStreamEvent> Events,
+        DateTimeOffset CompletedAt);
 
     public DeterministicAgentRuntime(
         IStructuredActionPlanner planner,
@@ -84,36 +110,106 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         AgentTurnRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var channel = Channel.CreateUnbounded<AgentTurnStreamEvent>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = true
-        });
+        ArgumentNullException.ThrowIfNull(request);
 
-        _ = Task.Run(async () =>
+        var runId = ResolveOrCreateRunId(request);
+        var runState = new StreamingRunState
         {
-            try
-            {
-                await RunTurnCoreAsync(
-                    request,
-                    streamEvent => channel.Writer.WriteAsync(streamEvent, cancellationToken),
-                    cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                channel.Writer.TryComplete();
-            }
-        }, CancellationToken.None);
+            RunId = runId,
+            Cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken),
+            EventLog = [],
+            Subscribers = [],
+            Gate = new object(),
+            Completed = false,
+            Sequence = 0
+        };
+
+        if (!_activeStreamingRuns.TryAdd(runId, runState))
+        {
+            throw new InvalidOperationException($"Run '{runId}' is already active.");
+        }
+
+        var channel = Subscribe(runState);
+        _ = Task.Run(() => ExecuteStreamingRunAsync(runState, request), CancellationToken.None);
 
         await foreach (var streamEvent in channel.Reader.ReadAllAsync(cancellationToken))
         {
             yield return streamEvent;
+        }
+    }
+
+    public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+        string runId,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+
+        if (_activeStreamingRuns.TryGetValue(runId, out var active))
+        {
+            var channel = Subscribe(active);
+            List<AgentTurnStreamEvent> replay;
+            long lastReplaySequence = 0;
+            var completed = false;
+            lock (active.Gate)
+            {
+                replay = active.EventLog.Select(static e => e with { IsReplay = true }).ToList();
+                if (replay.Count > 0)
+                {
+                    lastReplaySequence = replay[^1].Sequence;
+                }
+                completed = active.Completed;
+            }
+
+            foreach (var streamEvent in replay)
+            {
+                yield return streamEvent;
+            }
+
+            if (completed)
+            {
+                yield break;
+            }
+
+            await foreach (var streamEvent in channel.Reader.ReadAllAsync(cancellationToken))
+            {
+                if (streamEvent.Sequence <= lastReplaySequence)
+                {
+                    continue;
+                }
+
+                yield return streamEvent with { IsReplay = true };
+            }
+
+            yield break;
+        }
+
+        if (_completedStreamingRuns.TryGetValue(runId, out var completedRun))
+        {
+            foreach (var streamEvent in completedRun.Events)
+            {
+                yield return streamEvent with { IsReplay = true };
+            }
+        }
+    }
+
+    public Task<bool> StopRunAsync(
+        string runId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        if (!_activeStreamingRuns.TryGetValue(runId, out var runState))
+        {
+            return Task.FromResult(false);
+        }
+
+        try
+        {
+            runState.Cancellation.Cancel();
+            return Task.FromResult(true);
+        }
+        catch (ObjectDisposedException)
+        {
+            return Task.FromResult(false);
         }
     }
 
@@ -195,6 +291,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 SessionId = sessionId,
                 UserId = request.GetEffectiveUserId(),
                 GenerateUi = IsGeneratedUiRequested(request.Context),
+                GeneratedUiAction = request.GeneratedUiAction,
                 AvailableComponents = allowedComponents,
                 MountedComponents = mountedComponents,
                 ConversationHistory = conversationHistory,
@@ -260,7 +357,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                     .Select(static pending => new ComponentActionExecutionResult(
                         pending.ComponentId,
                         pending.ActionId,
-                        Succeeded: false,
+                        Outcome: ActionOutcome.Blocked,
                         Message: $"Approval required for {pending.ComponentId}.{pending.ActionId}."))
                     .ToArray();
                 var approvalResponseText = BuildApprovalRequiredResponseText(pendingApprovals);
@@ -350,7 +447,12 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             var executionOptions = new PlanExecutionOptions
             {
                 ContinueOnFailure = false,
-                SessionId = sessionId
+                SessionId = sessionId,
+                RunId = request.Context is not null &&
+                        request.Context.TryGetValue(RunIdContextKey, out var contextRunId) &&
+                        !string.IsNullOrWhiteSpace(contextRunId)
+                    ? contextRunId
+                    : null
             };
 
             var executionResult = await _executor.ExecuteAsync(plan, executionOptions, cancellationToken);
@@ -360,7 +462,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 .Select(r => new ComponentActionExecutionResult(
                     r.Step.ComponentId,
                     r.Step.ActionId,
-                    r.Succeeded,
+                    r.Outcome,
                     r.Message))
                 .ToArray();
             await EmitExecutionResultsAsync(executionResults, emitEvent);
@@ -751,7 +853,7 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 return new ComponentActionExecutionResult(
                     step.Step.ComponentId,
                     step.Step.ActionId,
-                    Succeeded: false,
+                    Outcome: ActionOutcome.NeedsClarification,
                     Message: message);
             })
             .ToArray();
@@ -866,21 +968,49 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
 
     private static string BuildResponseText(PlanExecutionResult result)
     {
-        if (result.Succeeded)
+        if (result.StepResults.Count == 0)
         {
-            var actionCount = result.StepResults.Count;
-            return actionCount == 1
-                ? "Done."
-                : $"Completed {actionCount} actions.";
+            return "I understood your request but no actions were required.";
         }
 
-        var failures = result.StepResults.Where(r => !r.Succeeded).ToList();
-        if (failures.Count == 1)
+        var appliedCount = result.AppliedCount;
+        var queuedCount = result.QueuedCount;
+        var blocked = result.StepResults.Where(r => r.Outcome is ActionOutcome.Blocked).ToList();
+        var clarification = result.StepResults.Where(r => r.Outcome is ActionOutcome.NeedsClarification).ToList();
+        var failures = result.StepResults.Where(r => r.Outcome is ActionOutcome.Failed).ToList();
+
+        if (failures.Count > 0)
         {
             return failures[0].Message;
         }
 
-        return $"Completed {result.SuccessCount} of {result.StepResults.Count} actions. {failures[0].Message}";
+        if (clarification.Count > 0)
+        {
+            return clarification[0].Message;
+        }
+
+        if (blocked.Count > 0)
+        {
+            return blocked.Count == 1
+                ? blocked[0].Message
+                : $"Blocked {blocked.Count} actions pending approval.";
+        }
+
+        if (queuedCount > 0)
+        {
+            if (appliedCount > 0)
+            {
+                return $"Applied {appliedCount} actions. Queued {queuedCount} actions.";
+            }
+
+            return queuedCount == 1
+                ? "Queued 1 action for when the target component is available."
+                : $"Queued {queuedCount} actions for when target components are available.";
+        }
+
+        return appliedCount == 1
+            ? "Done."
+            : $"Completed {appliedCount} actions.";
     }
 
     private static AgentTurnResponse AttachPlannedGeneratedUi(
@@ -983,6 +1113,188 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             ExecutionResults: []);
     }
 
+    private string ResolveOrCreateRunId(AgentTurnRequest request)
+    {
+        if (request.Context is not null &&
+            request.Context.TryGetValue(RunIdContextKey, out var existing) &&
+            !string.IsNullOrWhiteSpace(existing))
+        {
+            return existing;
+        }
+
+        return Guid.NewGuid().ToString("N");
+    }
+
+    private static AgentTurnRequest EnsureRunIdOnRequest(AgentTurnRequest request, string runId)
+    {
+        var context = request.Context is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase);
+        context[RunIdContextKey] = runId;
+        return request with { Context = context };
+    }
+
+    private static Channel<AgentTurnStreamEvent> Subscribe(StreamingRunState runState)
+    {
+        var channel = Channel.CreateUnbounded<AgentTurnStreamEvent>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+        lock (runState.Gate)
+        {
+            if (runState.Completed)
+            {
+                channel.Writer.TryComplete();
+                return channel;
+            }
+
+            runState.Subscribers.Add(channel);
+        }
+
+        return channel;
+    }
+
+    private async Task ExecuteStreamingRunAsync(
+        StreamingRunState runState,
+        AgentTurnRequest request)
+    {
+        var requestWithRunId = EnsureRunIdOnRequest(request, runState.RunId);
+
+        try
+        {
+            await RunTurnCoreAsync(
+                requestWithRunId,
+                streamEvent => PublishStreamingEventAsync(runState, streamEvent),
+                runState.Cancellation.Token);
+        }
+        catch (OperationCanceledException) when (runState.Cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunError,
+                AgentName = request.AgentName,
+                ErrorCode = "UNHANDLED_EXCEPTION",
+                ErrorMessage = ex.Message
+            });
+        }
+        finally
+        {
+            await FinalizeStreamingRunAsync(runState, runState.Cancellation.IsCancellationRequested);
+        }
+    }
+
+    private async ValueTask PublishStreamingEventAsync(
+        StreamingRunState runState,
+        AgentTurnStreamEvent streamEvent)
+    {
+        List<Channel<AgentTurnStreamEvent>> subscribers;
+        AgentTurnStreamEvent normalized;
+
+        lock (runState.Gate)
+        {
+            if (runState.Completed)
+            {
+                return;
+            }
+
+            normalized = streamEvent with
+            {
+                RunId = runState.RunId,
+                Sequence = ++runState.Sequence,
+                Timestamp = streamEvent.Timestamp == default ? DateTimeOffset.UtcNow : streamEvent.Timestamp
+            };
+
+            runState.EventLog.Add(normalized);
+            subscribers = runState.Subscribers.ToList();
+        }
+
+        foreach (var subscriber in subscribers)
+        {
+            try
+            {
+                await subscriber.Writer.WriteAsync(normalized, CancellationToken.None);
+            }
+            catch
+            {
+                lock (runState.Gate)
+                {
+                    runState.Subscribers.Remove(subscriber);
+                }
+            }
+        }
+    }
+
+    private async Task FinalizeStreamingRunAsync(StreamingRunState runState, bool wasCanceled)
+    {
+        var needsTextEnd = false;
+        var hasTerminal = false;
+
+        lock (runState.Gate)
+        {
+            needsTextEnd =
+                runState.EventLog.Any(static e => e.Kind == AgentTurnStreamEventKind.TextMessageStart) &&
+                !runState.EventLog.Any(static e => e.Kind == AgentTurnStreamEventKind.TextMessageEnd);
+            hasTerminal = runState.EventLog.Any(static e =>
+                e.Kind is AgentTurnStreamEventKind.RunFinished or AgentTurnStreamEventKind.RunError);
+        }
+
+        if (needsTextEnd)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageEnd
+            });
+        }
+
+        if (!hasTerminal)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunError,
+                ErrorCode = wasCanceled ? "STOPPED" : "MISSING_TERMINAL_EVENT",
+                ErrorMessage = wasCanceled ? "Run canceled." : "Run ended without terminal event."
+            });
+        }
+
+        List<Channel<AgentTurnStreamEvent>> subscribers;
+        List<AgentTurnStreamEvent> historySnapshot;
+        lock (runState.Gate)
+        {
+            runState.Completed = true;
+            subscribers = runState.Subscribers.ToList();
+            runState.Subscribers.Clear();
+            historySnapshot = runState.EventLog.ToList();
+        }
+
+        foreach (var subscriber in subscribers)
+        {
+            subscriber.Writer.TryComplete();
+        }
+
+        _activeStreamingRuns.TryRemove(runState.RunId, out _);
+        _completedStreamingRuns[runState.RunId] = new StreamingRunHistory(
+            runState.RunId,
+            historySnapshot,
+            DateTimeOffset.UtcNow);
+        _completedRunOrder.Enqueue(runState.RunId);
+        TrimCompletedRunHistoryIfNeeded();
+
+        runState.Cancellation.Dispose();
+    }
+
+    private void TrimCompletedRunHistoryIfNeeded()
+    {
+        while (_completedRunOrder.Count > MaxRetainedRuns && _completedRunOrder.TryDequeue(out var runId))
+        {
+            _completedStreamingRuns.TryRemove(runId, out _);
+        }
+    }
+
     private static async ValueTask EmitEventAsync(
         Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
         AgentTurnStreamEvent streamEvent)
@@ -1011,12 +1323,39 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         IReadOnlyList<PlannedComponentAction> plannedActions,
         Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
     {
-        foreach (var plannedAction in plannedActions)
+        for (var index = 0; index < plannedActions.Count; index++)
         {
+            var plannedAction = plannedActions[index];
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
             {
-                Kind = AgentTurnStreamEventKind.PlannedAction,
+                Kind = AgentTurnStreamEventKind.StepStarted,
                 AgentName = null,
+                StepIndex = index,
+                PlannedAction = plannedAction
+            });
+
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.ToolCallStart,
+                StepIndex = index,
+                PlannedAction = plannedAction
+            });
+
+            if (plannedAction.Arguments is { Count: > 0 })
+            {
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.ToolCallArgs,
+                    StepIndex = index,
+                    PlannedAction = plannedAction,
+                    ToolArguments = plannedAction.Arguments
+                });
+            }
+
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.ToolCallEnd,
+                StepIndex = index,
                 PlannedAction = plannedAction
             });
         }
@@ -1026,12 +1365,23 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
         IReadOnlyList<ComponentActionExecutionResult> executionResults,
         Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
     {
-        foreach (var executionResult in executionResults)
+        for (var index = 0; index < executionResults.Count; index++)
         {
+            var executionResult = executionResults[index];
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
             {
-                Kind = AgentTurnStreamEventKind.ExecutionResult,
+                Kind = AgentTurnStreamEventKind.ToolCallResult,
                 AgentName = null,
+                StepIndex = index,
+                ExecutionResult = executionResult
+            });
+
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.StepFinished,
+                AgentName = null,
+                StepIndex = index,
+                StepSucceeded = executionResult.Succeeded,
                 ExecutionResult = executionResult
             });
         }
@@ -1047,16 +1397,28 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             return;
         }
 
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.TextMessageStart,
+            AgentName = agentName
+        });
+
         foreach (var delta in SplitTextDeltas(responseText))
         {
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
             {
-                Kind = AgentTurnStreamEventKind.TextDelta,
+                Kind = AgentTurnStreamEventKind.TextMessageContent,
                 AgentName = agentName,
                 TextDelta = delta
             });
             await Task.Yield();
         }
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.TextMessageEnd,
+            AgentName = agentName
+        });
     }
 
     private static IEnumerable<string> SplitTextDeltas(string text)

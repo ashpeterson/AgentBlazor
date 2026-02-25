@@ -1,3 +1,5 @@
+using AgentBlazor.Core.Runtime.Agents;
+
 namespace AgentBlazor.Core.Runtime.Planning;
 
 /// <summary>
@@ -29,6 +31,7 @@ public sealed record ActionPlanRequest
     public required string SessionId { get; init; }
     public string? UserId { get; init; }
     public bool GenerateUi { get; init; }
+    public GeneratedUiActionInvocation? GeneratedUiAction { get; init; }
 
     /// <summary>
     /// Available components and their actions.

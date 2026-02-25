@@ -281,21 +281,27 @@
         {
             if (!TryGetStringParameter(action, "column", out var column))
             {
-                return ActionResult.Failure("Action 'sort' requires 'column' parameter.");
+                return ActionResult.NeedsClarification("Action 'sort' requires 'column' parameter.");
             }
 
-            if (ResolveProperty(typeof(TItem), column) is null)
+            var sortResolution = ResolveColumnHint(column);
+            if (sortResolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(sortResolution.Value))
             {
-                return ActionResult.Failure(
-                    $"Action 'sort' requires 'column' parameter matching a grid property. Available columns: {string.Join(", ", GetSortableColumns())}.");
+                var availableColumns = string.Join(", ", GetSortableColumns());
+                var suggested = sortResolution.Candidates.Count > 0
+                    ? $" Suggested columns: {string.Join(", ", sortResolution.Candidates)}."
+                    : string.Empty;
+                return ActionResult.NeedsClarification(
+                    $"Action 'sort' requires 'column' parameter matching a grid property. Available columns: {availableColumns}.{suggested}");
             }
+            column = sortResolution.Value;
 
             var direction = TryGetStringParameter(action, "direction", out var sortDirection)
                 ? sortDirection
                 : "asc";
             if (!IsSupportedSortDirection(direction))
             {
-                return ActionResult.Failure("Action 'sort' requires direction 'asc' or 'desc'.");
+                return ActionResult.NeedsClarification("Action 'sort' requires direction 'asc' or 'desc'.");
             }
 
             SortColumn = column;
@@ -328,14 +334,16 @@
             {
                 if (!hasColumn)
                 {
-                    return ActionResult.Failure("Action 'filter' requires 'column' parameter.");
+                    return ActionResult.NeedsClarification("Action 'filter' requires 'column' parameter.");
                 }
 
-                if (ResolveProperty(typeof(TItem), column!) is null)
+                var sortFromFilterResolution = ResolveColumnHint(column!);
+                if (sortFromFilterResolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(sortFromFilterResolution.Value))
                 {
-                    return ActionResult.Failure(
+                    return ActionResult.NeedsClarification(
                         $"Action 'filter' requires 'column' parameter matching a grid property. Available columns: {string.Join(", ", GetFilterableColumns())}.");
                 }
+                column = sortFromFilterResolution.Value;
 
                 SortColumn = column;
                 SortDirection = sortDirectionAlias;
@@ -365,12 +373,12 @@
 
             if (!hasColumn)
             {
-                return ActionResult.Failure("Action 'filter' requires 'column' parameter.");
+                return ActionResult.NeedsClarification("Action 'filter' requires 'column' parameter.");
             }
 
             if (!hasOperator)
             {
-                return ActionResult.Failure("Action 'filter' requires 'operator' parameter.");
+                return ActionResult.NeedsClarification("Action 'filter' requires 'operator' parameter.");
             }
 
             if (!IsSupportedFilterOperator(filterOperator!))
@@ -381,14 +389,19 @@
 
             if (!hasValue && RequiresFilterValue(filterOperator!))
             {
-                return ActionResult.Failure("Action 'filter' requires 'value' parameter for this operator.");
+                return ActionResult.NeedsClarification("Action 'filter' requires 'value' parameter for this operator.");
             }
 
-            if (ResolveProperty(typeof(TItem), column!) is null)
+            var filterResolution = ResolveColumnHint(column!);
+            if (filterResolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(filterResolution.Value))
             {
-                return ActionResult.Failure(
-                    $"Action 'filter' requires 'column' parameter matching a grid property. Available columns: {string.Join(", ", GetFilterableColumns())}.");
+                var suggested = filterResolution.Candidates.Count > 0
+                    ? $" Suggested columns: {string.Join(", ", filterResolution.Candidates)}."
+                    : string.Empty;
+                return ActionResult.NeedsClarification(
+                    $"Action 'filter' requires 'column' parameter matching a grid property. Available columns: {string.Join(", ", GetFilterableColumns())}.{suggested}");
             }
+            column = filterResolution.Value;
 
             FilterColumn = column;
             FilterOperator = filterOperator;
@@ -425,12 +438,12 @@
                                TryGetIntParameter(action, "page", out pageIndex);
             if (!hasPageIndex)
             {
-                return ActionResult.Failure("Action 'set_page' requires 'pageIndex' (or 'page') parameter.");
+                return ActionResult.NeedsClarification("Action 'set_page' requires 'pageIndex' (or 'page') parameter.");
             }
 
             if (pageIndex < 0)
             {
-                return ActionResult.Failure("Action 'set_page' requires non-negative 'pageIndex'.");
+                return ActionResult.NeedsClarification("Action 'set_page' requires non-negative 'pageIndex'.");
             }
 
             CurrentPageIndex = pageIndex;
@@ -440,7 +453,7 @@
             {
                 if (pageSize <= 0)
                 {
-                    return ActionResult.Failure("Action 'set_page' requires positive 'pageSize' when provided.");
+                    return ActionResult.NeedsClarification("Action 'set_page' requires positive 'pageSize' when provided.");
                 }
 
                 PageSize = pageSize;
@@ -460,7 +473,7 @@
             {
                 if (!TryInferRowKeyFromCurrentView(out rowKey))
                 {
-                    return ActionResult.Failure($"Action '{action.Name}' requires 'rowKey' parameter.");
+                    return ActionResult.NeedsClarification($"Action '{action.Name}' requires 'rowKey' parameter.");
                 }
 
                 inferredRowSelection = true;
@@ -470,7 +483,7 @@
             var item = FindItemByKey(rowKey);
             if (item is null)
             {
-                return ActionResult.Failure($"Row with key '{rowKey}' not found.");
+                return ActionResult.NeedsClarification($"Row with key '{rowKey}' not found.");
             }
 
             _selectedItem = item;
@@ -747,65 +760,58 @@
         return true;
     }
 
+    private EntityResolutionResult ResolveColumnHint(string columnHint)
+    {
+        var columns = GetFilterableColumns();
+        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var column in columns)
+        {
+            aliases[BuildWordSpacedIdentifier(column)] = column;
+        }
+
+        if (ColumnAliases is { Count: > 0 })
+        {
+            foreach (var (alias, canonical) in ColumnAliases)
+            {
+                aliases[alias] = canonical;
+            }
+        }
+
+        return DeterministicEntityResolver.Resolve(
+            columnHint,
+            columns,
+            aliases,
+            minConfidence: 0.55,
+            ambiguityMargin: 0.06);
+    }
+
     private static System.Reflection.PropertyInfo? ResolveProperty(Type type, string propertyName)
     {
         var properties = type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        var direct = properties.FirstOrDefault(p => string.Equals(p.Name, propertyName, StringComparison.OrdinalIgnoreCase));
-        if (direct is not null)
-        {
-            return direct;
-        }
-
-        var normalizedRequested = NormalizeIdentifier(propertyName);
-        if (normalizedRequested.Length == 0)
+        if (properties.Length == 0)
         {
             return null;
         }
 
-        var normalizedMatch = properties.FirstOrDefault(p =>
-            string.Equals(NormalizeIdentifier(p.Name), normalizedRequested, StringComparison.OrdinalIgnoreCase));
-        if (normalizedMatch is not null)
+        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in properties)
         {
-            return normalizedMatch;
+            aliases[BuildWordSpacedIdentifier(property.Name)] = property.Name;
         }
 
-        var requestedTokens = SplitIdentifierTokens(propertyName);
-        if (requestedTokens.Count == 0)
-        {
-            return null;
-        }
-
-        var candidates = properties
-            .Select(property =>
-            {
-                var propertyTokens = SplitIdentifierTokens(property.Name);
-                var overlap = propertyTokens.Count(token => requestedTokens.Contains(token, StringComparer.OrdinalIgnoreCase));
-                var score = overlap;
-                var normalizedProperty = NormalizeIdentifier(property.Name);
-                if (normalizedProperty.Contains(normalizedRequested, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedRequested.Contains(normalizedProperty, StringComparison.OrdinalIgnoreCase))
-                {
-                    score += 1;
-                }
-
-                return (property, score);
-            })
-            .Where(static candidate => candidate.score > 0)
-            .OrderByDescending(static candidate => candidate.score)
-            .ThenBy(static candidate => candidate.property.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (candidates.Length == 0)
+        var resolution = DeterministicEntityResolver.Resolve(
+            propertyName,
+            properties.Select(static property => property.Name),
+            aliases,
+            minConfidence: 0.55,
+            ambiguityMargin: 0.06);
+        if (resolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(resolution.Value))
         {
             return null;
         }
 
-        if (candidates.Length > 1 && candidates[0].score == candidates[1].score)
-        {
-            return null;
-        }
-
-        return candidates[0].property;
+        return properties.FirstOrDefault(property =>
+            string.Equals(property.Name, resolution.Value, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool TryGetStringParameter(AgentAction action, string key, out string value)
@@ -1050,22 +1056,11 @@
         return [value];
     }
 
-    private static string NormalizeIdentifier(string value)
+    private static string BuildWordSpacedIdentifier(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return string.Empty;
-        }
-
-        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-    }
-
-    private static List<string> SplitIdentifierTokens(string value)
-    {
-        var tokens = new List<string>();
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return tokens;
         }
 
         var builder = new System.Text.StringBuilder();
@@ -1074,8 +1069,6 @@
         {
             if (!char.IsLetterOrDigit(ch))
             {
-                Flush();
-                previous = null;
                 continue;
             }
 
@@ -1083,26 +1076,14 @@
                 char.IsLower(previous.Value) &&
                 char.IsUpper(ch))
             {
-                Flush();
+                builder.Append(' ');
             }
 
-            builder.Append(char.ToLowerInvariant(ch));
+            builder.Append(ch);
             previous = ch;
         }
 
-        Flush();
-        return tokens;
-
-        void Flush()
-        {
-            if (builder.Length == 0)
-            {
-                return;
-            }
-
-            tokens.Add(builder.ToString());
-            builder.Clear();
-        }
+        return builder.ToString();
     }
 
     private async Task<ActionResult> CompleteAndRefreshAsync(ActionResult result)

@@ -1,7 +1,12 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
 
-<aside class="ab-chat-panel @(Theme?.CssClass)" data-theme="@(Theme?.DataTheme)" style="@_panelStyle" role="complementary" aria-label="@(Title ?? "Agent chat panel")">
+<aside class="ab-chat-panel @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
+       data-theme="@(Theme?.DataTheme)"
+       data-style="@(Theme?.DataStyle)"
+       style="@_panelStyle"
+       role="complementary"
+       aria-label="@(Title ?? "Agent chat panel")">
     <AgentChatSurface Title="@Title"
                       Description="@Description"
                       FormName="@FormName"

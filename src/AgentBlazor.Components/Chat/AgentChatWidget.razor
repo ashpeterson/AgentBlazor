@@ -5,7 +5,12 @@
 @implements IDisposable
 @inject IAgentChatWidgetState WidgetState
 
-<section class="ab-chat-widget @(Theme?.CssClass)" data-theme="@(Theme?.DataTheme)" style="@HostStyle" aria-label="Chat widget">
+<section class="ab-chat-widget @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
+         data-theme="@(Theme?.DataTheme)"
+         data-style="@(Theme?.DataStyle)"
+         data-radius="@(Theme?.DataRadius)"
+         style="@HostStyle"
+         aria-label="Chat widget">
     @if (WidgetState.IsOpen)
     {
         <div class="ab-chat-widget__window" role="dialog" aria-modal="true" aria-label="@(Title ?? "Agent chat")">

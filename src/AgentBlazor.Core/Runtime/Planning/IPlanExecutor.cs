@@ -33,6 +33,11 @@ public sealed record PlanExecutionOptions
     /// Session ID for component targeting.
     /// </summary>
     public string? SessionId { get; init; }
+
+    /// <summary>
+    /// Optional run ID used to correlate downstream execution events.
+    /// </summary>
+    public string? RunId { get; init; }
 }
 
 /// <summary>
@@ -45,8 +50,13 @@ public sealed record PlanExecutionResult
     public required bool Succeeded { get; init; }
     public TimeSpan Duration { get; init; }
 
-    public int SuccessCount => StepResults.Count(r => r.Succeeded);
-    public int FailureCount => StepResults.Count(r => !r.Succeeded);
+    public int SuccessCount => StepResults.Count(r => r.Outcome is ActionOutcome.Applied or ActionOutcome.Queued);
+    public int FailureCount => StepResults.Count(r =>
+        r.Outcome is ActionOutcome.Failed or ActionOutcome.Blocked or ActionOutcome.NeedsClarification);
+    public int AppliedCount => StepResults.Count(r => r.Outcome is ActionOutcome.Applied);
+    public int QueuedCount => StepResults.Count(r => r.Outcome is ActionOutcome.Queued);
+    public int BlockedCount => StepResults.Count(r => r.Outcome is ActionOutcome.Blocked);
+    public int ClarificationCount => StepResults.Count(r => r.Outcome is ActionOutcome.NeedsClarification);
 }
 
 /// <summary>
@@ -55,17 +65,9 @@ public sealed record PlanExecutionResult
 public sealed record StepExecutionResult
 {
     public required PlannedStep Step { get; init; }
-    public required bool Succeeded { get; init; }
+    public required ActionOutcome Outcome { get; init; }
     public required string Message { get; init; }
     public TimeSpan Duration { get; init; }
 
-    /// <summary>
-    /// If the action required approval and it wasn't granted.
-    /// </summary>
-    public bool BlockedByApproval { get; init; }
-
-    /// <summary>
-    /// If the component wasn't mounted, action was queued.
-    /// </summary>
-    public bool Queued { get; init; }
+    public bool Succeeded => Outcome is ActionOutcome.Applied or ActionOutcome.Queued;
 }

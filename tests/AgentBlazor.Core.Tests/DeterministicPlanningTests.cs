@@ -344,6 +344,39 @@ public class DeterministicPlanningTests
     }
 
     [Fact]
+    public async Task Executor_AddsSessionAndRunMetadata_ToExecutionArguments()
+    {
+        var capturingExecutor = new CapturingActionExecutor();
+        var executor = new PlanExecutor(capturingExecutor);
+        var plan = new ActionPlan
+        {
+            Steps =
+            [
+                new PlannedStep
+                {
+                    ComponentId = "AgentDialog",
+                    ActionId = "open",
+                    Arguments = new Dictionary<string, object?> { ["mode"] = "inline" }
+                }
+            ]
+        };
+
+        var result = await executor.ExecuteAsync(plan, new PlanExecutionOptions
+        {
+            SessionId = "session-42",
+            RunId = "run-42"
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Single(capturingExecutor.ExecutedActions);
+        var executed = capturingExecutor.ExecutedActions[0];
+        var arguments = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(executed.Arguments);
+        Assert.Equal("inline", arguments["mode"]?.ToString());
+        Assert.Equal("session-42", arguments[AgentRuntimeContextKeys.SessionId]?.ToString());
+        Assert.Equal("run-42", arguments[AgentRuntimeContextKeys.RunId]?.ToString());
+    }
+
+    [Fact]
     public async Task Executor_CancellationRequested_StopsExecution()
     {
         var slowExecutor = new SlowActionExecutor(TimeSpan.FromSeconds(5));
@@ -359,10 +392,8 @@ public class DeterministicPlanningTests
         var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromMilliseconds(50));
 
-        var result = await executor.ExecuteAsync(plan, new PlanExecutionOptions(), cts.Token);
-
-        Assert.False(result.Succeeded);
-        Assert.True(result.StepResults.Count < 2);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await executor.ExecuteAsync(plan, new PlanExecutionOptions(), cts.Token));
     }
 
     #endregion
@@ -704,10 +735,10 @@ public class DeterministicPlanningTests
         Assert.Equal(AgentTurnStreamEventKind.RunStarted, events[0].Kind);
         Assert.Equal(AgentTurnStreamEventKind.RunFinished, events[^1].Kind);
         Assert.NotNull(events[^1].Response);
-        Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.TextDelta);
+        Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent);
 
         var streamedText = string.Concat(events
-            .Where(static e => e.Kind == AgentTurnStreamEventKind.TextDelta)
+            .Where(static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent)
             .Select(static e => e.TextDelta));
         Assert.Equal(events[^1].Response!.ResponseText, streamedText);
     }
@@ -726,7 +757,7 @@ public class DeterministicPlanningTests
         var streamedText = new StringBuilder();
         await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(new AgentTurnRequest("open dialog")))
         {
-            if (streamEvent.Kind == AgentTurnStreamEventKind.TextDelta)
+            if (streamEvent.Kind == AgentTurnStreamEventKind.TextMessageContent)
             {
                 streamedText.Append(streamEvent.TextDelta);
             }
@@ -739,6 +770,95 @@ public class DeterministicPlanningTests
         Assert.NotNull(finalResponse);
         Assert.Contains("No provider is configured", finalResponse!.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("No provider is configured", streamedText.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Runtime_Streaming_ConnectRunStreamAsync_ReplaysCompletedRun()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDialog",
+                        "actionId": "open",
+                        "arguments": {}
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var streamingRuntime = Assert.IsAssignableFrom<IAgentRuntimeStreaming>(runtime);
+
+        var runId = Guid.NewGuid().ToString("N");
+        var original = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(new AgentTurnRequest(
+                           "open dialog",
+                           Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                           {
+                               ["agentblazor.run_id"] = runId
+                           })))
+        {
+            original.Add(streamEvent);
+        }
+
+        Assert.NotEmpty(original);
+
+        var replay = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in streamingRuntime.ConnectRunStreamAsync(runId))
+        {
+            replay.Add(streamEvent);
+        }
+
+        Assert.Equal(original.Count, replay.Count);
+        Assert.All(replay, static streamEvent => Assert.True(streamEvent.IsReplay));
+        Assert.Equal(original.Select(static e => e.Kind), replay.Select(static e => e.Kind));
+        Assert.Equal(original.Select(static e => e.Sequence), replay.Select(static e => e.Sequence));
+    }
+
+    [Fact]
+    public async Task Runtime_Streaming_StopRunAsync_CancelsRunWithStoppedError()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new JsonPlanChatClient("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDialog",
+                        "actionId": "open",
+                        "arguments": {}
+                    }
+                ]
+            }
+            """));
+        services.AddSingleton<IComponentActionExecutor>(new SlowActionExecutor(TimeSpan.FromSeconds(5)));
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var streamingRuntime = Assert.IsAssignableFrom<IAgentRuntimeStreaming>(runtime);
+
+        var runId = Guid.NewGuid().ToString("N");
+        var events = new List<AgentTurnStreamEvent>();
+        var streamTask = Task.Run(async () =>
+        {
+            await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(new AgentTurnRequest(
+                               "open dialog",
+                               Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                               {
+                                   ["agentblazor.run_id"] = runId
+                               })))
+            {
+                events.Add(streamEvent);
+            }
+        });
+
+        await Task.Delay(100);
+        var stopped = await streamingRuntime.StopRunAsync(runId);
+        await streamTask;
+
+        Assert.True(stopped);
+        Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.RunError && e.ErrorCode == "STOPPED");
     }
 
     #endregion
@@ -938,6 +1058,23 @@ public class DeterministicPlanningTests
                     Succeeded: false,
                     Message: "Cancelled");
             }
+        }
+    }
+
+    private sealed class CapturingActionExecutor : IComponentActionExecutor
+    {
+        public List<PlannedComponentAction> ExecutedActions { get; } = [];
+
+        public Task<ComponentActionExecutionResult> ExecuteAsync(
+            PlannedComponentAction action,
+            CancellationToken cancellationToken = default)
+        {
+            ExecutedActions.Add(action);
+            return Task.FromResult(new ComponentActionExecutionResult(
+                action.ComponentId,
+                action.ActionId,
+                Succeeded: true,
+                Message: "OK"));
         }
     }
 

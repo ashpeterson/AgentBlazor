@@ -86,7 +86,7 @@ internal sealed class NoOpChatWidgetActionExecutor(
             return Task.FromResult(new ComponentActionExecutionResult(
                 ComponentId: "AgentChatWidget",
                 ActionId: actionId,
-                Succeeded: true,
+                Outcome: ActionOutcome.Applied,
                 Message: "Opened chat widget."));
         }
 
@@ -96,14 +96,14 @@ internal sealed class NoOpChatWidgetActionExecutor(
             return Task.FromResult(new ComponentActionExecutionResult(
                 ComponentId: "AgentChatWidget",
                 ActionId: actionId,
-                Succeeded: true,
+                Outcome: ActionOutcome.Applied,
                 Message: "Closed chat widget."));
         }
 
         return Task.FromResult(new ComponentActionExecutionResult(
             ComponentId: "AgentChatWidget",
             ActionId: actionId,
-            Succeeded: false,
+            Outcome: ActionOutcome.Failed,
             Message: $"AgentChatWidget action '{actionId}' is not supported."));
     }
 }

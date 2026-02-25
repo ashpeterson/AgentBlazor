@@ -8,12 +8,14 @@ namespace AgentBlazor.Core.Runtime.Agents;
 /// <param name="SessionId">Optional session identifier for conversation history.</param>
 /// <param name="UserId">Optional user identifier for cross-session preferences.</param>
 /// <param name="Context">Optional context dictionary.</param>
+/// <param name="GeneratedUiAction">Optional typed generated-UI action invocation metadata.</param>
 public sealed record AgentTurnRequest(
     string UserMessage,
     string? AgentName = null,
     string? SessionId = null,
     string? UserId = null,
-    IDictionary<string, string>? Context = null)
+    IDictionary<string, string>? Context = null,
+    GeneratedUiActionInvocation? GeneratedUiAction = null)
 {
     /// <summary>
     /// Gets the effective session ID, using the context value if SessionId is not set.
@@ -26,7 +28,7 @@ public sealed record AgentTurnRequest(
         }
 
         if (Context is not null &&
-            Context.TryGetValue("agentblazor.session_id", out var contextSessionId) &&
+            Context.TryGetValue(AgentRuntimeContextKeys.SessionId, out var contextSessionId) &&
             !string.IsNullOrWhiteSpace(contextSessionId))
         {
             return contextSessionId;
@@ -46,7 +48,7 @@ public sealed record AgentTurnRequest(
         }
 
         if (Context is not null &&
-            Context.TryGetValue("agentblazor.user_id", out var contextUserId) &&
+            Context.TryGetValue(AgentRuntimeContextKeys.UserId, out var contextUserId) &&
             !string.IsNullOrWhiteSpace(contextUserId))
         {
             return contextUserId;
@@ -55,3 +57,12 @@ public sealed record AgentTurnRequest(
         return null;
     }
 }
+
+/// <summary>
+/// Typed generated-UI action invocation forwarded from UI components.
+/// </summary>
+public sealed record GeneratedUiActionInvocation(
+    string BlockId,
+    string ActionId,
+    string? Prompt,
+    IReadOnlyDictionary<string, object?> Payload);

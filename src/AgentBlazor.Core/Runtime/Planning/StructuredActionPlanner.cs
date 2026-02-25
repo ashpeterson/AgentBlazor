@@ -132,7 +132,8 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("- The \"reasoning\" field goes INSIDE the JSON, not outside.");
         if (request.GenerateUi)
         {
-            sb.AppendLine("- Include a top-level \"generatedUi\" object that matches the schema when UI output is useful.");
+            sb.AppendLine("- GENERATE_UI is true, so generatedUi is REQUIRED and MUST be non-null.");
+            sb.AppendLine("- generatedUi.blocks MUST contain at least one block.");
             sb.AppendLine("- Use only block kinds Card, Form, or Table.");
         }
         else
@@ -185,6 +186,30 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("- For column clarifications, map close matches from user text to the nearest mounted column name (for example \"risk\" -> \"RiskScore\").");
         sb.AppendLine();
 
+        if (request.GenerateUi)
+        {
+            sb.AppendLine("## Rule 7: GENERATED UI QUALITY");
+            sb.AppendLine("- generatedUi.specVersion MUST be \"agentblazor.ui.v0\".");
+            sb.AppendLine("- Use generated UI to provide a useful next step for the user, not just static text.");
+            sb.AppendLine("- Every block should have clear title/description tied to the user request.");
+            sb.AppendLine("- Prefer at least one action button with a non-empty prompt so user can continue the workflow.");
+            sb.AppendLine("- Action prompts should be instruction-like (imperative) and ready to execute.");
+            sb.AppendLine("- Runtime forwards generated action payload in a typed GENERATED_UI_ACTION object; use prompts that can consume those payload values.");
+            sb.AppendLine("- Form blocks MUST include fields, and each field name should align to known model fields when available.");
+            sb.AppendLine("- Table blocks MUST include columns and may include rows when context contains concrete values.");
+            sb.AppendLine("- If steps are empty and no clarification is needed, still return a summary card block explaining the outcome.");
+            sb.AppendLine();
+
+            sb.AppendLine("## Rule 8: GENERATED ACTION FORWARDING");
+            sb.AppendLine("- If GENERATED_UI_ACTION is provided in the request payload, treat its payload as authoritative data for this turn.");
+            sb.AppendLine("- For generated apply actions, create executable steps instead of returning an unchanged draft UI.");
+            sb.AppendLine("- For form payloads, emit one AgentForm.set_field step per payload key/value.");
+            sb.AppendLine("- Ignore metadata payload keys: blockId, actionId.");
+            sb.AppendLine("- If target form is not mounted, include navigation and dialog-open steps before set_field steps.");
+            sb.AppendLine("- For forwarded actions, generatedUi should usually be a confirmation card, not a repeated draft form.");
+            sb.AppendLine();
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // SECTION 4: FEW-SHOT EXAMPLES
         // ═══════════════════════════════════════════════════════════════════
@@ -205,8 +230,33 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
       ""arguments"": { ""column"": ""Risk"", ""operator"": ""gte"", ""value"": ""high"" }
     }
   ],
-  ""needsClarification"": false
-}");
+  ""needsClarification"": false,");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""risk-filter-summary"",
+        ""kind"": ""Card"",
+        ""title"": ""High Risk Filter Applied"",
+        ""description"": ""Filtered suppliers where Risk is high."",
+        ""actions"": [
+          {
+            ""id"": ""focusHighest"",
+            ""label"": ""Focus Highest Risk Row"",
+            ""prompt"": ""Focus the highest risk supplier in the current grid.""
+          }
+        ]
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -229,8 +279,33 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
       ""arguments"": { ""column"": ""Name"", ""operator"": ""contains"", ""value"": ""Smith"" }
     }
   ],
-  ""needsClarification"": false
-}");
+  ""needsClarification"": false,");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""supplier-filter-followup"",
+        ""kind"": ""Card"",
+        ""title"": ""Supplier Search Ready"",
+        ""description"": ""Navigating and filtering suppliers by name 'Smith'."",
+        ""actions"": [
+          {
+            ""id"": ""sortByRisk"",
+            ""label"": ""Sort by Risk Desc"",
+            ""prompt"": ""Sort suppliers by RiskScore descending.""
+          }
+        ]
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -253,8 +328,33 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
       ""arguments"": { ""pageIndex"": 1 }
     }
   ],
-  ""needsClarification"": false
-}");
+  ""needsClarification"": false,");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""paging-summary"",
+        ""kind"": ""Card"",
+        ""title"": ""Sorted and Paged"",
+        ""description"": ""Sorted Date descending and moved to page 2."",
+        ""actions"": [
+          {
+            ""id"": ""returnFirstPage"",
+            ""label"": ""Go to Page 1"",
+            ""prompt"": ""Go to page 1 in the current data grid.""
+          }
+        ]
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -267,8 +367,26 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
   ""reasoning"": ""User wants to filter but didn't specify column, operator, or value."",
   ""steps"": [],
   ""needsClarification"": true,
-  ""clarificationQuestion"": ""Which column would you like to filter, and what value should I filter for?""
-}");
+  ""clarificationQuestion"": ""Which column would you like to filter, and what value should I filter for?"",");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""clarification-help"",
+        ""kind"": ""Card"",
+        ""title"": ""Need One More Detail"",
+        ""description"": ""Please tell me the column and value to filter.""
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -286,8 +404,37 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
       ""arguments"": { ""field"": ""customerName"", ""value"": ""John Doe"" }
     }
   ],
-  ""needsClarification"": false
-}");
+  ""needsClarification"": false,");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""customer-form-review"",
+        ""kind"": ""Form"",
+        ""title"": ""Customer Draft"",
+        ""description"": ""Review and apply customer details."",
+        ""fields"": [
+          { ""name"": ""customerName"", ""label"": ""Customer Name"", ""type"": ""text"", ""value"": ""John Doe"", ""required"": true },
+          { ""name"": ""email"", ""label"": ""Email"", ""type"": ""text"" }
+        ],
+        ""actions"": [
+          {
+            ""id"": ""applyDraft"",
+            ""label"": ""Apply Form Values"",
+            ""prompt"": ""Set form fields using the action payload values.""
+          }
+        ]
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
 
@@ -305,10 +452,170 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
       ""arguments"": { ""index"": 1 }
     }
   ],
-  ""needsClarification"": false
-}");
+  ""needsClarification"": false,");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine(@"  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""tab-navigation-summary"",
+        ""kind"": ""Card"",
+        ""title"": ""Tab Updated"",
+        ""description"": ""Switched to tab 2."",
+        ""actions"": [
+          {
+            ""id"": ""goBackTab"",
+            ""label"": ""Back to Tab 1"",
+            ""prompt"": ""Switch to tab index 0.""
+          }
+        ]
+      }
+    ]
+  }");
+        }
+        else
+        {
+            sb.AppendLine(@"  ""generatedUi"": null");
+        }
+        sb.AppendLine(@"}");
         sb.AppendLine("```");
         sb.AppendLine();
+
+        if (request.GenerateUi)
+        {
+            // Example 7: Supplier ranking with generated follow-up controls
+            sb.AppendLine("## Example 7: Highest risk supplier workflow");
+            sb.AppendLine("User: \"Show the highest risk supplier\"");
+            sb.AppendLine("Context: DataGrid mounted with columns [SupplierName, RiskScore, Region]");
+            sb.AppendLine("```json");
+            sb.AppendLine(@"{
+  ""reasoning"": ""Need highest risk supplier, so sort RiskScore descending and focus top row."",
+  ""steps"": [
+    {
+      ""componentId"": ""AgentDataGrid"",
+      ""actionId"": ""sort"",
+      ""arguments"": { ""column"": ""RiskScore"", ""direction"": ""desc"" }
+    },
+    {
+      ""componentId"": ""AgentDataGrid"",
+      ""actionId"": ""select_row"",
+      ""arguments"": {}
+    }
+  ],
+  ""needsClarification"": false,
+  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""highest-risk-controls"",
+        ""kind"": ""Card"",
+        ""title"": ""Highest Risk Supplier Focus"",
+        ""description"": ""RiskScore sorted descending and top row focused."",
+        ""actions"": [
+          {
+            ""id"": ""refreshHighestRisk"",
+            ""label"": ""Run Again"",
+            ""prompt"": ""Refresh focus on the highest risk supplier in the current grid.""
+          },
+          {
+            ""id"": ""showOnlyHighRisk"",
+            ""label"": ""Filter High Risk"",
+            ""prompt"": ""Filter the grid to high risk suppliers using RiskScore.""
+          }
+        ]
+      }
+    ]
+  }
+}");
+            sb.AppendLine("```");
+            sb.AppendLine();
+
+            // Example 8: Generated form driving a workflow
+            sb.AppendLine("## Example 8: Generated form for onboarding workflow");
+            sb.AppendLine("User: \"Create an onboarding draft for supplier Ash\"");
+            sb.AppendLine("Context: /demo/onboarding route exists");
+            sb.AppendLine("```json");
+            sb.AppendLine(@"{
+  ""reasoning"": ""Provide a generated form so user can confirm values, then forward payload to runtime."",
+  ""steps"": [],
+  ""needsClarification"": false,
+  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""onboarding-draft"",
+        ""kind"": ""Form"",
+        ""title"": ""Supplier Onboarding Draft"",
+        ""description"": ""Review details, then apply to onboarding form."",
+        ""fields"": [
+          { ""name"": ""SupplierName"", ""label"": ""Supplier Name"", ""type"": ""text"", ""value"": ""Ash"", ""required"": true },
+          { ""name"": ""RiskTier"", ""label"": ""Risk Tier"", ""type"": ""text"", ""value"": ""High"" }
+        ],
+        ""actions"": [
+          {
+            ""id"": ""applyOnboardingDraft"",
+            ""label"": ""Apply form values"",
+            ""prompt"": ""Open onboarding and set supplier onboarding form fields using the action payload values.""
+          }
+        ]
+      }
+    ]
+  }
+}");
+            sb.AppendLine("```");
+            sb.AppendLine();
+
+            // Example 9: Forwarded generated action with payload
+            sb.AppendLine("## Example 9: Apply generated form payload");
+            sb.AppendLine("User request includes GENERATED_UI_ACTION payload:");
+            sb.AppendLine(@"{");
+            sb.AppendLine(@"  ""blockId"": ""onboarding-draft"",");
+            sb.AppendLine(@"  ""actionId"": ""applyOnboardingDraft"",");
+            sb.AppendLine(@"  ""prompt"": ""Open onboarding and set supplier onboarding form fields using the action payload values."",");
+            sb.AppendLine(@"  ""payload"": { ""SupplierName"": ""Ash"", ""RiskTier"": ""High"", ""blockId"": ""onboarding-draft"" }");
+            sb.AppendLine(@"}");
+            sb.AppendLine("```json");
+            sb.AppendLine(@"{
+  ""reasoning"": ""This is a forwarded generated action with explicit payload values. Navigate/open if needed, then apply each form field from payload."",
+  ""steps"": [
+    {
+      ""componentId"": ""AgentNavMenu"",
+      ""actionId"": ""navigate_to"",
+      ""arguments"": { ""uri"": ""/demo/onboarding"" }
+    },
+    {
+      ""componentId"": ""AgentDialog"",
+      ""actionId"": ""open"",
+      ""arguments"": {}
+    },
+    {
+      ""componentId"": ""AgentForm"",
+      ""actionId"": ""set_field"",
+      ""arguments"": { ""field"": ""SupplierName"", ""value"": ""Ash"" }
+    },
+    {
+      ""componentId"": ""AgentForm"",
+      ""actionId"": ""set_field"",
+      ""arguments"": { ""field"": ""RiskTier"", ""value"": ""High"" }
+    }
+  ],
+  ""needsClarification"": false,
+  ""generatedUi"": {
+    ""specVersion"": ""agentblazor.ui.v0"",
+    ""blocks"": [
+      {
+        ""id"": ""onboarding-apply-confirmation"",
+        ""kind"": ""Card"",
+        ""title"": ""Onboarding Values Applied"",
+        ""description"": ""Supplier form values were sent to onboarding.""
+      }
+    ]
+  }
+}");
+            sb.AppendLine("```");
+            sb.AppendLine();
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // SECTION 5: COMMON MISTAKES TO AVOID
@@ -321,6 +628,11 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("❌ Leaving required parameters empty");
         sb.AppendLine("❌ Adding markdown code fences to output");
         sb.AppendLine("❌ Writing explanation text outside the JSON");
+        if (request.GenerateUi)
+        {
+            sb.AppendLine("❌ Returning generatedUi as null or with empty blocks when GENERATE_UI=true");
+            sb.AppendLine("❌ Omitting action prompts in generatedUi when follow-up actions are possible");
+        }
         sb.AppendLine();
 
         // ═══════════════════════════════════════════════════════════════════
@@ -434,7 +746,29 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
 
     private static string BuildUserPrompt(ActionPlanRequest request)
     {
-        return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: {(request.GenerateUi ? "true" : "false")}";
+        var generatedUiAction = request.GeneratedUiAction;
+        if (generatedUiAction is not null)
+        {
+            var actionJson = JsonSerializer.Serialize(new
+            {
+                blockId = generatedUiAction.BlockId,
+                actionId = generatedUiAction.ActionId,
+                prompt = generatedUiAction.Prompt,
+                payload = generatedUiAction.Payload
+            }, JsonOptions);
+
+            return
+                $"USER REQUEST: {request.UserMessage}\n" +
+                $"GENERATE_UI: {request.GenerateUi.ToString().ToLowerInvariant()}\n" +
+                $"GENERATED_UI_ACTION_JSON:\n{actionJson}";
+        }
+
+        if (request.GenerateUi)
+        {
+            return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: true\nGENERATED_UI_REQUIREMENT: Return non-null generatedUi with at least one actionable block.";
+        }
+
+        return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: false";
     }
 
     private ActionPlan ParsePlanResponse(

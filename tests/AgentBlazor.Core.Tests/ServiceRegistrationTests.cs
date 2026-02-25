@@ -304,7 +304,9 @@ public class ServiceRegistrationTests
             ActionId: "set_field",
             Succeeded: true,
             Message: "Set SupplierName to ash.",
-            OccurredAt: DateTimeOffset.UtcNow);
+            OccurredAt: DateTimeOffset.UtcNow,
+            SessionId: "session-1",
+            RunId: "run-1");
 
         deferredEvents.Publish(expected);
 

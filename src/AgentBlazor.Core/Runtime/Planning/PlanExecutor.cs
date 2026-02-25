@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,11 @@ internal sealed class PlanExecutor : IPlanExecutor
             }
 
             var stepResult = await ExecuteStepAsync(step, options, cancellationToken);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
             stepResults.Add(stepResult);
 
             if (!stepResult.Succeeded)
@@ -88,14 +94,12 @@ internal sealed class PlanExecutor : IPlanExecutor
         try
         {
             // Convert to PlannedComponentAction for the executor
+            var executionArguments = BuildExecutionArguments(step.Arguments, options);
             var plannedAction = new PlannedComponentAction(
                 step.ComponentId,
                 step.ActionId,
                 Reason: "Planned action from structured planner",
-                Arguments: step.Arguments.ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value,
-                    StringComparer.OrdinalIgnoreCase));
+                Arguments: executionArguments);
 
             var executionResult = await _actionExecutor.ExecuteAsync(plannedAction, cancellationToken);
 
@@ -104,11 +108,9 @@ internal sealed class PlanExecutor : IPlanExecutor
             return new StepExecutionResult
             {
                 Step = step,
-                Succeeded = executionResult.Succeeded,
+                Outcome = executionResult.Outcome,
                 Message = executionResult.Message,
-                Duration = stopwatch.Elapsed,
-                Queued = executionResult.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase),
-                BlockedByApproval = executionResult.Message.Contains("Approval required", StringComparison.OrdinalIgnoreCase)
+                Duration = stopwatch.Elapsed
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -117,7 +119,7 @@ internal sealed class PlanExecutor : IPlanExecutor
             return new StepExecutionResult
             {
                 Step = step,
-                Succeeded = false,
+                Outcome = ActionOutcome.Failed,
                 Message = "Execution cancelled",
                 Duration = stopwatch.Elapsed
             };
@@ -130,10 +132,34 @@ internal sealed class PlanExecutor : IPlanExecutor
             return new StepExecutionResult
             {
                 Step = step,
-                Succeeded = false,
+                Outcome = ActionOutcome.Failed,
                 Message = $"Execution error: {ex.Message}",
                 Duration = stopwatch.Elapsed
             };
         }
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildExecutionArguments(
+        IReadOnlyDictionary<string, object?> source,
+        PlanExecutionOptions options)
+    {
+        var merged = source.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(options.SessionId) &&
+            !merged.ContainsKey(AgentRuntimeContextKeys.SessionId))
+        {
+            merged[AgentRuntimeContextKeys.SessionId] = options.SessionId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.RunId) &&
+            !merged.ContainsKey(AgentRuntimeContextKeys.RunId))
+        {
+            merged[AgentRuntimeContextKeys.RunId] = options.RunId;
+        }
+
+        return merged;
     }
 }

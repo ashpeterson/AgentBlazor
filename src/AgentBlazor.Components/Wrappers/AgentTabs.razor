@@ -57,7 +57,7 @@
 
         if (!action.TryGetParameter<int>("index", out var index))
         {
-            return ActionResult.Failure("Action 'switch_tab' requires 'index' parameter.");
+            return ActionResult.NeedsClarification("Action 'switch_tab' requires 'index' parameter.");
         }
 
         ActivePanelIndex = index;

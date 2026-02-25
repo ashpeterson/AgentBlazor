@@ -1,20 +1,155 @@
-/* Uses same variable names as Surface where applicable */
+/* ═══════════════════════════════════════════════════════════════════════════
+   AgentChatPanel - Modern Side Panel Chat Container
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design Tokens ─────────────────────────────────────────────────────────── */
+
 .ab-chat-panel {
-    --ab-chat-panel-bg: #f8fbff;
-    --ab-chat-panel-border: #d8dee8;
+    /* Colors - Light (Default) */
+    --ab-panel-bg: #ffffff;
+    --ab-panel-surface: #f8fafc;
+    --ab-panel-border: rgba(0, 0, 0, 0.08);
+    --ab-panel-shadow: -4px 0 20px rgba(0, 0, 0, 0.05);
+
+    /* Animation */
+    --ab-panel-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ── Dark Theme ────────────────────────────────────────────────────────────── */
 
 .ab-chat-panel[data-theme="dark"] {
-    --ab-chat-panel-bg: #1e293b;
-    --ab-chat-panel-border: #334155;
+    --ab-panel-bg: #1e293b;
+    --ab-panel-surface: #0f172a;
+    --ab-panel-border: rgba(255, 255, 255, 0.08);
+    --ab-panel-shadow: -4px 0 20px rgba(0, 0, 0, 0.2);
 }
 
+/* ── Style Variants ────────────────────────────────────────────────────────── */
+
+/* Glass Style */
+.ab-chat-panel[data-style="glass"] {
+    --ab-panel-bg: rgba(255, 255, 255, 0.85);
+    --ab-panel-surface: rgba(248, 250, 252, 0.9);
+}
+
+.ab-chat-panel[data-style="glass"][data-theme="dark"] {
+    --ab-panel-bg: rgba(30, 41, 59, 0.85);
+    --ab-panel-surface: rgba(15, 23, 42, 0.9);
+}
+
+/* Minimal Style */
+.ab-chat-panel[data-style="minimal"] {
+    --ab-panel-shadow: none;
+    --ab-panel-border: rgba(0, 0, 0, 0.1);
+}
+
+.ab-chat-panel[data-style="minimal"][data-theme="dark"] {
+    --ab-panel-border: rgba(255, 255, 255, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base Container
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 .ab-chat-panel {
-    width: var(--ab-chat-panel-width, 350px);
+    width: var(--ab-chat-panel-width, 360px);
     height: var(--ab-chat-panel-height, 100%);
     min-height: 24rem;
-    border-left: 1px solid var(--ab-chat-panel-border);
-    background: var(--ab-chat-panel-bg);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--ab-panel-border);
+    background: var(--ab-panel-bg);
+    box-shadow: var(--ab-panel-shadow);
     box-sizing: border-box;
-    padding: 0.75rem;
+    overflow: hidden;
+    font-family: var(--ab-chat-font, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+}
+
+/* Glass effect */
+.ab-chat-panel[data-style="glass"] {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Panel Positions
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Right side (default) */
+.ab-chat-panel--right {
+    border-left: 1px solid var(--ab-panel-border);
+    border-right: none;
+}
+
+/* Left side */
+.ab-chat-panel--left {
+    border-right: 1px solid var(--ab-panel-border);
+    border-left: none;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.ab-chat-panel--left[data-theme="dark"] {
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Feature Classes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* No animations */
+.ab-chat-panel--no-animations,
+.ab-chat-panel--no-animations * {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* No shadows */
+.ab-chat-panel--no-shadows {
+    --ab-panel-shadow: none;
+}
+
+/* No glass effect */
+.ab-chat-panel--no-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive Design
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet and smaller: Full width overlay */
+@media (max-width: 768px) {
+    .ab-chat-panel {
+        position: fixed;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+        border: none;
+        border-radius: 0;
+        z-index: 1000;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .ab-chat-panel,
+    .ab-chat-panel * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast */
+@media (prefers-contrast: high) {
+    .ab-chat-panel {
+        border-width: 2px;
+    }
+}
+
+/* Print */
+@media print {
+    .ab-chat-panel {
+        display: none !important;
+    }
 }

@@ -180,16 +180,26 @@
         {
             if (!action.TryGetParameter<string>("field", out var field) || string.IsNullOrWhiteSpace(field))
             {
-                return ActionResult.Failure("Action 'set_field' requires 'field' parameter.");
+                return ActionResult.NeedsClarification("Action 'set_field' requires 'field' parameter.");
             }
 
-            var resolvedField = ResolveFieldName(Model.GetType(), field);
-            if (resolvedField is null)
+            var fieldResolution = ResolveFieldName(Model.GetType(), field);
+            if (fieldResolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(fieldResolution.Value))
             {
                 var available = string.Join(", ", GetSettableFieldNames(Model.GetType()));
-                return ActionResult.Failure(
-                    $"Field '{field}' was not found or is ambiguous on form model '{Model.GetType().Name}'. Available fields: {available}.");
+                var suggestion = fieldResolution.Candidates.Count > 0
+                    ? $" Closest fields: {string.Join(", ", fieldResolution.Candidates)}."
+                    : string.Empty;
+                return ActionResult.NeedsClarification(fieldResolution.Status switch
+                {
+                    EntityResolutionStatus.Ambiguous =>
+                        $"Field '{field}' is ambiguous on form model '{Model.GetType().Name}'. Available fields: {available}.{suggestion}",
+                    _ =>
+                        $"Field '{field}' was not found on form model '{Model.GetType().Name}'. Available fields: {available}.{suggestion}"
+                });
             }
+
+            var resolvedField = fieldResolution.Value;
 
             if (!action.Parameters.TryGetValue("value", out var raw))
             {
@@ -338,105 +348,55 @@
             .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-    private static string? ResolveFieldName(Type modelType, string fieldHint)
+    private static EntityResolutionResult ResolveFieldName(Type modelType, string fieldHint)
     {
         var properties = modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(static property => property.CanWrite && property.GetIndexParameters().Length == 0)
             .ToArray();
         if (properties.Length == 0)
         {
-            return null;
+            return new EntityResolutionResult(EntityResolutionStatus.NotFound, null, 0, []);
         }
 
-        var direct = properties.FirstOrDefault(property =>
-            string.Equals(property.Name, fieldHint, StringComparison.OrdinalIgnoreCase));
-        if (direct is not null)
+        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in properties)
         {
-            return direct.Name;
-        }
-
-        var normalizedHint = NormalizeIdentifier(fieldHint);
-        if (normalizedHint.Length == 0)
-        {
-            return null;
-        }
-
-        var normalizedMatches = properties
-            .Where(property => string.Equals(
-                NormalizeIdentifier(property.Name),
-                normalizedHint,
-                StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-        if (normalizedMatches.Length == 1)
-        {
-            return normalizedMatches[0].Name;
-        }
-
-        var hintTokens = SplitIdentifierTokens(fieldHint);
-        if (hintTokens.Count == 0)
-        {
-            return null;
-        }
-
-        var scored = properties
-            .Select(property =>
+            aliases[BuildWordSpacedIdentifier(property.Name)] = property.Name;
+            var display = property.GetCustomAttribute<DisplayAttribute>();
+            if (!string.IsNullOrWhiteSpace(display?.Name))
             {
-                var propertyTokens = SplitIdentifierTokens(property.Name);
-                var score = propertyTokens.Count(token =>
-                    hintTokens.Contains(token, StringComparer.OrdinalIgnoreCase));
-                var normalizedProperty = NormalizeIdentifier(property.Name);
-                if (normalizedProperty.Contains(normalizedHint, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedHint.Contains(normalizedProperty, StringComparison.OrdinalIgnoreCase))
-                {
-                    score += 1;
-                }
+                aliases[display.Name] = property.Name;
+            }
 
-                return (property.Name, score);
-            })
-            .Where(static candidate => candidate.score > 0)
-            .OrderByDescending(static candidate => candidate.score)
-            .ThenBy(static candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (scored.Length == 0)
-        {
-            return null;
+            var displayName = property.GetCustomAttribute<DisplayNameAttribute>();
+            if (!string.IsNullOrWhiteSpace(displayName?.DisplayName))
+            {
+                aliases[displayName.DisplayName] = property.Name;
+            }
         }
 
-        if (scored.Length > 1 && scored[0].score == scored[1].score)
-        {
-            return null;
-        }
-
-        return scored[0].Name;
+        return DeterministicEntityResolver.Resolve(
+            fieldHint,
+            properties.Select(static property => property.Name),
+            aliases,
+            minConfidence: 0.55,
+            ambiguityMargin: 0.06);
     }
 
-    private static string NormalizeIdentifier(string value)
+    private static string BuildWordSpacedIdentifier(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return string.Empty;
         }
 
-        return new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-    }
-
-    private static List<string> SplitIdentifierTokens(string value)
-    {
-        var tokens = new List<string>();
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return tokens;
-        }
-
         var builder = new System.Text.StringBuilder();
+
         char? previous = null;
         foreach (var ch in value)
         {
             if (!char.IsLetterOrDigit(ch))
             {
-                Flush();
-                previous = null;
                 continue;
             }
 
@@ -444,26 +404,14 @@
                 char.IsLower(previous.Value) &&
                 char.IsUpper(ch))
             {
-                Flush();
+                builder.Append(' ');
             }
 
-            builder.Append(char.ToLowerInvariant(ch));
+            builder.Append(ch);
             previous = ch;
         }
 
-        Flush();
-        return tokens;
-
-        void Flush()
-        {
-            if (builder.Length == 0)
-            {
-                return;
-            }
-
-            tokens.Add(builder.ToString());
-            builder.Clear();
-        }
+        return builder.ToString();
     }
 
     private static object? Normalize(object? value)

@@ -9,7 +9,7 @@ public static class AgentBlazorHostingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddAGUI();
-        services.TryAddSingleton<AgentBlazorHostedAgentFactory>();
+        services.TryAddSingleton<DeterministicAgUiHostedAgent>();
         return services;
     }
 }

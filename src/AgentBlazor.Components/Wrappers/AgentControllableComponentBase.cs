@@ -55,6 +55,7 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
             var uri = Navigation.Uri;
             var path = string.IsNullOrEmpty(uri) ? "/" : new Uri(uri).AbsolutePath;
             ComponentRouteRegistry.Register(ComponentIdForRoute, path);
+            NavigationIntentService.MarkNavigationCompleted(path);
         }
     }
 
@@ -87,6 +88,8 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
             }
 
             var resolvedAction = AgentAction.Create(action.Name, arguments);
+            var sessionId = TryGetContextValue(resolvedAction.Parameters, AgentRuntimeContextKeys.SessionId);
+            var runId = TryGetContextValue(resolvedAction.Parameters, AgentRuntimeContextKeys.RunId);
             var result = await ExecuteActionAsync(resolvedAction);
             _logger?.LogInformation(
                 "[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} applied {ActionName} Succeeded={Succeeded} Message={Message}",
@@ -97,7 +100,9 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
                 ActionId: action.Name,
                 Succeeded: result.Succeeded,
                 Message: result.Message,
-                OccurredAt: DateTimeOffset.UtcNow));
+                OccurredAt: DateTimeOffset.UtcNow,
+                SessionId: sessionId,
+                RunId: runId));
             if (!result.Succeeded)
             {
                 _logger?.LogWarning(
@@ -153,5 +158,28 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         }
 
         ComponentRouteRegistry?.Unregister(ComponentIdForRoute);
+    }
+
+    private static string? TryGetContextValue(
+        IReadOnlyDictionary<string, object?>? parameters,
+        string key)
+    {
+        if (parameters is null ||
+            !parameters.TryGetValue(key, out var raw) ||
+            raw is null)
+        {
+            return null;
+        }
+
+        var value = raw switch
+        {
+            string text => text,
+            System.Text.Json.JsonElement { ValueKind: System.Text.Json.JsonValueKind.String } json =>
+                json.GetString() ?? string.Empty,
+            System.Text.Json.JsonElement json => json.ToString(),
+            _ => raw.ToString() ?? string.Empty
+        };
+
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }
