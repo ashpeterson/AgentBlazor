@@ -1,0 +1,114 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Components
+@using MudBlazor
+
+@if (Block is not null)
+{
+    <MudPaper Class="ab-generated-form" Elevation="0">
+        <MudText Typo="Typo.caption" Class="ab-generated-form__eyebrow">Draft Form</MudText>
+        @if (!string.IsNullOrWhiteSpace(Block.Title))
+        {
+            <MudText Typo="Typo.subtitle1" Class="ab-generated-form__title">@Block.Title</MudText>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Block.Description))
+        {
+            <MudText Typo="Typo.body2" Class="ab-generated-form__description">@Block.Description</MudText>
+        }
+
+        <MudForm Class="ab-generated-form__fields">
+            @foreach (var field in Block.Fields)
+            {
+                var capturedField = field;
+                <MudTextField T="string"
+                              Label="@ResolveLabel(capturedField)"
+                              Placeholder="@capturedField.Placeholder"
+                              Required="@capturedField.Required"
+                              Disabled="@IsBusy"
+                              Immediate="true"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Class="ab-generated-form__input"
+                              InputType="@ResolveInputType(capturedField.Type)"
+                              Value="@GetValue(capturedField.Name)"
+                              ValueChanged="@(value => OnFieldValueChanged.InvokeAsync(new AgentGeneratedFieldChange(Block.Id, capturedField.Name, value)))" />
+            }
+        </MudForm>
+
+        @if (Block.Actions.Count > 0)
+        {
+            <div class="ab-generated-form__actions">
+                @foreach (var action in Block.Actions)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="ab-generated-form__action-btn"
+                               Disabled="IsBusy"
+                               OnClick="@(() => OnActionInvoked.InvokeAsync(action))">
+                        @(string.IsNullOrWhiteSpace(action.Label) ? action.Id : action.Label)
+                    </MudButton>
+                }
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public AgentUiBlock? Block { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, string?>? Values { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentGeneratedFieldChange> OnFieldValueChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentUiAction> OnActionInvoked { get; set; }
+
+    private string ResolveLabel(AgentUiField field)
+    {
+        if (!string.IsNullOrWhiteSpace(field.Label))
+        {
+            return field.Label;
+        }
+
+        return field.Name;
+    }
+
+    private string? GetValue(string fieldName)
+    {
+        if (Values is null)
+        {
+            return null;
+        }
+
+        return Values.TryGetValue(fieldName, out var value) ? value : null;
+    }
+
+    private static InputType ResolveInputType(string? type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return InputType.Text;
+        }
+
+        return type.Trim().ToLowerInvariant() switch
+        {
+            "email" => InputType.Email,
+            "number" => InputType.Number,
+            "password" => InputType.Password,
+            "tel" => InputType.Telephone,
+            "url" => InputType.Url,
+            "date" => InputType.Date,
+            "datetime-local" => InputType.DateTimeLocal,
+            "time" => InputType.Time,
+            "search" => InputType.Search,
+            _ => InputType.Text
+        };
+    }
+}

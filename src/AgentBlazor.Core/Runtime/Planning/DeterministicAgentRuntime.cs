@@ -298,7 +298,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 AvailableComponents = allowedComponents,
                 MountedComponents = mountedComponents,
                 ConversationHistory = conversationHistory,
-                AvailableRoutes = availableRoutes
+                AvailableRoutes = availableRoutes,
+                AgentInstructions = registration.Instructions
             };
 
             var plan = await _planner.PlanAsync(planRequest, cancellationToken);

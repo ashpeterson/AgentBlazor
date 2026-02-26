@@ -23,7 +23,6 @@ module.exports = defineConfig({
     reuseExistingServer: false,
     env: {
       ...process.env,
-      AGENTBLAZOR_DEMO_DETERMINISTIC_E2E: "true",
       OpenAI__ApiKey: "",
       OpenAI__Model: "",
       Ollama__Model: "",

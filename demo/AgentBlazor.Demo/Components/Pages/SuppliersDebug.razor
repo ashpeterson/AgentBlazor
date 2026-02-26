@@ -1,7 +1,9 @@
 @page "/suppliers-debug"
 @using AgentBlazor.Components
 @using AgentBlazor.Demo.Models
+@using AgentBlazor.Demo.Services
 @using MudBlazor
+@inject SupplierWorkflowService WorkflowService
 
 <PageTitle>Suppliers Debug</PageTitle>
 
@@ -42,5 +44,10 @@
 </MudPaper>
 
 @code {
-    private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
+    private List<SupplierRow> _suppliers = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _suppliers = (await WorkflowService.ListSuppliersAsync(CancellationToken.None)).ToList();
+    }
 }

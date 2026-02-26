@@ -17,28 +17,32 @@
     {
         @foreach (var block in Document.Blocks)
         {
-            <article class="ab-generative-surface__block">
-                @if (!string.IsNullOrWhiteSpace(block.Title))
-                {
-                    <h3 class="ab-generative-surface__title">@block.Title</h3>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(block.Description))
-                {
-                    <p class="ab-generative-surface__description">@block.Description</p>
-                }
-
+            <article class="ab-generative-surface__block @((block.Kind == AgentUiBlockKind.Card || block.Kind == AgentUiBlockKind.Form || block.Kind == AgentUiBlockKind.Chart || block.Kind == AgentUiBlockKind.Table) ? "ab-generative-surface__block--embedded" : null)">
                 @if (block.Kind == AgentUiBlockKind.Card)
                 {
-                    @RenderCardBlock(block)
+                    <AgentGeneratedCard Block="block"
+                                        IsBusy="_isBusy"
+                                        OnActionInvoked="@(action => InvokeActionAsync(block.Id, action, null))" />
                 }
                 else if (block.Kind == AgentUiBlockKind.Form)
                 {
-                    @RenderFormBlock(block)
+                    <AgentGeneratedForm Block="block"
+                                        Values="GetFormValues(block.Id)"
+                                        IsBusy="_isBusy"
+                                        OnFieldValueChanged="HandleFieldChange"
+                                        OnActionInvoked="@(action => InvokeActionAsync(block.Id, action, GetFormPayload(block.Id)))" />
+                }
+                else if (block.Kind == AgentUiBlockKind.Chart)
+                {
+                    <AgentGeneratedChart Block="block"
+                                         IsBusy="_isBusy"
+                                         OnActionInvoked="@(action => InvokeActionAsync(block.Id, action, null))" />
                 }
                 else if (block.Kind == AgentUiBlockKind.Table)
                 {
-                    @RenderTableBlock(block)
+                    <AgentGeneratedTable Block="block"
+                                         IsBusy="_isBusy"
+                                         OnActionInvoked="@(action => InvokeActionAsync(block.Id, action, null))" />
                 }
             </article>
         }
@@ -155,135 +159,6 @@
         }
     }
 
-    private RenderFragment RenderCardBlock(AgentUiBlock block) => builder =>
-    {
-        if (block.Actions.Count == 0)
-        {
-            return;
-        }
-
-        var sequence = 0;
-        builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
-        foreach (var action in block.Actions)
-        {
-            var capturedAction = action;
-            builder.OpenElement(sequence++, "button");
-            builder.AddAttribute(sequence++, "type", "button");
-            builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
-            builder.AddAttribute(sequence++, "disabled", _isBusy);
-            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => InvokeActionAsync(block.Id, capturedAction, null)));
-            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
-            builder.CloseElement();
-        }
-
-        builder.CloseElement();
-    };
-
-    private RenderFragment RenderFormBlock(AgentUiBlock block) => builder =>
-    {
-        var sequence = 0;
-        builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", "ab-generative-surface__form");
-
-        foreach (var field in block.Fields)
-        {
-            var capturedField = field;
-            builder.OpenElement(sequence++, "label");
-            builder.AddAttribute(sequence++, "class", "ab-generative-surface__label");
-            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedField.Label) ? capturedField.Name : capturedField.Label);
-            builder.OpenElement(sequence++, "input");
-            builder.AddAttribute(sequence++, "class", "ab-generative-surface__input");
-            builder.AddAttribute(sequence++, "type", string.IsNullOrWhiteSpace(capturedField.Type) ? "text" : capturedField.Type);
-            builder.AddAttribute(sequence++, "placeholder", capturedField.Placeholder);
-            builder.AddAttribute(sequence++, "required", capturedField.Required);
-            builder.AddAttribute(sequence++, "disabled", _isBusy);
-            builder.AddAttribute(sequence++, "value", GetFormFieldValue(block.Id, capturedField.Name));
-            builder.AddAttribute(sequence++, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(this, args =>
-                SetFormFieldValue(block.Id, capturedField.Name, args.Value?.ToString())));
-            builder.CloseElement();
-            builder.CloseElement();
-        }
-
-        if (block.Actions.Count > 0)
-        {
-            builder.OpenElement(sequence++, "div");
-            builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
-            foreach (var action in block.Actions)
-            {
-                var capturedAction = action;
-                builder.OpenElement(sequence++, "button");
-                builder.AddAttribute(sequence++, "type", "button");
-                builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
-                builder.AddAttribute(sequence++, "disabled", _isBusy);
-                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () =>
-                    InvokeActionAsync(block.Id, capturedAction, GetFormPayload(block.Id))));
-                builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
-                builder.CloseElement();
-            }
-
-            builder.CloseElement();
-        }
-
-        builder.CloseElement();
-    };
-
-    private RenderFragment RenderTableBlock(AgentUiBlock block) => builder =>
-    {
-        var sequence = 0;
-        builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", "ab-generative-surface__table-wrap");
-        builder.OpenElement(sequence++, "table");
-        builder.AddAttribute(sequence++, "class", "ab-generative-surface__table");
-
-        builder.OpenElement(sequence++, "thead");
-        builder.OpenElement(sequence++, "tr");
-        foreach (var column in block.Columns)
-        {
-            builder.OpenElement(sequence++, "th");
-            builder.AddContent(sequence++, string.IsNullOrWhiteSpace(column.Header) ? column.Key : column.Header);
-            builder.CloseElement();
-        }
-        builder.CloseElement();
-        builder.CloseElement();
-
-        builder.OpenElement(sequence++, "tbody");
-        foreach (var row in block.Rows)
-        {
-            builder.OpenElement(sequence++, "tr");
-            foreach (var column in block.Columns)
-            {
-                row.TryGetValue(column.Key, out var value);
-                builder.OpenElement(sequence++, "td");
-                builder.AddContent(sequence++, value?.ToString());
-                builder.CloseElement();
-            }
-            builder.CloseElement();
-        }
-        builder.CloseElement();
-
-        builder.CloseElement();
-        builder.CloseElement();
-
-        if (block.Actions.Count > 0)
-        {
-            builder.OpenElement(sequence++, "div");
-            builder.AddAttribute(sequence++, "class", "ab-generative-surface__actions");
-            foreach (var action in block.Actions)
-            {
-                var capturedAction = action;
-                builder.OpenElement(sequence++, "button");
-                builder.AddAttribute(sequence++, "type", "button");
-                builder.AddAttribute(sequence++, "class", "ab-generative-surface__action");
-                builder.AddAttribute(sequence++, "disabled", _isBusy);
-                builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => InvokeActionAsync(block.Id, capturedAction, null)));
-                builder.AddContent(sequence++, string.IsNullOrWhiteSpace(capturedAction.Label) ? capturedAction.Id : capturedAction.Label);
-                builder.CloseElement();
-            }
-            builder.CloseElement();
-        }
-    };
-
     private IReadOnlyDictionary<string, object?> GetFormPayload(string blockId)
     {
         if (!_formValues.TryGetValue(blockId, out var values))
@@ -297,14 +172,14 @@
             StringComparer.OrdinalIgnoreCase);
     }
 
-    private string? GetFormFieldValue(string blockId, string fieldName)
+    private IReadOnlyDictionary<string, string?> GetFormValues(string blockId)
     {
         if (!_formValues.TryGetValue(blockId, out var values))
         {
-            return null;
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return values.TryGetValue(fieldName, out var value) ? value : null;
+        return values;
     }
 
     private void SetFormFieldValue(string blockId, string fieldName, string? value)
@@ -316,6 +191,11 @@
         }
 
         values[fieldName] = value;
+    }
+
+    private void HandleFieldChange(AgentGeneratedFieldChange change)
+    {
+        SetFormFieldValue(change.BlockId, change.FieldName, change.Value);
     }
 
     private async Task InvokeActionAsync(

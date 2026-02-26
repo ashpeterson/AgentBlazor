@@ -11,6 +11,7 @@ public static class AgentUiToolIds
     public const string FormDraft = "form.draft";
     public const string ActionConfirmation = "action.confirmation";
     public const string TableView = "table.view";
+    public const string ChartView = "chart.view";
 }
 
 /// <summary>
@@ -209,6 +210,56 @@ public sealed class DefaultAgentUiToolCatalog : IAgentUiToolCatalog
                   "required": ["columns"]
                 }
                 """
+        },
+        new AgentUiToolDescriptor
+        {
+            ToolId = AgentUiToolIds.ChartView,
+            Description = "Render a deterministic chart from inline data or a named chart data source.",
+            InputSchema = """
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "blockId": { "type": "string" },
+                    "title": { "type": "string" },
+                    "description": { "type": "string" },
+                    "chartType": { "type": "string", "enum": ["line", "bar", "pie"] },
+                    "labels": { "type": "array", "items": { "type": "string" } },
+                    "dataSource": { "type": "string" },
+                    "dataArguments": { "type": "object" },
+                    "series": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": { "type": "string" },
+                          "data": { "type": "array", "items": { "type": ["number", "integer"] } }
+                        },
+                        "required": ["name", "data"]
+                      }
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": { "type": "string" },
+                          "label": { "type": "string" },
+                          "prompt": { "type": "string" },
+                          "arguments": { "type": "object" }
+                        },
+                        "required": ["id"]
+                      }
+                    }
+                  },
+                  "anyOf": [
+                    { "required": ["chartType", "labels", "series"] },
+                    { "required": ["dataSource"] }
+                  ]
+                }
+                """
         }
     ];
 
@@ -296,6 +347,8 @@ public sealed class DefaultAgentUiToolCatalog : IAgentUiToolCatalog
                 return TryRenderActionConfirmation(args, out block, out error);
             case AgentUiToolIds.TableView:
                 return TryRenderTableView(args, out block, out error);
+            case AgentUiToolIds.ChartView:
+                return TryRenderChartView(args, out block, out error);
             default:
                 block = null;
                 error = $"Unknown generated UI tool '{toolId}'.";
@@ -438,6 +491,77 @@ public sealed class DefaultAgentUiToolCatalog : IAgentUiToolCatalog
         return true;
     }
 
+    private static bool TryRenderChartView(
+        IReadOnlyDictionary<string, object?> args,
+        out AgentUiBlock? block,
+        out string? error)
+    {
+        var chartType = ReadChartType(args);
+        var labels = ReadStringList(args, "labels");
+        var series = ReadChartSeries(args);
+        var dataSource = ReadString(args, "dataSource");
+        var dataArguments = ReadObjectDictionary(args, "dataArguments");
+        var hasInlineData = labels.Count > 0 || series.Count > 0;
+
+        if (!hasInlineData && string.IsNullOrWhiteSpace(dataSource))
+        {
+            block = null;
+            error = $"Tool '{AgentUiToolIds.ChartView}' requires inline chart data or non-empty 'dataSource'.";
+            return false;
+        }
+
+        if (hasInlineData)
+        {
+            if (chartType is null)
+            {
+                block = null;
+                error = $"Tool '{AgentUiToolIds.ChartView}' requires a valid 'chartType' (line, bar, pie) for inline data.";
+                return false;
+            }
+
+            if (labels.Count == 0)
+            {
+                block = null;
+                error = $"Tool '{AgentUiToolIds.ChartView}' requires at least one label in 'labels' for inline data.";
+                return false;
+            }
+
+            if (series.Count == 0)
+            {
+                block = null;
+                error = $"Tool '{AgentUiToolIds.ChartView}' requires at least one series in 'series' for inline data.";
+                return false;
+            }
+
+            foreach (var entry in series)
+            {
+                if (entry.Data.Count != labels.Count)
+                {
+                    block = null;
+                    error = $"Tool '{AgentUiToolIds.ChartView}' series '{entry.Name}' must have {labels.Count} data points.";
+                    return false;
+                }
+            }
+        }
+
+        var title = ReadString(args, "title") ?? "Chart";
+        block = new AgentUiBlock
+        {
+            Id = ReadString(args, "blockId") ?? Slugify(title, "chart-view"),
+            Kind = AgentUiBlockKind.Chart,
+            Title = title,
+            Description = ReadString(args, "description"),
+            ChartType = chartType,
+            ChartLabels = labels,
+            ChartSeries = series,
+            ChartDataSource = dataSource,
+            ChartDataArguments = dataArguments,
+            Actions = ReadActions(args)
+        };
+        error = null;
+        return true;
+    }
+
     private static IReadOnlyList<AgentUiAction> ReadActions(IReadOnlyDictionary<string, object?> args)
     {
         if (!args.TryGetValue("actions", out var rawActions) || rawActions is not IEnumerable<object?> actionObjects)
@@ -562,6 +686,156 @@ public sealed class DefaultAgentUiToolCatalog : IAgentUiToolCatalog
         }
 
         return rows;
+    }
+
+    private static IReadOnlyList<string> ReadStringList(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        if (!args.TryGetValue(key, out var rawValues) || rawValues is not IEnumerable<object?> values)
+        {
+            return [];
+        }
+
+        var results = new List<string>();
+        foreach (var value in values)
+        {
+            var text = value?.ToString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                results.Add(text);
+            }
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyList<double> ReadNumberList(IReadOnlyDictionary<string, object?> args, string key)
+    {
+        if (!args.TryGetValue(key, out var rawValues) || rawValues is not IEnumerable<object?> values)
+        {
+            return [];
+        }
+
+        var results = new List<double>();
+        foreach (var value in values)
+        {
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (value is double number)
+            {
+                results.Add(number);
+                continue;
+            }
+
+            if (value is float floatValue)
+            {
+                results.Add(floatValue);
+                continue;
+            }
+
+            if (value is int intValue)
+            {
+                results.Add(intValue);
+                continue;
+            }
+
+            if (value is long longValue)
+            {
+                results.Add(longValue);
+                continue;
+            }
+
+            if (value is decimal decimalValue)
+            {
+                results.Add((double)decimalValue);
+                continue;
+            }
+
+            if (value is string text && double.TryParse(text, out var parsed))
+            {
+                results.Add(parsed);
+            }
+        }
+
+        return results;
+    }
+
+    private static IReadOnlyDictionary<string, object?> ReadObjectDictionary(
+        IReadOnlyDictionary<string, object?> args,
+        string key)
+    {
+        if (!args.TryGetValue(key, out var raw) || raw is null)
+        {
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (raw is IReadOnlyDictionary<string, object?> readOnly)
+        {
+            return readOnly;
+        }
+
+        if (raw is IDictionary<string, object?> mutable)
+        {
+            return new Dictionary<string, object?>(mutable, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<AgentUiChartSeries> ReadChartSeries(IReadOnlyDictionary<string, object?> args)
+    {
+        if (!args.TryGetValue("series", out var rawSeries) || rawSeries is not IEnumerable<object?> seriesValues)
+        {
+            return [];
+        }
+
+        var results = new List<AgentUiChartSeries>();
+        foreach (var rawSeriesEntry in seriesValues)
+        {
+            if (rawSeriesEntry is not IReadOnlyDictionary<string, object?> series)
+            {
+                continue;
+            }
+
+            var name = ReadString(series, "name");
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var data = ReadNumberList(series, "data");
+            if (data.Count == 0)
+            {
+                continue;
+            }
+
+            results.Add(new AgentUiChartSeries
+            {
+                Name = name,
+                Data = data
+            });
+        }
+
+        return results;
+    }
+
+    private static AgentUiChartType? ReadChartType(IReadOnlyDictionary<string, object?> args)
+    {
+        var raw = ReadString(args, "chartType");
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "line" => AgentUiChartType.Line,
+            "bar" => AgentUiChartType.Bar,
+            "pie" => AgentUiChartType.Pie,
+            _ => null
+        };
     }
 
     private static bool ReadBool(IReadOnlyDictionary<string, object?> args, string key)

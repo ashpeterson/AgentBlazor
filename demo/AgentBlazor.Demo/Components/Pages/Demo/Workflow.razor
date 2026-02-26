@@ -1,0 +1,174 @@
+@page "/demo/workflow"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Demo.Models
+@using AgentBlazor.Demo.Services
+@using MudBlazor
+@inject SupplierWorkflowService WorkflowService
+
+<PageTitle>Workflow — AgentBlazor Demo</PageTitle>
+
+<section>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+        <div>
+            <MudText Typo="Typo.h5">Complex Workflow</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Real-data workflow surface: onboarding queue, supplier risk operations, and generated UI charts.
+            </MudText>
+        </div>
+
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   Disabled="@_isLoading"
+                   OnClick="ReloadAsync">
+            Refresh
+        </MudButton>
+    </MudStack>
+
+    <MudStack Row="true" Spacing="1" Class="mb-3">
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Try: "sort onboarding requests by priority desc"
+        </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Try: "show only high risk suppliers"
+        </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            Try: "show onboarding intake volume chart"
+        </MudChip>
+    </MudStack>
+
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Suppliers</MudText>
+                <MudText Typo="Typo.h6">@_summary.TotalSuppliers</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">High Risk</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Error">@_summary.HighRiskSuppliers</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Open Onboarding</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Warning">@_summary.OpenOnboardingRequests</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Submitted This Month</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Success">@_summary.SubmittedThisMonth</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid>
+        <MudItem xs="12" lg="8">
+            <MudPaper Elevation="1" Class="pa-4">
+                <AgentTabs AgentId="workflow-tabs">
+                    <MudTabPanel Text="Onboarding Queue">
+                        <AgentDataGrid TItem="OnboardingRequestRow"
+                                       AgentId="workflow-intake-grid"
+                                       Items="@_onboarding"
+                                       Dense="true"
+                                       Hover="true"
+                                       Bordered="true"
+                                       Striped="true"
+                                       RowKeyProperty="RequestId"
+                                       ColumnAliases="@_onboardingAliases">
+                            <Columns>
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.RequestId" Title="Request" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.SupplierId" Title="Supplier ID" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.RiskTier" Title="Risk Tier" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="int" Property="x => x.Priority" Title="Priority" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.Status" Title="Status" />
+                                <PropertyColumn T="OnboardingRequestRow" TProperty="DateTime" Property="x => x.SubmittedUtc" Title="Submitted" Format="yyyy-MM-dd" />
+                            </Columns>
+                        </AgentDataGrid>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Supplier Risk">
+                        <AgentDataGrid TItem="SupplierRow"
+                                       AgentId="workflow-supplier-grid"
+                                       Items="@_suppliers"
+                                       Dense="true"
+                                       Hover="true"
+                                       Bordered="true"
+                                       Striped="true"
+                                       RowKeyProperty="SupplierId"
+                                       ColumnAliases="@_supplierAliases">
+                            <Columns>
+                                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
+                                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                                <PropertyColumn T="SupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                                <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+                            </Columns>
+                        </AgentDataGrid>
+                    </MudTabPanel>
+                </AgentTabs>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudPaper Elevation="1" Class="pa-4">
+                <AgentChatSurface Title="Workflow Agent"
+                                  Description="Coordinate the queue, suppliers, and generated UI from one workflow surface."
+                                  EnableGeneratedUi="true"
+                                  Placeholder="Ask to sort/filter tabs, then request generated cards/forms/charts for follow-up actions..." />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</section>
+
+@code {
+    private WorkflowSummary _summary = new(0, 0, 0, 0);
+    private List<OnboardingRequestRow> _onboarding = [];
+    private List<SupplierRow> _suppliers = [];
+    private bool _isLoading;
+
+    private static readonly IReadOnlyDictionary<string, string> _onboardingAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["request"] = nameof(OnboardingRequestRow.RequestId),
+            ["supplier"] = nameof(OnboardingRequestRow.SupplierName),
+            ["risk"] = nameof(OnboardingRequestRow.RiskTier),
+            ["priority"] = nameof(OnboardingRequestRow.Priority),
+            ["status"] = nameof(OnboardingRequestRow.Status),
+            ["submitted"] = nameof(OnboardingRequestRow.SubmittedUtc)
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> _supplierAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["id"] = nameof(SupplierRow.SupplierId),
+            ["supplier"] = nameof(SupplierRow.SupplierName),
+            ["region"] = nameof(SupplierRow.Region),
+            ["risk"] = nameof(SupplierRow.RiskScore),
+            ["audit"] = nameof(SupplierRow.LastAuditDate)
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _summary = await WorkflowService.GetWorkflowSummaryAsync(CancellationToken.None);
+            _onboarding = (await WorkflowService.ListOnboardingRequestsAsync(CancellationToken.None)).ToList();
+            _suppliers = (await WorkflowService.ListSuppliersAsync(CancellationToken.None)).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

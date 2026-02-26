@@ -41,9 +41,13 @@ dotnet add package AgentBlazor.Hosting</code></pre>
                         </div>
                         <pre><code><span class="code-keyword">using</span> AgentBlazor;
 
+builder.Services.AddSingleton&lt;MyChartDataSources&gt;();
+
 builder.Services.AddAgentBlazor(options =>
 {
     options.UseOpenAI(apiKey: <span class="code-string">"your-api-key"</span>);
+    options.UseChartDataResolver(sp => 
+        sp.GetRequiredService&lt;MyChartDataSources&gt;().ResolveAsync);
     <span class="code-comment">// Or use Ollama, Azure OpenAI, etc.</span>
 });
 
@@ -64,11 +68,11 @@ app.MapAgentBlazorEndpoints();</code></pre>
                             <span>YourPage.razor</span>
                         </div>
                         <pre><code><span class="code-comment">// Before: Standard MudBlazor</span>
-<span class="code-deleted">&lt;MudDataGrid Items="@@suppliers"&gt;</span>
+<span class="code-deleted">&lt;MudDataGrid Items="@@records"&gt;</span>
 
 <span class="code-comment">// After: Agent-controllable</span>
-<span class="code-added">&lt;AgentDataGrid AgentId="supplier-grid"</span>
-<span class="code-added">               Items="@@suppliers"&gt;</span>
+<span class="code-added">&lt;AgentDataGrid AgentId="records-grid"</span>
+<span class="code-added">               Items="@@records"&gt;</span>
 
 <span class="code-comment">// Same for forms, dialogs, tabs, nav menus...</span>
 <span class="code-added">&lt;AgentForm AgentId="my-form" ...&gt;</span>
@@ -97,7 +101,7 @@ app.MapAgentBlazorEndpoints();</code></pre>
                     </div>
                     <div class="landing-step__result">
                         <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
-                        <span>That's it! Users can now say <em>"show high risk suppliers"</em> and watch the magic happen.</span>
+                        <span>That's it! Users can now say <em>"show overdue records"</em> and watch the magic happen.</span>
                     </div>
                 </div>
             </article>

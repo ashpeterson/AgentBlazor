@@ -481,3 +481,8 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 /demo/AgentBlazor.Demo/appsettings.Development.json
+
+# Demo runtime database artifacts
+/demo/AgentBlazor.Demo/*.db
+/demo/AgentBlazor.Demo/*.db-shm
+/demo/AgentBlazor.Demo/*.db-wal

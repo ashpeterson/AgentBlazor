@@ -56,6 +56,11 @@ public sealed record ActionPlanRequest
     public IReadOnlyList<AvailableRoute> AvailableRoutes { get; init; } = [];
 
     /// <summary>
+    /// Optional agent-level instructions to bias deterministic planning for a specific app/domain.
+    /// </summary>
+    public string? AgentInstructions { get; init; }
+
+    /// <summary>
     /// The current route/URL the user is on. Helps the planner understand context
     /// and avoid unnecessary navigation when already on the correct page.
     /// </summary>

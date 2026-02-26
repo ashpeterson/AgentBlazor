@@ -1,0 +1,302 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Components
+@using Microsoft.Extensions.DependencyInjection
+@using MudBlazor
+
+@if (Block is not null)
+{
+    <MudPaper Class="ab-generated-chart" Elevation="0">
+        <MudText Typo="Typo.caption" Class="ab-generated-chart__eyebrow">Forecast Visual</MudText>
+        @if (!string.IsNullOrWhiteSpace(EffectiveTitle))
+        {
+            <MudText Typo="Typo.subtitle1" Class="ab-generated-chart__title">@EffectiveTitle</MudText>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(EffectiveDescription))
+        {
+            <MudText Typo="Typo.body2" Class="ab-generated-chart__description">@EffectiveDescription</MudText>
+        }
+
+        <div class="ab-generated-chart__canvas">
+            @if (_isLoadingData)
+            {
+                <MudText Typo="Typo.body2" Class="ab-generated-chart__status">Loading chart data...</MudText>
+            }
+            else if (!string.IsNullOrWhiteSpace(_dataError))
+            {
+                <MudText Typo="Typo.body2" Class="ab-generated-chart__status ab-generated-chart__status--error">@_dataError</MudText>
+            }
+            else if (_resolvedChart is not null)
+            {
+                <MudChart ChartType="@ResolveChartType(_resolvedChart.ChartType)"
+                          ChartSeries="@BuildSeries(_resolvedChart.Series)"
+                          Width="100%"
+                          Height="360px"
+                          XAxisLabels="@_resolvedChart.Labels.ToArray()" />
+            }
+        </div>
+
+        @{
+            var legendEntries = GetLegendEntries(_resolvedChart);
+        }
+        @if (legendEntries.Count > 0)
+        {
+            <ul class="ab-generated-chart__legend" aria-label="Chart legend">
+                @for (var index = 0; index < legendEntries.Count; index++)
+                {
+                    var label = legendEntries[index];
+                    <li class="ab-generated-chart__legend-item">
+                        <span class="ab-generated-chart__legend-dot" style="@($"--legend-color: {LegendColors[index % LegendColors.Length]};")"></span>
+                        <span class="ab-generated-chart__legend-label">@label</span>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Block.Actions.Count > 0)
+        {
+            <div class="ab-generated-chart__actions">
+                @foreach (var action in Block.Actions)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="ab-generated-chart__action-btn"
+                               Disabled="IsBusy"
+                               OnClick="@(() => OnActionInvoked.InvokeAsync(action))">
+                        @(string.IsNullOrWhiteSpace(action.Label) ? action.Id : action.Label)
+                    </MudButton>
+                }
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public AgentUiBlock? Block { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentUiAction> OnActionInvoked { get; set; }
+
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = default!;
+
+    private static readonly string[] LegendColors =
+    [
+        "#5fa2ff",
+        "#7e68ff",
+        "#df5ea8",
+        "#efac42",
+        "#4ac2c9",
+        "#6ac084",
+        "#ff8f50"
+    ];
+
+    private ResolvedChart? _resolvedChart;
+    private string? _resolvedStateKey;
+    private string? _dataError;
+    private bool _isLoadingData;
+
+    private string? EffectiveTitle => _resolvedChart?.Title ?? Block?.Title;
+
+    private string? EffectiveDescription => _resolvedChart?.Description ?? Block?.Description;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Block is null)
+        {
+            _resolvedChart = null;
+            _resolvedStateKey = null;
+            _dataError = null;
+            _isLoadingData = false;
+            return;
+        }
+
+        var stateKey = BuildStateKey(Block);
+        if (string.Equals(_resolvedStateKey, stateKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _resolvedStateKey = stateKey;
+        _dataError = null;
+
+        if (HasInlineData(Block))
+        {
+            _resolvedChart = new ResolvedChart(
+                ChartType: Block.ChartType ?? AgentUiChartType.Line,
+                Labels: Block.ChartLabels,
+                Series: Block.ChartSeries,
+                Title: null,
+                Description: null);
+            _isLoadingData = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Block.ChartDataSource))
+        {
+            _resolvedChart = null;
+            _isLoadingData = false;
+            _dataError = "No chart data available.";
+            return;
+        }
+
+        var effectiveResolver = ServiceProvider.GetService<AgentChartDataResolver>();
+        if (effectiveResolver is null)
+        {
+            _resolvedChart = null;
+            _isLoadingData = false;
+            _dataError = "Chart data resolver is not configured.";
+            return;
+        }
+
+        _isLoadingData = true;
+        try
+        {
+            var request = new AgentChartDataRequest(
+                Block.ChartDataSource,
+                Block.ChartDataArguments);
+            var response = await effectiveResolver(request, CancellationToken.None);
+            if (response is null)
+            {
+                _resolvedChart = null;
+                _dataError = $"No chart data was returned for '{Block.ChartDataSource}'.";
+                return;
+            }
+
+            if (!IsValidResolvedData(response, out var validationError))
+            {
+                _resolvedChart = null;
+                _dataError = validationError;
+                return;
+            }
+
+            _resolvedChart = new ResolvedChart(
+                response.ChartType,
+                response.Labels,
+                response.Series,
+                response.Title,
+                response.Description);
+        }
+        catch (Exception ex)
+        {
+            _resolvedChart = null;
+            _dataError = $"Unable to load chart data: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingData = false;
+        }
+    }
+
+    private static bool HasInlineData(AgentUiBlock block)
+    {
+        return block.ChartType is not null &&
+               block.ChartLabels.Count > 0 &&
+               block.ChartSeries.Count > 0;
+    }
+
+    private static string BuildStateKey(AgentUiBlock block)
+    {
+        var argsFingerprint = string.Join(
+            ';',
+            block.ChartDataArguments
+                .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static pair => $"{pair.Key}={pair.Value}"));
+
+        return string.Join(
+            '|',
+            block.Id,
+            block.ChartType?.ToString() ?? string.Empty,
+            block.ChartDataSource ?? string.Empty,
+            block.ChartLabels.Count,
+            block.ChartSeries.Count,
+            argsFingerprint);
+    }
+
+    private static bool IsValidResolvedData(AgentChartDataResult response, out string? error)
+    {
+        if (response.Labels.Count == 0)
+        {
+            error = "Resolved chart data must include labels.";
+            return false;
+        }
+
+        if (response.Series.Count == 0)
+        {
+            error = "Resolved chart data must include at least one series.";
+            return false;
+        }
+
+        foreach (var series in response.Series)
+        {
+            if (series.Data.Count != response.Labels.Count)
+            {
+                error = $"Series '{series.Name}' must contain {response.Labels.Count} points.";
+                return false;
+            }
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static ChartType ResolveChartType(AgentUiChartType chartType)
+    {
+        return chartType switch
+        {
+            AgentUiChartType.Bar => ChartType.Bar,
+            AgentUiChartType.Pie => ChartType.Pie,
+            _ => ChartType.Line
+        };
+    }
+
+    private static List<ChartSeries> BuildSeries(IReadOnlyList<AgentUiChartSeries> series)
+    {
+        if (series.Count == 0)
+        {
+            return [];
+        }
+
+        var chartSeries = new List<ChartSeries>(series.Count);
+        foreach (var entry in series)
+        {
+            chartSeries.Add(new ChartSeries
+            {
+                Name = entry.Name,
+                Data = entry.Data.ToArray()
+            });
+        }
+
+        return chartSeries;
+    }
+
+    private static IReadOnlyList<string> GetLegendEntries(ResolvedChart? chart)
+    {
+        if (chart is null)
+        {
+            return [];
+        }
+
+        if (chart.ChartType == AgentUiChartType.Pie)
+        {
+            return chart.Labels;
+        }
+
+        return chart.Series
+            .Select(static entry => entry.Name)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .ToArray();
+    }
+
+    private sealed record ResolvedChart(
+        AgentUiChartType ChartType,
+        IReadOnlyList<string> Labels,
+        IReadOnlyList<AgentUiChartSeries> Series,
+        string? Title,
+        string? Description);
+}

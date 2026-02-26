@@ -359,3 +359,41 @@ Agent responses stream in real-time, showing:
 
 Questions? Check the integration tests for working examples:
 `tests/AgentBlazor.IntegrationTests/`
+
+Best Workflow Demos
+
+  1. Incident Triage to Mitigation Plan
+
+  - User asks for unhealthy services.
+  - Agent filters/sorts grid, switches tabs, opens detail dialog.
+  - Agent generates a triage summary card + trend chart + action form.
+  - User applies generated form values; agent creates mitigation task.
+  - Shows: DataGrid + Tabs + Dialog + Form + Chart + generated actions.
+
+  2. Quarterly Review Builder
+
+  - User asks for “Q2 performance review package”.
+  - Agent navigates to reports page, applies filters, composes table + chart.
+  - Agent generates “Review Draft” form (owner, audience, notes).
+  - User edits generated form and approves final “publish” action.
+  - Shows: multi-page navigation, data transformations, approval workflow.
+
+  3. Change Request Lifecycle
+
+  - User: “Create a change request from high-priority backlog items.”
+  - Agent identifies candidates, drafts request form, opens approval-required actions.
+  - User approves/denies; agent confirms and logs outcome in chat.
+  - Shows: pending approvals, deterministic execution, auditability.
+
+  4. Forecast-Driven Planning
+
+  - User asks for 90-day forecast.
+  - Agent uses chartDataSource resolver to render multiple chart blocks.
+  - Agent generates follow-up actions like “drill into month 2” or “compare scenarios”.
+  - Shows: external data source integration + reusable chart pipeline.
+
+  5. Ops Daily Standup Copilot
+
+  - Agent assembles a daily briefing: blockers table, progress chart, action checklist.
+  - User triggers “create standup notes” generated form, then “send summary”.
+  - Shows: end-to-end generated UI from read -> synthesize -> act.

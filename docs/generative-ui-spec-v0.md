@@ -1,6 +1,6 @@
 # Generative UI Spec v0
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## Goal
 
@@ -17,12 +17,14 @@ Primary types:
 - `AgentUiAction`
 - `AgentUiField`
 - `AgentUiTableColumn`
+- `AgentUiChartSeries`
 - `AgentUiActionInvocation`
 
 Block kinds:
 - `Card`
 - `Form`
 - `Table`
+- `Chart`
 
 Spec version constant:
 - `agentblazor.ui.v0`
@@ -64,6 +66,23 @@ Spec version constant:
           "prompt": "submit supplier onboarding form"
         }
       ]
+    },
+    {
+      "id": "riskTrend",
+      "kind": "Chart",
+      "title": "Risk Trend",
+      "chartType": "Line",
+      "labels": ["Mon", "Tue", "Wed"],
+      "series": [
+        { "name": "RiskScore", "data": [62, 68, 71] }
+      ]
+    },
+    {
+      "id": "deliveryTrend",
+      "kind": "Chart",
+      "title": "Delivery Forecast",
+      "chartDataSource": "app.delivery.forecast",
+      "chartDataArguments": { "horizon": 6 }
     }
   ]
 }
@@ -96,6 +115,7 @@ The planner returns deterministic `uiToolCalls` (not freeform blocks), and runti
 3. Form field values are tracked locally by block id and included in action payloads.
 4. Every action emits `OnActionInvoked` with `AgentUiActionInvocation`.
 5. When `ForwardActionsToRuntime=true` and action has `Prompt`, the component forwards to `IAgentRuntime`.
+6. Chart blocks can use inline data (`chartType` + `labels` + `series`) or a named chart data source (`chartDataSource` + optional `chartDataArguments`) resolved by the host app.
 
 ## Current Scope Limits (v0)
 
@@ -107,4 +127,4 @@ The planner returns deterministic `uiToolCalls` (not freeform blocks), and runti
 
 1. State delta updates for incremental UI refresh.
 2. Standardized action metadata for approval and interrupt/resume.
-3. Richer component block types (charts, timeline, file previews).
+3. Richer component block types (timeline, file previews).

@@ -21,7 +21,8 @@ public enum AgentUiBlockKind
 {
     Card,
     Form,
-    Table
+    Table,
+    Chart
 }
 
 public sealed record AgentUiDocument
@@ -88,6 +89,17 @@ public sealed record AgentUiBlock
 
     public IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows { get; init; } = [];
 
+    public AgentUiChartType? ChartType { get; init; }
+
+    public IReadOnlyList<string> ChartLabels { get; init; } = [];
+
+    public IReadOnlyList<AgentUiChartSeries> ChartSeries { get; init; } = [];
+
+    public string? ChartDataSource { get; init; }
+
+    public IReadOnlyDictionary<string, object?> ChartDataArguments { get; init; } =
+        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
     public bool TryValidate(out string? error)
     {
         var seenActionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -125,6 +137,57 @@ public sealed record AgentUiBlock
                 if (string.IsNullOrWhiteSpace(column.Key))
                 {
                     error = $"Table block '{Id}' has a column with an empty key.";
+                    return false;
+                }
+            }
+        }
+
+        if (Kind == AgentUiBlockKind.Chart)
+        {
+            var hasInlineData = ChartLabels.Count > 0 || ChartSeries.Count > 0;
+            var hasDataSource = !string.IsNullOrWhiteSpace(ChartDataSource);
+
+            if (!hasInlineData && !hasDataSource)
+            {
+                error = $"Chart block '{Id}' must define inline data or a chart data source.";
+                return false;
+            }
+
+            if (!hasInlineData)
+            {
+                error = null;
+                return true;
+            }
+
+            if (ChartType is null)
+            {
+                error = $"Chart block '{Id}' must include a chart type.";
+                return false;
+            }
+
+            if (ChartLabels.Count == 0)
+            {
+                error = $"Chart block '{Id}' must define at least one label.";
+                return false;
+            }
+
+            if (ChartSeries.Count == 0)
+            {
+                error = $"Chart block '{Id}' must define at least one series.";
+                return false;
+            }
+
+            foreach (var series in ChartSeries)
+            {
+                if (string.IsNullOrWhiteSpace(series.Name))
+                {
+                    error = $"Chart block '{Id}' has a series with an empty name.";
+                    return false;
+                }
+
+                if (series.Data.Count != ChartLabels.Count)
+                {
+                    error = $"Chart block '{Id}' series '{series.Name}' must have {ChartLabels.Count} data points.";
                     return false;
                 }
             }
@@ -170,6 +233,21 @@ public sealed record AgentUiTableColumn
     public string Key { get; init; } = string.Empty;
 
     public string Header { get; init; } = string.Empty;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AgentUiChartType
+{
+    Line,
+    Bar,
+    Pie
+}
+
+public sealed record AgentUiChartSeries
+{
+    public string Name { get; init; } = string.Empty;
+
+    public IReadOnlyList<double> Data { get; init; } = [];
 }
 
 public sealed record AgentUiActionInvocation(

@@ -2,20 +2,38 @@
 @layout DemoLayout
 @using AgentBlazor.Components
 @using AgentBlazor.Demo.Models
+@using AgentBlazor.Demo.Services
 @using MudBlazor
+@inject SupplierWorkflowService WorkflowService
 
 <PageTitle>Suppliers — AgentBlazor Demo</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-1">Suppliers</MudText>
 <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
-    Try: <em>"show me high risk suppliers"</em>, <em>"sort by risk descending"</em>, or <em>"focus SUP-006"</em>
+    Live workflow data. Try: <em>"show me high risk suppliers"</em>, <em>"sort by risk descending"</em>, or <em>"focus SUP-006"</em>.
 </MudText>
 
 <MudPaper Elevation="1" Class="pa-4 mb-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
         <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">Ask the agent to filter, sort, or focus rows</MudChip>
+        <MudButton Size="Size.Small"
+                   Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   Disabled="@_isLoading"
+                   OnClick="ReloadAsync">
+            Refresh Data
+        </MudButton>
         <MudSpacer />
-        <MudText Typo="Typo.caption" Color="Color.Secondary">@_suppliers.Count suppliers loaded</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @if (_isLoading)
+            {
+                <text>Loading suppliers...</text>
+            }
+            else
+            {
+                <text>@_suppliers.Count suppliers loaded</text>
+            }
+        </MudText>
     </MudStack>
 
     <AgentDataGrid TItem="SupplierRow"
@@ -49,7 +67,26 @@
                  Description="Ask me to navigate, filter, sort, or focus suppliers." />
 
 @code {
-    private readonly List<SupplierRow> _suppliers = SupplierSeedData.Suppliers();
+    private List<SupplierRow> _suppliers = [];
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _suppliers = (await WorkflowService.ListSuppliersAsync(CancellationToken.None)).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
 
     private static Color RiskColor(int score) => score switch
     {

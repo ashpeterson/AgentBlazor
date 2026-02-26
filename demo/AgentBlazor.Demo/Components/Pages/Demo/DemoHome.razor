@@ -16,13 +16,13 @@
 
         <div class="demo-home__hero-content">
             <h1 class="demo-home__title">
-                Talk to your <span class="demo-home__accent">Supplier Platform</span>
+                Talk to your <span class="demo-home__accent">Blazor App</span>
             </h1>
             <p class="demo-home__subtitle">
-                Use natural language to filter data, navigate pages, switch tabs, and control UI components.
+                Run a real end-to-end workflow: submit onboarding, review suppliers, and generate live charts from persisted app data.
             </p>
 
-            <AgentChatBar Placeholder="Try: show me high risk suppliers"
+            <AgentChatBar Placeholder="Try: show overdue records"
                           Suggestions="_suggestions"
                           ShowTimeline="true"
                           ShowClearButton="true"
@@ -32,9 +32,14 @@
 
     <!-- Quick Links -->
     <section class="demo-home__links">
+        <a href="demo/workflow" class="demo-home__link-card">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Large" />
+            <span>Complex Workflow</span>
+            <small>Queue + suppliers + generated UI</small>
+        </a>
         <a href="demo/suppliers" class="demo-home__link-card">
             <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Large" />
-            <span>Suppliers Grid</span>
+            <span>Data Grid</span>
             <small>Filter, sort, and focus rows</small>
         </a>
         <a href="demo/generative-ui" class="demo-home__link-card">
@@ -49,7 +54,7 @@
         </a>
         <a href="demo/onboarding" class="demo-home__link-card">
             <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Large" />
-            <span>Onboarding</span>
+            <span>Form Workflow</span>
             <small>Forms and dialogs</small>
         </a>
         <a href="demo/status" class="demo-home__link-card">
@@ -63,10 +68,11 @@
 @code {
     private static readonly IReadOnlyList<string> _suggestions =
     [
-        "show me high risk suppliers",
-        "summarize this workspace as generated ui",
-        "go to workspace and switch to Risk tab",
-        "navigate to onboarding",
-        "sort suppliers by risk descending"
+        "open onboarding and draft a new supplier request",
+        "go to workflow and sort onboarding queue by priority",
+        "go to suppliers and show high risk rows first",
+        "switch to the Risk tab in workspace",
+        "summarize this page as generated ui",
+        "show supplier risk by region as a chart"
     ];
 }

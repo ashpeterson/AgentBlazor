@@ -161,6 +161,74 @@ public class AgentUiToolCatalogTests
     }
 
     [Fact]
+    public void BuildDocument_ChartView_RendersChartBlock()
+    {
+        var catalog = new DefaultAgentUiToolCatalog();
+
+        var document = catalog.BuildDocument(
+        [
+            new AgentUiToolCall
+            {
+                ToolId = AgentUiToolIds.ChartView,
+                Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["blockId"] = "trend-chart",
+                    ["title"] = "Weekly Trend",
+                    ["chartType"] = "line",
+                    ["labels"] = new object?[] { "Mon", "Tue", "Wed" },
+                    ["series"] = new object?[]
+                    {
+                        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["name"] = "Score",
+                            ["data"] = new object?[] { 3, 4, 5 }
+                        }
+                    }
+                }
+            }
+        ], out var errors);
+
+        Assert.NotNull(document);
+        Assert.Empty(errors);
+        var block = Assert.Single(document!.Blocks);
+        Assert.Equal(AgentUiBlockKind.Chart, block.Kind);
+        Assert.Equal("trend-chart", block.Id);
+        Assert.Equal(3, block.ChartLabels.Count);
+        Assert.Single(block.ChartSeries);
+    }
+
+    [Fact]
+    public void BuildDocument_ChartView_WithDataSource_RendersChartBlock()
+    {
+        var catalog = new DefaultAgentUiToolCatalog();
+
+        var document = catalog.BuildDocument(
+        [
+            new AgentUiToolCall
+            {
+                ToolId = AgentUiToolIds.ChartView,
+                Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["blockId"] = "chart-from-source",
+                    ["title"] = "Chart From Data Source",
+                    ["dataSource"] = "app.metrics.forecast",
+                    ["dataArguments"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["window"] = "30d"
+                    }
+                }
+            }
+        ], out var errors);
+
+        Assert.NotNull(document);
+        Assert.Empty(errors);
+        var block = Assert.Single(document!.Blocks);
+        Assert.Equal(AgentUiBlockKind.Chart, block.Kind);
+        Assert.Equal("app.metrics.forecast", block.ChartDataSource);
+        Assert.Single(block.ChartDataArguments);
+    }
+
+    [Fact]
     public void BuildDocument_DuplicateBlockIds_AreMadeUnique()
     {
         var catalog = new DefaultAgentUiToolCatalog();

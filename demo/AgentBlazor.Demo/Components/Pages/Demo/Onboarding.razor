@@ -2,7 +2,10 @@
 @layout DemoLayout
 @using System.ComponentModel.DataAnnotations
 @using AgentBlazor.Components
+@using AgentBlazor.Demo.Services
 @using MudBlazor
+@inject SupplierWorkflowService WorkflowService
+@inject ISnackbar Snackbar
 
 <PageTitle>Supplier Onboarding — AgentBlazor Demo</PageTitle>
 
@@ -11,6 +14,15 @@
 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
     Open Onboarding Dialog
 </MudButton>
+
+@if (_lastSubmission is not null)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+        Submitted <strong>@_lastSubmission.RequestId</strong> and created supplier
+        <strong>@_lastSubmission.SupplierId</strong> with computed risk score
+        <strong>@_lastSubmission.RiskScore</strong>.
+    </MudAlert>
+}
 
 <AgentDialog @ref="_dialog"
              AgentId="supplier-onboarding-dialog">
@@ -84,6 +96,13 @@
                               Lines="2"
                               For="@(() => _model.Notes)"
                               @bind-Value="_model.Notes" />
+                <MudStack Row="true" Justify="Justify.FlexEnd">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Submit Onboarding
+                    </MudButton>
+                </MudStack>
             </ChildContent>
         </AgentForm>
     </DialogContent>
@@ -95,17 +114,44 @@
 </AgentDialog>
 
 <AgentChatWidget Title="Onboarding Agent"
-                 Description="Ask me to open the form and fill supplier details across multiple fields." />
+                 Description="Ask me to open the form, fill multiple fields, and submit the onboarding request." />
 
 @code {
     private AgentDialog? _dialog;
-    private readonly SupplierOnboardingModel _model = new();
+    private SupplierOnboardingModel _model = new();
+    private SupplierOnboardingResult? _lastSubmission;
 
     private Task OpenDialogAsync() => _dialog?.OpenAsync() ?? Task.CompletedTask;
 
     private Task CloseDialogAsync() => _dialog?.CloseAsync() ?? Task.CompletedTask;
 
-    private Task OnSubmitted() => CloseDialogAsync();
+    private async Task OnSubmitted()
+    {
+        var submission = new SupplierOnboardingSubmission(
+            _model.SupplierName,
+            _model.ContactEmail,
+            _model.ContactPhone,
+            _model.RiskTier,
+            _model.Country,
+            _model.Category,
+            _model.PaymentTerms,
+            _model.PreferredCurrency,
+            _model.RequestedBudget,
+            _model.ExpectedMonthlySpend,
+            _model.Priority,
+            _model.SanctionsScreened,
+            _model.NdaRequired,
+            _model.Notes);
+
+        var result = await WorkflowService.SubmitOnboardingAsync(submission, CancellationToken.None);
+        _lastSubmission = result;
+        Snackbar.Add(
+            $"Submitted {result.RequestId} and created supplier {result.SupplierId} (risk score {result.RiskScore}).",
+            Severity.Success);
+
+        _model = new SupplierOnboardingModel();
+        await CloseDialogAsync();
+    }
 
     private sealed class SupplierOnboardingModel
     {

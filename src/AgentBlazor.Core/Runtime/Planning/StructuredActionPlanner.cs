@@ -122,6 +122,13 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         sb.AppendLine("- For AgentForm.set_field, semantic field hints are allowed; runtime resolves canonical fields.");
         sb.AppendLine();
 
+        if (!string.IsNullOrWhiteSpace(request.AgentInstructions))
+        {
+            sb.AppendLine("# AGENT-SPECIFIC INSTRUCTIONS");
+            sb.AppendLine(request.AgentInstructions.Trim());
+            sb.AppendLine();
+        }
+
         if (request.GenerateUi)
         {
             sb.AppendLine("# GENERATED UI RULES");

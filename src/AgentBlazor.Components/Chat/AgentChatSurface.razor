@@ -59,7 +59,7 @@
              aria-label="Conversation">
             @foreach (var item in _timeline)
             {
-                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role"
+                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role @(item.GeneratedUi is null ? null : "ab-chat-surface__item--generated")"
                          aria-label="@item.RoleLabel">
                     <div class="ab-chat-surface__item-role">@item.RoleLabel</div>
                     <div class="ab-chat-surface__item-text">@item.Text</div>

@@ -9,22 +9,22 @@
     <header class="gen-ui-demo__header">
         <MudText Typo="Typo.h5">Generative UI Playground</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Prompt the agent, then use generated UI actions to continue the workflow.
+            Generated blocks are backed by live workflow data from the demo database.
         </MudText>
     </header>
 
     <MudStack Row="true" Spacing="1" Class="mb-3">
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "show highest risk supplier"
+            Try: "show onboarding intake volume for the last 8 months"
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Then use generated actions like "Run Again" or "Filter High Risk"
+            Try: "show supplier risk by region as a chart"
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "create an onboarding draft for supplier Ash"
+            Try: "create a supplier onboarding checklist card"
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "create a risk forecast chart for supplier Ash"
+            Then continue with generated actions to run follow-up steps
         </MudChip>
     </MudStack>
 
@@ -32,6 +32,6 @@
         <AgentChatSurface Title="Generative UI Agent"
                           Description="Generated UI mode is enabled for this chat."
                           EnableGeneratedUi="true"
-                          Placeholder="Ask for a component (table, form, summary, forecast) and continue with generated actions..." />
+                          Placeholder="Ask for a generated summary, form draft, table, or live chart and continue with generated actions..." />
     </MudPaper>
 </section>

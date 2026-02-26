@@ -1,10 +1,9 @@
 using AgentBlazor;
 using AgentBlazor.Demo.Components;
+using AgentBlazor.Demo.Data;
 using AgentBlazor.Demo.Services;
-using AgentBlazor.Core.Components;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,9 +28,28 @@ var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"]
     ?? "http://127.0.0.1:11434/v1";
 var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OLLAMA_API_KEY");
+var workflowConnectionString = builder.Configuration.GetConnectionString("DemoWorkflow")
+    ?? "Data Source=agentblazor-demo.db";
+
+builder.Services.AddDbContextFactory<DemoWorkflowDbContext>(options =>
+    options.UseSqlite(workflowConnectionString));
+builder.Services.AddSingleton<SupplierWorkflowService>();
+builder.Services.AddSingleton<DemoChartDataSources>();
+builder.Services.AddSingleton<DemoWorkflowDatabaseSeeder>();
 
 builder.Services.AddAgentBlazor(options =>
 {
+    options.AgentInstructions =
+        """
+        Execute only deterministic component actions and generated UI tools.
+        Never fabricate operational metrics or chart values.
+        For generated charts, use chart.view with dataSource values:
+        - demo.suppliers.risk.by-region
+        - demo.suppliers.risk.tier-distribution
+        - demo.onboarding.volume.monthly (optional dataArguments.months: 3..18)
+        Prefer these data sources over inline chart labels/series whenever possible.
+        """;
+
     if (!string.IsNullOrWhiteSpace(openAiApiKey))
     {
         options.UseOpenAI(openAiApiKey, openAiModel);
@@ -40,17 +58,17 @@ builder.Services.AddAgentBlazor(options =>
     {
         options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
     }
+
+    options.UseChartDataResolver(sp => sp.GetRequiredService<DemoChartDataSources>().ResolveAsync);
 });
 
-if (bool.TryParse(Environment.GetEnvironmentVariable("AGENTBLAZOR_DEMO_DETERMINISTIC_E2E"), out var useDeterministicE2e) &&
-    useDeterministicE2e)
-{
-    builder.Services.Replace(ServiceDescriptor.Singleton<IChatClient, E2eDeterministicChatClient>());
-}
-
-builder.Services.Replace(ServiceDescriptor.Singleton<IAgentUiToolCatalog, DemoAgentUiToolCatalog>());
-
 var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var seeder = scope.ServiceProvider.GetRequiredService<DemoWorkflowDatabaseSeeder>();
+    await seeder.InitializeAsync(CancellationToken.None);
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

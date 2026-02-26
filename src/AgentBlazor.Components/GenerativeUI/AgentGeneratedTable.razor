@@ -1,0 +1,72 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Components
+@using MudBlazor
+
+@if (Block is not null)
+{
+    <MudPaper Class="ab-generated-table" Elevation="0">
+        <MudText Typo="Typo.caption" Class="ab-generated-table__eyebrow">Data View</MudText>
+        @if (!string.IsNullOrWhiteSpace(Block.Title))
+        {
+            <MudText Typo="Typo.subtitle1" Class="ab-generated-table__title">@Block.Title</MudText>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Block.Description))
+        {
+            <MudText Typo="Typo.body2" Class="ab-generated-table__description">@Block.Description</MudText>
+        }
+
+        <div class="ab-generated-table__wrap">
+            <table class="ab-generated-table__table">
+                <thead>
+                    <tr>
+                        @foreach (var column in Block.Columns)
+                        {
+                            <th>@(string.IsNullOrWhiteSpace(column.Header) ? column.Key : column.Header)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Block.Rows)
+                    {
+                        <tr>
+                            @foreach (var column in Block.Columns)
+                            {
+                                row.TryGetValue(column.Key, out var value);
+                                <td>@value</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Block.Actions.Count > 0)
+        {
+            <div class="ab-generated-table__actions">
+                @foreach (var action in Block.Actions)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="ab-generated-table__action-btn"
+                               Disabled="IsBusy"
+                               OnClick="@(() => OnActionInvoked.InvokeAsync(action))">
+                        @(string.IsNullOrWhiteSpace(action.Label) ? action.Id : action.Label)
+                    </MudButton>
+                }
+            </div>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public AgentUiBlock? Block { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentUiAction> OnActionInvoked { get; set; }
+}

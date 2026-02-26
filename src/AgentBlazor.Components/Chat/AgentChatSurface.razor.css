@@ -307,6 +307,13 @@
     border: 1px solid var(--ab-chat-assistant-border);
 }
 
+/* Assistant items containing generated UI should use a wider canvas */
+.ab-chat-surface__item--assistant.ab-chat-surface__item--generated {
+    align-self: stretch;
+    max-width: 100%;
+    width: 100%;
+}
+
 /* Activity messages */
 .ab-chat-surface__item--activity {
     align-self: center;
@@ -374,8 +381,8 @@
 
 /* Generated UI container */
 .ab-chat-surface__generated-ui {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
     border-top: 1px solid var(--ab-chat-border-muted);
 }
 

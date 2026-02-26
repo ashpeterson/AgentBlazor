@@ -2,13 +2,16 @@ using System.Reflection;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
 using AgentBlazor.Services;
+using AgentBlazor.Core.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentBlazor;
 
 public sealed class AgentBlazorRegistrationOptions
 {
     private Action<IServiceCollection>? _providerRegistration;
+    private Action<IServiceCollection>? _serviceRegistration;
     private Action<AgentBlazorOptions>? _optionsConfiguration;
     private Action<AgentBlazorBuilder>? _builderConfiguration;
     private readonly List<Assembly> _agentPageAssemblies = [];
@@ -47,6 +50,27 @@ public sealed class AgentBlazorRegistrationOptions
     }
 
     /// <summary>
+    /// Registers a default chart data resolver used by generated chart blocks
+    /// when component-level resolver parameters are not explicitly provided.
+    /// </summary>
+    public void UseChartDataResolver(AgentChartDataResolver resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        _serviceRegistration += services => services.Replace(ServiceDescriptor.Singleton(resolver));
+    }
+
+    /// <summary>
+    /// Registers a default chart data resolver using dependency injection.
+    /// Useful when chart data comes from app services such as repositories or DbContexts.
+    /// </summary>
+    public void UseChartDataResolver(Func<IServiceProvider, AgentChartDataResolver> resolverFactory)
+    {
+        ArgumentNullException.ThrowIfNull(resolverFactory);
+        _serviceRegistration += services => services.Replace(
+            ServiceDescriptor.Singleton<AgentChartDataResolver>(sp => resolverFactory(sp)));
+    }
+
+    /// <summary>
     /// Adds an assembly to the list scanned at startup for [Route] pages (used for intent→route and planner).
     /// If never called, the entry assembly is scanned by default.
     /// </summary>
@@ -68,7 +92,11 @@ public sealed class AgentBlazorRegistrationOptions
         _builderConfiguration += configure;
     }
 
-    internal void ApplyProvider(IServiceCollection services) => _providerRegistration?.Invoke(services);
+    internal void ApplyProvider(IServiceCollection services)
+    {
+        _providerRegistration?.Invoke(services);
+        _serviceRegistration?.Invoke(services);
+    }
 
     internal void ApplyOptions(AgentBlazorOptions options)
     {

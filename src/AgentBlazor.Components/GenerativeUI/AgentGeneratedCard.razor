@@ -1,0 +1,52 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Components
+@using MudBlazor
+
+@if (Block is not null)
+{
+    <MudCard Class="ab-generated-card">
+        @if (!string.IsNullOrWhiteSpace(Block.Title) || !string.IsNullOrWhiteSpace(Block.Description))
+        {
+            <MudCardContent Class="ab-generated-card__content">
+                <MudText Typo="Typo.caption" Class="ab-generated-card__eyebrow">Agent Insight</MudText>
+                @if (!string.IsNullOrWhiteSpace(Block.Title))
+                {
+                    <MudText Typo="Typo.subtitle1" Class="ab-generated-card__title">@Block.Title</MudText>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Block.Description))
+                {
+                    <MudText Typo="Typo.body2" Class="ab-generated-card__description">@Block.Description</MudText>
+                }
+            </MudCardContent>
+        }
+
+        @if (Block.Actions.Count > 0)
+        {
+            <MudCardActions Class="ab-generated-card__actions">
+                @foreach (var action in Block.Actions)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="ab-generated-card__action-btn"
+                               Disabled="IsBusy"
+                               OnClick="@(() => OnActionInvoked.InvokeAsync(action))">
+                        @(string.IsNullOrWhiteSpace(action.Label) ? action.Id : action.Label)
+                    </MudButton>
+                }
+            </MudCardActions>
+        }
+    </MudCard>
+}
+
+@code {
+    [Parameter]
+    public AgentUiBlock? Block { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public EventCallback<AgentUiAction> OnActionInvoked { get; set; }
+}

@@ -1,6 +1,7 @@
 .ab-generative-surface {
     display: grid;
-    gap: 0.75rem;
+    width: 100%;
+    gap: 1rem;
 }
 
 .ab-generative-surface__empty {
@@ -26,6 +27,12 @@
     background: #fff;
 }
 
+.ab-generative-surface__block--embedded {
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
 .ab-generative-surface__title {
     margin: 0;
     font-size: 1rem;
@@ -36,34 +43,6 @@
     margin: 0.4rem 0 0.75rem;
     color: #4f5f73;
     font-size: 0.9rem;
-}
-
-.ab-generative-surface__form {
-    display: grid;
-    gap: 0.55rem;
-}
-
-.ab-generative-surface__label {
-    display: grid;
-    gap: 0.25rem;
-    color: #25364a;
-    font-size: 0.82rem;
-    font-weight: 600;
-}
-
-.ab-generative-surface__input {
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    padding: 0.5rem 0.65rem;
-    font: inherit;
-    font-size: 0.92rem;
-    color: #122033;
-}
-
-.ab-generative-surface__input:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
 }
 
 .ab-generative-surface__actions {
@@ -91,28 +70,6 @@
 .ab-generative-surface__action:disabled {
     cursor: not-allowed;
     opacity: 0.65;
-}
-
-.ab-generative-surface__table-wrap {
-    overflow-x: auto;
-}
-
-.ab-generative-surface__table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.87rem;
-}
-
-.ab-generative-surface__table th,
-.ab-generative-surface__table td {
-    border: 1px solid #d8e0e8;
-    padding: 0.46rem 0.55rem;
-    text-align: left;
-}
-
-.ab-generative-surface__table th {
-    background: #f8fafc;
-    color: #243448;
 }
 
 .ab-generative-surface__responses {
