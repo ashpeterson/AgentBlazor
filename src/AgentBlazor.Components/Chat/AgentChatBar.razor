@@ -1,5 +1,6 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Core.Components
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Interfaces
@@ -7,6 +8,9 @@
 @using MudBlazor
 @inject IAgentRuntime AgentRuntime
 @inject IAgentDeferredActionEvents DeferredActionEvents
+@inject IConversationStore ConversationStore
+@inject IAgentChatSessionState ChatSessionState
+@inject IAgentChatSessionEvents SessionEvents
 
 <div class="ab-chat-bar @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
      data-theme="@(Theme?.DataTheme)"
@@ -104,7 +108,7 @@
 
             @if (ShowClearButton)
             {
-                <button class="ab-chat-bar__clear" @onclick="ClearTimeline">
+                <button class="ab-chat-bar__clear" @onclick="ClearTimelineAsync">
                     <MudIcon Icon="@Icons.Material.Filled.Delete" Size="Size.Small" />
                     @ClearButtonText
                 </button>
@@ -116,7 +120,7 @@
 @code {
     private string _prompt = string.Empty;
     private bool _isBusy;
-    private readonly string _sessionId = Guid.NewGuid().ToString("N");
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
     private readonly List<ChatBarTimelineItem> _timeline = [];
     private string _streamingResponseText = string.Empty;
     private string? _streamingAgentName;
@@ -124,6 +128,7 @@
     private readonly List<ActivityMessage> _streamingActivityMessages = [];
     private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
         new(StringComparer.OrdinalIgnoreCase);
+    private string? _historyHydratedForSession;
 
     /// <summary>
     /// Placeholder text for the input field.
@@ -174,6 +179,18 @@
     public string? AgentName { get; set; }
 
     /// <summary>
+    /// Optional session identifier. If not provided, the scoped chat session id is used.
+    /// </summary>
+    [Parameter]
+    public string? SessionId { get; set; }
+
+    /// <summary>
+    /// Enables generated UI planning context for each turn.
+    /// </summary>
+    [Parameter]
+    public bool EnableGeneratedUi { get; set; }
+
+    /// <summary>
     /// Theme configuration for the component.
     /// </summary>
     [Parameter]
@@ -203,16 +220,28 @@
     [Parameter]
     public EventCallback<Exception> OnError { get; set; }
 
+    private string EffectiveSessionId =>
+        string.IsNullOrWhiteSpace(SessionId)
+            ? ChatSessionState.SessionId
+            : SessionId.Trim();
+
     private string? _themeStyle => Theme?.GetStyleString();
 
     protected override void OnInitialized()
     {
         DeferredActionEvents.DeferredActionCompleted += HandleDeferredActionCompleted;
+        SessionEvents.SessionUpdated += HandleSessionUpdated;
     }
 
     public void Dispose()
     {
         DeferredActionEvents.DeferredActionCompleted -= HandleDeferredActionCompleted;
+        SessionEvents.SessionUpdated -= HandleSessionUpdated;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await HydrateTimelineFromHistoryAsync();
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -253,7 +282,8 @@
             var response = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 AgentName,
-                SessionId: _sessionId));
+                SessionId: EffectiveSessionId,
+                Context: CreateRequestContext()));
 
             // Add agent response to timeline
             var runId = string.IsNullOrWhiteSpace(_activeRunId) ? null : _activeRunId;
@@ -270,6 +300,7 @@
             _streamingActivityMessages.Clear();
 
             await OnResponseReceived.InvokeAsync(response);
+            SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
         }
         catch (Exception ex)
         {
@@ -285,12 +316,14 @@
         }
     }
 
-    private void ClearTimeline()
+    private async Task ClearTimelineAsync()
     {
         _timeline.Clear();
         _assistantTimelineIndexByRunId.Clear();
         _streamingActivityMessages.Clear();
         _activeRunId = null;
+        await ConversationStore.ClearSessionAsync(EffectiveSessionId);
+        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
     }
 
     /// <summary>
@@ -305,7 +338,15 @@
     /// <summary>
     /// Clear the conversation timeline.
     /// </summary>
-    public void Clear() => ClearTimeline();
+    public void Clear()
+    {
+        _timeline.Clear();
+        _assistantTimelineIndexByRunId.Clear();
+        _streamingActivityMessages.Clear();
+        _activeRunId = null;
+        _ = ConversationStore.ClearSessionAsync(EffectiveSessionId);
+        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+    }
 
     private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
     {
@@ -397,11 +438,27 @@
         });
     }
 
+    private void HandleSessionUpdated(AgentChatSessionUpdate update)
+    {
+        if (_isBusy ||
+            !string.Equals(update.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(update.SourceId, _instanceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await HydrateTimelineFromHistoryAsync(force: true);
+            StateHasChanged();
+        });
+    }
+
     private bool IsDeferredEventForCurrentChat(DeferredComponentActionEvent actionEvent)
     {
         if (!string.IsNullOrWhiteSpace(actionEvent.SessionId))
         {
-            return string.Equals(actionEvent.SessionId, _sessionId, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(actionEvent.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase);
         }
 
         if (!string.IsNullOrWhiteSpace(actionEvent.RunId) &&
@@ -538,6 +595,80 @@
         return executionResult.Succeeded
             ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
             : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
+    }
+
+    private IDictionary<string, string>? CreateRequestContext()
+    {
+        if (!EnableGeneratedUi)
+        {
+            return null;
+        }
+
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+        };
+    }
+
+    private async Task HydrateTimelineFromHistoryAsync(bool force = false)
+    {
+        var sessionId = EffectiveSessionId;
+        if (!force &&
+            string.Equals(_historyHydratedForSession, sessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _historyHydratedForSession = sessionId;
+        var history = await ConversationStore.GetHistoryAsync(sessionId);
+        _timeline.Clear();
+        _assistantTimelineIndexByRunId.Clear();
+        _streamingActivityMessages.Clear();
+        _streamingResponseText = string.Empty;
+        _streamingAgentName = null;
+        _activeRunId = null;
+
+        if (history is null || history.Turns.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var turn in history.Turns.OrderBy(static turn => turn.Timestamp))
+        {
+            if (!string.IsNullOrWhiteSpace(turn.UserMessage))
+            {
+                _timeline.Add(new ChatBarTimelineItem("user", turn.UserMessage, [], [], null));
+            }
+
+            if (!string.IsNullOrWhiteSpace(turn.AgentResponse))
+            {
+                _timeline.Add(new ChatBarTimelineItem(
+                    "assistant",
+                    turn.AgentResponse,
+                    turn.PlannedActions,
+                    BuildActivityMessages(turn.ExecutionResults),
+                    null));
+            }
+        }
+    }
+
+    private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
+        IReadOnlyList<ComponentActionExecutionResult> executionResults)
+    {
+        if (executionResults.Count == 0)
+        {
+            return [];
+        }
+
+        var messages = new List<ActivityMessage>(executionResults.Count);
+        foreach (var result in executionResults)
+        {
+            var key = BuildActivityKey(result.ComponentId, result.ActionId);
+            var text = FormatToolCallResultMessage(result);
+            messages.Add(new ActivityMessage(key, text));
+        }
+
+        return messages;
     }
 
     private static string GetRoleLabel(string role) =>

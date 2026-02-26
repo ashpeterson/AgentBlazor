@@ -50,6 +50,8 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<INavigationActionExecutor, NoOpNavigationActionExecutor>();
         services.TryAddSingleton<ITabsActionExecutor, NoOpTabsActionExecutor>();
         services.TryAddSingleton<IAgentChatWidgetState, AgentChatWidgetState>();
+        services.TryAddScoped<IAgentChatSessionState, AgentChatSessionState>();
+        services.TryAddSingleton<IAgentChatSessionEvents, AgentChatSessionEvents>();
         services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
         services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
         services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
@@ -69,7 +71,8 @@ public static class AgentBlazorServiceCollectionExtensions
 
         // Conversation management
         services.AddOptions<ConversationOptions>();
-        services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
+        services.TryAddSingleton<InMemoryConversationStore>();
+        services.TryAddSingleton<IConversationStore, FeatureGatedConversationStore>();
         services.TryAddSingleton<IConversationManager, ConversationManager>();
 
         // Intent classification and routing
@@ -83,7 +86,8 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IInternalPageStructureRegistry, InMemoryPageStructureRegistry>();
 
         // User preferences
-        services.TryAddSingleton<IUserPreferenceService, InMemoryUserPreferenceService>();
+        services.TryAddSingleton<InMemoryUserPreferenceService>();
+        services.TryAddSingleton<IUserPreferenceService, FeatureGatedUserPreferenceService>();
 
         // Prompt tracing (opt-in via EnablePromptTracing)
         services.AddOptions<PromptTracingOptions>();

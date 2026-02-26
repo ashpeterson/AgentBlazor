@@ -1,6 +1,6 @@
 @page "/demo/generative-ui"
 @layout DemoLayout
-@using AgentBlazor.Components
+@using AgentBlazor
 @using MudBlazor
 
 <PageTitle>Generative UI — AgentBlazor Demo</PageTitle>
@@ -28,10 +28,7 @@
         </MudChip>
     </MudStack>
 
-    <MudPaper Elevation="1" Class="pa-4 gen-ui-demo__chat">
-        <AgentChatSurface Title="Generative UI Agent"
-                          Description="Generated UI mode is enabled for this chat."
-                          EnableGeneratedUi="true"
-                          Placeholder="Ask for a generated summary, form draft, table, or live chart and continue with generated actions..." />
-    </MudPaper>
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+        Use the persistent Assistant chat bar at the bottom-right to run generated UI prompts on this page.
+    </MudAlert>
 </section>

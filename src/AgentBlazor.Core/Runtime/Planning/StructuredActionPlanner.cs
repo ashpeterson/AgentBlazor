@@ -63,16 +63,26 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
             messages.Insert(messages.Count - 1, new ChatMessage(role, turn.Content));
         }
 
-        var chatOptions = new ChatOptions
-        {
-            ResponseFormat = ChatResponseFormat.Json,
-            Temperature = 0.0f
-        };
+        var responseText = await RequestPlannerResponseAsync(messages, cancellationToken);
+        var plan = ParsePlanResponse(responseText, request.GenerateUi);
 
-        var response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-        var responseText = response.Text?.Trim() ?? string.Empty;
-        _logger?.LogDebug("LLM response: {Response}", responseText);
-        return ParsePlanResponse(responseText, request.GenerateUi);
+        if (!RequiresGeneratedUiRepair(request, plan))
+        {
+            return plan;
+        }
+
+        var repairedPlan = await TryRepairGeneratedUiPlanAsync(request, responseText, plan, cancellationToken);
+        if (repairedPlan is not null)
+        {
+            plan = repairedPlan;
+        }
+
+        if (plan.UiToolCalls.Count == 0 && !plan.RequiresClarification)
+        {
+            plan = AttachFallbackGeneratedUiSummary(plan, request.UserMessage);
+        }
+
+        return plan;
     }
 
     private string BuildSystemPrompt(ActionPlanRequest request)
@@ -281,6 +291,158 @@ internal sealed class StructuredActionPlanner : IStructuredActionPlanner
         }
 
         return $"USER REQUEST: {request.UserMessage}\nGENERATE_UI: false";
+    }
+
+    private async Task<string> RequestPlannerResponseAsync(
+        IReadOnlyList<ChatMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        if (_chatClient is null)
+        {
+            return string.Empty;
+        }
+
+        var chatOptions = new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.Json,
+            Temperature = 0.0f
+        };
+
+        var response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+        var responseText = response.Text?.Trim() ?? string.Empty;
+        _logger?.LogDebug("LLM response: {Response}", responseText);
+        return responseText;
+    }
+
+    private static bool RequiresGeneratedUiRepair(ActionPlanRequest request, ActionPlan plan)
+    {
+        if (!request.GenerateUi || request.GeneratedUiAction is not null)
+        {
+            return false;
+        }
+
+        if (plan.RequiresClarification || plan.UiToolCalls.Count > 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<ActionPlan?> TryRepairGeneratedUiPlanAsync(
+        ActionPlanRequest request,
+        string originalPlanJson,
+        ActionPlan originalPlan,
+        CancellationToken cancellationToken)
+    {
+        if (_chatClient is null)
+        {
+            return null;
+        }
+
+        var repairMessages = new List<ChatMessage>
+        {
+            new(ChatRole.System, BuildGeneratedUiRepairSystemPrompt(request)),
+            new(ChatRole.User, BuildGeneratedUiRepairUserPrompt(request, originalPlanJson))
+        };
+
+        var repairedResponse = await RequestPlannerResponseAsync(repairMessages, cancellationToken);
+        var repairedPlan = ParsePlanResponse(repairedResponse, generateUi: true);
+
+        if (repairedPlan.RequiresClarification || repairedPlan.UiToolCalls.Count == 0)
+        {
+            _logger?.LogWarning(
+                "Generated UI repair did not produce uiToolCalls. Falling back to deterministic summary card.");
+            return null;
+        }
+
+        if (repairedPlan.Steps.Count == 0 && originalPlan.Steps.Count > 0)
+        {
+            return repairedPlan with { Steps = originalPlan.Steps };
+        }
+
+        return repairedPlan;
+    }
+
+    private string BuildGeneratedUiRepairSystemPrompt(ActionPlanRequest request)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("# ROLE");
+        sb.AppendLine("You repair deterministic planner JSON.");
+        sb.AppendLine();
+        sb.AppendLine("# HARD RULES");
+        sb.AppendLine("- Return raw JSON only.");
+        sb.AppendLine("- Keep existing valid steps unchanged.");
+        sb.AppendLine("- uiToolCalls MUST include at least one valid generated-ui tool.");
+        sb.AppendLine("- Use only generated-ui tools listed below.");
+        sb.AppendLine("- Prefer generated-ui blocks that make next actions explicit (for example summary.card, chart.view, form.draft, or table.view).");
+        sb.AppendLine("- If chart labels/series are uncertain, use chart.view with a valid dataSource.");
+        sb.AppendLine("- Do not fabricate metrics.");
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(request.AgentInstructions))
+        {
+            sb.AppendLine("# AGENT-SPECIFIC INSTRUCTIONS");
+            sb.AppendLine(request.AgentInstructions.Trim());
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("# AVAILABLE GENERATED-UI TOOLS");
+        foreach (var tool in _uiToolCatalog.GetTools())
+        {
+            sb.Append("- ").Append(tool.ToolId).Append(": ").AppendLine(tool.Description);
+            sb.AppendLine("  inputSchema:");
+            sb.Append("  ").AppendLine(tool.InputSchema.Replace("\n", "\n  ", StringComparison.Ordinal));
+        }
+        sb.AppendLine();
+        sb.AppendLine("Return repaired JSON now.");
+        return sb.ToString();
+    }
+
+    private static string BuildGeneratedUiRepairUserPrompt(ActionPlanRequest request, string originalPlanJson)
+    {
+        return
+            $"USER REQUEST: {request.UserMessage}\n" +
+            "GENERATE_UI: true\n" +
+            "REPAIR_GOAL: preserve steps and add valid uiToolCalls.\n" +
+            $"ORIGINAL_PLAN_JSON:\n{originalPlanJson}";
+    }
+
+    private static ActionPlan AttachFallbackGeneratedUiSummary(ActionPlan plan, string userMessage)
+    {
+        var summaryDescription = BuildFallbackSummaryDescription(plan, userMessage);
+        var summaryToolCall = new AgentUiToolCall
+        {
+            ToolId = AgentUiToolIds.SummaryCard,
+            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["blockId"] = "generated-summary",
+                ["title"] = "Request Summary",
+                ["description"] = summaryDescription
+            }
+        };
+
+        return plan with
+        {
+            UiToolCalls = [summaryToolCall]
+        };
+    }
+
+    private static string BuildFallbackSummaryDescription(ActionPlan plan, string userMessage)
+    {
+        if (plan.Steps.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(userMessage)
+                ? "No executable actions were required."
+                : $"Processed request: {userMessage}.";
+        }
+
+        var actionList = string.Join(
+            ", ",
+            plan.Steps.Take(4).Select(static step => $"{step.ComponentId}.{step.ActionId}"));
+        var suffix = plan.Steps.Count > 4 ? ", ..." : string.Empty;
+        var plural = plan.Steps.Count == 1 ? "action" : "actions";
+        return $"Planned {plan.Steps.Count} {plural}: {actionList}{suffix}.";
     }
 
     private ActionPlan ParsePlanResponse(string responseText, bool generateUi)

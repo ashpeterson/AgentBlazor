@@ -1,0 +1,52 @@
+[
+  {
+    "id": "incident-triage-mitigation",
+    "name": "Incident Triage to Mitigation Plan",
+    "prompt": "triage unhealthy services and draft a mitigation plan with actionable next steps",
+    "requiredBlockTypes": ["card", "chart", "form"],
+    "requiresActions": true,
+    "minGeneratedBlocks": 3,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2
+  },
+  {
+    "id": "quarterly-review-builder",
+    "name": "Quarterly Review Builder",
+    "prompt": "build a Q2 performance review package from onboarding and supplier risk data, then draft the review form",
+    "requiredBlockTypes": ["card", "chart", "form"],
+    "requiresActions": true,
+    "minGeneratedBlocks": 3,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2
+  },
+  {
+    "id": "change-request-lifecycle",
+    "name": "Change Request Lifecycle",
+    "prompt": "create a change request from high-priority backlog items and prepare an approval-ready draft",
+    "requiredBlockTypes": ["card", "form"],
+    "requiresActions": true,
+    "minGeneratedBlocks": 2,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2
+  },
+  {
+    "id": "forecast-driven-planning",
+    "name": "Forecast-Driven Planning",
+    "prompt": "generate a 90-day supplier risk forecast and include follow-up drill-down actions",
+    "requiredBlockTypes": ["chart", "card"],
+    "requiresActions": false,
+    "minGeneratedBlocks": 2,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2
+  },
+  {
+    "id": "ops-daily-standup",
+    "name": "Ops Daily Standup Copilot",
+    "prompt": "assemble a daily standup briefing with blockers table, progress chart, and an action checklist draft",
+    "requiredBlockTypes": ["card", "table", "form"],
+    "requiresActions": false,
+    "minGeneratedBlocks": 3,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2
+  }
+]

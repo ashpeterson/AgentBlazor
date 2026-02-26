@@ -89,13 +89,21 @@ internal sealed class SupplierWorkflowService(IDbContextFactory<DemoWorkflowDbCo
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        return await db.Suppliers
+        var points = await db.Suppliers
             .GroupBy(static x => x.Region)
-            .Select(static group => new RegionRiskPoint(
-                group.Key,
-                Math.Round(group.Average(static x => x.RiskScore), 1)))
+            .Select(static group => new
+            {
+                Region = group.Key,
+                AverageRisk = group.Average(static x => (double)x.RiskScore)
+            })
             .OrderByDescending(static x => x.AverageRisk)
             .ToListAsync(cancellationToken);
+
+        return points
+            .Select(static point => new RegionRiskPoint(
+                point.Region,
+                Math.Round(point.AverageRisk, 1)))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<RiskTierPoint>> GetRiskTierDistributionAsync(CancellationToken cancellationToken)
@@ -141,12 +149,15 @@ internal sealed class SupplierWorkflowService(IDbContextFactory<DemoWorkflowDbCo
             .CountAsync(x => x.Status == "Submitted" || x.Status == "InReview", cancellationToken);
         var submittedThisMonth = await db.OnboardingRequests
             .CountAsync(x => x.SubmittedUtc >= monthStart, cancellationToken);
+        var openMitigationTasks = await db.MitigationTasks
+            .CountAsync(x => x.Status == "Open" || x.Status == "InProgress", cancellationToken);
 
         return new WorkflowSummary(
             totalSuppliers,
             highRiskSuppliers,
             openOnboarding,
-            submittedThisMonth);
+            submittedThisMonth,
+            openMitigationTasks);
     }
 
     public async Task<IReadOnlyList<MonthlyOnboardingPoint>> GetMonthlyOnboardingVolumeAsync(
@@ -173,6 +184,102 @@ internal sealed class SupplierWorkflowService(IDbContextFactory<DemoWorkflowDbCo
 
         return monthStarts
             .Select(month => new MonthlyOnboardingPoint(
+                month.ToString("MMM yyyy"),
+                counts.TryGetValue(month, out var count) ? count : 0))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<MitigationTaskRow>> ListMitigationTasksAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.MitigationTasks
+            .OrderBy(static x => x.Priority)
+            .ThenBy(static x => x.DueDate)
+            .Select(static x => new MitigationTaskRow(
+                x.TaskId,
+                x.SupplierId,
+                x.SupplierName,
+                x.ServiceName,
+                x.Owner,
+                x.Priority,
+                x.Status,
+                x.DueDate,
+                x.CreatedUtc))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<MitigationTaskResult> CreateMitigationTaskAsync(
+        MitigationTaskSubmission submission,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(submission);
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var taskId = await GetNextIdAsync(
+            db.MitigationTasks.Select(static x => x.TaskId),
+            prefix: "MIT-",
+            pad: 4,
+            cancellationToken);
+
+        var supplier = await db.Suppliers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.SupplierName == submission.SupplierName || x.SupplierId == submission.SupplierId,
+                cancellationToken);
+
+        var now = DateTime.UtcNow;
+        var task = new MitigationTaskEntity
+        {
+            TaskId = taskId,
+            SupplierId = !string.IsNullOrWhiteSpace(submission.SupplierId)
+                ? submission.SupplierId.Trim()
+                : supplier?.SupplierId ?? string.Empty,
+            SupplierName = submission.SupplierName.Trim(),
+            ServiceName = submission.ServiceName.Trim(),
+            Owner = submission.Owner.Trim(),
+            MitigationAction = submission.MitigationAction.Trim(),
+            Priority = Math.Clamp(submission.Priority, 1, 5),
+            Status = "Open",
+            DueDate = submission.DueDate.Date,
+            CreatedUtc = now
+        };
+
+        db.MitigationTasks.Add(task);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new MitigationTaskResult(
+            task.TaskId,
+            task.SupplierName,
+            task.Owner,
+            task.Priority,
+            task.DueDate);
+    }
+
+    public async Task<IReadOnlyList<MonthlyMitigationPoint>> GetMonthlyMitigationVolumeAsync(
+        int months,
+        CancellationToken cancellationToken)
+    {
+        months = Math.Clamp(months, 3, 18);
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var monthStarts = Enumerable.Range(0, months)
+            .Select(offset => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-(months - 1 - offset)))
+            .ToArray();
+
+        var firstMonth = monthStarts[0];
+        var created = await db.MitigationTasks
+            .Where(x => x.CreatedUtc >= firstMonth)
+            .ToListAsync(cancellationToken);
+
+        var counts = created
+            .GroupBy(x => new DateTime(x.CreatedUtc.Year, x.CreatedUtc.Month, 1))
+            .ToDictionary(static group => group.Key, static group => group.Count());
+
+        return monthStarts
+            .Select(month => new MonthlyMitigationPoint(
                 month.ToString("MMM yyyy"),
                 counts.TryGetValue(month, out var count) ? count : 0))
             .ToArray();
@@ -287,4 +394,34 @@ internal sealed record WorkflowSummary(
     int TotalSuppliers,
     int HighRiskSuppliers,
     int OpenOnboardingRequests,
-    int SubmittedThisMonth);
+    int SubmittedThisMonth,
+    int OpenMitigationTasks);
+
+internal sealed record MitigationTaskSubmission(
+    string SupplierId,
+    string SupplierName,
+    string ServiceName,
+    string Owner,
+    string MitigationAction,
+    int Priority,
+    DateTime DueDate);
+
+internal sealed record MitigationTaskResult(
+    string TaskId,
+    string SupplierName,
+    string Owner,
+    int Priority,
+    DateTime DueDate);
+
+internal sealed record MitigationTaskRow(
+    string TaskId,
+    string SupplierId,
+    string SupplierName,
+    string ServiceName,
+    string Owner,
+    int Priority,
+    string Status,
+    DateTime DueDate,
+    DateTime CreatedUtc);
+
+internal sealed record MonthlyMitigationPoint(string Month, int Count);

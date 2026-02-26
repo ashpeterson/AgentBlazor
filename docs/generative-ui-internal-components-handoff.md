@@ -19,11 +19,8 @@ Implementation order:
 ## Current State (Important Context)
 - Generative UI page has already been refactored to chat-first layout (single chat pane).
 - Core tool catalog is domain-agnostic and now supports generic tools (`summary.card`, `form.draft`, `action.confirmation`, `table.view`).
-- Demo has its own `DemoAgentUiToolCatalog` for supplier/onboarding examples.
-- Deterministic demo client currently returns in-chat generated blocks for:
-  - Highest risk snapshot (table block)
-  - Onboarding draft (form block + action confirmation)
-  - Risk forecast (summary + table)
+- Demo generated charts resolve from app-owned data sources through `DemoChartDataSources`.
+- Demo and e2e now run through the real runtime/provider path (no deterministic e2e chat client swap).
 
 Observed user feedback:
 - They want richer generated components, specifically reusable internal components for Card/Form/Chart.
@@ -208,8 +205,7 @@ Components:
 
 Demo:
 - `demo/AgentBlazor.Demo/Components/Pages/Demo/GenerativeUi.razor`
-- `demo/AgentBlazor.Demo/Services/DemoAgentUiToolCatalog.cs`
-- `demo/AgentBlazor.Demo/Services/E2eDeterministicChatClient.cs`
+- `demo/AgentBlazor.Demo/Services/DemoChartDataSources.cs`
 
 Tests:
 - `tests/AgentBlazor.Core.Tests/AgentUiToolCatalogTests.cs`

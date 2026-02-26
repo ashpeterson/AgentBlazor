@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { openAssistantChatSurface } = require("./chat-helpers.cjs");
 
 test.describe("Complex workflow page", () => {
   test("renders workflow surface with queue, suppliers, and chat", async ({ page }) => {
@@ -7,7 +8,8 @@ test.describe("Complex workflow page", () => {
     await expect(page.getByText("Complex Workflow")).toBeVisible();
     await expect(page.getByRole("tab", { name: "Onboarding Queue" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Supplier Risk" })).toBeVisible();
-    await expect(page.getByText("Workflow Agent")).toBeVisible();
+    const chatSurface = await openAssistantChatSurface(page);
+    await expect(chatSurface).toBeVisible();
   });
 
   test("submitting onboarding updates workflow queue with real data", async ({ page }) => {
@@ -34,5 +36,21 @@ test.describe("Complex workflow page", () => {
     await page.getByRole("button", { name: "Refresh" }).click();
 
     await expect(page.getByText(uniqueSupplierName)).toBeVisible();
+  });
+
+  test("triage workflow renders generated ui and deterministic activity", async ({ page }) => {
+    await page.goto("/demo/workflow", { waitUntil: "networkidle" });
+
+    const chatSurface = await openAssistantChatSurface(page);
+    const prompt = chatSurface.getByLabel("Message input");
+    const sendButton = chatSurface.getByRole("button", { name: "Send" });
+
+    await prompt.fill("triage unhealthy services and draft a mitigation plan");
+    await sendButton.click();
+
+    await expect(page.getByText("Complex Workflow")).toBeVisible();
+    await expect(chatSurface.locator(".ab-chat-surface__item--generated")).toBeVisible();
+    await expect(chatSurface.locator(".ab-generative-surface__block").first()).toBeVisible();
+    await expect(chatSurface.getByText("AgentDataGrid.filter")).toBeVisible();
   });
 });

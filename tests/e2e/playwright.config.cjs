@@ -20,14 +20,6 @@ module.exports = defineConfig({
     command: "dotnet run --project ../../demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj --urls http://127.0.0.1:5188",
     url: "http://127.0.0.1:5188/demo/generative-ui",
     timeout: 180000,
-    reuseExistingServer: false,
-    env: {
-      ...process.env,
-      OpenAI__ApiKey: "",
-      OpenAI__Model: "",
-      Ollama__Model: "",
-      OLLAMA_MODEL: "",
-      OPENAI_API_KEY: ""
-    }
+    reuseExistingServer: false
   }
 });

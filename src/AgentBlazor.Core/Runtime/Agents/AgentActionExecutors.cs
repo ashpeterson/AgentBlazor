@@ -61,6 +61,18 @@ public interface ITabsActionExecutor
 
 internal static class RegisteredComponentActionExecutorBridge
 {
+    private enum TargetResolutionStatus
+    {
+        Resolved,
+        NotAvailable,
+        Ambiguous
+    }
+
+    private sealed record TargetResolution(
+        TargetResolutionStatus Status,
+        IAgentControllable? Target = null,
+        string? Message = null);
+
     public static IReadOnlyDictionary<string, object?> NormalizeArguments(
         string componentId,
         string actionId,
@@ -109,8 +121,18 @@ internal static class RegisteredComponentActionExecutorBridge
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
         var normalizedArguments = NormalizeArguments(componentId, actionId, arguments);
-        var target = ResolveTarget(componentRegistry, expectedComponentType, actionId, normalizedArguments);
-        if (target is null)
+        var resolution = ResolveTarget(componentRegistry, expectedComponentType, actionId, normalizedArguments);
+        if (resolution.Status is TargetResolutionStatus.Ambiguous)
+        {
+            return (true, new ComponentActionExecutionResult(
+                ComponentId: componentId,
+                ActionId: actionId,
+                Outcome: ActionOutcome.NeedsClarification,
+                Message: resolution.Message ??
+                         $"Action '{actionId}' requires an explicit 'agentId' because multiple {expectedComponentType} components are available."));
+        }
+
+        if (resolution.Status is not TargetResolutionStatus.Resolved || resolution.Target is null)
         {
             return (false, new ComponentActionExecutionResult(
                 ComponentId: componentId,
@@ -120,7 +142,7 @@ internal static class RegisteredComponentActionExecutorBridge
         }
 
         var action = AgentAction.Create(actionId, normalizedArguments);
-        var execution = await target.ExecuteActionAsync(action, cancellationToken);
+        var execution = await resolution.Target.ExecuteActionAsync(action, cancellationToken);
         return (true, new ComponentActionExecutionResult(
             ComponentId: componentId,
             ActionId: actionId,
@@ -128,25 +150,26 @@ internal static class RegisteredComponentActionExecutorBridge
             Message: execution.Message));
     }
 
-    private static IAgentControllable? ResolveTarget(
+    private static TargetResolution ResolveTarget(
         IAgentComponentRegistry componentRegistry,
         string expectedComponentType,
         string actionId,
         IReadOnlyDictionary<string, object?>? arguments)
     {
+        var typedCandidates = componentRegistry.GetAll()
+            .Where(component => string.Equals(component.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(component => component.AgentId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         var agentId = TryGetAgentId(arguments);
         if (!string.IsNullOrWhiteSpace(agentId))
         {
             if (componentRegistry.TryGet(agentId, out var targeted) &&
                 string.Equals(targeted.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
             {
-                return targeted;
+                return new TargetResolution(TargetResolutionStatus.Resolved, targeted);
             }
 
-            var typedCandidates = componentRegistry.GetAll()
-                .Where(component => string.Equals(component.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(component => component.AgentId, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
             if (typedCandidates.Length > 0)
             {
                 var resolution = DeterministicEntityResolver.Resolve(
@@ -156,34 +179,51 @@ internal static class RegisteredComponentActionExecutorBridge
                     ambiguityMargin: 0.05);
                 if (resolution.Status is EntityResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(resolution.Value))
                 {
-                    return typedCandidates.FirstOrDefault(candidate =>
+                    var resolved = typedCandidates.FirstOrDefault(candidate =>
                         string.Equals(candidate.AgentId, resolution.Value, StringComparison.OrdinalIgnoreCase));
+                    if (resolved is not null)
+                    {
+                        return new TargetResolution(TargetResolutionStatus.Resolved, resolved);
+                    }
                 }
             }
 
             // If a specific target is requested, do not execute on a different instance.
-            return null;
+            return new TargetResolution(TargetResolutionStatus.NotAvailable);
         }
 
-        var candidates = componentRegistry.GetAll()
-            .Where(component => string.Equals(component.ComponentType, expectedComponentType, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(component => component.AgentId, StringComparer.OrdinalIgnoreCase)
+        if (typedCandidates.Length == 0)
+        {
+            return new TargetResolution(TargetResolutionStatus.NotAvailable);
+        }
+
+        var capableCandidates = typedCandidates
+            .Where(candidate => candidate.GetCapability().Actions.Any(action =>
+                string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
-        if (candidates.Length == 0)
+
+        if (capableCandidates.Length == 1)
         {
-            return null;
+            return new TargetResolution(TargetResolutionStatus.Resolved, capableCandidates[0]);
         }
 
-        foreach (var candidate in candidates)
+        if (capableCandidates.Length > 1)
         {
-            var capability = candidate.GetCapability();
-            if (capability.Actions.Any(action => string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase)))
-            {
-                return candidate;
-            }
+            var ids = string.Join(", ", capableCandidates.Select(static candidate => candidate.AgentId));
+            return new TargetResolution(
+                TargetResolutionStatus.Ambiguous,
+                Message: $"Action '{actionId}' matches multiple {expectedComponentType} components ({ids}). Specify 'agentId' to target one.");
         }
 
-        return candidates[0];
+        if (typedCandidates.Length == 1)
+        {
+            return new TargetResolution(TargetResolutionStatus.Resolved, typedCandidates[0]);
+        }
+
+        var allIds = string.Join(", ", typedCandidates.Select(static candidate => candidate.AgentId));
+        return new TargetResolution(
+            TargetResolutionStatus.Ambiguous,
+            Message: $"Multiple {expectedComponentType} components are available ({allIds}). Specify 'agentId' to target one.");
     }
 
     private static string? TryGetString(IReadOnlyDictionary<string, object?>? arguments, string key)

@@ -313,12 +313,12 @@ public class ComponentMockingTests
     }
 
     [Fact]
-    public async Task MultipleComponents_FirstMatchingComponent_ReceivesAction()
+    public async Task MultipleComponents_WithoutAgentId_ReturnsNeedsClarification()
     {
-        // Arrange - When multiple components of same type are registered,
-        // the first alphabetically receives the action (by agentId)
-        var grid1 = new MockDataGrid("alpha-grid");  // First alphabetically
-        var grid2 = new MockDataGrid("beta-grid");   // Second alphabetically
+        // Arrange - when multiple components of the same type are registered,
+        // execution must not pick one implicitly without an explicit agentId.
+        var grid1 = new MockDataGrid("alpha-grid");
+        var grid2 = new MockDataGrid("beta-grid");
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
@@ -339,11 +339,11 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status"));
 
-        // Assert - first component (alphabetically by agentId) receives the action
-        Assert.Single(grid1.ExecutedActions);
-        Assert.NotNull(grid1.CurrentFilter);
+        Assert.Contains("Specify 'agentId' to target one", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(grid1.ExecutedActions);
+        Assert.Empty(grid2.ExecutedActions);
     }
 
     [Fact]

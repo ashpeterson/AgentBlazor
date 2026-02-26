@@ -190,6 +190,8 @@
     {
         var columns = GetFilterableColumns();
         var columnTypes = GetColumnTypes();
+        var focusedRow = ResolveFocusedRowSnapshot();
+        var currentViewRows = BuildCurrentViewRowSnapshots(maxRows: 5);
         var rowCount = Items switch
         {
             null => 0,
@@ -212,11 +214,23 @@
             ["filterValue"] = FilterValue?.ToString(),
             ["currentPageIndex"] = CurrentPageIndex,
             ["pageSize"] = PageSize,
+            ["rowKeyProperty"] = RowKeyProperty,
             ["focusedRowKey"] = FocusedRowKey,
             ["columns"] = columns,
             // NEW: Expose column types for intelligent operator selection
             ["columnTypes"] = columnTypes
         };
+
+        if (focusedRow is not null)
+        {
+            state["focusedRow"] = focusedRow;
+        }
+
+        if (currentViewRows.Count > 0)
+        {
+            state["currentViewRows"] = currentViewRows;
+        }
+
         if (ColumnAliases is { Count: > 0 })
         {
             state[AgentBlazor.Core.Runtime.Components.ComponentActionArgumentResolver.StateKeyColumnAliases] = ColumnAliases;
@@ -635,6 +649,67 @@
         }
 
         return false;
+    }
+
+    private IReadOnlyDictionary<string, object?>? ResolveFocusedRowSnapshot()
+    {
+        TItem? focusedItem = _selectedItem;
+        if (focusedItem is null &&
+            !string.IsNullOrWhiteSpace(FocusedRowKey))
+        {
+            focusedItem = FindItemByKey(FocusedRowKey!);
+        }
+
+        return focusedItem is null
+            ? null
+            : BuildRowSnapshot(focusedItem);
+    }
+
+    private IReadOnlyList<IReadOnlyDictionary<string, object?>> BuildCurrentViewRowSnapshots(int maxRows)
+    {
+        if (maxRows <= 0)
+        {
+            return [];
+        }
+
+        return EffectiveItems
+            .Take(maxRows)
+            .Select(BuildRowSnapshot)
+            .ToArray();
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildRowSnapshot(TItem row)
+    {
+        var snapshot = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in typeof(TItem).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            snapshot[property.Name] = NormalizeStateValue(property.GetValue(row));
+        }
+
+        return snapshot;
+    }
+
+    private static object? NormalizeStateValue(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            string or bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => value,
+            DateTime dateTime => dateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            DateTimeOffset dateTimeOffset => dateTimeOffset.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            Guid guid => guid.ToString(),
+            Enum enumValue => enumValue.ToString(),
+            _ => value.ToString()
+        };
     }
 
     private static bool MatchesFilter(TItem item, string propertyName, string @operator, object? expectedRaw)

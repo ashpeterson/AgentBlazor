@@ -19,6 +19,7 @@ internal sealed class DemoChartDataSources(SupplierWorkflowService workflowServi
             "demo.suppliers.risk.by-region" => await ResolveRiskByRegionAsync(cancellationToken),
             "demo.suppliers.risk.tier-distribution" => await ResolveRiskTierDistributionAsync(cancellationToken),
             "demo.onboarding.volume.monthly" => await ResolveMonthlyOnboardingAsync(request.Arguments, cancellationToken),
+            "demo.mitigation.volume.monthly" => await ResolveMonthlyMitigationAsync(request.Arguments, cancellationToken),
             _ => null
         };
     }
@@ -81,6 +82,30 @@ internal sealed class DemoChartDataSources(SupplierWorkflowService workflowServi
                 new AgentUiChartSeries
                 {
                     Name = "Requests",
+                    Data = points.Select(static x => (double)x.Count).ToArray()
+                }
+            ]
+        };
+    }
+
+    private async Task<AgentChartDataResult> ResolveMonthlyMitigationAsync(
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
+        var months = TryGetInt(arguments, "months") ?? 6;
+        var points = await workflowService.GetMonthlyMitigationVolumeAsync(months, cancellationToken);
+
+        return new AgentChartDataResult
+        {
+            Title = "Mitigation Task Creation Trend",
+            Description = "Monthly volume of mitigation tasks created.",
+            ChartType = AgentUiChartType.Line,
+            Labels = points.Select(static x => x.Month).ToArray(),
+            Series =
+            [
+                new AgentUiChartSeries
+                {
+                    Name = "Tasks Created",
                     Data = points.Select(static x => (double)x.Count).ToArray()
                 }
             ]

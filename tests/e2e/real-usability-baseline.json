@@ -1,0 +1,15 @@
+{
+  "minPassRate": 0.8,
+  "maxFailures": 1,
+  "requiredScenarioPasses": [
+    "incident-triage-mitigation",
+    "forecast-driven-planning"
+  ],
+  "maxRootCauseCounts": {
+    "missing_generated_ui": 0,
+    "missing_required_block_types": 1,
+    "excessive_clarifications": 1,
+    "repeated_deferred_loop": 0,
+    "no_component_actions": 1
+  }
+}

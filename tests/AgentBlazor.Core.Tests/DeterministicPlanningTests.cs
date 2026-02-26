@@ -603,6 +603,99 @@ public class DeterministicPlanningTests
     }
 
     [Fact]
+    public async Task Runtime_GenerativeUiEnabled_MissingUiToolCalls_AttachesFallbackSummary()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDataGrid",
+                        "actionId": "sort",
+                        "arguments": { "column": "RiskScore", "direction": "desc" }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+        };
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "show highest risk suppliers",
+            Context: context));
+
+        Assert.NotNull(response.GeneratedUi);
+        var block = Assert.Single(response.GeneratedUi!.Blocks);
+        Assert.Equal(AgentUiBlockKind.Card, block.Kind);
+        Assert.Equal("generated-summary", block.Id);
+        Assert.Contains("Planned 1 action", block.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Runtime_GenerativeUiEnabled_RepairsMissingUiToolCalls_WhenSecondAttemptProvidesTools()
+    {
+        var chatClient = new SequentialJsonPlanChatClient(
+        [
+            """
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDataGrid",
+                        "actionId": "sort",
+                        "arguments": { "column": "RiskScore", "direction": "desc" }
+                    }
+                ]
+            }
+            """,
+            """
+            {
+                "steps": [
+                    {
+                        "componentId": "AgentDataGrid",
+                        "actionId": "sort",
+                        "arguments": { "column": "RiskScore", "direction": "desc" }
+                    }
+                ],
+                "uiToolCalls": [
+                    {
+                        "toolId": "summary.card",
+                        "arguments": {
+                            "blockId": "repair-summary",
+                            "title": "Risk Focus",
+                            "description": "Sorted suppliers by risk."
+                        }
+                    }
+                ]
+            }
+            """
+        ]);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(chatClient);
+        services.AddSingleton<IComponentActionExecutor>(new SuccessfulActionExecutor());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+        };
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "triage unhealthy services and draft a mitigation plan",
+            Context: context));
+
+        Assert.Equal(2, chatClient.CallCount);
+        Assert.NotNull(response.GeneratedUi);
+        var block = Assert.Single(response.GeneratedUi!.Blocks);
+        Assert.Equal("repair-summary", block.Id);
+    }
+
+    [Fact]
     public async Task Runtime_ComponentInstanceIdAsComponentId_NormalizesToAllowedComponent()
     {
         var services = CreateDeterministicServices("""
@@ -633,6 +726,31 @@ public class DeterministicPlanningTests
         var planned = Assert.Single(response.PlannedActions);
         Assert.Equal(AgentComponentCapabilityProfile.AgentDataGridComponentId, planned.ComponentId);
         Assert.Equal(AgentComponentCapabilityProfile.DataGridSortActionId, planned.ActionId);
+        Assert.DoesNotContain("not available or not allowed", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Runtime_UnmountedComponentInstanceId_NormalizesByActionToAllowedComponent()
+    {
+        var services = CreateDeterministicServices("""
+            {
+                "steps": [
+                    {
+                        "componentId": "workflow-tabs",
+                        "actionId": "switch_tab",
+                        "arguments": { "index": 1 }
+                    }
+                ]
+            }
+            """);
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier risk tab"));
+
+        var planned = Assert.Single(response.PlannedActions);
+        Assert.Equal(AgentComponentCapabilityProfile.AgentTabsComponentId, planned.ComponentId);
+        Assert.Equal(AgentComponentCapabilityProfile.TabsSwitchTabActionId, planned.ActionId);
         Assert.DoesNotContain("not available or not allowed", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1173,6 +1291,43 @@ public class DeterministicPlanningTests
         {
             yield return new ChatResponseUpdate(ChatRole.Assistant, jsonResponse);
             await Task.CompletedTask;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
+    private sealed class SequentialJsonPlanChatClient(params string[] responses) : IChatClient
+    {
+        private readonly Queue<string> _responses = new(responses);
+
+        public int CallCount { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+
+            CallCount++;
+
+            var response = _responses.Count > 0
+                ? _responses.Dequeue()
+                : """{"steps": []}""";
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, response)));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text ?? string.Empty);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;

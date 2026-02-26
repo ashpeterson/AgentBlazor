@@ -11,6 +11,7 @@
                       Description="@Description"
                       FormName="@FormName"
                       DefaultAgentName="@DefaultAgentName"
+                      SessionId="@SessionId"
                       Placeholder="@Placeholder"
                       EnableGeneratedUi="@EnableGeneratedUi"
                       Theme="@Theme"
@@ -42,6 +43,9 @@
 
     [Parameter]
     public string? DefaultAgentName { get; set; }
+
+    [Parameter]
+    public string? SessionId { get; set; }
 
     [Parameter]
     public string? CssClass { get; set; }

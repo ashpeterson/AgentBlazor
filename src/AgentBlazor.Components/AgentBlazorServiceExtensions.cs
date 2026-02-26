@@ -1,4 +1,6 @@
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +65,41 @@ public static class AgentBlazorServiceExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<ITabsActionExecutor, TExecutor>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a paid persistent conversation store provider.
+    /// </summary>
+    public static IServiceCollection AddAgentBlazorPersistentConversationStore<TStore>(this IServiceCollection services)
+        where TStore : class, IPersistentConversationStore
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IPersistentConversationStore, TStore>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers a paid persistent user preference provider.
+    /// </summary>
+    public static IServiceCollection AddAgentBlazorPersistentUserPreferenceService<TService>(this IServiceCollection services)
+        where TService : class, IPersistentUserPreferenceService
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IPersistentUserPreferenceService, TService>();
+        return services;
+    }
+
+    /// <summary>
+    /// Configures paid feature switches (for example persistent memory).
+    /// </summary>
+    public static IServiceCollection ConfigureAgentBlazorPaidFeatures(
+        this IServiceCollection services,
+        Action<AgentBlazorPaidFeaturesOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+        services.Configure<AgentBlazorOptions>(options => configure(options.PaidFeatures));
         return services;
     }
 

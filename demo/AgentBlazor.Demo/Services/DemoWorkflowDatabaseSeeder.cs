@@ -10,6 +10,7 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureMitigationSchemaAsync(db, cancellationToken);
 
         if (!await db.Suppliers.AnyAsync(cancellationToken))
         {
@@ -63,6 +64,63 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
             }
         }
 
+        if (!await db.MitigationTasks.AnyAsync(cancellationToken))
+        {
+            var seededSuppliers = await db.Suppliers
+                .OrderByDescending(x => x.RiskScore)
+                .Take(4)
+                .ToListAsync(cancellationToken);
+
+            for (var i = 0; i < seededSuppliers.Count; i++)
+            {
+                var supplier = seededSuppliers[i];
+                db.MitigationTasks.Add(new MitigationTaskEntity
+                {
+                    TaskId = $"MIT-{(i + 1).ToString("D4")}",
+                    SupplierId = supplier.SupplierId,
+                    SupplierName = supplier.SupplierName,
+                    ServiceName = "Supplier Risk Monitoring",
+                    Owner = i % 2 == 0 ? "Ops Lead" : "Risk Analyst",
+                    MitigationAction = "Increase audit cadence and validate contingency coverage.",
+                    Priority = Math.Clamp(1 + i, 1, 5),
+                    Status = i == 0 ? "InProgress" : "Open",
+                    DueDate = DateTime.UtcNow.Date.AddDays(7 + (i * 3)),
+                    CreatedUtc = DateTime.UtcNow.AddDays(-(i + 2))
+                });
+            }
+        }
+
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureMitigationSchemaAsync(
+        DemoWorkflowDbContext db,
+        CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS mitigation_tasks (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TaskId TEXT NOT NULL,
+                SupplierId TEXT NOT NULL,
+                SupplierName TEXT NOT NULL,
+                ServiceName TEXT NOT NULL,
+                Owner TEXT NOT NULL,
+                MitigationAction TEXT NOT NULL,
+                Priority INTEGER NOT NULL,
+                Status TEXT NOT NULL,
+                DueDate TEXT NOT NULL,
+                CreatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                CompletedUtc TEXT NULL
+            );
+            """,
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_mitigation_tasks_TaskId ON mitigation_tasks (TaskId);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_mitigation_tasks_SupplierId ON mitigation_tasks (SupplierId);",
+            cancellationToken);
     }
 }

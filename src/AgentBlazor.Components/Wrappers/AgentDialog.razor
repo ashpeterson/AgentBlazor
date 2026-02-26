@@ -73,17 +73,23 @@
         action = NormalizeAction(AgentComponentCapabilityProfile.AgentDialogComponentId, action);
         if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))
         {
-            Visible = true;
-            await VisibleChanged.InvokeAsync(true);
-            await RequestComponentRefreshAsync();
+            await InvokeAsync(async () =>
+            {
+                Visible = true;
+                await VisibleChanged.InvokeAsync(true);
+                StateHasChanged();
+            });
             return ActionResult.Success("Dialog opened.");
         }
 
         if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogCloseActionId, StringComparison.OrdinalIgnoreCase))
         {
-            Visible = false;
-            await VisibleChanged.InvokeAsync(false);
-            await RequestComponentRefreshAsync();
+            await InvokeAsync(async () =>
+            {
+                Visible = false;
+                await VisibleChanged.InvokeAsync(false);
+                StateHasChanged();
+            });
             return ActionResult.Success("Dialog closed.");
         }
 
@@ -105,9 +111,13 @@
             AgentAction.Create(AgentComponentCapabilityProfile.DialogCloseActionId),
             cancellationToken);
 
-    private async Task OnVisibleChanged(bool visible)
+    private Task OnVisibleChanged(bool visible)
     {
-        Visible = visible;
-        await VisibleChanged.InvokeAsync(visible);
+        return InvokeAsync(async () =>
+        {
+            Visible = visible;
+            await VisibleChanged.InvokeAsync(visible);
+            StateHasChanged();
+        });
     }
 }

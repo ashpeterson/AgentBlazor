@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@using AgentBlazor.Components
+@using AgentBlazor.Components.Chat
 @using MudBlazor
 
 <MudThemeProvider Theme="_activeTheme" IsDarkMode="true" />
@@ -44,6 +46,17 @@
         </article>
     </main>
 </div>
+
+<AgentChatWidget Title="Assistant"
+                 Description="Generated UI mode is enabled for this chat."
+                 EnableGeneratedUi="true"
+                 Placeholder="Ask me to navigate, analyze data, draft UI, and run workflow actions across this app..."
+                 Theme="ChatTheme.Dark()"
+                 Width="31rem"
+                 Height="68vh"
+                 Right="1.1rem"
+                 Bottom="1rem"
+                 CssClass="demo-app__assistant-widget" />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

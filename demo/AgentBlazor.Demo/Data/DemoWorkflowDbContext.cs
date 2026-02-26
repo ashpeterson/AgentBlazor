@@ -6,6 +6,7 @@ internal sealed class DemoWorkflowDbContext(DbContextOptions<DemoWorkflowDbConte
 {
     public DbSet<SupplierEntity> Suppliers => Set<SupplierEntity>();
     public DbSet<OnboardingRequestEntity> OnboardingRequests => Set<OnboardingRequestEntity>();
+    public DbSet<MitigationTaskEntity> MitigationTasks => Set<MitigationTaskEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,5 +30,18 @@ internal sealed class DemoWorkflowDbContext(DbContextOptions<DemoWorkflowDbConte
         onboarding.Property(static x => x.ContactEmail).IsRequired();
         onboarding.Property(static x => x.Status).HasMaxLength(32);
         onboarding.Property(static x => x.SubmittedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        var mitigation = modelBuilder.Entity<MitigationTaskEntity>();
+        mitigation.ToTable("mitigation_tasks");
+        mitigation.HasKey(static x => x.Id);
+        mitigation.HasIndex(static x => x.TaskId).IsUnique();
+        mitigation.HasIndex(static x => x.SupplierId);
+        mitigation.Property(static x => x.TaskId).IsRequired();
+        mitigation.Property(static x => x.SupplierName).IsRequired();
+        mitigation.Property(static x => x.ServiceName).IsRequired();
+        mitigation.Property(static x => x.Owner).IsRequired();
+        mitigation.Property(static x => x.MitigationAction).IsRequired();
+        mitigation.Property(static x => x.Status).HasMaxLength(32);
+        mitigation.Property(static x => x.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
     }
 }

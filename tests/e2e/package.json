@@ -6,7 +6,8 @@
   "scripts": {
     "test:e2e": "playwright test --config=playwright.config.cjs",
     "test:e2e:headed": "playwright test --config=playwright.config.cjs --headed",
-    "install:browsers": "playwright install --with-deps chromium"
+    "install:browsers": "playwright install --with-deps chromium",
+    "test:real-usability": "node ./scripts/real-usability-runner.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2"

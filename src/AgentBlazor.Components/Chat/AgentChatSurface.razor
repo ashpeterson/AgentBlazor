@@ -10,6 +10,9 @@
 @inject IAgentRegistry AgentRegistry
 @inject IAgentRuntime AgentRuntime
 @inject IAgentDeferredActionEvents DeferredActionEvents
+@inject IConversationStore ConversationStore
+@inject IAgentChatSessionState ChatSessionState
+@inject IAgentChatSessionEvents SessionEvents
 @inject IJSRuntime JSRuntime
 
 <section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
@@ -50,7 +53,10 @@
         </div>
     }
 
-    @if (_timeline.Count > 0 || !string.IsNullOrWhiteSpace(_streamingResponseText))
+    @if (_timeline.Count > 0 ||
+         !string.IsNullOrWhiteSpace(_streamingResponseText) ||
+         _pendingClarification is not null ||
+         _pendingApprovals.Count > 0)
     {
         <div id="@TimelineId"
              class="ab-chat-surface__timeline"
@@ -99,7 +105,7 @@
                         <div class="ab-chat-surface__generated-ui">
                             <AgentGenerativeSurface Document="@item.GeneratedUi"
                                                     AgentName="@item.RoleLabel"
-                                                    SessionId="@_instanceId"
+                                                    SessionId="@EffectiveSessionId"
                                                     ForwardActionsToRuntime="true"
                                                     ShowRuntimeResponses="false"
                                                     OnActionInvoked="HandleGeneratedActionInvokedAsync"
@@ -127,69 +133,69 @@
                     }
                 </article>
             }
-        </div>
-    }
 
-    @if (_pendingClarification is { } clar)
-    {
-        <article class="ab-chat-surface__item ab-chat-surface__item--clarification" aria-label="Clarification needed">
-            <div class="ab-chat-surface__item-role">Clarification Needed</div>
-            <div class="ab-chat-surface__item-text">@clar.Question</div>
-            <div class="ab-chat-surface__clarification-input">
-                <label class="ab-chat-surface__label" for="@ClarificationInputId">Your answer:</label>
-                <input id="@ClarificationInputId"
-                       type="text"
-                       class="ab-chat-surface__input"
-                       @bind="_clarificationResponse"
-                       @bind:event="oninput"
-                       placeholder="Type your answer..."
-                       disabled="@_isBusy"
-                       @onkeydown="HandleClarificationKeyDown" />
-                <button type="button"
-                        id="@ClarificationSubmitButtonId"
-                        class="ab-chat-surface__submit"
-                        disabled="@(_isBusy || string.IsNullOrWhiteSpace(_clarificationResponse))"
-                        @onclick="SubmitClarificationAsync">
-                    @(_isBusy ? "Sending…" : "Submit")
-                </button>
-            </div>
-        </article>
-    }
+            @if (_pendingClarification is { } clar)
+            {
+                <article class="ab-chat-surface__item ab-chat-surface__item--clarification" aria-label="Clarification needed">
+                    <div class="ab-chat-surface__item-role">Clarification Needed</div>
+                    <div class="ab-chat-surface__item-text">@clar.Question</div>
+                    <div class="ab-chat-surface__clarification-input">
+                        <label class="ab-chat-surface__label" for="@ClarificationInputId">Your answer:</label>
+                        <input id="@ClarificationInputId"
+                               type="text"
+                               class="ab-chat-surface__input"
+                               @bind="_clarificationResponse"
+                               @bind:event="oninput"
+                               placeholder="Type your answer..."
+                               disabled="@_isBusy"
+                               @onkeydown="HandleClarificationKeyDown" />
+                        <button type="button"
+                                id="@ClarificationSubmitButtonId"
+                                class="ab-chat-surface__submit"
+                                disabled="@(_isBusy || string.IsNullOrWhiteSpace(_clarificationResponse))"
+                                @onclick="SubmitClarificationAsync">
+                            @(_isBusy ? "Sending…" : "Submit")
+                        </button>
+                    </div>
+                </article>
+            }
 
-    @if (_pendingApprovals.Count > 0)
-    {
-        <article class="ab-chat-surface__item ab-chat-surface__item--approval" aria-label="Approval required">
-            <div class="ab-chat-surface__item-role">Approval Required</div>
-            <div class="ab-chat-surface__item-text">The following actions require your approval:</div>
-            <ul class="ab-chat-surface__approval-list">
-                @foreach (var approval in _pendingApprovals)
-                {
-                    <li>
-                        <strong>@approval.ComponentId.@approval.ActionId</strong>
-                        @if (approval.Parameters.Count > 0)
+            @if (_pendingApprovals.Count > 0)
+            {
+                <article class="ab-chat-surface__item ab-chat-surface__item--approval" aria-label="Approval required">
+                    <div class="ab-chat-surface__item-role">Approval Required</div>
+                    <div class="ab-chat-surface__item-text">The following actions require your approval:</div>
+                    <ul class="ab-chat-surface__approval-list">
+                        @foreach (var approval in _pendingApprovals)
                         {
-                            <span class="ab-chat-surface__approval-params">
-                                (@string.Join(", ", approval.Parameters.Select(p => $"{p.Key}={p.Value}")))
-                            </span>
+                            <li>
+                                <strong>@approval.ComponentId.@approval.ActionId</strong>
+                                @if (approval.Parameters.Count > 0)
+                                {
+                                    <span class="ab-chat-surface__approval-params">
+                                        (@string.Join(", ", approval.Parameters.Select(p => $"{p.Key}={p.Value}")))
+                                    </span>
+                                }
+                            </li>
                         }
-                    </li>
-                }
-            </ul>
-            <div class="ab-chat-surface__approval-buttons">
-                <button type="button"
-                        class="ab-chat-surface__submit ab-chat-surface__submit--approve"
-                        disabled="@_isBusy"
-                        @onclick="ApproveActionsAsync">
-                    @(_isBusy ? "Approving…" : "Approve")
-                </button>
-                <button type="button"
-                        class="ab-chat-surface__submit ab-chat-surface__submit--deny"
-                        disabled="@_isBusy"
-                        @onclick="DenyActionsAsync">
-                    @(_isBusy ? "Denying…" : "Deny")
-                </button>
-            </div>
-        </article>
+                    </ul>
+                    <div class="ab-chat-surface__approval-buttons">
+                        <button type="button"
+                                class="ab-chat-surface__submit ab-chat-surface__submit--approve"
+                                disabled="@_isBusy"
+                                @onclick="ApproveActionsAsync">
+                            @(_isBusy ? "Approving…" : "Approve")
+                        </button>
+                        <button type="button"
+                                class="ab-chat-surface__submit ab-chat-surface__submit--deny"
+                                disabled="@_isBusy"
+                                @onclick="DenyActionsAsync">
+                            @(_isBusy ? "Denying…" : "Deny")
+                        </button>
+                    </div>
+                </article>
+            }
+        </div>
     }
 
     <EditForm class="ab-chat-surface__controls" Model="@this" FormName="@EffectiveFormName" OnValidSubmit="SendAsync">
@@ -246,6 +252,7 @@
     private readonly List<ActivityMessage> _streamingActivityMessages = [];
     private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
         new(StringComparer.OrdinalIgnoreCase);
+    private string? _historyHydratedForSession;
 
     private PendingClarificationInfo? _pendingClarification;
     private string _clarificationResponse = string.Empty;
@@ -276,7 +283,15 @@
     public string? CssClass { get; set; }
 
     [Parameter]
+    public string? SessionId { get; set; }
+
+    [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    private string EffectiveSessionId =>
+        string.IsNullOrWhiteSpace(SessionId)
+            ? ChatSessionState.SessionId
+            : SessionId.Trim();
 
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)
@@ -299,6 +314,7 @@
     protected override void OnInitialized()
     {
         DeferredActionEvents.DeferredActionCompleted += HandleDeferredActionCompleted;
+        SessionEvents.SessionUpdated += HandleSessionUpdated;
 
         _agentNames.AddRange(
             AgentRegistry.GetAll()
@@ -312,6 +328,11 @@
         }
 
         _selectedAgent ??= _agentNames.FirstOrDefault();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await HydrateTimelineFromHistoryAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -368,6 +389,7 @@
     public void Dispose()
     {
         DeferredActionEvents.DeferredActionCompleted -= HandleDeferredActionCompleted;
+        SessionEvents.SessionUpdated -= HandleSessionUpdated;
 
         try
         {
@@ -411,7 +433,7 @@
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 _selectedAgent,
-                SessionId: _instanceId,
+                SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
             ApplyTurnOutcome(message, turnOutcome);
             _scrollRequested = true;
@@ -447,7 +469,7 @@
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 fullMessage,
                 _selectedAgent,
-                SessionId: _instanceId,
+                SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
             ApplyTurnOutcome(fullMessage, turnOutcome);
             _scrollRequested = true;
@@ -497,7 +519,7 @@
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 approvalMessage,
                 _selectedAgent,
-                SessionId: _instanceId,
+                SessionId: EffectiveSessionId,
                 Context: CreateRequestContext(approvalContext)));
             ApplyTurnOutcome(approvalMessage, turnOutcome);
             _scrollRequested = true;
@@ -633,6 +655,7 @@
         {
             _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
         }
+        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
 
         if (!string.IsNullOrWhiteSpace(turnOutcome.ClarificationQuestion))
         {
@@ -709,7 +732,7 @@
     {
         if (!string.IsNullOrWhiteSpace(actionEvent.SessionId))
         {
-            return string.Equals(actionEvent.SessionId, _instanceId, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(actionEvent.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase);
         }
 
         if (!string.IsNullOrWhiteSpace(actionEvent.RunId) &&
@@ -883,8 +906,45 @@
     private Task HandleGeneratedRuntimeResponseAsync(AgentTurnResponse response)
     {
         _timeline.Add(ChatTimelineItem.Agent(response));
+        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+
+        if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
+        {
+            _pendingApprovals.Clear();
+            _pendingClarification = new PendingClarificationInfo(response.ClarificationQuestion, response.ResponseText);
+            _agentState = AgentState.WaitingForClarification;
+        }
+        else if (response.RequiresApproval && response.PendingApprovals.Count > 0)
+        {
+            _pendingClarification = null;
+            SetPendingApprovals(response.PendingApprovals);
+            _agentState = AgentState.WaitingForApproval;
+        }
+        else
+        {
+            _pendingClarification = null;
+            _pendingApprovals.Clear();
+            _agentState = AgentState.Idle;
+        }
+
         _scrollRequested = true;
         return InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleSessionUpdated(AgentChatSessionUpdate update)
+    {
+        if (_isBusy ||
+            !string.Equals(update.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(update.SourceId, _instanceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await HydrateTimelineFromHistoryAsync(force: true);
+            StateHasChanged();
+        });
     }
 
     private Task HandleGeneratedUiErrorAsync(Exception exception)
@@ -892,6 +952,76 @@
         _timeline.Add(ChatTimelineItem.Activity($"Generated UI action failed: {exception.Message}"));
         _scrollRequested = true;
         return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HydrateTimelineFromHistoryAsync(bool force = false)
+    {
+        var sessionId = EffectiveSessionId;
+        if (!force &&
+            string.Equals(_historyHydratedForSession, sessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _historyHydratedForSession = sessionId;
+        var history = await ConversationStore.GetHistoryAsync(sessionId);
+
+        _timeline.Clear();
+        _assistantTimelineIndexByRunId.Clear();
+        _streamingActivityMessages.Clear();
+        _streamingResponseText = string.Empty;
+        _streamingAgentName = null;
+        _activeRunId = null;
+        _pendingClarification = null;
+        _pendingApprovals.Clear();
+        _clarificationResponse = string.Empty;
+        _agentState = AgentState.Idle;
+
+        if (history is null || history.Turns.Count == 0)
+        {
+            return;
+        }
+
+        var roleLabel = _selectedAgent ?? DefaultAgentName ?? "Agent";
+        foreach (var turn in history.Turns.OrderBy(static turn => turn.Timestamp))
+        {
+            if (!string.IsNullOrWhiteSpace(turn.UserMessage))
+            {
+                _timeline.Add(ChatTimelineItem.User(turn.UserMessage));
+            }
+
+            if (!string.IsNullOrWhiteSpace(turn.AgentResponse))
+            {
+                _timeline.Add(new ChatTimelineItem(
+                    "assistant",
+                    roleLabel,
+                    turn.AgentResponse,
+                    BuildActivityMessages(turn.ExecutionResults),
+                    turn.PlannedActions,
+                    turn.ExecutionResults,
+                    GeneratedUi: turn.GeneratedUi,
+                    RunId: null));
+            }
+        }
+    }
+
+    private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
+        IReadOnlyList<ComponentActionExecutionResult> executionResults)
+    {
+        if (executionResults.Count == 0)
+        {
+            return [];
+        }
+
+        var messages = new List<ActivityMessage>(executionResults.Count);
+        foreach (var result in executionResults)
+        {
+            var key = BuildActivityKey(result.ComponentId, result.ActionId);
+            var text = FormatToolCallResultMessage(result);
+            messages.Add(new ActivityMessage(key, text));
+        }
+
+        return messages;
     }
 
     private sealed record ChatTimelineItem(

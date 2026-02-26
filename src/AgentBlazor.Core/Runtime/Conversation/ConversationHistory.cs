@@ -1,4 +1,5 @@
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Components;
 
 namespace AgentBlazor.Core.Runtime.Conversation;
 
@@ -31,6 +32,11 @@ public sealed record ConversationTurn
     /// Results of executing the planned actions.
     /// </summary>
     public IReadOnlyList<ComponentActionExecutionResult> ExecutionResults { get; init; } = [];
+
+    /// <summary>
+    /// Optional generated UI document returned for this turn.
+    /// </summary>
+    public AgentUiDocument? GeneratedUi { get; init; }
 
     /// <summary>
     /// Whether any actions were successfully executed.

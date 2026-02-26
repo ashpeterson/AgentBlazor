@@ -100,7 +100,27 @@
 /* ── Content ────────────────────────────────────── */
 
 .demo-app__content {
-    padding: 1.25rem 0.2rem 2rem;
+    padding: 1.25rem 0.2rem 27rem;
+}
+
+.demo-app__assistant-widget ::deep .ab-chat-widget__window {
+    border: 1px solid var(--ab-border);
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.demo-app__assistant-widget ::deep .ab-chat-surface__timeline {
+    max-height: min(43vh, 28rem);
+}
+
+.demo-app__assistant-widget ::deep .ab-chat-surface__controls {
+    background: rgba(6, 8, 16, 0.96);
+    backdrop-filter: blur(8px);
+}
+
+.demo-app__assistant-widget ::deep .ab-chat-surface__header {
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
 }
 
 /* ── Error UI ───────────────────────────────────── */
@@ -152,5 +172,14 @@
 
     .demo-app__theme-select {
         min-width: 100%;
+    }
+
+    .demo-app__content {
+        padding-bottom: 26rem;
+    }
+
+    .demo-app__assistant-widget {
+        --ab-chat-widget-right: 0.7rem;
+        --ab-chat-widget-bottom: 0.7rem;
     }
 }

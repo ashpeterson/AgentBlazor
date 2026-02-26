@@ -1,0 +1,60 @@
+name: real-usability-nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  real-usability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (pinned)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Restore
+        run: dotnet restore AgentBlazor.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
+
+      - name: Install E2E Dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npm run install:browsers
+
+      - name: Run Real Usability Suite
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OpenAI__ApiKey: ${{ secrets.OPENAI_API_KEY }}
+          OpenAI__Model: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL }}
+          Ollama__Model: ${{ vars.OLLAMA_MODEL }}
+          OLLAMA_ENDPOINT: ${{ vars.OLLAMA_ENDPOINT }}
+          Ollama__Endpoint: ${{ vars.OLLAMA_ENDPOINT }}
+        run: npm --prefix tests/e2e run test:real-usability
+
+      - name: Upload Real Usability Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-usability-artifacts
+          path: tests/e2e/artifacts/real-usability/**
+          if-no-files-found: warn

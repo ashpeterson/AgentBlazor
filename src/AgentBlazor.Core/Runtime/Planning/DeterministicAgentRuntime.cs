@@ -911,6 +911,22 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
 
             if (!IsAllowedComponent(componentId, allowedComponents))
             {
+                if (string.IsNullOrWhiteSpace(targetAgentId))
+                {
+                    var canonicalByAction = ResolveUniqueAllowedComponentIdByAction(
+                        step.ActionId,
+                        allowedComponents);
+                    if (!string.IsNullOrWhiteSpace(canonicalByAction) &&
+                        !string.Equals(componentId, canonicalByAction, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Planner sometimes emits instance ids in componentId (for example "workflow-tabs").
+                        // If action→component mapping is unambiguous, treat componentId as target instance id.
+                        targetAgentId = componentId;
+                        componentId = canonicalByAction;
+                        stepChanged = true;
+                    }
+                }
+
                 if (mountedByAgentId.TryGetValue(componentId, out var referencedInstance))
                 {
                     var canonicalFromInstance = ResolveAllowedComponentIdForType(
@@ -997,6 +1013,26 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
             component.ComponentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(component.ComponentId[5..], typeName, StringComparison.OrdinalIgnoreCase));
         return bySuffix?.ComponentId;
+    }
+
+    private static string? ResolveUniqueAllowedComponentIdByAction(
+        string? actionId,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (string.IsNullOrWhiteSpace(actionId))
+        {
+            return null;
+        }
+
+        var matches = allowedComponents
+            .Where(component => component.Actions.Any(action =>
+                string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase)))
+            .Select(component => component.ComponentId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToArray();
+
+        return matches.Length == 1 ? matches[0] : null;
     }
 
     private ActionPlan EnforceGeneratedUiActionPolicies(
@@ -1749,7 +1785,8 @@ internal sealed class DeterministicAgentRuntime : IAgentRuntime, IAgentRuntimeSt
                 UserMessage = userMessage,
                 AgentResponse = response.ResponseText,
                 PlannedActions = response.PlannedActions,
-                ExecutionResults = response.ExecutionResults
+                ExecutionResults = response.ExecutionResults,
+                GeneratedUi = response.GeneratedUi
             };
 
             await _conversationManager.AppendTurnAsync(sessionId, turn, cancellationToken);

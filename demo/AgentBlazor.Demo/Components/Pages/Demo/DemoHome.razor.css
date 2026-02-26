@@ -123,6 +123,21 @@
     max-width: 550px;
 }
 
+.demo-home__chat {
+    width: min(760px, 100%);
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.demo-home__chat-note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--ab-ink-muted);
+    opacity: 0.9;
+}
+
 /* ── Quick Links ────────────────────────────────── */
 
 .demo-home__links {

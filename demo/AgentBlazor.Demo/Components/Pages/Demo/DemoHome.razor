@@ -1,7 +1,7 @@
 @page "/demo"
 @layout DemoLayout
-@using AgentBlazor.Components
 @using MudBlazor
+@using AgentBlazor.Components.Chat
 
 <PageTitle>AgentBlazor Demo</PageTitle>
 
@@ -21,12 +21,20 @@
             <p class="demo-home__subtitle">
                 Run a real end-to-end workflow: submit onboarding, review suppliers, and generate live charts from persisted app data.
             </p>
+            <p class="demo-home__subtitle">
+                Use the floating <strong>Ask Agent</strong> widget to run the same assistant across every demo page.
+            </p>
 
-            <AgentChatBar Placeholder="Try: show overdue records"
-                          Suggestions="_suggestions"
-                          ShowTimeline="true"
-                          ShowClearButton="true"
-                          ClearButtonText="Clear conversation" />
+            <div class="demo-home__chat">
+                <AgentChatBar Placeholder="Try: triage unhealthy services and draft a mitigation plan"
+                              EnableGeneratedUi="true"
+                              ShowTimeline="false"
+                              ShowClearButton="false"
+                              Theme="ChatTheme.Dark()" />
+                <p class="demo-home__chat-note">
+                    Inline chat and floating widget share the same conversation state.
+                </p>
+            </div>
         </div>
     </section>
 
@@ -65,14 +73,3 @@
     </section>
 </div>
 
-@code {
-    private static readonly IReadOnlyList<string> _suggestions =
-    [
-        "open onboarding and draft a new supplier request",
-        "go to workflow and sort onboarding queue by priority",
-        "go to suppliers and show high risk rows first",
-        "switch to the Risk tab in workspace",
-        "summarize this page as generated ui",
-        "show supplier risk by region as a chart"
-    ];
-}
