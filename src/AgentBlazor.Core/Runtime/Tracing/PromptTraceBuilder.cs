@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
-using AgentBlazor.Core.Runtime.Intent;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
 using Microsoft.Extensions.Options;
@@ -124,31 +123,6 @@ internal sealed class PromptTraceBuilder
     public TimeSpan StageElapsed => _stageStopwatch.Elapsed;
 
     /// <summary>
-    /// Records intent classification results.
-    /// </summary>
-    public PromptTraceBuilder RecordClassification(IntentClassification classification)
-    {
-        if (!IsEnabled) return this;
-
-        _classification = new PromptTraceClassification
-        {
-            Method = classification.ClassificationMethod,
-            PrimaryIntent = classification.PrimaryIntent,
-            Confidence = classification.Confidence,
-            TargetComponentId = classification.TargetComponentId,
-            TargetActionId = classification.TargetActionId,
-            ExtractedEntities = _options.CaptureExtractedEntities
-                ? classification.ExtractedEntities
-                : null,
-            Duration = _stageStopwatch.Elapsed,
-            RequiresClarification = classification.RequiresClarification,
-            ClarificationPrompt = classification.ClarificationPrompt
-        };
-
-        return this;
-    }
-
-    /// <summary>
     /// Records intent classification with explicit values.
     /// </summary>
     public PromptTraceBuilder RecordClassification(
@@ -169,26 +143,6 @@ internal sealed class PromptTraceBuilder
             TargetComponentId = targetComponentId,
             TargetActionId = targetActionId,
             ExtractedEntities = _options.CaptureExtractedEntities ? extractedEntities : null,
-            Duration = _stageStopwatch.Elapsed
-        };
-
-        return this;
-    }
-
-    /// <summary>
-    /// Records intent resolution results.
-    /// </summary>
-    public PromptTraceBuilder RecordResolution(ResolvedIntent? resolved)
-    {
-        if (!IsEnabled || resolved is null) return this;
-
-        _resolution = new PromptTraceResolution
-        {
-            ComponentId = resolved.ComponentId,
-            ActionId = resolved.ActionId,
-            Arguments = _options.CaptureActionArguments ? resolved.Arguments : null,
-            Reason = resolved.Reason,
-            RequiresApproval = resolved.RequiresApproval,
             Duration = _stageStopwatch.Elapsed
         };
 

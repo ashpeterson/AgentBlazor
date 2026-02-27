@@ -11,7 +11,7 @@
 @inject IAgentRuntime AgentRuntime
 @inject IAgentDeferredActionEvents DeferredActionEvents
 @inject IConversationStore ConversationStore
-@inject IAgentChatSessionState ChatSessionState
+@inject IAgentComponentRegistry ComponentRegistry
 @inject IAgentChatSessionEvents SessionEvents
 @inject IJSRuntime JSRuntime
 
@@ -254,6 +254,10 @@
         new(StringComparer.OrdinalIgnoreCase);
     private string? _historyHydratedForSession;
 
+    // Session ID is taken from the scoped circuit registry so the runtime
+    // can look up this circuit's components via AgentComponentRegistryHub.
+    private string CircuitSessionId => ComponentRegistry.SessionId;
+
     private PendingClarificationInfo? _pendingClarification;
     private string _clarificationResponse = string.Empty;
     private readonly List<PendingApprovalInfo> _pendingApprovals = [];
@@ -290,7 +294,7 @@
 
     private string EffectiveSessionId =>
         string.IsNullOrWhiteSpace(SessionId)
-            ? ChatSessionState.SessionId
+            ? CircuitSessionId
             : SessionId.Trim();
 
     private string EffectiveFormName =>
@@ -314,7 +318,8 @@
     protected override void OnInitialized()
     {
         DeferredActionEvents.DeferredActionCompleted += HandleDeferredActionCompleted;
-        SessionEvents.SessionUpdated += HandleSessionUpdated;
+        if (SessionEvents is not null)
+            SessionEvents.SessionUpdated += HandleSessionUpdated;
 
         _agentNames.AddRange(
             AgentRegistry.GetAll()
@@ -389,7 +394,8 @@
     public void Dispose()
     {
         DeferredActionEvents.DeferredActionCompleted -= HandleDeferredActionCompleted;
-        SessionEvents.SessionUpdated -= HandleSessionUpdated;
+        if (SessionEvents is not null)
+            SessionEvents.SessionUpdated -= HandleSessionUpdated;
 
         try
         {

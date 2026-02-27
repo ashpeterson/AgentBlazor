@@ -1,5 +1,5 @@
 @namespace AgentBlazor.Components
-@using AgentBlazor.Components
+@using AgentBlazor.Attributes
 @using AgentBlazor.Runtime
 @using MudBlazor
 @inherits AgentControllableComponentBase
@@ -28,43 +28,22 @@
 
     public override string ComponentType => "Tabs";
 
-    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentTabsComponentId;
+    [AgentReadable("Currently active tab index (0-based)")]
+    public int CurrentTabIndex => ActivePanelIndex;
 
-    public override ComponentCapability GetCapability()
+    [AgentAction("Switch to a specific tab by index (0-based)")]
+    public async Task SwitchTab(
+        [AgentParam("Tab index, starting from 0", Required = true)] int index)
     {
-        var capability = new ComponentCapability(AgentId, "Agent-aware tabs wrapper.");
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.TabsSwitchTabActionId,
-            "Switch to a specific tab index."));
-        return capability;
+        ActivePanelIndex = index;
+        await ActivePanelIndexChanged.InvokeAsync(index);
+        await RequestComponentRefreshAsync();
     }
 
     public override ComponentState GetCurrentState() => new()
     {
         ["activePanelIndex"] = ActivePanelIndex
     };
-
-    public override async Task<ActionResult> ExecuteActionAsync(
-        AgentAction action,
-        CancellationToken cancellationToken = default)
-    {
-        _ = cancellationToken;
-        action = NormalizeAction(AgentComponentCapabilityProfile.AgentTabsComponentId, action);
-        if (!string.Equals(action.Name, AgentComponentCapabilityProfile.TabsSwitchTabActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            return ActionResult.Unknown(action.Name);
-        }
-
-        if (!action.TryGetParameter<int>("index", out var index))
-        {
-            return ActionResult.NeedsClarification("Action 'switch_tab' requires 'index' parameter.");
-        }
-
-        ActivePanelIndex = index;
-        await ActivePanelIndexChanged.InvokeAsync(index);
-        await RequestComponentRefreshAsync();
-        return ActionResult.Success($"Switched to tab index {index}.");
-    }
 
     private async Task OnActivePanelIndexChanged(int index)
     {

@@ -1,0 +1,385 @@
+using System.Text;
+using System.Text.Json;
+using AgentBlazor.Core.Components;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+
+namespace AgentBlazor.Core.Runtime.Planning;
+
+/// <summary>
+/// Simplified LLM planner. Single prompt, no repair loop.
+/// The model returns a structured JSON response containing a natural-language message,
+/// component actions, and optional UI blocks — all in one call.
+/// </summary>
+internal sealed class AgentPlanner : IStructuredActionPlanner
+{
+    private readonly IChatClient? _chatClient;
+    private readonly ILogger<AgentPlanner>? _logger;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public bool IsProviderConfigured => _chatClient is not null;
+
+    public AgentPlanner(
+        IChatClient? chatClient = null,
+        ILogger<AgentPlanner>? logger = null)
+    {
+        _chatClient = chatClient;
+        _logger = logger;
+    }
+
+    public async Task<ActionPlan> PlanAsync(
+        ActionPlanRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_chatClient is null)
+        {
+            return ActionPlan.NeedsClarification(
+                "No AI provider is configured. Register an AgentBlazor chat client.");
+        }
+
+        var systemPrompt = BuildSystemPrompt(request);
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, systemPrompt)
+        };
+
+        foreach (var turn in request.ConversationHistory.TakeLast(10))
+        {
+            var role = turn.Role.Equals("user", StringComparison.OrdinalIgnoreCase)
+                ? ChatRole.User
+                : ChatRole.Assistant;
+            messages.Add(new ChatMessage(role, turn.Content));
+        }
+
+        messages.Add(new ChatMessage(ChatRole.User, BuildUserPrompt(request)));
+
+        _logger?.LogDebug("AgentPlanner prompt: {Length} chars", systemPrompt.Length);
+
+        var response = await _chatClient.GetResponseAsync(
+            messages,
+            new ChatOptions { ResponseFormat = ChatResponseFormat.Json, Temperature = 0.0f },
+            cancellationToken);
+
+        var responseText = response.Text?.Trim() ?? string.Empty;
+        _logger?.LogDebug("AgentPlanner response: {Response}", responseText);
+
+        return ParseResponse(responseText, request.GenerateUi);
+    }
+
+    // -------------------------------------------------------------------------
+    // Prompt building
+    // -------------------------------------------------------------------------
+
+    private static string BuildSystemPrompt(ActionPlanRequest request)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# ROLE");
+        sb.AppendLine("You are an AI assistant embedded in a Blazor web application.");
+        sb.AppendLine("You control UI components and respond helpfully to the user.");
+        sb.AppendLine("You must return only valid JSON — no markdown fences, no extra text.");
+        sb.AppendLine();
+
+        sb.AppendLine("# OUTPUT SCHEMA");
+        sb.AppendLine("""
+{
+  "message": "Natural language reply shown to the user (always required)",
+  "actions": [
+    { "agentId": "component-instance-id", "action": "action_name", "args": {} }
+  ],
+  "ui": [
+    { "type": "summary.card", "title": "...", "description": "..." }
+  ],
+  "needsClarification": false,
+  "clarificationQuestion": null
+}
+""");
+        sb.AppendLine();
+
+        sb.AppendLine("# RULES");
+        sb.AppendLine("- `message` is always required — it is shown directly to the user.");
+        sb.AppendLine("- `actions` executes component operations. Use only agentIds and action names listed in ACTIVE COMPONENTS.");
+        sb.AppendLine("- `ui` is optional — include when it adds value (charts, tables, summaries, forms).");
+        sb.AppendLine("- If key information is missing, set needsClarification=true with a specific clarificationQuestion.");
+        sb.AppendLine("- Do not invent agentIds, action names, or routes not listed below.");
+        sb.AppendLine("- Include all required parameters for each action.");
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(request.AgentInstructions))
+        {
+            sb.AppendLine("# INSTRUCTIONS");
+            sb.AppendLine(request.AgentInstructions.Trim());
+            sb.AppendLine();
+        }
+
+        BuildActiveComponentsSection(sb, request);
+
+        if (request.AvailableRoutes.Count > 0)
+        {
+            sb.AppendLine("# AVAILABLE ROUTES");
+            foreach (var route in request.AvailableRoutes)
+            {
+                sb.Append("- ").Append(route.Path);
+                if (!string.IsNullOrWhiteSpace(route.Description))
+                    sb.Append(": ").Append(route.Description);
+                if (route.Aliases.Count > 0)
+                    sb.Append(" (keywords: ").Append(string.Join(", ", route.Aliases.Take(5))).Append(')');
+                sb.AppendLine();
+            }
+            sb.AppendLine();
+        }
+
+        if (request.GenerateUi)
+        {
+            sb.AppendLine("# OPTIONAL UI BLOCKS");
+            sb.AppendLine("Include in the `ui` array when helpful:");
+            sb.AppendLine("- summary.card  : { type, title, description, actions[{id, label, prompt}] }");
+            sb.AppendLine("- form.draft    : { type, title, description, fields[{name,label,type,value,required}], actions[{id,label,prompt}] }");
+            sb.AppendLine("- table.view    : { type, title, columns[{key,header}], rows[{...}], actions[{id,label,prompt}] }");
+            sb.AppendLine("- chart.view    : { type, title, dataSource }  OR  { type, title, chartType, labels, series[{name,data[]}] }");
+            sb.AppendLine("  chartType values: line | bar | pie");
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CurrentRoute))
+        {
+            sb.Append("# CURRENT ROUTE: ").AppendLine(request.CurrentRoute);
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("Return JSON now.");
+        return sb.ToString();
+    }
+
+    private static void BuildActiveComponentsSection(StringBuilder sb, ActionPlanRequest request)
+    {
+        if (request.MountedComponents.Count == 0 && request.AvailableComponents.Count == 0)
+            return;
+
+        // Build lookup: componentType → actions
+        var actionsByType = request.AvailableComponents.ToDictionary(
+            c => c.ComponentId,
+            c => c.Actions,
+            StringComparer.OrdinalIgnoreCase);
+
+        sb.AppendLine("# ACTIVE COMPONENTS");
+
+        var listedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mounted in request.MountedComponents)
+        {
+            sb.Append("AgentId: ").Append(mounted.AgentId)
+              .Append(" (").Append(mounted.ComponentType).AppendLine(")");
+
+            if (actionsByType.TryGetValue(mounted.ComponentType, out var actions) && actions.Count > 0)
+            {
+                sb.AppendLine("  Actions:");
+                foreach (var action in actions)
+                {
+                    sb.Append("    - ").Append(action.ActionId);
+                    if (action.RequiresApproval) sb.Append(" [requires-approval]");
+                    if (!string.IsNullOrWhiteSpace(action.Description))
+                        sb.Append(": ").Append(action.Description);
+                    sb.AppendLine();
+
+                    foreach (var p in action.Parameters)
+                    {
+                        sb.Append("        ").Append(p.Name).Append(": ").Append(p.Type);
+                        if (p.Required) sb.Append(" [required]");
+                        if (p.AllowedValues is { Count: > 0 })
+                            sb.Append(" [allowed: ").Append(string.Join("|", p.AllowedValues)).Append(']');
+                        if (!string.IsNullOrWhiteSpace(p.Description))
+                            sb.Append(" — ").Append(p.Description);
+                        sb.AppendLine();
+                    }
+                }
+            }
+
+            if (mounted.State.Count > 0)
+            {
+                sb.AppendLine("  State:");
+                foreach (var kv in mounted.State)
+                    sb.Append("    ").Append(kv.Key).Append(": ").AppendLine(kv.Value);
+            }
+
+            sb.AppendLine();
+            listedTypes.Add(mounted.ComponentType);
+        }
+
+        // Unmounted component types (navigation targets)
+        foreach (var component in request.AvailableComponents)
+        {
+            if (listedTypes.Contains(component.ComponentId)) continue;
+
+            sb.Append("Component: ").Append(component.ComponentId);
+            if (!string.IsNullOrWhiteSpace(component.Description))
+                sb.Append(" — ").Append(component.Description);
+            sb.AppendLine(" (not mounted — navigate first if needed)");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static string BuildUserPrompt(ActionPlanRequest request)
+    {
+        if (request.GeneratedUiAction is not null)
+        {
+            var actionJson = JsonSerializer.Serialize(new
+            {
+                blockId = request.GeneratedUiAction.BlockId,
+                actionId = request.GeneratedUiAction.ActionId,
+                prompt = request.GeneratedUiAction.Prompt,
+                payload = request.GeneratedUiAction.Payload
+            });
+            return $"USER REQUEST: {request.UserMessage}\nGENERATED_UI_ACTION: {actionJson}";
+        }
+
+        return $"USER REQUEST: {request.UserMessage}";
+    }
+
+    // -------------------------------------------------------------------------
+    // Response parsing
+    // -------------------------------------------------------------------------
+
+    private ActionPlan ParseResponse(string responseText, bool generateUi)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            _logger?.LogWarning("Empty response from AgentPlanner");
+            return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<PlannerResponse>(responseText, JsonOptions);
+            if (parsed is null)
+            {
+                _logger?.LogWarning("Failed to deserialize AgentPlanner response");
+                return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
+            }
+
+            var uiToolCalls = generateUi ? BuildUiToolCalls(parsed.Ui) : [];
+
+            if (parsed.NeedsClarification)
+            {
+                return ActionPlan.NeedsClarification(
+                    parsed.ClarificationQuestion ?? "Can you provide more details?",
+                    uiToolCalls) with { Message = parsed.Message };
+            }
+
+            var steps = new List<PlannedStep>();
+            if (parsed.Actions is { Count: > 0 })
+            {
+                foreach (var action in parsed.Actions)
+                {
+                    if (string.IsNullOrWhiteSpace(action.AgentId) || string.IsNullOrWhiteSpace(action.Action))
+                        continue;
+
+                    steps.Add(new PlannedStep
+                    {
+                        ComponentId = action.AgentId,
+                        ActionId = action.Action,
+                        Arguments = action.Args ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+                        TargetAgentId = action.AgentId
+                    });
+                }
+            }
+
+            return new ActionPlan
+            {
+                Steps = steps,
+                UiToolCalls = uiToolCalls,
+                Message = parsed.Message
+            };
+        }
+        catch (JsonException ex)
+        {
+            _logger?.LogWarning(ex, "Failed to parse AgentPlanner response: {Response}", responseText);
+            return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
+        }
+    }
+
+    private static IReadOnlyList<AgentUiToolCall> BuildUiToolCalls(IReadOnlyList<PlannerUiBlock>? blocks)
+    {
+        if (blocks is null || blocks.Count == 0) return [];
+
+        var result = new List<AgentUiToolCall>(blocks.Count);
+        foreach (var block in blocks)
+        {
+            if (string.IsNullOrWhiteSpace(block.Type)) continue;
+
+            var toolId = block.Type.Trim().ToLowerInvariant() switch
+            {
+                "summary.card" or "summary_card" => AgentUiToolIds.SummaryCard,
+                "form.draft" or "form_draft"     => AgentUiToolIds.FormDraft,
+                "table.view" or "table_view"     => AgentUiToolIds.TableView,
+                "chart.view" or "chart_view"     => AgentUiToolIds.ChartView,
+                "action.confirmation"            => AgentUiToolIds.ActionConfirmation,
+                _ => null
+            };
+
+            if (toolId is null) continue;
+
+            var args = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(block.Title))       args["title"] = block.Title;
+            if (!string.IsNullOrWhiteSpace(block.Description)) args["description"] = block.Description;
+            if (!string.IsNullOrWhiteSpace(block.BlockId))     args["blockId"] = block.BlockId;
+            if (!string.IsNullOrWhiteSpace(block.DataSource))  args["dataSource"] = block.DataSource;
+            if (!string.IsNullOrWhiteSpace(block.ChartType))   args["chartType"] = block.ChartType;
+            if (block.Labels          is not null) args["labels"] = block.Labels;
+            if (block.Series          is not null) args["series"] = block.Series;
+            if (block.Columns         is not null) args["columns"] = block.Columns;
+            if (block.Rows            is not null) args["rows"] = block.Rows;
+            if (block.Fields          is not null) args["fields"] = block.Fields;
+            if (block.Actions         is not null) args["actions"] = block.Actions;
+            if (block.DataArguments   is not null) args["dataArguments"] = block.DataArguments;
+
+            result.Add(new AgentUiToolCall { ToolId = toolId, Arguments = args });
+        }
+
+        return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Private DTOs for JSON deserialization
+    // -------------------------------------------------------------------------
+
+    private sealed class PlannerResponse
+    {
+        public string? Message { get; set; }
+        public List<PlannerAction>? Actions { get; set; }
+        public List<PlannerUiBlock>? Ui { get; set; }
+        public bool NeedsClarification { get; set; }
+        public string? ClarificationQuestion { get; set; }
+    }
+
+    private sealed class PlannerAction
+    {
+        public string? AgentId { get; set; }
+        public string? Action { get; set; }
+        public Dictionary<string, object?>? Args { get; set; }
+    }
+
+    private sealed class PlannerUiBlock
+    {
+        public string? Type { get; set; }
+        public string? BlockId { get; set; }
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public string? DataSource { get; set; }
+        public string? ChartType { get; set; }
+        public Dictionary<string, object?>? DataArguments { get; set; }
+        public List<object?>? Labels { get; set; }
+        public List<object?>? Series { get; set; }
+        public List<object?>? Columns { get; set; }
+        public List<object?>? Rows { get; set; }
+        public List<object?>? Fields { get; set; }
+        public List<object?>? Actions { get; set; }
+    }
+}

@@ -269,15 +269,18 @@ public class AgUiHostingIntegrationTests
     {
         var payload = new
         {
-            steps = new[]
+            message = $"Executing {componentId}.{actionId}",
+            actions = new[]
             {
                 new
                 {
-                    componentId,
-                    actionId,
-                    arguments = arguments ?? new Dictionary<string, object?>()
+                    agentId = componentId,
+                    action = actionId,
+                    args = arguments ?? new Dictionary<string, object?>()
                 }
-            }
+            },
+            needsClarification = false,
+            clarificationQuestion = (string?)null
         };
 
         return JsonSerializer.Serialize(payload);

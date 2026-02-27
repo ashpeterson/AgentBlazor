@@ -1,5 +1,5 @@
 @namespace AgentBlazor.Components
-@using AgentBlazor.Components
+@using AgentBlazor.Attributes
 @using AgentBlazor.Runtime
 @using MudBlazor
 @inherits AgentControllableComponentBase
@@ -21,19 +21,29 @@
 
     public override string ComponentType => "NavMenu";
 
-    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentNavMenuComponentId;
+    [AgentReadable("Current page URI")]
+    public string CurrentUri => Navigation.Uri;
 
-    public override ComponentCapability GetCapability()
+    [AgentAction("Navigate to an internal application route")]
+    public Task<ActionResult> NavigateTo(
+        [AgentParam("The route URI to navigate to (e.g. /demo/suppliers)", Required = true)] string uri)
     {
-        var capability = new ComponentCapability(AgentId, "Agent-aware navigation menu wrapper.");
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
-            "Navigate to an internal route."));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.NavigationNavigateExternalActionId,
-            "Navigate to an external URL.",
-            RequiresApproval: true));
-        return capability;
+        if (string.IsNullOrWhiteSpace(uri))
+            return Task.FromResult(ActionResult.NeedsClarification("Action 'navigate_to' requires a 'uri' parameter."));
+
+        Navigation.NavigateTo(uri, forceLoad: false);
+        return Task.FromResult(ActionResult.Applied($"Navigated to {uri}."));
+    }
+
+    [AgentAction("Navigate to an external URL", RequiresApproval = true)]
+    public Task<ActionResult> NavigateExternal(
+        [AgentParam("The full external URL to navigate to", Required = true)] string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return Task.FromResult(ActionResult.NeedsClarification("Action 'navigate_external' requires a 'url' parameter."));
+
+        Navigation.NavigateTo(url, forceLoad: true);
+        return Task.FromResult(ActionResult.Applied($"Navigated externally to {url}."));
     }
 
     public override ComponentState GetCurrentState() => new()
@@ -41,50 +51,4 @@
         ["uri"] = Navigation.Uri,
         ["dense"] = Dense
     };
-
-    public override Task<ActionResult> ExecuteActionAsync(
-        AgentAction action,
-        CancellationToken cancellationToken = default)
-    {
-        _ = cancellationToken;
-        action = NormalizeAction(AgentComponentCapabilityProfile.AgentNavMenuComponentId, action);
-
-        var target = ResolveTarget(action);
-        if (string.IsNullOrWhiteSpace(target))
-        {
-            return Task.FromResult(ActionResult.NeedsClarification(
-                $"Action '{action.Name}' requires 'uri', 'url', or 'target' parameter."));
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            Navigation.NavigateTo(target, forceLoad: false);
-            return Task.FromResult(ActionResult.Success($"Navigated to {target}."));
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            Navigation.NavigateTo(target, forceLoad: true);
-            return Task.FromResult(ActionResult.Success($"Navigated externally to {target}."));
-        }
-
-        return Task.FromResult(ActionResult.Unknown(action.Name));
-    }
-
-    private static string? ResolveTarget(AgentAction action)
-    {
-        if (action.TryGetParameter<string>("uri", out var uri) && !string.IsNullOrWhiteSpace(uri))
-        {
-            return uri;
-        }
-
-        if (action.TryGetParameter<string>("url", out var url) && !string.IsNullOrWhiteSpace(url))
-        {
-            return url;
-        }
-
-        return action.TryGetParameter<string>("target", out var target) && !string.IsNullOrWhiteSpace(target)
-            ? target
-            : null;
-    }
 }

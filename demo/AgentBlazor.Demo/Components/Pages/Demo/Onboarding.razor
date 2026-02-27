@@ -118,9 +118,9 @@
     private SupplierOnboardingModel _model = new();
     private SupplierOnboardingResult? _lastSubmission;
 
-    private Task OpenDialogAsync() => _dialog?.OpenAsync() ?? Task.CompletedTask;
+    private Task OpenDialogAsync() => _dialog?.Open() ?? Task.CompletedTask;
 
-    private Task CloseDialogAsync() => _dialog?.CloseAsync() ?? Task.CompletedTask;
+    private Task CloseDialogAsync() => _dialog?.Close() ?? Task.CompletedTask;
 
     private async Task OnSubmitted()
     {

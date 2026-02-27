@@ -300,10 +300,10 @@
     }
 
     private Task OpenMitigationDialogAsync() =>
-        _mitigationDialog?.OpenAsync() ?? Task.CompletedTask;
+        _mitigationDialog?.Open() ?? Task.CompletedTask;
 
     private Task CloseMitigationDialogAsync() =>
-        _mitigationDialog?.CloseAsync() ?? Task.CompletedTask;
+        _mitigationDialog?.Close() ?? Task.CompletedTask;
 
     private Task OnMitigationDialogVisibleChanged(bool visible)
     {

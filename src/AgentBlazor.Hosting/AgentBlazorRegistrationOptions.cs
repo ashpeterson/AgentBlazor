@@ -93,66 +93,6 @@ public sealed class AgentBlazorRegistrationOptions
         _builderConfiguration += configure;
     }
 
-    /// <summary>
-    /// Enables or disables paid persistent memory routing.
-    /// When disabled, conversation and preference stores remain in-memory.
-    /// </summary>
-    public void EnablePaidPersistentMemory(bool enabled = true)
-    {
-        _optionsConfiguration += options => options.PaidFeatures.EnablePersistentMemory = enabled;
-    }
-
-    /// <summary>
-    /// Requires paid persistent providers when persistent memory is enabled.
-    /// If providers are missing and this is true, runtime calls throw instead of falling back.
-    /// </summary>
-    public void RequirePaidPersistentProviders(bool required = true)
-    {
-        _optionsConfiguration += options => options.PaidFeatures.RequirePersistentProviders = required;
-    }
-
-    /// <summary>
-    /// Registers a paid persistent conversation provider.
-    /// </summary>
-    public void UsePersistentConversationStore<TStore>()
-        where TStore : class, IPersistentConversationStore
-    {
-        _optionsConfiguration += options => options.PaidFeatures.EnablePersistentMemory = true;
-        _serviceRegistration += services => services.TryAddSingleton<IPersistentConversationStore, TStore>();
-    }
-
-    /// <summary>
-    /// Registers a paid persistent conversation provider using a factory.
-    /// </summary>
-    public void UsePersistentConversationStore(Func<IServiceProvider, IPersistentConversationStore> factory)
-    {
-        ArgumentNullException.ThrowIfNull(factory);
-        _optionsConfiguration += options => options.PaidFeatures.EnablePersistentMemory = true;
-        _serviceRegistration += services =>
-            services.TryAddSingleton<IPersistentConversationStore>(sp => factory(sp));
-    }
-
-    /// <summary>
-    /// Registers a paid persistent user preference provider.
-    /// </summary>
-    public void UsePersistentUserPreferenceService<TService>()
-        where TService : class, IPersistentUserPreferenceService
-    {
-        _optionsConfiguration += options => options.PaidFeatures.EnablePersistentMemory = true;
-        _serviceRegistration += services => services.TryAddSingleton<IPersistentUserPreferenceService, TService>();
-    }
-
-    /// <summary>
-    /// Registers a paid persistent user preference provider using a factory.
-    /// </summary>
-    public void UsePersistentUserPreferenceService(Func<IServiceProvider, IPersistentUserPreferenceService> factory)
-    {
-        ArgumentNullException.ThrowIfNull(factory);
-        _optionsConfiguration += options => options.PaidFeatures.EnablePersistentMemory = true;
-        _serviceRegistration += services =>
-            services.TryAddSingleton<IPersistentUserPreferenceService>(sp => factory(sp));
-    }
-
     internal void ApplyProvider(IServiceCollection services)
     {
         _providerRegistration?.Invoke(services);

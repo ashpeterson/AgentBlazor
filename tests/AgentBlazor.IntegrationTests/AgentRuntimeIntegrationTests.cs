@@ -51,7 +51,7 @@ public class AgentRuntimeIntegrationTests
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskScore",
-                ["operator"] = "<=",
+                ["operator"] = "lte",
                 ["value"] = 50
             }));
         services.AddSingleton<CapturingPlannedActionExecutor>();
@@ -69,7 +69,7 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal(AgentComponentCapabilityProfile.DataGridFilterActionId, action.ActionId);
         Assert.NotNull(action.Arguments);
         Assert.Equal("RiskScore", action.Arguments["column"]?.ToString());
-        Assert.Equal("lte", action.Arguments["operator"]?.ToString()); // <= is normalized to lte
+        Assert.Equal("lte", action.Arguments["operator"]?.ToString());
         Assert.Equal("50", action.Arguments["value"]?.ToString());
     }
 
@@ -156,9 +156,9 @@ public class AgentRuntimeIntegrationTests
             "agentblazor_agentdatagrid_filter",
             new Dictionary<string, object?>
             {
-                ["field"] = "RiskCategory",
+                ["column"] = "RiskCategory",
                 ["operator"] = "in",
-                ["fieldValue"] = new[] { "High" },
+                ["value"] = "High",
                 ["target"] = "supplier-grid"
             }));
         services.AddAgentBlazorServices();
@@ -186,7 +186,7 @@ public class AgentRuntimeIntegrationTests
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskScore",
-                ["operator"] = ">=",
+                ["operator"] = "gte",
                 ["value"] = 70
             }));
         services.AddAgentBlazorServices();
@@ -394,7 +394,7 @@ public class AgentRuntimeIntegrationTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
         var chatClient = provider.GetRequiredService<CapturingInstructionChatClient>();
 
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("what can you do?"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("what can you do?", SessionId: registry.SessionId));
 
         Assert.Contains("supplier-grid", chatClient.LastInstructions ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("riskScoreThreshold", chatClient.LastInstructions ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -791,20 +791,23 @@ public class AgentRuntimeIntegrationTests
     {
         if (!TryResolveToolName(toolName, out var componentId, out var actionId))
         {
-            return """{"steps":[]}""";
+            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
         }
 
         var payload = new
         {
-            steps = new[]
+            message = $"Executing {componentId}.{actionId}",
+            actions = new[]
             {
                 new
                 {
-                    componentId,
-                    actionId,
-                    arguments = arguments ?? new Dictionary<string, object?>()
+                    agentId = componentId,
+                    action = actionId,
+                    args = arguments ?? new Dictionary<string, object?>()
                 }
-            }
+            },
+            needsClarification = false,
+            clarificationQuestion = (string?)null
         };
 
         return JsonSerializer.Serialize(payload);
@@ -812,7 +815,7 @@ public class AgentRuntimeIntegrationTests
 
     private static string BuildMultiStepPlanJson(IReadOnlyList<ToolInvocation> toolInvocations)
     {
-        var steps = new List<object>();
+        var actions = new List<object>();
         foreach (var invocation in toolInvocations)
         {
             if (!TryResolveToolName(invocation.Name, out var componentId, out var actionId))
@@ -820,15 +823,21 @@ public class AgentRuntimeIntegrationTests
                 continue;
             }
 
-            steps.Add(new
+            actions.Add(new
             {
-                componentId,
-                actionId,
-                arguments = invocation.Arguments ?? new Dictionary<string, object?>()
+                agentId = componentId,
+                action = actionId,
+                args = invocation.Arguments ?? new Dictionary<string, object?>()
             });
         }
 
-        return JsonSerializer.Serialize(new { steps });
+        return JsonSerializer.Serialize(new
+        {
+            message = "Executing multiple actions",
+            actions,
+            needsClarification = false,
+            clarificationQuestion = (string?)null
+        });
     }
 
     private static bool TryResolveToolName(

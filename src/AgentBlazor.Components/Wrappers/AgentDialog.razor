@@ -1,5 +1,5 @@
 @namespace AgentBlazor.Components
-@using AgentBlazor.Components
+@using AgentBlazor.Attributes
 @using AgentBlazor.Runtime
 @using MudBlazor
 @inherits AgentControllableComponentBase
@@ -42,74 +42,39 @@
 
     public override string ComponentType => "Dialog";
 
-    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentDialogComponentId;
+    [AgentReadable("Whether the dialog is currently visible")]
+    public bool IsVisible => Visible;
 
-    public override ComponentCapability GetCapability()
+    [AgentAction("Open this dialog")]
+    public async Task Open()
     {
-        var capability = new ComponentCapability(AgentId, "Agent-aware dialog wrapper.");
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.DialogOpenActionId,
-            "Open dialog."));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.DialogCloseActionId,
-            "Close dialog."));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.DialogConfirmActionId,
-            "Confirm dialog action.",
-            RequiresApproval: true));
-        return capability;
+        await InvokeAsync(async () =>
+        {
+            Visible = true;
+            await VisibleChanged.InvokeAsync(true);
+            StateHasChanged();
+        });
     }
+
+    [AgentAction("Close this dialog")]
+    public async Task Close()
+    {
+        await InvokeAsync(async () =>
+        {
+            Visible = false;
+            await VisibleChanged.InvokeAsync(false);
+            StateHasChanged();
+        });
+    }
+
+    [AgentAction("Confirm the dialog action", RequiresApproval = true)]
+    public Task<ActionResult> Confirm()
+        => Task.FromResult(ActionResult.Failure("Confirm execution wiring is not implemented for this dialog."));
 
     public override ComponentState GetCurrentState() => new()
     {
         ["visible"] = Visible
     };
-
-    public override async Task<ActionResult> ExecuteActionAsync(
-        AgentAction action,
-        CancellationToken cancellationToken = default)
-    {
-        _ = cancellationToken;
-        action = NormalizeAction(AgentComponentCapabilityProfile.AgentDialogComponentId, action);
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            await InvokeAsync(async () =>
-            {
-                Visible = true;
-                await VisibleChanged.InvokeAsync(true);
-                StateHasChanged();
-            });
-            return ActionResult.Success("Dialog opened.");
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogCloseActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            await InvokeAsync(async () =>
-            {
-                Visible = false;
-                await VisibleChanged.InvokeAsync(false);
-                StateHasChanged();
-            });
-            return ActionResult.Success("Dialog closed.");
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            return ActionResult.Failure("Confirm workflow registration is present, but execution wiring is not implemented yet.");
-        }
-
-        return ActionResult.Unknown(action.Name);
-    }
-
-    public Task<ActionResult> OpenAsync(CancellationToken cancellationToken = default)
-        => ExecuteActionAsync(
-            AgentAction.Create(AgentComponentCapabilityProfile.DialogOpenActionId),
-            cancellationToken);
-
-    public Task<ActionResult> CloseAsync(CancellationToken cancellationToken = default)
-        => ExecuteActionAsync(
-            AgentAction.Create(AgentComponentCapabilityProfile.DialogCloseActionId),
-            cancellationToken);
 
     private Task OnVisibleChanged(bool visible)
     {

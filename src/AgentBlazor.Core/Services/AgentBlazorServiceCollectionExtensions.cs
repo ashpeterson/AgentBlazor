@@ -9,12 +9,9 @@ using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
-using AgentBlazor.Core.Runtime.Intent;
 using AgentBlazor.Core.Runtime.Planning;
-using AgentBlazor.Core.Runtime.Preferences;
 using AgentBlazor.Core.Runtime.Routing;
 using AgentBlazor.Core.Runtime.Tracing;
-using AgentBlazor.Core.Runtime.Internal;
 using AgentBlazor.Core.Components;
 
 namespace AgentBlazor.Services;
@@ -44,50 +41,44 @@ public static class AgentBlazorServiceCollectionExtensions
             sp.GetRequiredService<IOptions<AgentBlazorOptions>>().Value,
             sp.GetRequiredService<AgentBlazorConfigurationStore>(),
             sp.GetRequiredService<IComponentCapabilityCatalog>()));
+
+        // Component action executors (specialized, kept for backwards compatibility)
         services.TryAddSingleton<IDataGridActionExecutor, NoOpDataGridActionExecutor>();
         services.TryAddSingleton<IDialogActionExecutor, NoOpDialogActionExecutor>();
         services.TryAddSingleton<IFormActionExecutor, NoOpFormActionExecutor>();
         services.TryAddSingleton<INavigationActionExecutor, NoOpNavigationActionExecutor>();
         services.TryAddSingleton<ITabsActionExecutor, NoOpTabsActionExecutor>();
+        services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
+        services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
+
+        // Chat widget state
         services.TryAddSingleton<IAgentChatWidgetState, AgentChatWidgetState>();
         services.TryAddScoped<IAgentChatSessionState, AgentChatSessionState>();
         services.TryAddSingleton<IAgentChatSessionEvents, AgentChatSessionEvents>();
-        services.TryAddSingleton<IChatWidgetActionExecutor, NoOpChatWidgetActionExecutor>();
-        services.TryAddSingleton<IComponentActionExecutor, NoOpComponentActionExecutor>();
-        services.TryAddSingleton<IAgentComponentRegistry, InMemoryAgentComponentRegistry>();
+
+        // Circuit-scoped component registry — each Blazor Server circuit gets its own registry
+        services.TryAddSingleton<AgentComponentRegistryHub>();
+        services.TryAddScoped<IAgentComponentRegistry, CircuitAgentComponentRegistry>();
+
         services.TryAddSingleton<IAgentUiToolCatalog, DefaultAgentUiToolCatalog>();
 
-        // Deterministic runtime with structured JSON planning
-        // Uses Plan → Validate → Execute flow with no fallbacks or heuristics
-        services.TryAddSingleton<IStructuredActionPlanner, StructuredActionPlanner>();
+        // Core runtime: Plan (AgentPlanner) → Validate → Execute
+        services.TryAddSingleton<IStructuredActionPlanner, AgentPlanner>();
         services.TryAddSingleton<IPlanValidator, PlanValidator>();
         services.TryAddSingleton<IPlanExecutor, PlanExecutor>();
-        services.TryAddSingleton<IAgentRuntime, DeterministicAgentRuntime>();
+        services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
 
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
         services.TryAddSingleton<IAgentDeferredActionEvents, AgentDeferredActionEvents>();
-        services.TryAddSingleton<IComponentActionArgumentResolver, ComponentActionArgumentResolver>();
 
-        // Conversation management
+        // Conversation store — direct InMemory (no feature gating)
         services.AddOptions<ConversationOptions>();
-        services.TryAddSingleton<InMemoryConversationStore>();
-        services.TryAddSingleton<IConversationStore, FeatureGatedConversationStore>();
-        services.TryAddSingleton<IConversationManager, ConversationManager>();
+        services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
 
-        // Intent classification and routing
-        services.AddOptions<IntentClassificationOptions>();
-        services.TryAddSingleton<IIntentClassifier, KeywordIntentClassifier>();
+        // Route registry for navigation planning
         services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();
         services.TryAddSingleton<IComponentRouteRegistry, InMemoryComponentRouteRegistry>();
-        services.TryAddSingleton<IIntentResolver, IntentResolver>();
-
-        // Internal page structure registry (not exposed to public API - for demo/internal use)
-        services.TryAddSingleton<IInternalPageStructureRegistry, InMemoryPageStructureRegistry>();
-
-        // User preferences
-        services.TryAddSingleton<InMemoryUserPreferenceService>();
-        services.TryAddSingleton<IUserPreferenceService, FeatureGatedUserPreferenceService>();
 
         // Prompt tracing (opt-in via EnablePromptTracing)
         services.AddOptions<PromptTracingOptions>();

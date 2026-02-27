@@ -1,14 +1,21 @@
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Discovery;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Runtime;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Logging;
 
 namespace AgentBlazor;
 
+/// <summary>
+/// Base class for Blazor components that can be controlled by the agent runtime.
+///
+/// Subclasses can use [AgentAction] / [AgentReadable] / [AgentParam] attributes for
+/// zero-boilerplate registration, or override GetCapability() / GetCurrentState() /
+/// ExecuteActionAsync() for full manual control.
+/// </summary>
 public abstract class AgentControllableComponentBase : ComponentBase, IAgentControllable, IDisposable
 {
     [Inject]
@@ -24,9 +31,6 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     private NavigationManager? Navigation { get; set; }
 
     [Inject]
-    protected IComponentActionArgumentResolver? ActionArgumentResolver { get; set; }
-
-    [Inject]
     private ILoggerFactory? LoggerFactory { get; set; }
 
     [Inject]
@@ -40,9 +44,10 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     public abstract string ComponentType { get; }
 
     /// <summary>
-    /// Component id used for route registration (e.g. AgentDataGrid). Used to know which route hosts this component when navigating.
+    /// Route registration id for this component type.
+    /// Defaults to ComponentType; override when the type name differs from the route key.
     /// </summary>
-    protected abstract string ComponentIdForRoute { get; }
+    protected virtual string ComponentIdForRoute => ComponentType;
 
     protected override void OnInitialized()
     {
@@ -69,7 +74,6 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     {
         if (!NavigationIntentService.HasPending(ComponentType, AgentId))
         {
-            _logger?.LogDebug("[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} has no pending actions.", ComponentType, AgentId);
             return;
         }
 
@@ -80,17 +84,9 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
 
         foreach (var action in pending)
         {
-            var arguments = action.Parameters;
-            if (ActionArgumentResolver is not null)
-            {
-                var state = GetCurrentState();
-                arguments = ActionArgumentResolver.Resolve(ComponentType, action.Name, action.Parameters, state);
-            }
-
-            var resolvedAction = AgentAction.Create(action.Name, arguments);
-            var sessionId = TryGetContextValue(resolvedAction.Parameters, AgentRuntimeContextKeys.SessionId);
-            var runId = TryGetContextValue(resolvedAction.Parameters, AgentRuntimeContextKeys.RunId);
-            var result = await ExecuteActionAsync(resolvedAction);
+            var sessionId = TryGetContextValue(action.Parameters, AgentRuntimeContextKeys.SessionId);
+            var runId = TryGetContextValue(action.Parameters, AgentRuntimeContextKeys.RunId);
+            var result = await ExecuteActionAsync(action);
             _logger?.LogInformation(
                 "[AgentFlow] Component.ApplyIntents: {ComponentType}/{AgentId} applied {ActionName} Succeeded={Succeeded} Message={Message}",
                 ComponentType, AgentId, action.Name, result.Succeeded, result.Message);
@@ -103,39 +99,35 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
                 OccurredAt: DateTimeOffset.UtcNow,
                 SessionId: sessionId,
                 RunId: runId));
-            if (!result.Succeeded)
-            {
-                _logger?.LogWarning(
-                    "Pending action failed for {ComponentType}/{AgentId}: {ActionName} -> {Message}",
-                    ComponentType,
-                    AgentId,
-                    action.Name,
-                    result.Message);
-            }
         }
 
         await RequestComponentRefreshAsync();
     }
 
-    public abstract ComponentCapability GetCapability();
+    /// <summary>
+    /// Returns the component's capability description.
+    /// Default implementation uses [AgentAction]-decorated methods via reflection.
+    /// Override to provide a fully custom capability descriptor.
+    /// </summary>
+    public virtual ComponentCapability GetCapability()
+        => AgentActionDiscovery.BuildCapability(this);
 
-    public abstract ComponentState GetCurrentState();
+    /// <summary>
+    /// Returns the component's current readable state.
+    /// Default implementation uses [AgentReadable]-decorated properties via reflection.
+    /// Override to provide a fully custom state snapshot.
+    /// </summary>
+    public virtual ComponentState GetCurrentState()
+        => AgentActionDiscovery.BuildState(this);
 
-    public abstract Task<ActionResult> ExecuteActionAsync(
+    /// <summary>
+    /// Dispatches an agent action to the matching [AgentAction]-decorated method.
+    /// Override to handle actions manually instead of via attribute discovery.
+    /// </summary>
+    public virtual Task<ActionResult> ExecuteActionAsync(
         AgentAction action,
-        CancellationToken cancellationToken = default);
-
-    protected static AgentAction NormalizeAction(
-        string componentId,
-        AgentAction action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        var normalized = ComponentActionArgumentNormalizer.Normalize(
-            componentId,
-            action.Name,
-            action.Parameters);
-        return AgentAction.Create(action.Name, normalized);
-    }
+        CancellationToken cancellationToken = default)
+        => AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
 
     protected Task RequestComponentRefreshAsync()
     {
@@ -145,7 +137,7 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         }
         catch (InvalidOperationException)
         {
-            // Unit tests instantiate wrappers without attaching them to a renderer.
+            // Unit tests may instantiate wrappers without a renderer — ignore.
             return Task.CompletedTask;
         }
     }

@@ -747,20 +747,23 @@ public class ComponentMockingTests
     {
         if (!TryResolveToolName(toolName, out var componentId, out var actionId))
         {
-            return """{"steps":[]}""";
+            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
         }
 
         var payload = new
         {
-            steps = new[]
+            message = $"Executing {componentId}.{actionId}",
+            actions = new[]
             {
                 new
                 {
-                    componentId,
-                    actionId,
-                    arguments = arguments ?? new Dictionary<string, object?>()
+                    agentId = componentId,
+                    action = actionId,
+                    args = arguments ?? new Dictionary<string, object?>()
                 }
-            }
+            },
+            needsClarification = false,
+            clarificationQuestion = (string?)null
         };
 
         return JsonSerializer.Serialize(payload);
@@ -768,7 +771,7 @@ public class ComponentMockingTests
 
     private static string BuildMultiStepPlanJson(IEnumerable<(string ToolName, IDictionary<string, object?> Arguments)> invocations)
     {
-        var steps = new List<object>();
+        var actions = new List<object>();
         foreach (var invocation in invocations)
         {
             if (!TryResolveToolName(invocation.ToolName, out var componentId, out var actionId))
@@ -776,15 +779,21 @@ public class ComponentMockingTests
                 continue;
             }
 
-            steps.Add(new
+            actions.Add(new
             {
-                componentId,
-                actionId,
-                arguments = invocation.Arguments
+                agentId = componentId,
+                action = actionId,
+                args = invocation.Arguments
             });
         }
 
-        return JsonSerializer.Serialize(new { steps });
+        return JsonSerializer.Serialize(new
+        {
+            message = "Executing multiple actions",
+            actions,
+            needsClarification = false,
+            clarificationQuestion = (string?)null
+        });
     }
 
     private static bool TryResolveToolName(

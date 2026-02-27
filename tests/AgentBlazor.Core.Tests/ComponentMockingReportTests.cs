@@ -604,20 +604,23 @@ public class ComponentMockingReportTests
     {
         if (!TryResolveToolName(toolName, out var componentId, out var actionId))
         {
-            return """{"steps":[]}""";
+            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
         }
 
         var payload = new
         {
-            steps = new[]
+            message = $"Executing {componentId}.{actionId}",
+            actions = new[]
             {
                 new
                 {
-                    componentId,
-                    actionId,
-                    arguments
+                    agentId = componentId,
+                    action = actionId,
+                    args = arguments
                 }
-            }
+            },
+            needsClarification = false,
+            clarificationQuestion = (string?)null
         };
 
         return JsonSerializer.Serialize(payload);

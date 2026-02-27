@@ -17,11 +17,6 @@ internal sealed class NoOpComponentActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(action);
-        var normalizedArguments = ComponentActionArgumentNormalizer.Normalize(
-            action.ComponentId,
-            action.ActionId,
-            action.Arguments,
-            action.Reason);
 
         return (action.ComponentId, action.ActionId) switch
         {
@@ -33,32 +28,32 @@ internal sealed class NoOpComponentActionExecutor(
                 AgentComponentCapabilityProfile.DataGridGoToPageActionId or
                 AgentComponentCapabilityProfile.DataGridNavigateToRowActionId or
                 AgentComponentCapabilityProfile.DataGridSetPageActionId) =>
-                dataGridExecutor.ExecuteAsync(new DataGridActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                dataGridExecutor.ExecuteAsync(new DataGridActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             (AgentComponentCapabilityProfile.AgentDialogComponentId,
                 AgentComponentCapabilityProfile.DialogOpenActionId or
                 AgentComponentCapabilityProfile.DialogCloseActionId or
                 AgentComponentCapabilityProfile.DialogConfirmActionId) =>
-                dialogExecutor.ExecuteAsync(new DialogActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                dialogExecutor.ExecuteAsync(new DialogActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             (AgentComponentCapabilityProfile.AgentFormComponentId,
                 AgentComponentCapabilityProfile.FormSetFieldActionId or
                 AgentComponentCapabilityProfile.FormValidateActionId or
                 AgentComponentCapabilityProfile.FormResetActionId or
                 AgentComponentCapabilityProfile.FormSubmitActionId) =>
-                formExecutor.ExecuteAsync(new FormActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                formExecutor.ExecuteAsync(new FormActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             (AgentComponentCapabilityProfile.AgentNavMenuComponentId,
                 AgentComponentCapabilityProfile.NavigationNavigateToActionId or
                 AgentComponentCapabilityProfile.NavigationNavigateExternalActionId) =>
-                navigationExecutor.ExecuteAsync(new NavigationActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                navigationExecutor.ExecuteAsync(new NavigationActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             (AgentComponentCapabilityProfile.AgentTabsComponentId,
                 AgentComponentCapabilityProfile.TabsSwitchTabActionId) =>
-                tabsExecutor.ExecuteAsync(new TabsActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                tabsExecutor.ExecuteAsync(new TabsActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             ("AgentChatWidget", "open_widget" or "close_widget") =>
-                chatWidgetExecutor.ExecuteAsync(new ChatWidgetActionRequest(action.ActionId, normalizedArguments), cancellationToken),
+                chatWidgetExecutor.ExecuteAsync(new ChatWidgetActionRequest(action.ActionId, action.Arguments), cancellationToken),
 
             _ => Task.FromResult(new ComponentActionExecutionResult(
                 action.ComponentId,

@@ -73,12 +73,6 @@ internal static class RegisteredComponentActionExecutorBridge
         IAgentControllable? Target = null,
         string? Message = null);
 
-    public static IReadOnlyDictionary<string, object?> NormalizeArguments(
-        string componentId,
-        string actionId,
-        IReadOnlyDictionary<string, object?>? arguments)
-        => ComponentActionArgumentNormalizer.Normalize(componentId, actionId, arguments);
-
     public static string? TryGetAgentId(IReadOnlyDictionary<string, object?>? arguments)
         => TryGetString(arguments, "agentId") ??
            TryGetString(arguments, "target");
@@ -120,8 +114,7 @@ internal static class RegisteredComponentActionExecutorBridge
         ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
-        var normalizedArguments = NormalizeArguments(componentId, actionId, arguments);
-        var resolution = ResolveTarget(componentRegistry, expectedComponentType, actionId, normalizedArguments);
+        var resolution = ResolveTarget(componentRegistry, expectedComponentType, actionId, arguments);
         if (resolution.Status is TargetResolutionStatus.Ambiguous)
         {
             return (true, new ComponentActionExecutionResult(
@@ -141,7 +134,7 @@ internal static class RegisteredComponentActionExecutorBridge
                 Message: $"No registered {expectedComponentType} component is available for action '{actionId}'."));
         }
 
-        var action = AgentAction.Create(actionId, normalizedArguments);
+        var action = AgentAction.Create(actionId, arguments);
         var execution = await resolution.Target.ExecuteActionAsync(action, cancellationToken);
         return (true, new ComponentActionExecutionResult(
             ComponentId: componentId,
@@ -172,19 +165,11 @@ internal static class RegisteredComponentActionExecutorBridge
 
             if (typedCandidates.Length > 0)
             {
-                var resolution = DeterministicEntityResolver.Resolve(
-                    agentId,
-                    typedCandidates.Select(static candidate => candidate.AgentId),
-                    minConfidence: 0.7,
-                    ambiguityMargin: 0.05);
-                if (resolution.Status is EntityResolutionStatus.Resolved && !string.IsNullOrWhiteSpace(resolution.Value))
+                var resolved = typedCandidates.FirstOrDefault(candidate =>
+                    candidate.AgentId.Contains(agentId, StringComparison.OrdinalIgnoreCase));
+                if (resolved is not null)
                 {
-                    var resolved = typedCandidates.FirstOrDefault(candidate =>
-                        string.Equals(candidate.AgentId, resolution.Value, StringComparison.OrdinalIgnoreCase));
-                    if (resolved is not null)
-                    {
-                        return new TargetResolution(TargetResolutionStatus.Resolved, resolved);
-                    }
+                    return new TargetResolution(TargetResolutionStatus.Resolved, resolved);
                 }
             }
 
@@ -253,16 +238,12 @@ internal sealed class NoOpDataGridActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            request.ActionId,
-            request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "DataGrid",
             componentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
             actionId: request.ActionId,
-            arguments: normalizedArguments,
+            arguments: request.Arguments,
             cancellationToken);
         if (handled)
         {
@@ -271,8 +252,8 @@ internal sealed class NoOpDataGridActionExecutor(
 
         navigationIntentService.Enqueue(
             "DataGrid",
-            RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
+            AgentAction.Create(request.ActionId, request.Arguments),
             RegisteredComponentActionExecutorBridge.BuildPendingOptions(
                 componentRouteRegistry,
                 AgentComponentCapabilityProfile.AgentDataGridComponentId));
@@ -294,16 +275,12 @@ internal sealed class NoOpDialogActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            request.ActionId,
-            request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Dialog",
             componentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
             actionId: request.ActionId,
-            arguments: normalizedArguments,
+            arguments: request.Arguments,
             cancellationToken);
         if (handled)
         {
@@ -312,8 +289,8 @@ internal sealed class NoOpDialogActionExecutor(
 
         navigationIntentService.Enqueue(
             "Dialog",
-            RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
+            AgentAction.Create(request.ActionId, request.Arguments),
             RegisteredComponentActionExecutorBridge.BuildPendingOptions(
                 componentRouteRegistry,
                 AgentComponentCapabilityProfile.AgentDialogComponentId));
@@ -335,16 +312,12 @@ internal sealed class NoOpFormActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentCapabilityProfile.AgentFormComponentId,
-            request.ActionId,
-            request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Form",
             componentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             actionId: request.ActionId,
-            arguments: normalizedArguments,
+            arguments: request.Arguments,
             cancellationToken);
         if (handled)
         {
@@ -353,8 +326,8 @@ internal sealed class NoOpFormActionExecutor(
 
         navigationIntentService.Enqueue(
             "Form",
-            RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
+            AgentAction.Create(request.ActionId, request.Arguments),
             RegisteredComponentActionExecutorBridge.BuildPendingOptions(
                 componentRouteRegistry,
                 AgentComponentCapabilityProfile.AgentFormComponentId));
@@ -376,16 +349,12 @@ internal sealed class NoOpNavigationActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
-            request.ActionId,
-            request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "NavMenu",
             componentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             actionId: request.ActionId,
-            arguments: normalizedArguments,
+            arguments: request.Arguments,
             cancellationToken);
         if (handled)
         {
@@ -394,8 +363,8 @@ internal sealed class NoOpNavigationActionExecutor(
 
         navigationIntentService.Enqueue(
             "NavMenu",
-            RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
+            AgentAction.Create(request.ActionId, request.Arguments),
             RegisteredComponentActionExecutorBridge.BuildPendingOptions(
                 componentRouteRegistry,
                 AgentComponentCapabilityProfile.AgentNavMenuComponentId));
@@ -417,16 +386,12 @@ internal sealed class NoOpTabsActionExecutor(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var normalizedArguments = RegisteredComponentActionExecutorBridge.NormalizeArguments(
-            AgentComponentCapabilityProfile.AgentTabsComponentId,
-            request.ActionId,
-            request.Arguments);
         var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
             componentRegistry,
             expectedComponentType: "Tabs",
             componentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
             actionId: request.ActionId,
-            arguments: normalizedArguments,
+            arguments: request.Arguments,
             cancellationToken);
         if (handled)
         {
@@ -435,8 +400,8 @@ internal sealed class NoOpTabsActionExecutor(
 
         navigationIntentService.Enqueue(
             "Tabs",
-            RegisteredComponentActionExecutorBridge.TryGetAgentId(normalizedArguments),
-            AgentAction.Create(request.ActionId, normalizedArguments),
+            RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
+            AgentAction.Create(request.ActionId, request.Arguments),
             RegisteredComponentActionExecutorBridge.BuildPendingOptions(
                 componentRouteRegistry,
                 AgentComponentCapabilityProfile.AgentTabsComponentId));

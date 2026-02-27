@@ -13,6 +13,11 @@ public sealed record ActionPlan
     public string? ClarificationNeeded { get; init; }
     public IReadOnlyList<AgentUiToolCall> UiToolCalls { get; init; } = [];
 
+    /// <summary>
+    /// Natural language reply from the planner shown directly to the user.
+    /// </summary>
+    public string? Message { get; init; }
+
     public bool RequiresClarification => !string.IsNullOrWhiteSpace(ClarificationNeeded);
     public bool IsEmpty => Steps.Count == 0 && !RequiresClarification;
 

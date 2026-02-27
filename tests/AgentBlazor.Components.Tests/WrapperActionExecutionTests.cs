@@ -144,8 +144,8 @@ public class WrapperActionExecutionTests
 
         Assert.False(highest.Succeeded);
         Assert.False(lowest.Succeeded);
-        Assert.Contains("requires 'column' parameter", highest.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("requires 'column' parameter", lowest.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Required parameter 'column' is missing", highest.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Required parameter 'column' is missing", lowest.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Null(grid.FilterColumn);
         Assert.Null(grid.FilterOperator);
         Assert.Null(grid.FilterValue);
@@ -169,7 +169,7 @@ public class WrapperActionExecutionTests
         var result = await grid.ExecuteActionAsync(AgentAction.Create("filter"));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("requires 'column' parameter", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Required parameter 'column' is missing", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public class WrapperActionExecutionTests
         }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("requires 'column' parameter", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Required parameter 'column' is missing", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Null(grid.SortColumn);
         Assert.Equal("asc", grid.SortDirection);
     }
@@ -217,7 +217,7 @@ public class WrapperActionExecutionTests
 
         var result = await grid.ExecuteActionAsync(AgentAction.Create("filter", new Dictionary<string, object?>
         {
-            ["column"] = "Name",
+            ["column"] = "SupplierName",
             ["operator"] = "contains",
             ["value"] = "Alpine"
         }));
@@ -227,7 +227,7 @@ public class WrapperActionExecutionTests
         Assert.Contains("Applied filter SupplierName contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Skip = "Row inference from filter context was removed — rowKey is now required.")]
     public async Task AgentDataGrid_SelectRow_WithoutRowKey_InferFromHighRiskFilter_SelectsHighestRiskRow()
     {
         var rows = new[]
@@ -278,7 +278,7 @@ public class WrapperActionExecutionTests
         var result = await grid.ExecuteActionAsync(AgentAction.Create("select_row"));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("requires 'rowKey' parameter", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Required parameter 'rowKey' is missing", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class WrapperActionExecutionTests
 
         var result = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
         {
-            ["field"] = "name",
+            ["field"] = "SupplierName",
             ["value"] = "Ash"
         }));
 
@@ -369,7 +369,7 @@ public class WrapperActionExecutionTests
         }));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("ambiguous", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not found", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Ada", model.FirstName);
         Assert.Equal("Lovelace", model.LastName);
     }

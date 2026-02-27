@@ -1,5 +1,5 @@
 @namespace AgentBlazor.Components
-@using AgentBlazor.Components
+@using AgentBlazor.Attributes
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Runtime
 @using Microsoft.AspNetCore.Components.Forms
@@ -46,8 +46,6 @@
 
     public override string ComponentType => "Form";
 
-    protected override string ComponentIdForRoute => AgentComponentCapabilityProfile.AgentFormComponentId;
-
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)
             ? $"agent-form-{_instanceId}"
@@ -59,102 +57,207 @@
         EnsureEditContext();
     }
 
-    public override ComponentCapability GetCapability()
+    [AgentAction("Set a form field value by name")]
+    public async Task<ActionResult> SetField(
+        [AgentParam("Field name (property name on the form model)", Required = true)] string field,
+        [AgentParam("Value to set the field to")] object? value = null)
     {
-        var capability = new ComponentCapability(AgentId, "Agent-aware form wrapper.");
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.FormSetFieldActionId,
-            "Set a form field value."));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.FormValidateActionId,
-            "Validate the form."));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.FormSubmitActionId,
-            "Submit the form.",
-            RequiresApproval: true));
-        capability.UpsertAction(new ComponentActionCapability(
-            AgentComponentCapabilityProfile.FormResetActionId,
-            "Reset form fields to initial values."));
-        return capability;
+        EnsureEditContext();
+        var property = ResolveProperty(field);
+        if (property is null)
+        {
+            var available = string.Join(", ", GetSettableFieldNames());
+            return ActionResult.NeedsClarification(
+                $"Field '{field}' not found on form model '{Model.GetType().Name}'. Available fields: {available}.");
+        }
+
+        var normalized = NormalizeValue(value);
+        if (!TrySetValue(property, normalized, out var message))
+            return ActionResult.Failure(message);
+
+        _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, property.Name));
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied(message);
+    }
+
+    [AgentAction("Validate the form")]
+    public async Task<ActionResult> Validate()
+    {
+        EnsureEditContext();
+        var valid = _editContext!.Validate();
+        await ValidationChanged.InvokeAsync(valid);
+        await RequestComponentRefreshAsync();
+        return valid
+            ? ActionResult.Applied("Form validation passed.")
+            : ActionResult.Failure("Form validation failed.");
+    }
+
+    [AgentAction("Reset the form to its initial values")]
+    public async Task<ActionResult> Reset()
+    {
+        EnsureEditContext();
+        RestoreValues(_initialValues);
+        _editContext = new EditContext(Model);
+        await ValidationChanged.InvokeAsync(false);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Reset form to initial values.");
+    }
+
+    [AgentAction("Submit the form", RequiresApproval = true)]
+    public async Task<ActionResult> Submit()
+    {
+        EnsureEditContext();
+        var valid = _editContext!.Validate();
+        await ValidationChanged.InvokeAsync(valid);
+        if (!valid)
+            return ActionResult.Failure("Submit blocked because validation failed.");
+
+        await Submitted.InvokeAsync();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Submitted form.");
     }
 
     public override ComponentState GetCurrentState()
     {
         EnsureEditContext();
-        var values = CaptureValues(Model);
-        var metadata = GetFieldMetadata(Model);
-
+        var values = CaptureValues();
+        var metadata = GetFieldMetadata();
         return new ComponentState
         {
             ["fieldCount"] = values.Count,
             ["isValid"] = _editContext!.Validate(),
-            // NEW: Expose field names for the agent
             ["fields"] = values.Keys.ToArray(),
-            // NEW: Expose current field values
             ["fieldValues"] = values,
-            // NEW: Expose field metadata (types, validation rules)
             ["fieldMetadata"] = metadata
         };
     }
 
-    /// <summary>
-    /// Extracts metadata from form model properties using reflection and data annotations.
-    /// </summary>
-    private static Dictionary<string, FieldMetadata> GetFieldMetadata(object model)
+    private async Task HandleValidSubmitAsync()
     {
-        var result = new Dictionary<string, FieldMetadata>(StringComparer.OrdinalIgnoreCase);
+        await Submitted.InvokeAsync();
+    }
 
-        foreach (var prop in model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+    private void EnsureEditContext()
+    {
+        if (Model is null)
+            throw new InvalidOperationException($"{nameof(AgentForm)} requires a non-null {nameof(Model)}.");
+
+        if (_editContext is null || !ReferenceEquals(_editContext.Model, Model))
         {
-            if (!prop.CanRead || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
+            _editContext = new EditContext(Model);
+            _initialValues = CaptureValues();
+        }
+    }
+
+    // Simple case-insensitive property resolution — the planner sends exact field names
+    private PropertyInfo? ResolveProperty(string fieldHint)
+    {
+        return Model.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(p =>
+                p.CanWrite &&
+                p.GetIndexParameters().Length == 0 &&
+                string.Equals(p.Name, fieldHint, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string[] GetSettableFieldNames() =>
+        Model.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(static p => p.CanWrite && p.GetIndexParameters().Length == 0)
+            .Select(static p => p.Name)
+            .OrderBy(static n => n, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private Dictionary<string, object?> CaptureValues()
+    {
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in Model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!p.CanRead || !p.CanWrite || p.GetIndexParameters().Length > 0)
+                continue;
+            values[p.Name] = p.GetValue(Model);
+        }
+        return values;
+    }
+
+    private void RestoreValues(IReadOnlyDictionary<string, object?> values)
+    {
+        foreach (var p in Model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!p.CanWrite || p.GetIndexParameters().Length > 0)
+                continue;
+            if (!values.TryGetValue(p.Name, out var initial))
+                continue;
+            if (initial is null)
             {
+                p.SetValue(Model, null);
                 continue;
             }
+            if (TryConvert(initial, p.PropertyType, out var converted))
+                p.SetValue(Model, converted);
+        }
+    }
 
-            var propType = prop.PropertyType;
-            var underlyingType = Nullable.GetUnderlyingType(propType);
-            var isNullable = underlyingType is not null || !propType.IsValueType;
-            var effectiveType = underlyingType ?? propType;
-
-            // Extract validation attributes
-            var requiredAttr = prop.GetCustomAttribute<RequiredAttribute>();
-            var maxLengthAttr = prop.GetCustomAttribute<MaxLengthAttribute>();
-            var minLengthAttr = prop.GetCustomAttribute<MinLengthAttribute>();
-            var stringLengthAttr = prop.GetCustomAttribute<StringLengthAttribute>();
-            var rangeAttr = prop.GetCustomAttribute<RangeAttribute>();
-            var regexAttr = prop.GetCustomAttribute<RegularExpressionAttribute>();
-            var displayAttr = prop.GetCustomAttribute<DisplayAttribute>();
-            var displayNameAttr = prop.GetCustomAttribute<DisplayNameAttribute>();
-
-            // Get enum values if applicable
-            string[]? allowedValues = null;
-            if (effectiveType.IsEnum)
-            {
-                allowedValues = Enum.GetNames(effectiveType);
-            }
-
-            result[prop.Name] = new FieldMetadata
-            {
-                Type = GetFriendlyTypeName(effectiveType),
-                IsRequired = requiredAttr is not null,
-                IsNullable = isNullable,
-                MaxLength = maxLengthAttr?.Length ?? stringLengthAttr?.MaximumLength,
-                MinLength = minLengthAttr?.Length ?? stringLengthAttr?.MinimumLength,
-                Pattern = regexAttr?.Pattern,
-                MinValue = rangeAttr?.Minimum,
-                MaxValue = rangeAttr?.Maximum,
-                AllowedValues = allowedValues,
-                DisplayName = displayAttr?.Name ?? displayNameAttr?.DisplayName,
-                Description = displayAttr?.Description ?? displayAttr?.Prompt
-            };
+    private bool TrySetValue(PropertyInfo property, object? raw, out string message)
+    {
+        if (raw is null)
+        {
+            property.SetValue(Model, null);
+            message = $"Set field '{property.Name}' to null.";
+            return true;
         }
 
+        if (!TryConvert(raw, property.PropertyType, out var converted))
+        {
+            message = $"Unable to convert '{raw}' to {property.PropertyType.Name} for field '{property.Name}'.";
+            return false;
+        }
+
+        property.SetValue(Model, converted);
+        message = $"Set field '{property.Name}' to '{converted}'.";
+        return true;
+    }
+
+    private Dictionary<string, FieldMetadata> GetFieldMetadata()
+    {
+        var result = new Dictionary<string, FieldMetadata>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in Model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!p.CanRead || !p.CanWrite || p.GetIndexParameters().Length > 0)
+                continue;
+
+            var propType = p.PropertyType;
+            var underlying = Nullable.GetUnderlyingType(propType);
+            var effective = underlying ?? propType;
+
+            string[]? allowed = effective.IsEnum ? Enum.GetNames(effective) : null;
+            var req = p.GetCustomAttribute<RequiredAttribute>();
+            var maxLen = p.GetCustomAttribute<MaxLengthAttribute>();
+            var minLen = p.GetCustomAttribute<MinLengthAttribute>();
+            var strLen = p.GetCustomAttribute<StringLengthAttribute>();
+            var range = p.GetCustomAttribute<RangeAttribute>();
+            var regex = p.GetCustomAttribute<RegularExpressionAttribute>();
+            var display = p.GetCustomAttribute<DisplayAttribute>();
+            var displayName = p.GetCustomAttribute<DisplayNameAttribute>();
+
+            result[p.Name] = new FieldMetadata
+            {
+                Type = GetFriendlyTypeName(effective),
+                IsRequired = req is not null,
+                IsNullable = underlying is not null || !propType.IsValueType,
+                MaxLength = maxLen?.Length ?? strLen?.MaximumLength,
+                MinLength = minLen?.Length ?? strLen?.MinimumLength,
+                Pattern = regex?.Pattern,
+                MinValue = range?.Minimum,
+                MaxValue = range?.Maximum,
+                AllowedValues = allowed,
+                DisplayName = display?.Name ?? displayName?.DisplayName,
+                Description = display?.Description ?? display?.Prompt
+            };
+        }
         return result;
     }
 
-    /// <summary>
-    /// Converts a CLR type to a friendly type name for the LLM.
-    /// </summary>
     private static string GetFriendlyTypeName(Type type)
     {
         if (type == typeof(string)) return "string";
@@ -169,252 +272,7 @@
         return "object";
     }
 
-    public override async Task<ActionResult> ExecuteActionAsync(
-        AgentAction action,
-        CancellationToken cancellationToken = default)
-    {
-        _ = cancellationToken;
-        action = NormalizeAction(AgentComponentCapabilityProfile.AgentFormComponentId, action);
-        EnsureEditContext();
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormSetFieldActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            if (!action.TryGetParameter<string>("field", out var field) || string.IsNullOrWhiteSpace(field))
-            {
-                return ActionResult.NeedsClarification("Action 'set_field' requires 'field' parameter.");
-            }
-
-            var fieldResolution = ResolveFieldName(Model.GetType(), field);
-            if (fieldResolution.Status is not EntityResolutionStatus.Resolved || string.IsNullOrWhiteSpace(fieldResolution.Value))
-            {
-                var available = string.Join(", ", GetSettableFieldNames(Model.GetType()));
-                var suggestion = fieldResolution.Candidates.Count > 0
-                    ? $" Closest fields: {string.Join(", ", fieldResolution.Candidates)}."
-                    : string.Empty;
-                return ActionResult.NeedsClarification(fieldResolution.Status switch
-                {
-                    EntityResolutionStatus.Ambiguous =>
-                        $"Field '{field}' is ambiguous on form model '{Model.GetType().Name}'. Available fields: {available}.{suggestion}",
-                    _ =>
-                        $"Field '{field}' was not found on form model '{Model.GetType().Name}'. Available fields: {available}.{suggestion}"
-                });
-            }
-
-            var resolvedField = fieldResolution.Value;
-
-            if (!action.Parameters.TryGetValue("value", out var raw))
-            {
-                action.Parameters.TryGetValue("fieldValue", out raw);
-            }
-            if (!TrySetFieldValue(Model, resolvedField, Normalize(raw), out var message))
-            {
-                return ActionResult.Failure(message);
-            }
-
-            _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, resolvedField));
-            await RequestComponentRefreshAsync();
-            return ActionResult.Success(message);
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormValidateActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            var valid = _editContext!.Validate();
-            await ValidationChanged.InvokeAsync(valid);
-            await RequestComponentRefreshAsync();
-            return valid
-                ? ActionResult.Success("Form validation passed.")
-                : ActionResult.Failure("Form validation failed.");
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            var valid = _editContext!.Validate();
-            await ValidationChanged.InvokeAsync(valid);
-            if (!valid)
-            {
-                return ActionResult.Failure("Submit blocked because validation failed.");
-            }
-
-            await Submitted.InvokeAsync();
-            await RequestComponentRefreshAsync();
-            return ActionResult.Success("Submitted form.");
-        }
-
-        if (string.Equals(action.Name, AgentComponentCapabilityProfile.FormResetActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            RestoreValues(Model, _initialValues);
-            _editContext = new EditContext(Model);
-            await ValidationChanged.InvokeAsync(false);
-            await RequestComponentRefreshAsync();
-            return ActionResult.Success("Reset form to initial values.");
-        }
-
-        return ActionResult.Unknown(action.Name);
-    }
-
-    private async Task HandleValidSubmitAsync()
-    {
-        await Submitted.InvokeAsync();
-    }
-
-    private void EnsureEditContext()
-    {
-        if (Model is null)
-        {
-            throw new InvalidOperationException($"{nameof(AgentForm)} requires a non-null {nameof(Model)}.");
-        }
-
-        if (_editContext is null || !ReferenceEquals(_editContext.Model, Model))
-        {
-            _editContext = new EditContext(Model);
-            _initialValues = CaptureValues(Model);
-        }
-    }
-
-    private static Dictionary<string, object?> CaptureValues(object model)
-    {
-        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var property in model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-        {
-            if (!property.CanRead || !property.CanWrite || property.GetIndexParameters().Length > 0)
-            {
-                continue;
-            }
-
-            values[property.Name] = property.GetValue(model);
-        }
-
-        return values;
-    }
-
-    private static void RestoreValues(object model, IReadOnlyDictionary<string, object?> values)
-    {
-        foreach (var property in model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-        {
-            if (!property.CanWrite || property.GetIndexParameters().Length > 0)
-            {
-                continue;
-            }
-
-            if (!values.TryGetValue(property.Name, out var initial))
-            {
-                continue;
-            }
-
-            if (initial is null)
-            {
-                property.SetValue(model, null);
-                continue;
-            }
-
-            if (TryConvert(initial, property.PropertyType, out var converted))
-            {
-                property.SetValue(model, converted);
-            }
-        }
-    }
-
-    private static bool TrySetFieldValue(object model, string field, object? raw, out string message)
-    {
-        var property = model.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-            .FirstOrDefault(p => p.CanWrite && string.Equals(p.Name, field, StringComparison.OrdinalIgnoreCase));
-        if (property is null)
-        {
-            message = $"Field '{field}' was not found on form model '{model.GetType().Name}'.";
-            return false;
-        }
-
-        if (raw is null)
-        {
-            property.SetValue(model, null);
-            message = $"Set field '{property.Name}' to null.";
-            return true;
-        }
-
-        if (!TryConvert(raw, property.PropertyType, out var converted))
-        {
-            message = $"Unable to convert field '{property.Name}' value '{raw}' to {property.PropertyType.Name}.";
-            return false;
-        }
-
-        property.SetValue(model, converted);
-        message = $"Set field '{property.Name}' to '{converted}'.";
-        return true;
-    }
-
-    private static string[] GetSettableFieldNames(Type modelType) =>
-        modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(static property => property.CanWrite && property.GetIndexParameters().Length == 0)
-            .Select(static property => property.Name)
-            .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static EntityResolutionResult ResolveFieldName(Type modelType, string fieldHint)
-    {
-        var properties = modelType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(static property => property.CanWrite && property.GetIndexParameters().Length == 0)
-            .ToArray();
-        if (properties.Length == 0)
-        {
-            return new EntityResolutionResult(EntityResolutionStatus.NotFound, null, 0, []);
-        }
-
-        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var property in properties)
-        {
-            aliases[BuildWordSpacedIdentifier(property.Name)] = property.Name;
-            var display = property.GetCustomAttribute<DisplayAttribute>();
-            if (!string.IsNullOrWhiteSpace(display?.Name))
-            {
-                aliases[display.Name] = property.Name;
-            }
-
-            var displayName = property.GetCustomAttribute<DisplayNameAttribute>();
-            if (!string.IsNullOrWhiteSpace(displayName?.DisplayName))
-            {
-                aliases[displayName.DisplayName] = property.Name;
-            }
-        }
-
-        return DeterministicEntityResolver.Resolve(
-            fieldHint,
-            properties.Select(static property => property.Name),
-            aliases,
-            minConfidence: 0.55,
-            ambiguityMargin: 0.06);
-    }
-
-    private static string BuildWordSpacedIdentifier(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        var builder = new System.Text.StringBuilder();
-
-        char? previous = null;
-        foreach (var ch in value)
-        {
-            if (!char.IsLetterOrDigit(ch))
-            {
-                continue;
-            }
-
-            if (previous is not null &&
-                char.IsLower(previous.Value) &&
-                char.IsUpper(ch))
-            {
-                builder.Append(' ');
-            }
-
-            builder.Append(ch);
-            previous = ch;
-        }
-
-        return builder.ToString();
-    }
-
-    private static object? Normalize(object? value)
+    private static object? NormalizeValue(object? value)
     {
         if (value is System.Text.Json.JsonElement json)
         {
@@ -429,30 +287,27 @@
                 _ => json.ToString()
             };
         }
-
         return value;
     }
 
     private static bool TryConvert(object raw, Type destinationType, out object? converted)
     {
-        var targetType = Nullable.GetUnderlyingType(destinationType) ?? destinationType;
+        var target = Nullable.GetUnderlyingType(destinationType) ?? destinationType;
         try
         {
-            if (targetType.IsEnum)
+            if (target.IsEnum)
             {
                 converted = raw is string s
-                    ? Enum.Parse(targetType, s, ignoreCase: true)
-                    : Enum.ToObject(targetType, raw);
+                    ? Enum.Parse(target, s, ignoreCase: true)
+                    : Enum.ToObject(target, raw);
                 return true;
             }
-
-            if (targetType == typeof(Guid))
+            if (target == typeof(Guid))
             {
                 converted = raw is Guid g ? g : Guid.Parse(raw.ToString() ?? string.Empty);
                 return true;
             }
-
-            converted = Convert.ChangeType(raw, targetType, System.Globalization.CultureInfo.InvariantCulture);
+            converted = Convert.ChangeType(raw, target, System.Globalization.CultureInfo.InvariantCulture);
             return true;
         }
         catch

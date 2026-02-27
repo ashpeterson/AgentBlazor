@@ -9,11 +9,6 @@ public sealed class AgentBlazorOptions
     public DefaultAgentOptions DefaultAgent { get; } = new();
 
     /// <summary>
-    /// Paid feature switches (for example persistent memory).
-    /// </summary>
-    public AgentBlazorPaidFeaturesOptions PaidFeatures { get; } = new();
-
-    /// <summary>
     /// Assemblies to scan at startup for [Route] pages. Used by IRouteRegistry for intent→route resolution.
     /// Defaults to the entry assembly when none are added.
     /// </summary>

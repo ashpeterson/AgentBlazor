@@ -8,6 +8,8 @@ internal sealed class InMemoryAgentComponentRegistry : IAgentComponentRegistry
     private readonly ConcurrentDictionary<string, IAgentControllable> _components =
         new(StringComparer.OrdinalIgnoreCase);
 
+    public string SessionId { get; } = Guid.NewGuid().ToString("N");
+
     public void Register(IAgentControllable component)
     {
         ArgumentNullException.ThrowIfNull(component);

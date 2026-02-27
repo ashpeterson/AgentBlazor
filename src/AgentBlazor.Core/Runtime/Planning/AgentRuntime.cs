@@ -1,0 +1,1325 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+using AgentBlazor.Agents;
+using AgentBlazor.Components;
+using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Conversation;
+using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Tracing;
+using AgentBlazor.Options;
+using AgentBlazor.Telemetry;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace AgentBlazor.Core.Runtime.Planning;
+
+/// <summary>
+/// Agent runtime: Plan → Validate → Execute.
+/// Registry is resolved per-request from AgentComponentRegistryHub using the circuit session ID.
+/// </summary>
+internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
+{
+    private const string RunIdContextKey = AgentRuntimeContextKeys.RunId;
+    private const int MaxRetainedRuns = 200;
+
+    private readonly ConcurrentDictionary<string, StreamingRunState> _activeStreamingRuns =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, StreamingRunHistory> _completedStreamingRuns =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentQueue<string> _completedRunOrder = new();
+
+    private readonly IStructuredActionPlanner _planner;
+    private readonly IPlanValidator _validator;
+    private readonly IPlanExecutor _executor;
+    private readonly IAgentRegistry _agentRegistry;
+    private readonly IComponentCapabilityCatalog _componentCatalog;
+    private readonly IAgentUiToolCatalog _uiToolCatalog;
+    private readonly IConversationStore? _conversationStore;
+    private readonly AgentComponentRegistryHub? _registryHub;
+    private readonly IComponentRouteRegistry _componentRouteRegistry;
+    private readonly IRouteRegistry _routeRegistry;
+    private readonly IOptions<AgentBlazorOptions> _options;
+    private readonly IAgentBlazorTelemetrySink _telemetrySink;
+    private readonly IOptions<PromptTracingOptions>? _tracingOptions;
+    private readonly IPromptTraceStore? _traceStore;
+    private readonly ILogger<AgentRuntime>? _logger;
+
+    private sealed class StreamingRunState
+    {
+        public required string RunId { get; init; }
+        public required CancellationTokenSource Cancellation { get; init; }
+        public required List<AgentTurnStreamEvent> EventLog { get; init; }
+        public required List<Channel<AgentTurnStreamEvent>> Subscribers { get; init; }
+        public required object Gate { get; init; }
+        public bool Completed { get; set; }
+        public long Sequence { get; set; }
+    }
+
+    private sealed record StreamingRunHistory(
+        string RunId,
+        IReadOnlyList<AgentTurnStreamEvent> Events,
+        DateTimeOffset CompletedAt);
+
+    public AgentRuntime(
+        IStructuredActionPlanner planner,
+        IPlanValidator validator,
+        IPlanExecutor executor,
+        IAgentRegistry agentRegistry,
+        IComponentCapabilityCatalog componentCatalog,
+        IAgentUiToolCatalog uiToolCatalog,
+        IConversationStore? conversationStore,
+        AgentComponentRegistryHub? registryHub,
+        IComponentRouteRegistry componentRouteRegistry,
+        IRouteRegistry routeRegistry,
+        IOptions<AgentBlazorOptions> options,
+        IAgentBlazorTelemetrySink telemetrySink,
+        IOptions<PromptTracingOptions>? tracingOptions = null,
+        IPromptTraceStore? traceStore = null,
+        ILogger<AgentRuntime>? logger = null)
+    {
+        _planner = planner;
+        _validator = validator;
+        _executor = executor;
+        _agentRegistry = agentRegistry;
+        _componentCatalog = componentCatalog;
+        _uiToolCatalog = uiToolCatalog;
+        _conversationStore = conversationStore;
+        _registryHub = registryHub;
+        _componentRouteRegistry = componentRouteRegistry;
+        _routeRegistry = routeRegistry;
+        _options = options;
+        _telemetrySink = telemetrySink;
+        _tracingOptions = tracingOptions;
+        _traceStore = traceStore;
+        _logger = logger;
+    }
+
+    public Task<AgentTurnResponse> RunTurnAsync(
+        AgentTurnRequest request,
+        CancellationToken cancellationToken = default) =>
+        RunTurnCoreAsync(request, emitEvent: null, cancellationToken);
+
+    public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
+        AgentTurnRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var runId = ResolveOrCreateRunId(request);
+        var runState = new StreamingRunState
+        {
+            RunId = runId,
+            Cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken),
+            EventLog = [],
+            Subscribers = [],
+            Gate = new object(),
+            Completed = false,
+            Sequence = 0
+        };
+
+        if (!_activeStreamingRuns.TryAdd(runId, runState))
+        {
+            throw new InvalidOperationException($"Run '{runId}' is already active.");
+        }
+
+        var channel = Subscribe(runState);
+        _ = Task.Run(() => ExecuteStreamingRunAsync(runState, request), CancellationToken.None);
+
+        await foreach (var streamEvent in channel.Reader.ReadAllAsync(cancellationToken))
+        {
+            yield return streamEvent;
+        }
+    }
+
+    public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+        string runId,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+
+        if (_activeStreamingRuns.TryGetValue(runId, out var active))
+        {
+            var channel = Subscribe(active);
+            List<AgentTurnStreamEvent> replay;
+            long lastReplaySequence = 0;
+            var completed = false;
+            lock (active.Gate)
+            {
+                replay = active.EventLog.Select(static e => e with { IsReplay = true }).ToList();
+                if (replay.Count > 0) lastReplaySequence = replay[^1].Sequence;
+                completed = active.Completed;
+            }
+
+            foreach (var streamEvent in replay) yield return streamEvent;
+
+            if (completed) yield break;
+
+            await foreach (var streamEvent in channel.Reader.ReadAllAsync(cancellationToken))
+            {
+                if (streamEvent.Sequence <= lastReplaySequence) continue;
+                yield return streamEvent with { IsReplay = true };
+            }
+
+            yield break;
+        }
+
+        if (_completedStreamingRuns.TryGetValue(runId, out var completedRun))
+        {
+            foreach (var streamEvent in completedRun.Events)
+                yield return streamEvent with { IsReplay = true };
+        }
+    }
+
+    public Task<bool> StopRunAsync(string runId, CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        if (!_activeStreamingRuns.TryGetValue(runId, out var runState))
+            return Task.FromResult(false);
+
+        try
+        {
+            runState.Cancellation.Cancel();
+            return Task.FromResult(true);
+        }
+        catch (ObjectDisposedException)
+        {
+            return Task.FromResult(false);
+        }
+    }
+
+    private async Task<AgentTurnResponse> RunTurnCoreAsync(
+        AgentTurnRequest request,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.UserMessage))
+            throw new ArgumentException("User message is required.", nameof(request));
+
+        var stopwatch = Stopwatch.StartNew();
+        var traceBuilder = new PromptTraceBuilder(_tracingOptions);
+        var sessionId = request.GetEffectiveSessionId();
+        var conversationHistory = await BuildConversationHistoryAsync(sessionId, cancellationToken);
+
+        // Resolve the per-circuit registry for this session
+        IAgentComponentRegistry? registry = null;
+        _registryHub?.TryGet(sessionId, out registry);
+
+        var registration = ResolveAgent(request.AgentName);
+        traceBuilder.RecordEntry(request, registration?.Name);
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunStarted,
+            AgentName = registration?.Name ?? "none"
+        });
+
+        if (registration is null)
+        {
+            var noAgentResponse = await HandleNoAgentAsync(traceBuilder, cancellationToken);
+            await StoreConversationTurnAsync(sessionId, request.UserMessage, noAgentResponse, cancellationToken);
+            await EmitTextDeltasAsync(noAgentResponse.AgentName, noAgentResponse.ResponseText, emitEvent);
+            await EmitRunFinishedAsync(noAgentResponse, emitEvent);
+            return noAgentResponse;
+        }
+
+        var allowedComponents = GetAllowedComponents(registration);
+        var mountedComponents = GetMountedComponents(registry);
+        var providerConfigured = _planner.IsProviderConfigured;
+
+        await TrackStartedAsync(registration.Name, request, providerConfigured);
+
+        if (!providerConfigured)
+        {
+            var providerMissingResponse = await BuildProviderMissingResponseAsync(
+                registration.Name, traceBuilder, cancellationToken);
+
+            await TrackFinishedAsync(registration.Name, request, AgentBlazorRunOutcome.ProviderMissing,
+                plannedCount: 0, executedCount: 0, providerConfigured: false);
+            await StoreConversationTurnAsync(sessionId, request.UserMessage, providerMissingResponse, cancellationToken);
+            await EmitTextDeltasAsync(providerMissingResponse.AgentName, providerMissingResponse.ResponseText, emitEvent);
+            await EmitRunFinishedAsync(providerMissingResponse, emitEvent);
+            return providerMissingResponse;
+        }
+
+        try
+        {
+            // PHASE 1: PLAN
+            _logger?.LogInformation("Planning: {Request}", request.UserMessage);
+
+            var availableRoutes = _routeRegistry.GetAll()
+                .Select(r => new AvailableRoute { Path = r.Path, Description = r.Description, Aliases = r.Aliases })
+                .ToList();
+
+            var planRequest = new ActionPlanRequest
+            {
+                UserMessage = request.UserMessage,
+                SessionId = sessionId,
+                UserId = request.GetEffectiveUserId(),
+                GenerateUi = IsGeneratedUiRequested(request.Context),
+                GeneratedUiAction = request.GeneratedUiAction,
+                AvailableComponents = allowedComponents,
+                MountedComponents = mountedComponents,
+                ConversationHistory = conversationHistory,
+                AvailableRoutes = availableRoutes,
+                AgentInstructions = registration.Instructions
+            };
+
+            var plan = await _planner.PlanAsync(planRequest, cancellationToken);
+
+            // Resolve agentId-based steps to canonical component types for validation
+            plan = ResolveComponentTypes(plan, mountedComponents, allowedComponents);
+            plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents, request.UserMessage);
+            plan = EnsureDialogOpenBeforeUnmountedFormAction(plan, mountedComponents, allowedComponents);
+            plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
+
+            // Determine response text from the plan's message or build one
+            var planMessage = plan.Message;
+
+            if (plan.RequiresClarification)
+            {
+                _logger?.LogInformation("Clarification needed: {Question}", plan.ClarificationNeeded);
+                var clarificationText = plan.ClarificationNeeded!;
+                var clarificationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
+                    AgentName: registration.Name,
+                    ResponseText: clarificationText,
+                    PlannedActions: [],
+                    ExecutionResults: []), plan);
+                await StoreConversationTurnAsync(sessionId, request.UserMessage, clarificationResponse, cancellationToken);
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.ClarificationRequired,
+                    AgentName = registration.Name,
+                    ClarificationQuestion = clarificationText
+                });
+                await EmitTextDeltasAsync(registration.Name, planMessage ?? clarificationText, emitEvent);
+                await EmitRunFinishedAsync(clarificationResponse, emitEvent);
+                return clarificationResponse;
+            }
+
+            if (plan.IsEmpty)
+            {
+                _logger?.LogInformation("Plan is empty — no actions");
+                var emptyText = planMessage ?? "I understood your request but no actions are needed.";
+                var emptyResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
+                    AgentName: registration.Name,
+                    ResponseText: emptyText,
+                    PlannedActions: [],
+                    ExecutionResults: []), plan);
+                await StoreConversationTurnAsync(sessionId, request.UserMessage, emptyResponse, cancellationToken);
+                await EmitTextDeltasAsync(registration.Name, emptyText, emitEvent);
+                await EmitRunFinishedAsync(emptyResponse, emitEvent);
+                return emptyResponse;
+            }
+
+            _logger?.LogInformation("Plan has {StepCount} steps", plan.Steps.Count);
+
+            var plannedActions = CreatePlannedActions(plan);
+            await EmitPlannedActionsAsync(plannedActions, emitEvent);
+
+            var runtimeContext = request.Context is null
+                ? null
+                : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase);
+            var approvedActions = GetApprovedActions(plan, allowedComponents, runtimeContext);
+            var pendingApprovals = GetPendingApprovals(plan, allowedComponents, approvedActions);
+
+            if (pendingApprovals.Count > 0)
+            {
+                var blockedResults = pendingApprovals
+                    .Select(static p => new ComponentActionExecutionResult(
+                        p.ComponentId, p.ActionId,
+                        Outcome: ActionOutcome.Blocked,
+                        Message: $"Approval required for {p.ComponentId}.{p.ActionId}."))
+                    .ToArray();
+                var approvalText = BuildApprovalRequiredResponseText(pendingApprovals);
+
+                if (traceBuilder.IsEnabled)
+                {
+                    traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
+                        .RecordExecution(blockedResults)
+                        .RecordSuccess(approvalText);
+                    await StoreTraceAsync(traceBuilder, cancellationToken);
+                }
+
+                var approvalResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
+                    AgentName: registration.Name,
+                    ResponseText: approvalText,
+                    PlannedActions: plannedActions,
+                    ExecutionResults: blockedResults)
+                {
+                    RequiresApproval = true,
+                    PendingApprovals = pendingApprovals
+                }, plan);
+                await StoreConversationTurnAsync(sessionId, request.UserMessage, approvalResponse, cancellationToken);
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.ApprovalRequired,
+                    AgentName = registration.Name,
+                    PendingApprovals = pendingApprovals
+                });
+                await EmitExecutionResultsAsync(blockedResults, emitEvent);
+                await EmitTextDeltasAsync(registration.Name, approvalText, emitEvent);
+                await EmitRunFinishedAsync(approvalResponse, emitEvent);
+                return approvalResponse;
+            }
+
+            // PHASE 2: VALIDATE
+            _logger?.LogInformation("Validating plan");
+
+            var validationContext = new PlanValidationContext
+            {
+                AllowedComponents = allowedComponents,
+                MountedComponents = mountedComponents,
+                ApprovedActions = approvedActions
+            };
+
+            var validationResult = _validator.Validate(plan, validationContext);
+
+            if (!validationResult.IsValid)
+            {
+                var clarification = validationResult.BuildClarificationQuestion() ?? "The plan could not be validated.";
+                var validationFailures = BuildValidationFailureResults(validationResult);
+
+                if (traceBuilder.IsEnabled)
+                {
+                    traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
+                        .RecordExecution(validationFailures)
+                        .RecordSuccess(clarification);
+                    await StoreTraceAsync(traceBuilder, cancellationToken);
+                }
+
+                var validationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
+                    AgentName: registration.Name,
+                    ResponseText: clarification,
+                    PlannedActions: [],
+                    ExecutionResults: validationFailures), plan);
+                await StoreConversationTurnAsync(sessionId, request.UserMessage, validationResponse, cancellationToken);
+                await EmitExecutionResultsAsync(validationFailures, emitEvent);
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.ClarificationRequired,
+                    AgentName = registration.Name,
+                    ClarificationQuestion = clarification
+                });
+                await EmitTextDeltasAsync(registration.Name, clarification, emitEvent);
+                await EmitRunFinishedAsync(validationResponse, emitEvent);
+                return validationResponse;
+            }
+
+            // PHASE 3: EXECUTE
+            _logger?.LogInformation("Executing plan");
+
+            var executionOptions = new PlanExecutionOptions
+            {
+                ContinueOnFailure = false,
+                SessionId = sessionId,
+                RunId = request.Context is not null &&
+                        request.Context.TryGetValue(RunIdContextKey, out var contextRunId) &&
+                        !string.IsNullOrWhiteSpace(contextRunId)
+                    ? contextRunId
+                    : null
+            };
+
+            var executionResult = await _executor.ExecuteAsync(plan, executionOptions, cancellationToken);
+
+            var executionResults = executionResult.StepResults
+                .Select(r => new ComponentActionExecutionResult(
+                    r.Step.ComponentId, r.Step.ActionId, r.Outcome, r.Message))
+                .ToArray();
+            await EmitExecutionResultsAsync(executionResults, emitEvent);
+
+            var responseText = planMessage ?? BuildResponseText(executionResult);
+            stopwatch.Stop();
+
+            if (traceBuilder.IsEnabled)
+            {
+                traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
+                    .RecordExecution(executionResults)
+                    .RecordSuccess(responseText);
+                await StoreTraceAsync(traceBuilder, cancellationToken);
+            }
+
+            await TrackFinishedAsync(registration.Name, request,
+                executionResult.Succeeded ? AgentBlazorRunOutcome.Succeeded : AgentBlazorRunOutcome.Failed,
+                plannedActions.Length, executionResults.Length, providerConfigured);
+
+            _logger?.LogInformation(
+                "Turn completed in {Duration}ms — {Success}/{Total} steps succeeded",
+                stopwatch.ElapsedMilliseconds, executionResult.SuccessCount, executionResult.StepResults.Count);
+
+            var successResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
+                AgentName: registration.Name,
+                ResponseText: responseText,
+                PlannedActions: plannedActions,
+                ExecutionResults: executionResults), plan);
+            await StoreConversationTurnAsync(sessionId, request.UserMessage, successResponse, cancellationToken);
+            await EmitTextDeltasAsync(registration.Name, responseText, emitEvent);
+            await EmitRunFinishedAsync(successResponse, emitEvent);
+            return successResponse;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            traceBuilder.RecordCanceled();
+            await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Turn failed");
+            traceBuilder.RecordFailure(ex.Message);
+            await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunError,
+                AgentName = registration?.Name,
+                ErrorMessage = ex.Message
+            });
+            throw;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Registry / component helpers
+    // -------------------------------------------------------------------------
+
+    private AgentRegistration? ResolveAgent(string? requestedAgentName)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedAgentName) &&
+            _agentRegistry.TryGet(requestedAgentName, out var requested))
+        {
+            return requested;
+        }
+
+        if (_agentRegistry.TryGet(_options.Value.DefaultAgent.Name, out var configuredDefault))
+            return configuredDefault;
+
+        return _agentRegistry.GetAll()
+            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+    }
+
+    private IReadOnlyList<AvailableComponent> GetAllowedComponents(AgentRegistration registration)
+    {
+        var components = _componentCatalog.GetComponents();
+        var evaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
+            components, registration.AllowedComponents, registration.AllowedActions);
+
+        return evaluation.AllowedComponents
+            .Select(c => new AvailableComponent
+            {
+                ComponentId = c.ComponentId,
+                Description = c.Description ?? $"{c.ComponentId} component",
+                Actions = c.Actions.Select(a => new AvailableAction
+                {
+                    ActionId = a.ActionId,
+                    Description = a.Description ?? $"{a.ActionId} action",
+                    RequiresApproval = a.RequiresApproval,
+                    Parameters = GetActionParameters(c.ComponentId, a.ActionId)
+                }).ToList()
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<MountedComponentState> GetMountedComponents(IAgentComponentRegistry? registry)
+    {
+        if (registry is null) return [];
+
+        return registry.GetAll()
+            .Select(c => new MountedComponentState
+            {
+                AgentId = c.AgentId,
+                ComponentType = c.ComponentType,
+                State = c.GetCurrentState()
+                    .ToDictionary(kv => kv.Key, kv => FormatMountedStateValue(kv.Value))
+            })
+            .ToList();
+    }
+
+    private static string FormatMountedStateValue(object? value)
+    {
+        if (value is null) return "null";
+        if (value is string s) return s;
+        return value switch
+        {
+            bool b => b ? "true" : "false",
+            DateTime dt => dt.ToString("O", CultureInfo.InvariantCulture),
+            DateTimeOffset dto => dto.ToString("O", CultureInfo.InvariantCulture),
+            _ => JsonSerializer.Serialize(value)
+        };
+    }
+
+    /// <summary>
+    /// After planning, the new AgentPlanner emits steps where ComponentId = agentId (instance ID).
+    /// This method resolves each step's ComponentId to the canonical component type so validation works.
+    /// </summary>
+    private static ActionPlan ResolveComponentTypes(
+        ActionPlan plan,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (plan.Steps.Count == 0) return plan;
+
+        var mountedByAgentId = mountedComponents.ToDictionary(
+            static m => m.AgentId, StringComparer.OrdinalIgnoreCase);
+
+        var changed = false;
+        var steps = new List<PlannedStep>(plan.Steps.Count);
+
+        foreach (var step in plan.Steps)
+        {
+            var componentId = step.ComponentId;
+            var targetAgentId = step.TargetAgentId;
+
+            // If componentId looks like an agentId (not a known component type), resolve it
+            if (!IsAllowedComponent(componentId, allowedComponents))
+            {
+                if (mountedByAgentId.TryGetValue(componentId, out var mounted))
+                {
+                    var canonical = ResolveAllowedComponentId(mounted.ComponentType, allowedComponents);
+                    if (!string.IsNullOrWhiteSpace(canonical))
+                    {
+                        targetAgentId ??= componentId;
+                        componentId = canonical;
+                        changed = true;
+                    }
+                }
+                else
+                {
+                    // Last resort: try resolving by type name
+                    var canonical = ResolveAllowedComponentId(componentId, allowedComponents);
+                    if (!string.IsNullOrWhiteSpace(canonical))
+                    {
+                        componentId = canonical;
+                        changed = true;
+                    }
+                }
+            }
+
+            steps.Add(changed && componentId != step.ComponentId
+                ? step with { ComponentId = componentId, TargetAgentId = targetAgentId }
+                : step);
+        }
+
+        return changed ? plan with { Steps = steps } : plan;
+    }
+
+    private static bool IsAllowedComponent(string componentId, IReadOnlyList<AvailableComponent> allowedComponents)
+        => allowedComponents.Any(c => string.Equals(c.ComponentId, componentId, StringComparison.OrdinalIgnoreCase));
+
+    private static string? ResolveAllowedComponentId(string? typeOrId, IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (string.IsNullOrWhiteSpace(typeOrId)) return null;
+        var raw = typeOrId.Trim();
+
+        var exact = allowedComponents.FirstOrDefault(c =>
+            string.Equals(c.ComponentId, raw, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null) return exact.ComponentId;
+
+        var typeName = raw.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) ? raw[5..] : raw;
+        var prefixed = allowedComponents.FirstOrDefault(c =>
+            string.Equals(c.ComponentId, $"Agent{typeName}", StringComparison.OrdinalIgnoreCase));
+        return prefixed?.ComponentId;
+    }
+
+    private static IReadOnlyList<ActionParameter> GetActionParameters(string componentId, string actionId)
+    {
+        return (componentId, actionId) switch
+        {
+            ("AgentNavMenu", "navigate_to") =>
+            [
+                new ActionParameter { Name = "uri", Type = "string", Required = true, Description = "The URI to navigate to" }
+            ],
+            ("AgentDataGrid", "filter") =>
+            [
+                new ActionParameter { Name = "column", Type = "string", Required = true },
+                new ActionParameter { Name = "operator", Type = "string", Required = true, AllowedValues = ["eq","neq","gt","gte","lt","lte","contains","startsWith","endsWith","in","notin","isnull","notnull"] },
+                new ActionParameter { Name = "value", Type = "any", Required = true }
+            ],
+            ("AgentDataGrid", "sort") =>
+            [
+                new ActionParameter { Name = "column", Type = "string", Required = true },
+                new ActionParameter { Name = "direction", Type = "string", Required = false, AllowedValues = ["asc","desc"] }
+            ],
+            ("AgentDataGrid", "go_to_page") =>
+            [
+                new ActionParameter { Name = "pageIndex", Type = "int", Required = false },
+                new ActionParameter { Name = "pageSize", Type = "int", Required = false }
+            ],
+            ("AgentDataGrid", "select_row") =>
+            [
+                new ActionParameter { Name = "rowKey", Type = "string", Required = false }
+            ],
+            ("AgentForm", "set_field") =>
+            [
+                new ActionParameter { Name = "field", Type = "string", Required = true },
+                new ActionParameter { Name = "value", Type = "any", Required = true }
+            ],
+            ("AgentTabs", "switch_tab") =>
+            [
+                new ActionParameter { Name = "index", Type = "int", Required = true }
+            ],
+            _ => []
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Plan post-processing
+    // -------------------------------------------------------------------------
+
+    private ActionPlan EnsureNavigationWhenTargetUnmounted(
+        ActionPlan plan,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        string userMessage)
+    {
+        if (plan.Steps.Count == 0) return plan;
+
+        var first = plan.Steps[0];
+        if (string.Equals(first.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(first.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return plan;
+        }
+
+        if (IsComponentTypeMounted(first.ComponentId, mountedComponents))
+            return plan;
+
+        var route = ResolveRouteForUnmountedComponent(first.ComponentId, userMessage);
+        if (string.IsNullOrWhiteSpace(route)) return plan;
+
+        var navigateStep = new PlannedStep
+        {
+            ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
+            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["uri"] = route }
+        };
+
+        _logger?.LogInformation("Prepending navigation to {Route} for unmounted {ComponentId}", route, first.ComponentId);
+        return plan with { Steps = [navigateStep, ..plan.Steps] };
+    }
+
+    private string? ResolveRouteForUnmountedComponent(string componentId, string userMessage)
+    {
+        if (_componentRouteRegistry.TryGetRoute(componentId, out var fromRegistry) &&
+            !string.IsNullOrWhiteSpace(fromRegistry))
+        {
+            return fromRegistry;
+        }
+
+        // Form/Dialog pairing heuristic
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentDialogComponentId, out var dialogRoute) &&
+                !string.IsNullOrWhiteSpace(dialogRoute))
+            {
+                return dialogRoute;
+            }
+            return null;
+        }
+
+        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentFormComponentId, out var formRoute) &&
+                !string.IsNullOrWhiteSpace(formRoute))
+            {
+                return formRoute;
+            }
+            return null;
+        }
+
+        var matches = _routeRegistry.ResolveAll(userMessage, maxResults: 3);
+        if (matches.Count == 0 || matches[0].Confidence < 0.2f) return null;
+
+        return matches[0].Path;
+    }
+
+    private static bool IsComponentTypeMounted(string componentId, IReadOnlyList<MountedComponentState> mounted)
+    {
+        var typeName = componentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? componentId[5..] : componentId;
+        return mounted.Any(m =>
+            string.Equals(m.ComponentType, componentId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.ComponentType, typeName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static ActionPlan EnsureDialogOpenBeforeUnmountedFormAction(
+        ActionPlan plan,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        IReadOnlyList<AvailableComponent> allowedComponents)
+    {
+        if (plan.Steps.Count == 0 ||
+            IsComponentTypeMounted(AgentComponentCapabilityProfile.AgentFormComponentId, mountedComponents))
+        {
+            return plan;
+        }
+
+        var firstFormIndex = -1;
+        for (var i = 0; i < plan.Steps.Count; i++)
+        {
+            if (string.Equals(plan.Steps[i].ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
+            {
+                firstFormIndex = i;
+                break;
+            }
+        }
+
+        if (firstFormIndex < 0) return plan;
+
+        var hasDialogOpen = plan.Steps.Take(firstFormIndex).Any(s =>
+            string.Equals(s.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(s.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
+
+        if (hasDialogOpen) return plan;
+
+        if (!allowedComponents.Any(c =>
+                string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
+                c.Actions.Any(a => string.Equals(a.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))))
+        {
+            return plan;
+        }
+
+        var openDialog = new PlannedStep
+        {
+            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
+            ActionId = AgentComponentCapabilityProfile.DialogOpenActionId,
+            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        };
+
+        var rewritten = new List<PlannedStep>(plan.Steps.Count + 1);
+        for (var i = 0; i < plan.Steps.Count; i++)
+        {
+            if (i == firstFormIndex) rewritten.Add(openDialog);
+            rewritten.Add(plan.Steps[i]);
+        }
+
+        return plan with { Steps = rewritten };
+    }
+
+    private static ActionPlan EnforceGeneratedUiActionPolicies(
+        ActionPlan plan,
+        GeneratedUiActionInvocation? generatedUiAction,
+        string userMessage)
+    {
+        if (generatedUiAction is null || plan.Steps.Count == 0) return plan;
+
+        if (IsExplicitSubmitIntent(userMessage) || IsExplicitSubmitIntent(generatedUiAction.ActionId))
+            return plan;
+
+        var filtered = plan.Steps
+            .Where(s => !(
+                string.Equals(s.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(s.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        return filtered.Length == plan.Steps.Count ? plan : plan with { Steps = filtered };
+    }
+
+    private static bool IsExplicitSubmitIntent(string? text)
+        => !string.IsNullOrWhiteSpace(text) && (
+            text.Contains("submit", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("save", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("confirm", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("finalize", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("send", StringComparison.OrdinalIgnoreCase));
+
+    // -------------------------------------------------------------------------
+    // Approval / Validation helpers
+    // -------------------------------------------------------------------------
+
+    private static IReadOnlySet<string> GetApprovedActions(
+        ActionPlan plan,
+        IReadOnlyList<AvailableComponent> allowedComponents,
+        IReadOnlyDictionary<string, string>? context)
+    {
+        var approved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (context is null || context.Count == 0) return approved;
+
+        foreach (var step in plan.Steps)
+        {
+            var action = allowedComponents
+                .FirstOrDefault(c => string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase))
+                ?.Actions.FirstOrDefault(a => string.Equals(a.ActionId, step.ActionId, StringComparison.OrdinalIgnoreCase));
+
+            if (action is null || !action.RequiresApproval) continue;
+
+            if (ComponentActionApprovalPolicy.IsApprovalGranted(step.ComponentId, step.ActionId, context))
+                approved.Add($"{step.ComponentId}.{step.ActionId}");
+        }
+
+        return approved;
+    }
+
+    private static IReadOnlyList<PendingApproval> GetPendingApprovals(
+        ActionPlan plan,
+        IReadOnlyList<AvailableComponent> allowedComponents,
+        IReadOnlySet<string> approvedActions)
+    {
+        var pending = new List<PendingApproval>();
+        foreach (var step in plan.Steps)
+        {
+            var action = allowedComponents
+                .FirstOrDefault(c => string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase))
+                ?.Actions.FirstOrDefault(a => string.Equals(a.ActionId, step.ActionId, StringComparison.OrdinalIgnoreCase));
+
+            if (action is null || !action.RequiresApproval) continue;
+            if (approvedActions.Contains($"{step.ComponentId}.{step.ActionId}")) continue;
+
+            pending.Add(new PendingApproval(
+                step.ComponentId,
+                step.ActionId,
+                action.Description,
+                step.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        return pending;
+    }
+
+    private static ComponentActionExecutionResult[] BuildValidationFailureResults(PlanValidationResult validationResult)
+        => validationResult.StepResults
+            .Where(static s => !s.IsValid)
+            .Select(static s =>
+            {
+                var message = s.MissingParameters.Count > 0
+                    ? $"Action '{s.Step.ActionId}' requires '{s.MissingParameters[0]}' parameter."
+                    : s.Errors.FirstOrDefault() ?? "Plan validation failed.";
+                return new ComponentActionExecutionResult(s.Step.ComponentId, s.Step.ActionId,
+                    Outcome: ActionOutcome.NeedsClarification, Message: message);
+            })
+            .ToArray();
+
+    private static PlannedComponentAction[] CreatePlannedActions(ActionPlan plan)
+        => plan.Steps
+            .Select(static s => new PlannedComponentAction(
+                s.ComponentId, s.ActionId,
+                "Planned by AgentPlanner",
+                s.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)))
+            .ToArray();
+
+    private static string BuildApprovalRequiredResponseText(IReadOnlyList<PendingApproval> pending)
+        => pending.Count == 1
+            ? $"Approval required for {pending[0].ComponentId}.{pending[0].ActionId}."
+            : $"Approval required for {pending.Count} actions.";
+
+    private static string BuildResponseText(PlanExecutionResult result)
+    {
+        if (result.StepResults.Count == 0) return "I understood your request but no actions were required.";
+
+        var failures = result.StepResults.Where(r => r.Outcome is ActionOutcome.Failed).ToList();
+        if (failures.Count > 0) return failures[0].Message;
+
+        var clarification = result.StepResults.Where(r => r.Outcome is ActionOutcome.NeedsClarification).ToList();
+        if (clarification.Count > 0) return clarification[0].Message;
+
+        var blocked = result.StepResults.Where(r => r.Outcome is ActionOutcome.Blocked).ToList();
+        if (blocked.Count > 0) return blocked.Count == 1 ? blocked[0].Message : $"Blocked {blocked.Count} actions pending approval.";
+
+        var applied = result.AppliedCount;
+        return applied == 1 ? "Done." : $"Completed {applied} actions.";
+    }
+
+    private AgentTurnResponse AttachPlannedGeneratedUi(AgentTurnResponse response, ActionPlan plan)
+    {
+        if (plan.UiToolCalls.Count == 0) return response;
+
+        var generatedUi = _uiToolCatalog.BuildDocument(plan.UiToolCalls, out var renderErrors);
+        if (generatedUi is null)
+        {
+            if (renderErrors.Count > 0)
+                _logger?.LogWarning("Generated UI rendering failed: {Errors}", string.Join("; ", renderErrors));
+            return response;
+        }
+
+        return response with { GeneratedUi = generatedUi };
+    }
+
+    // -------------------------------------------------------------------------
+    // Conversation store
+    // -------------------------------------------------------------------------
+
+    private async Task<IReadOnlyList<ConversationTurn>> BuildConversationHistoryAsync(
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (_conversationStore is null) return [];
+
+        try
+        {
+            var history = await _conversationStore.GetHistoryAsync(sessionId, cancellationToken);
+            if (history is null || history.Turns.Count == 0) return [];
+
+            var plannerTurns = new List<ConversationTurn>(history.Turns.Count * 2);
+            foreach (var turn in history.Turns.TakeLast(10))
+            {
+                if (!string.IsNullOrWhiteSpace(turn.UserMessage))
+                    plannerTurns.Add(new ConversationTurn { Role = "user", Content = turn.UserMessage });
+                if (!string.IsNullOrWhiteSpace(turn.AgentResponse))
+                    plannerTurns.Add(new ConversationTurn { Role = "assistant", Content = turn.AgentResponse });
+            }
+
+            return plannerTurns;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to load conversation history for session {SessionId}", sessionId);
+            return [];
+        }
+    }
+
+    private async Task StoreConversationTurnAsync(
+        string sessionId,
+        string userMessage,
+        AgentTurnResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (_conversationStore is null) return;
+
+        try
+        {
+            await _conversationStore.AppendTurnAsync(sessionId, new Conversation.ConversationTurn
+            {
+                Timestamp = DateTime.UtcNow,
+                UserMessage = userMessage,
+                AgentResponse = response.ResponseText,
+                PlannedActions = response.PlannedActions,
+                ExecutionResults = response.ExecutionResults,
+                GeneratedUi = response.GeneratedUi
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to store conversation turn for session {SessionId}", sessionId);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Streaming infrastructure
+    // -------------------------------------------------------------------------
+
+    private string ResolveOrCreateRunId(AgentTurnRequest request)
+    {
+        if (request.Context is not null &&
+            request.Context.TryGetValue(RunIdContextKey, out var existing) &&
+            !string.IsNullOrWhiteSpace(existing))
+        {
+            return existing;
+        }
+
+        return Guid.NewGuid().ToString("N");
+    }
+
+    private static AgentTurnRequest EnsureRunIdOnRequest(AgentTurnRequest request, string runId)
+    {
+        var context = request.Context is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase);
+        context[RunIdContextKey] = runId;
+        return request with { Context = context };
+    }
+
+    private static Channel<AgentTurnStreamEvent> Subscribe(StreamingRunState runState)
+    {
+        var channel = Channel.CreateUnbounded<AgentTurnStreamEvent>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+        lock (runState.Gate)
+        {
+            if (runState.Completed)
+            {
+                channel.Writer.TryComplete();
+                return channel;
+            }
+
+            runState.Subscribers.Add(channel);
+        }
+
+        return channel;
+    }
+
+    private async Task ExecuteStreamingRunAsync(StreamingRunState runState, AgentTurnRequest request)
+    {
+        var requestWithRunId = EnsureRunIdOnRequest(request, runState.RunId);
+
+        try
+        {
+            await RunTurnCoreAsync(
+                requestWithRunId,
+                streamEvent => PublishStreamingEventAsync(runState, streamEvent),
+                runState.Cancellation.Token);
+        }
+        catch (OperationCanceledException) when (runState.Cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunError,
+                AgentName = request.AgentName,
+                ErrorCode = "UNHANDLED_EXCEPTION",
+                ErrorMessage = ex.Message
+            });
+        }
+        finally
+        {
+            await FinalizeStreamingRunAsync(runState, runState.Cancellation.IsCancellationRequested);
+        }
+    }
+
+    private async ValueTask PublishStreamingEventAsync(StreamingRunState runState, AgentTurnStreamEvent streamEvent)
+    {
+        List<Channel<AgentTurnStreamEvent>> subscribers;
+        AgentTurnStreamEvent normalized;
+
+        lock (runState.Gate)
+        {
+            if (runState.Completed) return;
+
+            normalized = streamEvent with
+            {
+                RunId = runState.RunId,
+                Sequence = ++runState.Sequence,
+                Timestamp = streamEvent.Timestamp == default ? DateTimeOffset.UtcNow : streamEvent.Timestamp
+            };
+
+            runState.EventLog.Add(normalized);
+            subscribers = runState.Subscribers.ToList();
+        }
+
+        foreach (var subscriber in subscribers)
+        {
+            try
+            {
+                await subscriber.Writer.WriteAsync(normalized, CancellationToken.None);
+            }
+            catch
+            {
+                lock (runState.Gate) { runState.Subscribers.Remove(subscriber); }
+            }
+        }
+    }
+
+    private async Task FinalizeStreamingRunAsync(StreamingRunState runState, bool wasCanceled)
+    {
+        var needsTextEnd = false;
+        var hasTerminal = false;
+
+        lock (runState.Gate)
+        {
+            needsTextEnd =
+                runState.EventLog.Any(static e => e.Kind == AgentTurnStreamEventKind.TextMessageStart) &&
+                !runState.EventLog.Any(static e => e.Kind == AgentTurnStreamEventKind.TextMessageEnd);
+            hasTerminal = runState.EventLog.Any(static e =>
+                e.Kind is AgentTurnStreamEventKind.RunFinished or AgentTurnStreamEventKind.RunError);
+        }
+
+        if (needsTextEnd)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageEnd });
+        }
+
+        if (!hasTerminal)
+        {
+            await PublishStreamingEventAsync(runState, new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunError,
+                ErrorCode = wasCanceled ? "STOPPED" : "MISSING_TERMINAL_EVENT",
+                ErrorMessage = wasCanceled ? "Run canceled." : "Run ended without terminal event."
+            });
+        }
+
+        List<Channel<AgentTurnStreamEvent>> subscribers;
+        List<AgentTurnStreamEvent> historySnapshot;
+        lock (runState.Gate)
+        {
+            runState.Completed = true;
+            subscribers = runState.Subscribers.ToList();
+            runState.Subscribers.Clear();
+            historySnapshot = runState.EventLog.ToList();
+        }
+
+        foreach (var subscriber in subscribers)
+            subscriber.Writer.TryComplete();
+
+        _activeStreamingRuns.TryRemove(runState.RunId, out _);
+        _completedStreamingRuns[runState.RunId] = new StreamingRunHistory(runState.RunId, historySnapshot, DateTimeOffset.UtcNow);
+        _completedRunOrder.Enqueue(runState.RunId);
+        TrimCompletedRunHistoryIfNeeded();
+        runState.Cancellation.Dispose();
+    }
+
+    private void TrimCompletedRunHistoryIfNeeded()
+    {
+        while (_completedRunOrder.Count > MaxRetainedRuns && _completedRunOrder.TryDequeue(out var runId))
+            _completedStreamingRuns.TryRemove(runId, out _);
+    }
+
+    // -------------------------------------------------------------------------
+    // Emit helpers
+    // -------------------------------------------------------------------------
+
+    private static async ValueTask EmitEventAsync(Func<AgentTurnStreamEvent, ValueTask>? emitEvent, AgentTurnStreamEvent streamEvent)
+    {
+        if (emitEvent is not null) await emitEvent(streamEvent);
+    }
+
+    private static async ValueTask EmitRunFinishedAsync(AgentTurnResponse response, Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunFinished,
+            AgentName = response.AgentName,
+            Response = response
+        });
+    }
+
+    private static async ValueTask EmitPlannedActionsAsync(
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        for (var index = 0; index < plannedActions.Count; index++)
+        {
+            var action = plannedActions[index];
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.StepStarted, StepIndex = index, PlannedAction = action });
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.ToolCallStart, StepIndex = index, PlannedAction = action });
+
+            if (action.Arguments is { Count: > 0 })
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.ToolCallArgs, StepIndex = index, PlannedAction = action, ToolArguments = action.Arguments });
+
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.ToolCallEnd, StepIndex = index, PlannedAction = action });
+        }
+    }
+
+    private static async ValueTask EmitExecutionResultsAsync(
+        IReadOnlyList<ComponentActionExecutionResult> executionResults,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        for (var index = 0; index < executionResults.Count; index++)
+        {
+            var result = executionResults[index];
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.ToolCallResult, StepIndex = index, ExecutionResult = result });
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.StepFinished, StepIndex = index, StepSucceeded = result.Succeeded, ExecutionResult = result });
+        }
+    }
+
+    private static async ValueTask EmitTextDeltasAsync(
+        string agentName,
+        string responseText,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        if (emitEvent is null || string.IsNullOrWhiteSpace(responseText)) return;
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageStart, AgentName = agentName });
+
+        var buffer = new StringBuilder();
+        foreach (var ch in responseText)
+        {
+            buffer.Append(ch);
+            if (char.IsWhiteSpace(ch))
+            {
+                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageContent, AgentName = agentName, TextDelta = buffer.ToString() });
+                buffer.Clear();
+                await Task.Yield();
+            }
+        }
+
+        if (buffer.Length > 0)
+            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageContent, AgentName = agentName, TextDelta = buffer.ToString() });
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageEnd, AgentName = agentName });
+    }
+
+    // -------------------------------------------------------------------------
+    // Telemetry / trace
+    // -------------------------------------------------------------------------
+
+    private async Task StoreTraceAsync(PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
+    {
+        if (_traceStore is null || !traceBuilder.IsEnabled) return;
+
+        try
+        {
+            var trace = traceBuilder.Build();
+            if (trace is not null) await _traceStore.StoreAsync(trace, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to store trace");
+        }
+    }
+
+    private async Task TrackStartedAsync(string agentName, AgentTurnRequest request, bool providerConfigured)
+    {
+        await _telemetrySink.TrackRunEventAsync(new AgentBlazorRunTelemetryEvent
+        {
+            Kind = AgentBlazorRunEventKind.Started,
+            Source = AgentBlazorTelemetrySources.Runtime,
+            AgentName = agentName,
+            RequestedAgentName = request.AgentName,
+            HasContext = request.Context?.Count > 0,
+            ProviderConfigured = providerConfigured
+        });
+    }
+
+    private async Task TrackFinishedAsync(string agentName, AgentTurnRequest request, AgentBlazorRunOutcome outcome,
+        int plannedCount, int executedCount, bool providerConfigured)
+    {
+        await _telemetrySink.TrackRunEventAsync(new AgentBlazorRunTelemetryEvent
+        {
+            Kind = AgentBlazorRunEventKind.Finished,
+            Source = AgentBlazorTelemetrySources.Runtime,
+            AgentName = agentName,
+            RequestedAgentName = request.AgentName,
+            Outcome = outcome,
+            PlannedActionCount = plannedCount,
+            ExecutionResultCount = executedCount,
+            HasContext = request.Context?.Count > 0,
+            ProviderConfigured = providerConfigured
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Response builders
+    // -------------------------------------------------------------------------
+
+    private async Task<AgentTurnResponse> HandleNoAgentAsync(PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
+    {
+        if (traceBuilder.IsEnabled)
+        {
+            traceBuilder.RecordFailure("No agents registered");
+            await StoreTraceAsync(traceBuilder, cancellationToken);
+        }
+
+        return new AgentTurnResponse("none", "No agents are registered.", [], []);
+    }
+
+    private async Task<AgentTurnResponse> BuildProviderMissingResponseAsync(string agentName, PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
+    {
+        const string message = "No provider is configured. Register an AgentBlazor provider chat client.";
+
+        if (traceBuilder.IsEnabled)
+        {
+            traceBuilder.RecordFailure(message);
+            await StoreTraceAsync(traceBuilder, cancellationToken);
+        }
+
+        return new AgentTurnResponse(agentName, message, [], []);
+    }
+
+    // -------------------------------------------------------------------------
+    // Utility
+    // -------------------------------------------------------------------------
+
+    private static bool IsGeneratedUiRequested(IDictionary<string, string>? context)
+        => context is not null &&
+           context.TryGetValue(AgentGenerativeUiSpec.GenerateUiContextKey, out var raw) &&
+           bool.TryParse(raw, out var val) && val;
+}

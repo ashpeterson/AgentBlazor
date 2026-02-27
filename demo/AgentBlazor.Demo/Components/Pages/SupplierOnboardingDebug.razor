@@ -65,9 +65,9 @@
     private AgentDialog? _dialog;
     private readonly SupplierOnboardingModel _model = new();
 
-    private Task OpenDialogAsync() => _dialog?.OpenAsync() ?? Task.CompletedTask;
+    private Task OpenDialogAsync() => _dialog?.Open() ?? Task.CompletedTask;
 
-    private Task CloseDialogAsync() => _dialog?.CloseAsync() ?? Task.CompletedTask;
+    private Task CloseDialogAsync() => _dialog?.Close() ?? Task.CompletedTask;
 
     private Task OnSubmitted() => CloseDialogAsync();
 
