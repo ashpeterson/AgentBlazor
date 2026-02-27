@@ -99,7 +99,7 @@ public class ComponentMockingReportTests
 
             // Tabs - Switch
             new("Switch to the security tab", "agentblazor_agenttabs_switch_tab",
-                new Dictionary<string, object?> { ["tab_index"] = 2, ["agentId"] = "settings-tabs" }),
+                new Dictionary<string, object?> { ["index"] = 2, ["agentId"] = "settings-tabs" }),
 
             // Dialog - Close
             new("Close the dialog", "agentblazor_agentdialog_close",

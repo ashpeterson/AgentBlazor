@@ -148,7 +148,11 @@ internal sealed class PlanExecutor : IPlanExecutor
             kv => kv.Value,
             StringComparer.OrdinalIgnoreCase);
 
+        // Only inject TargetAgentId when it's a real instance ID (differs from the component type).
+        // When TargetAgentId == ComponentId the LLM used the component type name as the agentId,
+        // not a specific mounted instance — let the executor resolve by type instead.
         if (!string.IsNullOrWhiteSpace(step.TargetAgentId) &&
+            !string.Equals(step.TargetAgentId, step.ComponentId, StringComparison.OrdinalIgnoreCase) &&
             !merged.ContainsKey("agentId"))
         {
             merged["agentId"] = step.TargetAgentId;

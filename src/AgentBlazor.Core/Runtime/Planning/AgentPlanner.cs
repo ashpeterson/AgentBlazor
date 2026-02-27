@@ -285,7 +285,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
                     {
                         ComponentId = action.AgentId,
                         ActionId = action.Action,
-                        Arguments = action.Args ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+                        Arguments = NormalizeArgs(action.Args),
                         TargetAgentId = action.AgentId
                     });
                 }
@@ -345,6 +345,38 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
 
         return result;
     }
+
+    // -------------------------------------------------------------------------
+    // Argument normalization
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Converts a raw args dictionary (whose values may be JsonElement from deserialization)
+    /// to a dictionary with native CLR types so callers get int, string, bool, etc.
+    /// </summary>
+    private static Dictionary<string, object?> NormalizeArgs(Dictionary<string, object?>? args)
+    {
+        if (args is null) return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        var result = new Dictionary<string, object?>(args.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in args)
+        {
+            result[key] = value is JsonElement je ? UnwrapJsonElement(je) : value;
+        }
+        return result;
+    }
+
+    private static object? UnwrapJsonElement(JsonElement je) => je.ValueKind switch
+    {
+        JsonValueKind.String => je.GetString(),
+        JsonValueKind.Number => je.TryGetInt32(out var i) ? i
+            : je.TryGetInt64(out var l) ? l
+            : (object?)je.GetDouble(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Null or JsonValueKind.Undefined => null,
+        _ => je.ToString()
+    };
 
     // -------------------------------------------------------------------------
     // Private DTOs for JSON deserialization

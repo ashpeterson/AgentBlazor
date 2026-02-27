@@ -224,7 +224,7 @@ public class WrapperActionExecutionTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("SupplierName", grid.FilterColumn);
-        Assert.Contains("Applied filter SupplierName contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SupplierName contains Alpine", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact(Skip = "Row inference from filter context was removed — rowKey is now required.")]

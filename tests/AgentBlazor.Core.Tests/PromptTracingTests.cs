@@ -315,7 +315,7 @@ public class PromptTracingTests
             "agentblazor_agenttabs_switch_tab",
             "AgentTabs",
             "switch_tab",
-            new Dictionary<string, object?> { ["tab_index"] = 1 }
+            new Dictionary<string, object?> { ["index"] = 1 }
         };
     }
 

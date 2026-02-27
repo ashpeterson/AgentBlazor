@@ -296,7 +296,7 @@ public class ComponentMockingTests
             "agentblazor_agenttabs_switch_tab",
             new Dictionary<string, object?>
             {
-                ["tab_index"] = 2
+                ["index"] = 2
             }));
         services.AddAgentBlazorServices();
 

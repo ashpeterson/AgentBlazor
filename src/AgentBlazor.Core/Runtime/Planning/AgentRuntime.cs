@@ -435,7 +435,11 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 .ToArray();
             await EmitExecutionResultsAsync(executionResults, emitEvent);
 
-            var responseText = planMessage ?? BuildResponseText(executionResult);
+            // When execution fully succeeded, use the LLM's plan message if available.
+            // When any step failed (NeedsClarification, Failed, etc.), surface the execution message instead.
+            var responseText = executionResult.Succeeded
+                ? (planMessage ?? BuildResponseText(executionResult))
+                : BuildResponseText(executionResult);
             stopwatch.Stop();
 
             if (traceBuilder.IsEnabled)
