@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-02
 
-## Completed Recently
+## Done (Implemented)
 
 - Root README quickstart created with install/setup/provider guidance
 - Provider-missing UX improved:
@@ -42,6 +42,12 @@ Last updated: 2026-03-02
     - `UseJsonFileConversationStore(path, configure?)`
   - Added file-backed `JsonFileConversationStore` for restart-safe history
   - Added core/integration tests for subscriber + persistence behavior
+- Demo expansion for new wrappers completed:
+  - Added `/demo/components` route mounting `AgentSelect`, `AgentAutocomplete`, `AgentDatePicker`,
+    `AgentDateRangePicker`, `AgentTreeView`, `AgentStepper`, `AgentCommandBar`, `AgentFileUpload`
+  - Added prompt chips for each wrapper family
+  - Added explicit local/remote file-upload policy examples in demo page/docs
+  - Added "Component Kit" nav entry in demo sidebar
 
 ## Docs and Architecture Audit (This Review)
 
@@ -76,13 +82,25 @@ The `/docs` folder was re-reviewed against current code.
 - Circuit-scoped component registry model
 - Demo route `/demo/components` showcasing new wrapper actions and prompt examples
 
-### Known technical gaps
+## Outstanding (Known Gaps)
 
 - Tier boundaries are defined, but full action-level hard enforcement remains partial
-- New wrappers are implemented/test-covered and have a consolidated demo route;
-  richer domain-specific scenarios are still limited
+- Wrapper breadth is complete for current plan; deeper domain scenarios are still limited for:
+  - tree/stepper business workflows
+  - command/file flows tied to real backend integrations
+- File upload wrapper currently demonstrates name-based attachment/list/remove patterns;
+  full storage integrations are still sample-level backlog items
 
-## Next Plan
+## Verification Snapshot
+
+Latest local validation after recent changes:
+
+- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj` passed
+- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj` passed
+- `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj` passed
+- `dotnet build demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj` passed
+
+## Next (Sequenced)
 
 Detailed expansion plan is tracked in:
 

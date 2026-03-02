@@ -21,7 +21,7 @@ Do not put provider-specific code in Core or Components.
 
 ## Review Findings That Drive This Plan
 
-Current wrapper surface is strong but narrow:
+Current wrapper surface in code now includes:
 
 - `AgentDataGrid`
 - `AgentDialog`
@@ -32,8 +32,15 @@ Current wrapper surface is strong but narrow:
 - `AgentAutocomplete`
 - `AgentDatePicker`
 - `AgentDateRangePicker`
+- `AgentTreeView`
+- `AgentStepper`
+- `AgentCommandBar`
+- `AgentFileUpload`
 
-Coverage is improving, but workflow/navigation/command/file surfaces are still missing.
+Current non-paid gaps are no longer wrapper availability; they are depth gaps:
+
+- richer domain-specific demo scenarios using the new wrappers
+- end-to-end file integration samples (local policy mode vs remote handoff mode)
 
 ## Phase 0 (Stability, Completed)
 
@@ -220,7 +227,9 @@ Status for Phase 5:
 - Added file-backed `JsonFileConversationStore` for restart-safe conversation history
 - Added core + integration test coverage for event subscriber and persistent store behavior
 
-## Proposed Delivery Sequence
+## Delivery Status
+
+Completed sequence:
 
 1. Phase 0
 2. Phase 1
@@ -228,6 +237,11 @@ Status for Phase 5:
 4. Phase 3
 5. Phase 4
 6. Phase 5
+
+Next sequence (post-phase polish):
+
+1. Deepen workflow scenarios for tree/stepper/command/file interactions
+2. Add real file service integration examples (local-reference policy and remote-handoff policy)
 
 ## Definition of Done for Each New Component
 
