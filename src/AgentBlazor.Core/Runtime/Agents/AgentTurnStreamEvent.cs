@@ -17,7 +17,10 @@ public enum AgentTurnStreamEventKind
     ClarificationRequired,
     ApprovalRequired,
     RunFinished,
-    RunError
+    RunError,
+    ReasoningStart,
+    ReasoningContent,
+    ReasoningEnd
 }
 
 public sealed record AgentTurnStreamEvent
@@ -39,4 +42,5 @@ public sealed record AgentTurnStreamEvent
     public AgentTurnResponse? Response { get; init; }
     public string? ErrorMessage { get; init; }
     public string? ErrorCode { get; init; }
+    public string? ReasoningDelta { get; init; }
 }

@@ -42,7 +42,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by high risk"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by high risk", SessionId: registry.SessionId));
 
         // Assert
         Assert.Single(mockGrid.ExecutedActions);
@@ -75,7 +75,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("sort by risk score descending"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("sort by risk score descending", SessionId: registry.SessionId));
 
         // Assert
         Assert.Single(mockGrid.ExecutedActions);
@@ -106,7 +106,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to page 3"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to page 3", SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal(3, mockGrid.CurrentPage);
@@ -135,7 +135,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("clear all filters"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("clear all filters", SessionId: registry.SessionId));
 
         // Assert
         Assert.Null(mockGrid.CurrentFilter);
@@ -164,7 +164,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog", SessionId: registry.SessionId));
 
         // Assert
         Assert.True(mockDialog.IsOpen);
@@ -195,7 +195,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("close the dialog"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("close the dialog", SessionId: registry.SessionId));
 
         // Assert
         Assert.False(mockDialog.IsOpen);
@@ -224,7 +224,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Northwind Traders"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Northwind Traders", SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal("Northwind Traders", mockForm.GetFieldValue("supplierName"));
@@ -247,7 +247,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act - simulate setting two fields
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Acme and risk level to Low"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Acme and risk level to Low", SessionId: registry.SessionId));
 
         // Assert - verify both actions were tracked
         Assert.Equal(2, mockForm.ExecutedActions.Count);
@@ -279,7 +279,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers page"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers page", SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal("/suppliers", mockNav.CurrentUri);
@@ -339,7 +339,7 @@ public class ComponentMockingTests
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         // Act
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status", SessionId: registry.SessionId));
 
         Assert.Contains("Specify 'agentId' to target one", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(grid1.ExecutedActions);
@@ -371,7 +371,7 @@ public class ComponentMockingTests
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by electronics"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by electronics", SessionId: registry.SessionId));
 
         // Assert - verify trace captured the execution
         var traces = await traceStore.GetRecentAsync(1);

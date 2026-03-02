@@ -7,28 +7,35 @@
 
 <section class="gen-ui-demo">
     <header class="gen-ui-demo__header">
-        <MudText Typo="Typo.h5">Generative UI Playground</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Generated blocks are backed by live workflow data from the demo database.
+        <MudText Typo="Typo.h5">Generative UI</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            The agent renders live charts, KPI cards, and action buttons directly inside the chat —
+            backed by real data from the demo database. No grids or forms are mounted on this page;
+            everything appears inline in the Assistant widget.
         </MudText>
     </header>
 
-    <MudStack Row="true" Spacing="1" Class="mb-3">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
+    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-4">
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "show onboarding intake volume for the last 8 months"
+            show supplier risk by region as a bar chart
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "show supplier risk by region as a chart"
+            show risk tier distribution as a pie chart
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "create a supplier onboarding checklist card"
+            chart onboarding intake for the last 9 months
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Then continue with generated actions to run follow-up steps
+            chart mitigation task volume for the last 6 months
+        </MudChip>
+        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
+            create a risk summary card with action buttons
         </MudChip>
     </MudStack>
 
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-        Use the persistent Assistant chat bar at the bottom-right to run generated UI prompts on this page.
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+        Open the <strong>Assistant</strong> widget at the bottom-right and type any prompt above.
+        Charts and cards appear directly in the conversation and can include follow-up action buttons.
     </MudAlert>
 </section>

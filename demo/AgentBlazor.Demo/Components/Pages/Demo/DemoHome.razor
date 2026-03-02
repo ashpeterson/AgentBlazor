@@ -1,75 +1,313 @@
 @page "/demo"
-@layout DemoLayout
+@layout DemoShowcaseLayout
+@using System.ComponentModel.DataAnnotations
+@using AgentBlazor.Components
+@using AgentBlazor.Core.Models
+@using AgentBlazor.Demo.Models
+@using AgentBlazor.Demo.Services
 @using MudBlazor
-@using AgentBlazor.Components.Chat
+@inject SupplierWorkflowService WorkflowService
+@inject ISnackbar Snackbar
 
-<PageTitle>AgentBlazor Demo</PageTitle>
+<PageTitle>AgentBlazor — Live Demo</PageTitle>
 
-<div class="demo-home">
-    <!-- Hero Section -->
-    <section class="demo-home__hero">
-        <div class="demo-home__hero-bg">
-            <div class="demo-home__orb demo-home__orb--1"></div>
-            <div class="demo-home__orb demo-home__orb--2"></div>
-            <div class="demo-home__grid"></div>
-        </div>
+@* Custom chat rendering: filter action on the supplier grid shows a styled result *@
+<AgentActionRender AgentId="showcase-supplier-grid" ActionId="filter_rows">
+    <Complete Context="ctx">
+        <MudAlert Severity="Severity.Success" Dense="true" Class="my-1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" />
+                <MudText Typo="Typo.body2">
+                    Filtered suppliers
+                    @if (ctx.Args.TryGetValue("column", out var col) && col is not null)
+                    { <text> by <strong>@col</strong></text> }
+                    @if (ctx.Args.TryGetValue("value", out var val) && val is not null)
+                    { <text> = <strong>@val</strong></text> }
+                </MudText>
+            </MudStack>
+        </MudAlert>
+    </Complete>
+    <InProgress Context="_">
+        <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="my-1" />
+    </InProgress>
+</AgentActionRender>
 
-        <div class="demo-home__hero-content">
-            <h1 class="demo-home__title">
-                Talk to your <span class="demo-home__accent">Blazor App</span>
-            </h1>
-            <p class="demo-home__subtitle">
-                Run a real end-to-end workflow: submit onboarding, review suppliers, and generate live charts from persisted app data.
-            </p>
-            <p class="demo-home__subtitle">
-                Use the floating <strong>Ask Agent</strong> widget to run the same assistant across every demo page.
-            </p>
-
-            <div class="demo-home__chat">
-                <AgentChatBar Placeholder="Try: triage unhealthy services and draft a mitigation plan"
-                              EnableGeneratedUi="true"
-                              ShowTimeline="false"
-                              ShowClearButton="false"
-                              Theme="ChatTheme.Dark()" />
-                <p class="demo-home__chat-note">
-                    Inline chat and floating widget share the same conversation state.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Quick Links -->
-    <section class="demo-home__links">
-        <a href="demo/workflow" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Large" />
-            <span>Complex Workflow</span>
-            <small>Queue + suppliers + generated UI</small>
-        </a>
-        <a href="demo/suppliers" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Large" />
-            <span>Data Grid</span>
-            <small>Filter, sort, and focus rows</small>
-        </a>
-        <a href="demo/generative-ui" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" />
-            <span>Generative UI</span>
-            <small>Prompt to generated blocks and actions</small>
-        </a>
-        <a href="demo/workspace" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" />
-            <span>Workspace</span>
-            <small>Navigate tabs and pages</small>
-        </a>
-        <a href="demo/onboarding" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Large" />
-            <span>Form Workflow</span>
-            <small>Forms and dialogs</small>
-        </a>
-        <a href="demo/status" class="demo-home__link-card">
-            <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Size="Size.Large" />
-            <span>Status</span>
-            <small>Runtime telemetry</small>
-        </a>
-    </section>
+@* KPI summary row *@
+<div class="showcase-kpis">
+    <div class="showcase-kpi">
+        <span class="showcase-kpi__value">@_summary.TotalSuppliers</span>
+        <span class="showcase-kpi__label">Suppliers</span>
+    </div>
+    <div class="showcase-kpi showcase-kpi--danger">
+        <span class="showcase-kpi__value">@_summary.HighRiskSuppliers</span>
+        <span class="showcase-kpi__label">High Risk</span>
+    </div>
+    <div class="showcase-kpi showcase-kpi--warn">
+        <span class="showcase-kpi__value">@_summary.OpenOnboardingRequests</span>
+        <span class="showcase-kpi__label">Open Onboarding</span>
+    </div>
+    <div class="showcase-kpi showcase-kpi--success">
+        <span class="showcase-kpi__value">@_summary.SubmittedThisMonth</span>
+        <span class="showcase-kpi__label">This Month</span>
+    </div>
+    <div class="showcase-kpi showcase-kpi--warn">
+        <span class="showcase-kpi__value">@_summary.OpenMitigationTasks</span>
+        <span class="showcase-kpi__label">Open Mitigation</span>
+    </div>
 </div>
 
+@* Tabs with live data grids *@
+<MudPaper Elevation="1" Class="mt-3">
+    <AgentTabs AgentId="showcase-tabs">
+
+        <MudTabPanel Text="Onboarding Queue">
+            <AgentDataGrid TItem="OnboardingRequestRow"
+                           AgentId="showcase-onboarding-grid"
+                           Items="@_onboarding"
+                           Dense="true"
+                           Hover="true"
+                           Bordered="true"
+                           Striped="true"
+                           RowKeyProperty="RequestId"
+                           ColumnAliases="@_onboardingAliases">
+                <Columns>
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.RequestId" Title="Request" />
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.RiskTier" Title="Risk Tier" />
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="int" Property="x => x.Priority" Title="Priority" />
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="string" Property="x => x.Status" Title="Status" />
+                    <PropertyColumn T="OnboardingRequestRow" TProperty="DateTime" Property="x => x.SubmittedUtc" Title="Submitted" Format="yyyy-MM-dd" />
+                </Columns>
+            </AgentDataGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Supplier Risk">
+            <AgentDataGrid TItem="SupplierRow"
+                           AgentId="showcase-supplier-grid"
+                           Items="@_suppliers"
+                           Dense="true"
+                           Hover="true"
+                           Bordered="true"
+                           Striped="true"
+                           RowKeyProperty="SupplierId"
+                           ColumnAliases="@_supplierAliases">
+                <Columns>
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                    <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                    <TemplateColumn T="SupplierRow" Title="Risk Score">
+                        <CellTemplate>
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Variant="Variant.Filled"
+                                     Color="@RiskColor(context.Item.RiskScore)">
+                                @context.Item.RiskScore
+                            </MudChip>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+                </Columns>
+            </AgentDataGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Mitigation Tasks">
+            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-2 mt-1 px-2">
+                <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
+                           Color="Color.Primary"
+                           OnClick="OpenMitigationDialogAsync">
+                    Open Mitigation Dialog
+                </MudButton>
+            </MudStack>
+            <AgentDataGrid TItem="MitigationTaskRow"
+                           AgentId="showcase-mitigation-grid"
+                           Items="@_mitigationTasks"
+                           Dense="true"
+                           Hover="true"
+                           Bordered="true"
+                           Striped="true"
+                           RowKeyProperty="TaskId"
+                           ColumnAliases="@_mitigationAliases">
+                <Columns>
+                    <PropertyColumn T="MitigationTaskRow" TProperty="string" Property="x => x.TaskId" Title="Task" />
+                    <PropertyColumn T="MitigationTaskRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                    <PropertyColumn T="MitigationTaskRow" TProperty="string" Property="x => x.Owner" Title="Owner" />
+                    <PropertyColumn T="MitigationTaskRow" TProperty="int" Property="x => x.Priority" Title="Priority" />
+                    <PropertyColumn T="MitigationTaskRow" TProperty="string" Property="x => x.Status" Title="Status" />
+                    <PropertyColumn T="MitigationTaskRow" TProperty="DateTime" Property="x => x.DueDate" Title="Due" Format="yyyy-MM-dd" />
+                </Columns>
+            </AgentDataGrid>
+        </MudTabPanel>
+
+    </AgentTabs>
+</MudPaper>
+
+@* Agent-controlled mitigation dialog + form *@
+<AgentDialog @ref="_mitigationDialog"
+             AgentId="showcase-mitigation-dialog"
+             Visible="@_mitigationDialogVisible"
+             VisibleChanged="OnMitigationDialogVisibleChanged">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Create Mitigation Task</MudText>
+    </TitleContent>
+    <DialogContent>
+        <AgentForm AgentId="showcase-mitigation-form"
+                   Model="@_mitigationModel"
+                   Submitted="OnMitigationSubmittedAsync">
+            <ChildContent Context="formContext">
+                <DataAnnotationsValidator />
+                <MudTextField T="string" Label="Supplier ID"
+                              For="@(() => _mitigationModel.SupplierId)"
+                              @bind-Value="_mitigationModel.SupplierId" />
+                <MudTextField T="string" Label="Supplier name"
+                              For="@(() => _mitigationModel.SupplierName)"
+                              @bind-Value="_mitigationModel.SupplierName" />
+                <MudTextField T="string" Label="Service name"
+                              For="@(() => _mitigationModel.ServiceName)"
+                              @bind-Value="_mitigationModel.ServiceName" />
+                <MudTextField T="string" Label="Owner"
+                              For="@(() => _mitigationModel.Owner)"
+                              @bind-Value="_mitigationModel.Owner" />
+                <MudTextField T="string" Label="Mitigation action"
+                              Lines="3"
+                              For="@(() => _mitigationModel.MitigationAction)"
+                              @bind-Value="_mitigationModel.MitigationAction" />
+                <MudNumericField T="int" Label="Priority (1–5)"
+                                 For="@(() => _mitigationModel.Priority)"
+                                 @bind-Value="_mitigationModel.Priority" />
+                <MudDatePicker Label="Due date"
+                               For="@(() => _mitigationModel.DueDate)"
+                               @bind-Date="_mitigationModel.DueDate" />
+                <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Submit Mitigation Task
+                    </MudButton>
+                </MudStack>
+            </ChildContent>
+        </AgentForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseMitigationDialogAsync">
+            Close
+        </MudButton>
+    </DialogActions>
+</AgentDialog>
+
+@if (_lastMitigationResult is not null)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+        Created task <strong>@_lastMitigationResult.TaskId</strong> for
+        <strong>@_lastMitigationResult.SupplierName</strong> (owner: @_lastMitigationResult.Owner).
+    </MudAlert>
+}
+
+@code {
+    private WorkflowSummary _summary = new(0, 0, 0, 0, 0);
+    private List<OnboardingRequestRow> _onboarding = [];
+    private List<SupplierRow> _suppliers = [];
+    private List<MitigationTaskRow> _mitigationTasks = [];
+    private AgentDialog? _mitigationDialog;
+    private bool _mitigationDialogVisible;
+    private MitigationTaskModel _mitigationModel = new();
+    private MitigationTaskResult? _lastMitigationResult;
+
+    private static readonly IReadOnlyDictionary<string, string> _onboardingAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["request"] = nameof(OnboardingRequestRow.RequestId),
+            ["supplier"] = nameof(OnboardingRequestRow.SupplierName),
+            ["risk"] = nameof(OnboardingRequestRow.RiskTier),
+            ["priority"] = nameof(OnboardingRequestRow.Priority),
+            ["status"] = nameof(OnboardingRequestRow.Status),
+            ["submitted"] = nameof(OnboardingRequestRow.SubmittedUtc)
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> _supplierAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["id"] = nameof(SupplierRow.SupplierId),
+            ["supplier"] = nameof(SupplierRow.SupplierName),
+            ["region"] = nameof(SupplierRow.Region),
+            ["risk"] = nameof(SupplierRow.RiskScore),
+            ["audit"] = nameof(SupplierRow.LastAuditDate)
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> _mitigationAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["task"] = nameof(MitigationTaskRow.TaskId),
+            ["supplier"] = nameof(MitigationTaskRow.SupplierName),
+            ["supplier id"] = nameof(MitigationTaskRow.SupplierId),
+            ["service"] = nameof(MitigationTaskRow.ServiceName),
+            ["owner"] = nameof(MitigationTaskRow.Owner),
+            ["priority"] = nameof(MitigationTaskRow.Priority),
+            ["status"] = nameof(MitigationTaskRow.Status),
+            ["due"] = nameof(MitigationTaskRow.DueDate)
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _summary = await WorkflowService.GetWorkflowSummaryAsync(CancellationToken.None);
+        _onboarding = (await WorkflowService.ListOnboardingRequestsAsync(CancellationToken.None)).ToList();
+        _suppliers = (await WorkflowService.ListSuppliersAsync(CancellationToken.None)).ToList();
+        _mitigationTasks = (await WorkflowService.ListMitigationTasksAsync(CancellationToken.None)).ToList();
+    }
+
+    private Task OpenMitigationDialogAsync() =>
+        _mitigationDialog?.Open() ?? Task.CompletedTask;
+
+    private Task CloseMitigationDialogAsync() =>
+        _mitigationDialog?.Close() ?? Task.CompletedTask;
+
+    private Task OnMitigationDialogVisibleChanged(bool visible) =>
+        InvokeAsync(() =>
+        {
+            _mitigationDialogVisible = visible;
+            StateHasChanged();
+        });
+
+    private async Task OnMitigationSubmittedAsync()
+    {
+        var submission = new MitigationTaskSubmission(
+            _mitigationModel.SupplierId,
+            _mitigationModel.SupplierName,
+            _mitigationModel.ServiceName,
+            _mitigationModel.Owner,
+            _mitigationModel.MitigationAction,
+            _mitigationModel.Priority,
+            _mitigationModel.DueDate ?? DateTime.UtcNow.Date.AddDays(7));
+
+        var result = await WorkflowService.CreateMitigationTaskAsync(submission, CancellationToken.None);
+        _lastMitigationResult = result;
+        Snackbar.Add($"Created {result.TaskId} for {result.SupplierName}.", Severity.Success);
+
+        _mitigationModel = new MitigationTaskModel();
+        await CloseMitigationDialogAsync();
+        await ReloadAsync();
+    }
+
+    private static Color RiskColor(int score) => score switch
+    {
+        >= 80 => Color.Error,
+        >= 60 => Color.Warning,
+        _ => Color.Success
+    };
+
+    private sealed class MitigationTaskModel
+    {
+        [Required] public string SupplierId { get; set; } = string.Empty;
+        [Required] public string SupplierName { get; set; } = string.Empty;
+        [Required] public string ServiceName { get; set; } = "Supplier Risk Monitoring";
+        [Required] public string Owner { get; set; } = "Ops Lead";
+        [Required, StringLength(500)] public string MitigationAction { get; set; } = string.Empty;
+        [Range(1, 5)] public int Priority { get; set; } = 1;
+        [Required] public DateTime? DueDate { get; set; } = DateTime.UtcNow.Date.AddDays(7);
+    }
+}

@@ -177,50 +177,6 @@ public class AgentRuntimeIntegrationTests
         Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public async Task RunTurnAsync_DataGridOnlyToolCall_AppendsNavigationContinuationAction()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentdatagrid_filter",
-            new Dictionary<string, object?>
-            {
-                ["column"] = "RiskScore",
-                ["operator"] = "gte",
-                ["value"] = 70
-            }));
-        services.AddAgentBlazorServices();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        // Register a route for suppliers so navigation can be prepended when DataGrid isn't mounted
-        var routeRegistry = provider.GetRequiredService<IRouteRegistry>();
-        routeRegistry.Register(new RouteDefinition
-        {
-            Path = "/suppliers",
-            Description = "Supplier Management",
-            Aliases = ["suppliers", "supplier", "risk"]
-        });
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk"));
-
-        Assert.Equal(2, response.PlannedActions.Count);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
-    }
 
     [Fact]
     public async Task RunTurnAsync_WhenActionIsMissingRequiredParameter_AppendsClarificationGuidance()

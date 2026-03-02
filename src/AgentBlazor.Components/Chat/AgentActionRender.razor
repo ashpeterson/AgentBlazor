@@ -1,0 +1,32 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Components.Render
+@using AgentBlazor.Core.Models
+@implements IDisposable
+@inject IAgentActionRenderRegistry Registry
+
+@* No visible output — registers render fragments as a pure side-effect. *@
+
+@code {
+    [Parameter, EditorRequired]
+    public string AgentId { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string ActionId { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? InProgress { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Executing { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Complete { get; set; }
+
+    protected override void OnInitialized()
+        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete));
+
+    protected override void OnParametersSet()
+        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete));
+
+    public void Dispose() => Registry.Unregister(AgentId, ActionId);
+}

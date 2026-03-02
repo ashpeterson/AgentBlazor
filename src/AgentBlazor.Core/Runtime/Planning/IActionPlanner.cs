@@ -1,4 +1,5 @@
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Tools;
 
 namespace AgentBlazor.Core.Runtime.Planning;
 
@@ -65,6 +66,12 @@ public sealed record ActionPlanRequest
     /// and avoid unnecessary navigation when already on the correct page.
     /// </summary>
     public string? CurrentRoute { get; init; }
+
+    /// <summary>
+    /// Service-side tools the agent can call alongside component actions.
+    /// Includes both hand-registered tools and MCP-sourced tools.
+    /// </summary>
+    public IReadOnlyList<AgentServiceTool> ServiceTools { get; init; } = [];
 }
 
 /// <summary>
@@ -112,11 +119,14 @@ public sealed record ActionParameter
 
 /// <summary>
 /// State of a mounted component instance.
+/// Actions are populated from [AgentAction] attribute discovery — single source of truth.
 /// </summary>
 public sealed record MountedComponentState
 {
     public required string AgentId { get; init; }
     public required string ComponentType { get; init; }
+    /// <summary>Actions discovered from [AgentAction] attributes on the live component instance.</summary>
+    public IReadOnlyList<AvailableAction> Actions { get; init; } = [];
     public IReadOnlyDictionary<string, string> State { get; init; } = new Dictionary<string, string>();
 }
 

@@ -18,6 +18,15 @@ public sealed record ActionPlan
     /// </summary>
     public string? Message { get; init; }
 
+    /// <summary>The system prompt sent to the LLM for this plan (for inspector/debug).</summary>
+    public string? SystemPrompt { get; init; }
+
+    /// <summary>The raw LLM response text (for inspector/debug).</summary>
+    public string? RawResponse { get; init; }
+
+    /// <summary>Reasoning content emitted by thinking models (e.g. o1, DeepSeek-R1).</summary>
+    public string? ReasoningContent { get; init; }
+
     public bool RequiresClarification => !string.IsNullOrWhiteSpace(ClarificationNeeded);
     public bool IsEmpty => Steps.Count == 0 && !RequiresClarification;
 

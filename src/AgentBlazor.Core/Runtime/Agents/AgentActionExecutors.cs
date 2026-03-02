@@ -77,23 +77,11 @@ internal static class RegisteredComponentActionExecutorBridge
         => TryGetString(arguments, "agentId") ??
            TryGetString(arguments, "target");
 
-    public static PendingActionOptions BuildPendingOptions(
-        IComponentRouteRegistry componentRouteRegistry,
-        string componentId)
+    public static string? TryGetSessionId(IReadOnlyDictionary<string, object?>? arguments)
+        => TryGetString(arguments, AgentRuntimeContextKeys.SessionId);
+
+    public static PendingActionOptions BuildPendingOptions()
     {
-        ArgumentNullException.ThrowIfNull(componentRouteRegistry);
-        ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
-
-        if (componentRouteRegistry.TryGetRoute(componentId, out var route) && !string.IsNullOrWhiteSpace(route))
-        {
-            return new PendingActionOptions
-            {
-                TimeToLive = TimeSpan.FromMinutes(10),
-                Dependency = PendingActionDependency.NavigationCompletion,
-                RequiredRoutePath = route
-            };
-        }
-
         return new PendingActionOptions
         {
             TimeToLive = TimeSpan.FromMinutes(5),
@@ -229,34 +217,32 @@ internal static class RegisteredComponentActionExecutorBridge
 }
 
 internal sealed class NoOpDataGridActionExecutor(
-    IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService,
-    IComponentRouteRegistry componentRouteRegistry) : IDataGridActionExecutor
+    AgentComponentRegistryHub componentRegistryHub,
+    IAgentNavigationIntentService navigationIntentService) : IDataGridActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         DataGridActionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
-            componentRegistry,
-            expectedComponentType: "DataGrid",
-            componentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            actionId: request.ActionId,
-            arguments: request.Arguments,
-            cancellationToken);
-        if (handled)
+        var sessionId = RegisteredComponentActionExecutorBridge.TryGetSessionId(request.Arguments);
+        if (sessionId is not null && componentRegistryHub.TryGet(sessionId, out var registry))
         {
-            return result;
+            var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
+                registry,
+                expectedComponentType: "DataGrid",
+                componentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                actionId: request.ActionId,
+                arguments: request.Arguments,
+                cancellationToken);
+            if (handled) return result;
         }
 
         navigationIntentService.Enqueue(
             "DataGrid",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
             AgentAction.Create(request.ActionId, request.Arguments),
-            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
-                componentRouteRegistry,
-                AgentComponentCapabilityProfile.AgentDataGridComponentId));
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions());
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentDataGridComponentId,
             ActionId: request.ActionId,
@@ -266,34 +252,32 @@ internal sealed class NoOpDataGridActionExecutor(
 }
 
 internal sealed class NoOpDialogActionExecutor(
-    IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService,
-    IComponentRouteRegistry componentRouteRegistry) : IDialogActionExecutor
+    AgentComponentRegistryHub componentRegistryHub,
+    IAgentNavigationIntentService navigationIntentService) : IDialogActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         DialogActionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
-            componentRegistry,
-            expectedComponentType: "Dialog",
-            componentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
-            actionId: request.ActionId,
-            arguments: request.Arguments,
-            cancellationToken);
-        if (handled)
+        var sessionId = RegisteredComponentActionExecutorBridge.TryGetSessionId(request.Arguments);
+        if (sessionId is not null && componentRegistryHub.TryGet(sessionId, out var registry))
         {
-            return result;
+            var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
+                registry,
+                expectedComponentType: "Dialog",
+                componentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
+                actionId: request.ActionId,
+                arguments: request.Arguments,
+                cancellationToken);
+            if (handled) return result;
         }
 
         navigationIntentService.Enqueue(
             "Dialog",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
             AgentAction.Create(request.ActionId, request.Arguments),
-            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
-                componentRouteRegistry,
-                AgentComponentCapabilityProfile.AgentDialogComponentId));
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions());
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentDialogComponentId,
             ActionId: request.ActionId,
@@ -303,34 +287,32 @@ internal sealed class NoOpDialogActionExecutor(
 }
 
 internal sealed class NoOpFormActionExecutor(
-    IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService,
-    IComponentRouteRegistry componentRouteRegistry) : IFormActionExecutor
+    AgentComponentRegistryHub componentRegistryHub,
+    IAgentNavigationIntentService navigationIntentService) : IFormActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         FormActionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
-            componentRegistry,
-            expectedComponentType: "Form",
-            componentId: AgentComponentCapabilityProfile.AgentFormComponentId,
-            actionId: request.ActionId,
-            arguments: request.Arguments,
-            cancellationToken);
-        if (handled)
+        var sessionId = RegisteredComponentActionExecutorBridge.TryGetSessionId(request.Arguments);
+        if (sessionId is not null && componentRegistryHub.TryGet(sessionId, out var registry))
         {
-            return result;
+            var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
+                registry,
+                expectedComponentType: "Form",
+                componentId: AgentComponentCapabilityProfile.AgentFormComponentId,
+                actionId: request.ActionId,
+                arguments: request.Arguments,
+                cancellationToken);
+            if (handled) return result;
         }
 
         navigationIntentService.Enqueue(
             "Form",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
             AgentAction.Create(request.ActionId, request.Arguments),
-            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
-                componentRouteRegistry,
-                AgentComponentCapabilityProfile.AgentFormComponentId));
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions());
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentFormComponentId,
             ActionId: request.ActionId,
@@ -340,34 +322,32 @@ internal sealed class NoOpFormActionExecutor(
 }
 
 internal sealed class NoOpNavigationActionExecutor(
-    IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService,
-    IComponentRouteRegistry componentRouteRegistry) : INavigationActionExecutor
+    AgentComponentRegistryHub componentRegistryHub,
+    IAgentNavigationIntentService navigationIntentService) : INavigationActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         NavigationActionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
-            componentRegistry,
-            expectedComponentType: "NavMenu",
-            componentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
-            actionId: request.ActionId,
-            arguments: request.Arguments,
-            cancellationToken);
-        if (handled)
+        var sessionId = RegisteredComponentActionExecutorBridge.TryGetSessionId(request.Arguments);
+        if (sessionId is not null && componentRegistryHub.TryGet(sessionId, out var registry))
         {
-            return result;
+            var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
+                registry,
+                expectedComponentType: "NavMenu",
+                componentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+                actionId: request.ActionId,
+                arguments: request.Arguments,
+                cancellationToken);
+            if (handled) return result;
         }
 
         navigationIntentService.Enqueue(
             "NavMenu",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
             AgentAction.Create(request.ActionId, request.Arguments),
-            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
-                componentRouteRegistry,
-                AgentComponentCapabilityProfile.AgentNavMenuComponentId));
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions());
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentNavMenuComponentId,
             ActionId: request.ActionId,
@@ -377,34 +357,32 @@ internal sealed class NoOpNavigationActionExecutor(
 }
 
 internal sealed class NoOpTabsActionExecutor(
-    IAgentComponentRegistry componentRegistry,
-    IAgentNavigationIntentService navigationIntentService,
-    IComponentRouteRegistry componentRouteRegistry) : ITabsActionExecutor
+    AgentComponentRegistryHub componentRegistryHub,
+    IAgentNavigationIntentService navigationIntentService) : ITabsActionExecutor
 {
     public async Task<ComponentActionExecutionResult> ExecuteAsync(
         TabsActionRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
-            componentRegistry,
-            expectedComponentType: "Tabs",
-            componentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
-            actionId: request.ActionId,
-            arguments: request.Arguments,
-            cancellationToken);
-        if (handled)
+        var sessionId = RegisteredComponentActionExecutorBridge.TryGetSessionId(request.Arguments);
+        if (sessionId is not null && componentRegistryHub.TryGet(sessionId, out var registry))
         {
-            return result;
+            var (handled, result) = await RegisteredComponentActionExecutorBridge.TryExecuteAsync(
+                registry,
+                expectedComponentType: "Tabs",
+                componentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
+                actionId: request.ActionId,
+                arguments: request.Arguments,
+                cancellationToken);
+            if (handled) return result;
         }
 
         navigationIntentService.Enqueue(
             "Tabs",
             RegisteredComponentActionExecutorBridge.TryGetAgentId(request.Arguments),
             AgentAction.Create(request.ActionId, request.Arguments),
-            RegisteredComponentActionExecutorBridge.BuildPendingOptions(
-                componentRouteRegistry,
-                AgentComponentCapabilityProfile.AgentTabsComponentId));
+            RegisteredComponentActionExecutorBridge.BuildPendingOptions());
         return new ComponentActionExecutionResult(
             ComponentId: AgentComponentCapabilityProfile.AgentTabsComponentId,
             ActionId: request.ActionId,

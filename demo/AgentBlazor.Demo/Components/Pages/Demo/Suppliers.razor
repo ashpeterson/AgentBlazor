@@ -1,6 +1,7 @@
 @page "/demo/suppliers"
 @layout DemoLayout
 @using AgentBlazor.Components
+@using AgentBlazor.Core.Models
 @using AgentBlazor.Demo.Models
 @using AgentBlazor.Demo.Services
 @using MudBlazor
@@ -8,14 +9,46 @@
 
 <PageTitle>Suppliers — AgentBlazor Demo</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Suppliers</MudText>
-<MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
-    Live workflow data. Try: <em>"show me high risk suppliers"</em>, <em>"sort by risk descending"</em>, or <em>"focus SUP-006"</em>.
+@* Register custom chat UI for the filter action on the supplier grid *@
+<AgentActionRender AgentId="supplier-grid" ActionId="filter_rows">
+    <Complete Context="ctx">
+        <MudAlert Severity="Severity.Success" Dense="true" Class="my-1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" />
+                <MudText Typo="Typo.body2">
+                    Filtered suppliers
+                    @if (ctx.Args.TryGetValue("column", out var col) && col is not null)
+                    {
+                        <text> by <strong>@col</strong></text>
+                    }
+                    @if (ctx.Args.TryGetValue("value", out var val) && val is not null)
+                    {
+                        <text> = <strong>@val</strong></text>
+                    }
+                </MudText>
+            </MudStack>
+        </MudAlert>
+    </Complete>
+    <InProgress Context="_">
+        <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="my-1" />
+    </InProgress>
+</AgentActionRender>
+
+<MudText Typo="Typo.h5" Class="mb-1">Data Grid</MudText>
+<MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+    A single <strong>AgentDataGrid</strong> is mounted. Ask the agent to filter rows, sort columns, or select a specific row — and watch the custom action result appear in the chat.
 </MudText>
+
+<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
+<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">show me the highest risk supplier</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">filter to EMEA region</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">sort by risk score descending</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">show suppliers with risk above 75</MudChip>
+</MudStack>
 
 <MudPaper Elevation="1" Class="pa-4 mb-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
-        <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">Ask the agent to filter, sort, or focus rows</MudChip>
         <MudButton Size="Size.Small"
                    Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.Refresh"

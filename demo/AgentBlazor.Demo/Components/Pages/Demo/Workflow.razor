@@ -15,7 +15,7 @@
         <div>
             <MudText Typo="Typo.h5">Complex Workflow</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Real-data workflow surface: onboarding queue, supplier risk operations, and generated UI charts.
+                <strong>AgentTabs</strong>, three <strong>AgentDataGrids</strong>, an <strong>AgentDialog</strong>, and an <strong>AgentForm</strong> are all mounted. Ask the agent to switch tabs, filter data, and create tasks end-to-end.
             </MudText>
         </div>
 
@@ -28,18 +28,19 @@
         </MudButton>
     </MudStack>
 
-    <MudStack Row="true" Spacing="1" Class="mb-3">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
+    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "sort onboarding requests by priority desc"
+            switch to supplier risk tab and show only EMEA suppliers
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "show only high risk suppliers"
+            sort onboarding queue by priority descending
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "show onboarding intake volume chart"
+            filter onboarding queue to show only high-risk tier requests
         </MudChip>
         <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            Try: "triage unhealthy services and draft a mitigation plan"
+            open the mitigation dialog and fill in a task for the highest-risk supplier
         </MudChip>
     </MudStack>
 

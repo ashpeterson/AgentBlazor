@@ -10,9 +10,12 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Planning;
+using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Core.Runtime.Routing;
+using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Paid;
 
 namespace AgentBlazor.Services;
 
@@ -78,12 +81,24 @@ public static class AgentBlazorServiceCollectionExtensions
 
         // Route registry for navigation planning
         services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();
-        services.TryAddSingleton<IComponentRouteRegistry, InMemoryComponentRouteRegistry>();
 
         // Prompt tracing (opt-in via EnablePromptTracing)
         services.AddOptions<PromptTracingOptions>();
         services.TryAddSingleton<IPromptTraceStore, InMemoryPromptTraceStore>();
         services.TryAddSingleton<IPromptTraceService, PromptTraceService>();
+
+        // Paid-tier features — default to no-op implementations
+        services.TryAddSingleton<IActionHistoryStore, NullActionHistoryStore>();
+        services.TryAddSingleton<IAdaptiveSuggestionService, StaticSuggestionService>();
+        services.TryAddSingleton<IProactiveInsightService, NullProactiveInsightService>();
+        services.TryAddSingleton<IAgentInspectorStore, NullAgentInspectorStore>();
+
+        // Service tools + MCP (null defaults so runtime works without them)
+        services.TryAddSingleton<IAgentServiceToolRegistry, InMemoryAgentServiceToolRegistry>();
+        services.TryAddSingleton<IMcpToolProvider, NullMcpToolProvider>();
+
+        // Middleware pipeline (empty by default)
+        services.TryAddSingleton(new AgentMiddlewarePipeline());
 
         return new AgentBlazorBuilder(services, store);
     }

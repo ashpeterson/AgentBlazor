@@ -389,7 +389,8 @@ public class ServiceRegistrationTests
             AgentComponentCapabilityProfile.DataGridFilterActionId,
             new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
-                ["agentId"] = "supplier-grid"
+                ["agentId"] = "supplier-grid",
+                [AgentRuntimeContextKeys.SessionId] = registry.SessionId
             }));
 
         Assert.True(result.Succeeded);
@@ -500,26 +501,27 @@ public class ServiceRegistrationTests
             componentType: "Tabs",
             supportedActionId: AgentComponentCapabilityProfile.TabsSwitchTabActionId));
 
+        var sessionId = registry.SessionId;
         var dataGrid = await provider.GetRequiredService<IDataGridActionExecutor>().ExecuteAsync(
             new DataGridActionRequest(
                 AgentComponentCapabilityProfile.DataGridFilterActionId,
-                new Dictionary<string, object?> { ["agentId"] = "grid-a" }));
+                new Dictionary<string, object?> { ["agentId"] = "grid-a", [AgentRuntimeContextKeys.SessionId] = sessionId }));
         var dialog = await provider.GetRequiredService<IDialogActionExecutor>().ExecuteAsync(
             new DialogActionRequest(
                 AgentComponentCapabilityProfile.DialogOpenActionId,
-                new Dictionary<string, object?> { ["agentId"] = "dialog-a" }));
+                new Dictionary<string, object?> { ["agentId"] = "dialog-a", [AgentRuntimeContextKeys.SessionId] = sessionId }));
         var form = await provider.GetRequiredService<IFormActionExecutor>().ExecuteAsync(
             new FormActionRequest(
                 AgentComponentCapabilityProfile.FormValidateActionId,
-                new Dictionary<string, object?> { ["agentId"] = "form-a" }));
+                new Dictionary<string, object?> { ["agentId"] = "form-a", [AgentRuntimeContextKeys.SessionId] = sessionId }));
         var nav = await provider.GetRequiredService<INavigationActionExecutor>().ExecuteAsync(
             new NavigationActionRequest(
                 AgentComponentCapabilityProfile.NavigationNavigateToActionId,
-                new Dictionary<string, object?> { ["agentId"] = "nav-a" }));
+                new Dictionary<string, object?> { ["agentId"] = "nav-a", [AgentRuntimeContextKeys.SessionId] = sessionId }));
         var tabs = await provider.GetRequiredService<ITabsActionExecutor>().ExecuteAsync(
             new TabsActionRequest(
                 AgentComponentCapabilityProfile.TabsSwitchTabActionId,
-                new Dictionary<string, object?> { ["agentId"] = "tabs-a" }));
+                new Dictionary<string, object?> { ["agentId"] = "tabs-a", [AgentRuntimeContextKeys.SessionId] = sessionId }));
 
         Assert.Equal("grid-a", dataGrid.Message);
         Assert.Equal("dialog-a", dialog.Message);

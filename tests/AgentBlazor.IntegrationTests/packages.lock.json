@@ -504,6 +504,7 @@
         "dependencies": {
           "AgentBlazor.Core": "[1.0.0, )",
           "AgentBlazor.Hosting": "[1.0.0, )",
+          "Markdig": "[0.38.0, )",
           "MudBlazor": "[8.15.0, )"
         }
       },
@@ -555,6 +556,12 @@
           "Azure.Core": "1.50.0",
           "OpenAI": "2.8.0"
         }
+      },
+      "Markdig": {
+        "type": "CentralTransitive",
+        "requested": "[0.38.0, )",
+        "resolved": "0.38.0",
+        "contentHash": "zKy3JFjQvr1wbuMtbfcZVjNNCIqHxSCjGMq/CBcyNsY/MPsxqcS3o8M7CZ2kcMGGIw5LI2ZZd8rFUaFeV6SvrQ=="
       },
       "Microsoft.Agents.AI": {
         "type": "CentralTransitive",

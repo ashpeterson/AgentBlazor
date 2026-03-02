@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Runtime.Tools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -69,7 +70,16 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         var responseText = response.Text?.Trim() ?? string.Empty;
         _logger?.LogDebug("AgentPlanner response: {Response}", responseText);
 
-        return ParseResponse(responseText, request.GenerateUi);
+        // Extract reasoning content if present (thinking models)
+        var reasoningContent = ExtractReasoningContent(response);
+
+        var plan = ParseResponse(responseText, request.GenerateUi);
+        return plan with
+        {
+            SystemPrompt = systemPrompt,
+            RawResponse = responseText,
+            ReasoningContent = reasoningContent
+        };
     }
 
     // -------------------------------------------------------------------------
@@ -119,6 +129,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         }
 
         BuildActiveComponentsSection(sb, request);
+        BuildServiceToolsSection(sb, request);
 
         if (request.AvailableRoutes.Count > 0)
         {
@@ -159,28 +170,20 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
 
     private static void BuildActiveComponentsSection(StringBuilder sb, ActionPlanRequest request)
     {
-        if (request.MountedComponents.Count == 0 && request.AvailableComponents.Count == 0)
+        if (request.MountedComponents.Count == 0)
             return;
 
-        // Build lookup: componentType → actions
-        var actionsByType = request.AvailableComponents.ToDictionary(
-            c => c.ComponentId,
-            c => c.Actions,
-            StringComparer.OrdinalIgnoreCase);
-
         sb.AppendLine("# ACTIVE COMPONENTS");
-
-        var listedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var mounted in request.MountedComponents)
         {
             sb.Append("AgentId: ").Append(mounted.AgentId)
               .Append(" (").Append(mounted.ComponentType).AppendLine(")");
 
-            if (actionsByType.TryGetValue(mounted.ComponentType, out var actions) && actions.Count > 0)
+            if (mounted.Actions is { Count: > 0 })
             {
                 sb.AppendLine("  Actions:");
-                foreach (var action in actions)
+                foreach (var action in mounted.Actions)
                 {
                     sb.Append("    - ").Append(action.ActionId);
                     if (action.RequiresApproval) sb.Append(" [requires-approval]");
@@ -209,18 +212,64 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
             }
 
             sb.AppendLine();
-            listedTypes.Add(mounted.ComponentType);
         }
 
-        // Unmounted component types (navigation targets)
-        foreach (var component in request.AvailableComponents)
-        {
-            if (listedTypes.Contains(component.ComponentId)) continue;
+        sb.AppendLine();
+    }
 
-            sb.Append("Component: ").Append(component.ComponentId);
-            if (!string.IsNullOrWhiteSpace(component.Description))
-                sb.Append(" — ").Append(component.Description);
-            sb.AppendLine(" (not mounted — navigate first if needed)");
+    /// <summary>
+    /// Attempts to extract reasoning/thinking content from the model response.
+    /// Handles providers that surface reasoning via content items or response metadata.
+    /// </summary>
+    private static string? ExtractReasoningContent(ChatResponse response)
+    {
+        if (response.Messages is null) return null;
+
+        foreach (var message in response.Messages)
+        {
+            foreach (var content in message.Contents)
+            {
+                if (content is not TextContent tc) continue;
+
+                // Check for JSON-wrapped "thinking" content from providers like Anthropic
+                if (tc.RawRepresentation is System.Text.Json.JsonElement je &&
+                    je.TryGetProperty("type", out var typeEl) &&
+                    typeEl.GetString() is "thinking" or "reasoning" &&
+                    je.TryGetProperty("thinking", out var thinkEl))
+                {
+                    return thinkEl.GetString();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static void BuildServiceToolsSection(StringBuilder sb, ActionPlanRequest request)
+    {
+        if (request.ServiceTools.Count == 0)
+            return;
+
+        sb.AppendLine("# AVAILABLE TOOLS");
+        sb.AppendLine("These are server-side tools you can call alongside or instead of component actions.");
+        sb.AppendLine("Use agentId: \"tool\" and action: \"<tool_name>\" in the actions array.");
+        sb.AppendLine();
+
+        foreach (var tool in request.ServiceTools)
+        {
+            sb.Append("- ").Append(tool.Name);
+            if (!string.IsNullOrWhiteSpace(tool.Description))
+                sb.Append(": ").Append(tool.Description);
+            sb.AppendLine();
+
+            foreach (var param in tool.Parameters)
+            {
+                sb.Append("    ").Append(param.Name).Append(" (").Append(param.Type).Append(')');
+                if (param.Required) sb.Append(" [required]");
+                if (!string.IsNullOrWhiteSpace(param.Description))
+                    sb.Append(" — ").Append(param.Description);
+                sb.AppendLine();
+            }
         }
 
         sb.AppendLine();

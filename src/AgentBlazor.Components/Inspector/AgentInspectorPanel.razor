@@ -1,0 +1,189 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Paid
+@using AgentBlazor.Core.Runtime.Components
+@using AgentBlazor.Core.Runtime.Discovery
+@using AgentBlazor.Core.Runtime.Interfaces
+@using Microsoft.JSInterop
+@inject IAgentInspectorStore InspectorStore
+@inject IAgentComponentRegistry ComponentRegistry
+@inject IJSRuntime JSRuntime
+
+@if (_visible)
+{
+    <div class="ab-inspector @(Inline ? "ab-inspector--inline" : "ab-inspector--overlay")">
+        <div class="ab-inspector__header">
+            <span class="ab-inspector__title">Agent Inspector</span>
+            <button type="button" class="ab-inspector__close" @onclick="() => _visible = false" aria-label="Close inspector">&#x2715;</button>
+        </div>
+
+        <div class="ab-inspector__tabs" role="tablist">
+            <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 0 ? "ab-inspector__tab--active" : null)"
+                    @onclick="() => _activeTab = 0">Runs</button>
+            <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 1 ? "ab-inspector__tab--active" : null)"
+                    @onclick="() => _activeTab = 1">Events</button>
+            <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 2 ? "ab-inspector__tab--active" : null)"
+                    @onclick="() => _activeTab = 2">Prompt</button>
+            <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 3 ? "ab-inspector__tab--active" : null)"
+                    @onclick="() => _activeTab = 3">Components</button>
+        </div>
+
+        <div class="ab-inspector__body">
+            @if (_activeTab == 0)
+            {
+                var runs = InspectorStore.GetRecentRuns(SessionId);
+                if (runs.Count == 0)
+                {
+                    <p class="ab-inspector__empty">No runs recorded yet.</p>
+                }
+                else
+                {
+                    <ul class="ab-inspector__run-list">
+                        @foreach (var run in runs)
+                        {
+                            <li class="ab-inspector__run-item @(_selectedRunId == run.RunId ? "ab-inspector__run-item--selected" : null)"
+                                @onclick="() => SelectRun(run)">
+                                <span class="ab-inspector__run-time">@run.StartedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+                                <span class="ab-inspector__run-agent">@run.AgentName</span>
+                                <span class="ab-inspector__badge @(run.Succeeded ? "ab-inspector__badge--success" : "ab-inspector__badge--error")">
+                                    @(run.Succeeded ? "OK" : "ERR")
+                                </span>
+                                <span class="ab-inspector__run-actions">@run.Events.Count events</span>
+                                @if (run.FinishedAt.HasValue)
+                                {
+                                    var ms = (run.FinishedAt.Value - run.StartedAt).TotalMilliseconds;
+                                    <span class="ab-inspector__run-duration">@ms.ToString("F0")ms</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+            else if (_activeTab == 1)
+            {
+                @if (_selectedRun is null)
+                {
+                    <p class="ab-inspector__empty">Select a run to view events.</p>
+                }
+                else
+                {
+                    var startTs = _selectedRun.StartedAt;
+                    <ul class="ab-inspector__event-list">
+                        @foreach (var ev in _selectedRun.Events)
+                        {
+                            var deltaMs = (ev.Timestamp - startTs).TotalMilliseconds;
+                            <li class="ab-inspector__event-item ab-inspector__event-item--@ev.Kind.ToLowerInvariant()">
+                                <span class="ab-inspector__event-time">+@deltaMs.ToString("F0")ms</span>
+                                <span class="ab-inspector__event-kind">@ev.Kind</span>
+                                @if (!string.IsNullOrWhiteSpace(ev.ComponentId))
+                                {
+                                    <span class="ab-inspector__event-target">@ev.ComponentId@(ev.ActionId != null ? "." + ev.ActionId : null)</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(ev.Detail))
+                                {
+                                    <span class="ab-inspector__event-detail">@ev.Detail</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+            else if (_activeTab == 2)
+            {
+                @if (_selectedRun is null)
+                {
+                    <p class="ab-inspector__empty">Select a run to view its system prompt.</p>
+                }
+                else
+                {
+                    <div class="ab-inspector__prompt-toolbar">
+                        <button type="button" class="ab-inspector__copy-btn" @onclick="CopyPromptAsync">Copy</button>
+                    </div>
+                    <pre class="ab-inspector__prompt-pre">@_selectedRun.SystemPrompt</pre>
+                }
+            }
+            else if (_activeTab == 3)
+            {
+                var components = ComponentRegistry.GetAll().ToList();
+                if (components.Count == 0)
+                {
+                    <p class="ab-inspector__empty">No components currently mounted.</p>
+                }
+                else
+                {
+                    <ul class="ab-inspector__component-list">
+                        @foreach (var component in components)
+                        {
+                            <li class="ab-inspector__component-item">
+                                <span class="ab-inspector__component-type">@component.ComponentType</span>
+                                <span class="ab-inspector__component-id">(@component.AgentId)</span>
+                                @{
+                                    var state = component.GetCurrentState();
+                                }
+                                @if (state.Count > 0)
+                                {
+                                    <ul class="ab-inspector__state-list">
+                                        @foreach (var kv in state)
+                                        {
+                                            <li><span class="ab-inspector__state-key">@kv.Key:</span> @kv.Value?.ToString()</li>
+                                        }
+                                    </ul>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        </div>
+
+        <div class="ab-inspector__footer">
+            <button type="button" class="ab-inspector__refresh-btn" @onclick="Refresh">Refresh</button>
+        </div>
+    </div>
+}
+else if (!Inline)
+{
+    <button type="button" class="ab-inspector__toggle-btn" @onclick="() => _visible = true" title="Open Agent Inspector">
+        &#128270;
+    </button>
+}
+
+@code {
+    private bool _visible;
+    private int _activeTab;
+    private string? _selectedRunId;
+    private InspectorRunRecord? _selectedRun;
+
+    [Parameter]
+    public bool Inline { get; set; }
+
+    [Parameter]
+    public bool AutoShowOnDebug { get; set; }
+
+    [Parameter]
+    public string SessionId { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        if (AutoShowOnDebug)
+            _visible = true;
+    }
+
+    private void SelectRun(InspectorRunRecord run)
+    {
+        _selectedRunId = run.RunId;
+        _selectedRun = run;
+        _activeTab = 1;
+    }
+
+    private void Refresh() => StateHasChanged();
+
+    private async Task CopyPromptAsync()
+    {
+        if (_selectedRun?.SystemPrompt is null) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _selectedRun.SystemPrompt);
+        }
+        catch { }
+    }
+}

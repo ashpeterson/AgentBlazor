@@ -9,7 +9,16 @@
 
 <PageTitle>Supplier Onboarding — AgentBlazor Demo</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Supplier Onboarding</MudText>
+<MudText Typo="Typo.h5" Class="mb-1">Form Workflow</MudText>
+<MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+    An <strong>AgentDialog</strong> and <strong>AgentForm</strong> are mounted. The agent can open the dialog and populate every field from a single natural-language prompt — then submit on confirmation.
+</MudText>
+
+<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
+<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">open the onboarding form</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">onboard Apex Components from Germany, high risk tier, priority 2</MudChip>
+</MudStack>
 
 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
     Open Onboarding Dialog

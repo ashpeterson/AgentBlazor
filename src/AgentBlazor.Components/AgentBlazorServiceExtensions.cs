@@ -1,9 +1,11 @@
+using AgentBlazor.Components.Render;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentBlazor;
 
@@ -16,6 +18,10 @@ public static class AgentBlazorServiceExtensions
         AgentBlazor.Services.AgentBlazorUnifiedServiceCollectionExtensions.AddAgentBlazor(
             services,
             configure);
+
+        // Component-layer scoped services
+        services.TryAddScoped<IAgentActionRenderRegistry, InMemoryAgentActionRenderRegistry>();
+
         return services;
     }
 

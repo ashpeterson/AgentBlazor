@@ -19,7 +19,7 @@ internal sealed class DeterministicAgUiHostedAgent(
     IAgentRegistry agentRegistry,
     IOptions<AgentBlazorOptions> options,
     IAgentBlazorTelemetrySink telemetrySink,
-    IAgentComponentRegistry componentRegistry,
+    AgentComponentRegistryHub? registryHub = null,
     IAgentBlazorEntitlementService? entitlementService = null) : AIAgent
 {
     private const string SessionIdContextKey = "agentblazor.session_id";
@@ -31,7 +31,7 @@ internal sealed class DeterministicAgUiHostedAgent(
     private readonly IAgentRegistry _agentRegistry = agentRegistry;
     private readonly IOptions<AgentBlazorOptions> _options = options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink = telemetrySink;
-    private readonly IAgentComponentRegistry _componentRegistry = componentRegistry;
+    private readonly AgentComponentRegistryHub? _registryHub = registryHub;
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
     private readonly IAgentRuntimeStreaming? _streamingRuntime = runtime as IAgentRuntimeStreaming;
 
@@ -704,7 +704,7 @@ internal sealed class DeterministicAgUiHostedAgent(
             ProviderConfigured = true,
             Tier = _entitlementService?.CurrentTier.ToString(),
             HasContext = hasContext,
-            HasRegisteredComponents = _componentRegistry.GetAll().Count > 0,
+            HasRegisteredComponents = _registryHub?.GetAll().Any(static r => r.GetAll().Count > 0) ?? false,
             Detail = detail
         };
     }

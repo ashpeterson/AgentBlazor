@@ -1,32 +1,14 @@
 @page "/demo/workspace"
 @layout DemoLayout
-@using AgentBlazor.Components
 @using MudBlazor
 
 <PageTitle>Workspace — AgentBlazor Demo</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Workspace</MudText>
+<MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+    This page has been retired. Tab switching and navigation are showcased on the
+    <MudLink Href="/demo/workflow">Complex Workflow</MudLink> page.
+</MudAlert>
 
-<MudGrid>
-    <MudItem xs="12" md="3">
-        <AgentNavMenu AgentId="workspace-nav" Dense="true">
-            <MudNavLink Href="/demo/suppliers" Match="NavLinkMatch.Prefix">Suppliers</MudNavLink>
-            <MudNavLink Href="/demo/onboarding" Match="NavLinkMatch.Prefix">Onboarding</MudNavLink>
-            <MudNavLink Href="/demo/workspace" Match="NavLinkMatch.Prefix">Workspace</MudNavLink>
-        </AgentNavMenu>
-    </MudItem>
-    <MudItem xs="12" md="9">
-        <AgentTabs AgentId="workspace-tabs">
-            <MudTabPanel Text="Overview">
-                <MudText Typo="Typo.body2">Overview content.</MudText>
-            </MudTabPanel>
-            <MudTabPanel Text="Risk">
-                <MudText Typo="Typo.body2">Risk analysis content.</MudText>
-            </MudTabPanel>
-            <MudTabPanel Text="Audit">
-                <MudText Typo="Typo.body2">Audit trail content.</MudText>
-            </MudTabPanel>
-        </AgentTabs>
-    </MudItem>
-</MudGrid>
-
+<MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflow">
+    Go to Complex Workflow
+</MudButton>

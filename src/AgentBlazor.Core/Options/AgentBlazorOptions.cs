@@ -1,4 +1,5 @@
 using System.Reflection;
+using AgentBlazor.Licensing;
 
 namespace AgentBlazor.Options;
 
@@ -13,4 +14,9 @@ public sealed class AgentBlazorOptions
     /// Defaults to the entry assembly when none are added.
     /// </summary>
     public IList<Assembly> AssembliesToScan { get; } = new List<Assembly>();
+
+    /// <summary>
+    /// The licensed feature tier. Defaults to Free. Set via UseProLicense() in registration options.
+    /// </summary>
+    public AgentBlazorTier LicensedTier { get; set; } = AgentBlazorTier.Free;
 }

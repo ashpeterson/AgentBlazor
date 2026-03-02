@@ -1,0 +1,362 @@
+@page "/demo/docs"
+@layout DemoLayout
+@using MudBlazor
+
+<PageTitle>Getting Started — AgentBlazor</PageTitle>
+
+<div class="docs">
+
+    <MudText Typo="Typo.h4" Class="mb-1">Getting Started</MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+        Everything you need to add a natural-language agent to any Blazor Server app.
+        Five minutes from zero to a working assistant.
+    </MudText>
+
+    <!-- ── 1. Install ─────────────────────────────────────────── -->
+    <section class="docs-section" id="install">
+        <MudText Typo="Typo.h5" Class="docs-section__title">1. Install the package</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Add AgentBlazor to your Blazor Server project.
+        </MudText>
+        <pre class="docs-code">dotnet add package AgentBlazor</pre>
+    </section>
+
+    <!-- ── 2. Service Registration ────────────────────────────── -->
+    <section class="docs-section" id="setup">
+        <MudText Typo="Typo.h5" Class="docs-section__title">2. Register services in Program.cs</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Call <code class="docs-inline">AddAgentBlazor</code> with your LLM provider and call
+            <code class="docs-inline">MapAgentBlazorEndpoints()</code> on the app.
+        </MudText>
+        <pre class="docs-code">var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAgentBlazor(options =>
+{
+    // OpenAI
+    options.UseOpenAI(
+        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+        model: "gpt-4o-mini");
+
+    // — or Ollama (local) —
+    // options.UseOllama("llama3.2", "http://localhost:11434/v1");
+
+    // Optional: custom system prompt file
+    // options.UseInstructionsFile("agent-instructions.txt");
+
+    // Optional: Pro / Enterprise licence
+    // options.UseProLicense(builder.Configuration["AgentBlazor:LicenseKey"]!);
+});
+
+var app = builder.Build();
+// ... middleware ...
+app.MapAgentBlazorEndpoints();
+app.Run();</pre>
+    </section>
+
+    <!-- ── 3. Assets ───────────────────────────────────────────── -->
+    <section class="docs-section" id="assets">
+        <MudText Typo="Typo.h5" Class="docs-section__title">3. Add assets to App.razor</MudText>
+        <pre class="docs-code">&lt;!-- &lt;head&gt; --&gt;
+&lt;link rel="stylesheet" href="_content/AgentBlazor/agentblazor.css" /&gt;
+
+&lt;!-- before &lt;/body&gt; --&gt;
+&lt;script src="_content/AgentBlazor/agentblazor.js"&gt;&lt;/script&gt;</pre>
+    </section>
+
+    <!-- ── 4. Chat Widget ─────────────────────────────────────── -->
+    <section class="docs-section" id="widget">
+        <MudText Typo="Typo.h5" Class="docs-section__title">4. Add the chat widget to your layout</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Drop <code class="docs-inline">AgentChatWidget</code> into your layout file. It renders a floating button that opens
+            a full chat surface. The agent automatically discovers every agent-controllable component
+            mounted on the current page.
+        </MudText>
+        <pre class="docs-code">&lt;!-- MainLayout.razor --&gt;
+&lt;AgentChatWidget
+    Title="Assistant"
+    Placeholder="Ask me anything…"
+    EnableGeneratedUi="true"
+    Theme="@@ChatTheme.Dark()"
+    Width="31rem"
+    Height="68vh" /&gt;</pre>
+        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+            Use <code>AgentChatSurface</code> for an inline panel (no floating button) — same parameters,
+            minus the positioning/sizing ones (<code>Width</code>, <code>Height</code>, <code>Right</code>, <code>Bottom</code>).
+        </MudAlert>
+    </section>
+
+    <!-- ── 5. AgentDataGrid ───────────────────────────────────── -->
+    <section class="docs-section" id="data-grid">
+        <MudText Typo="Typo.h5" Class="docs-section__title">5. AgentDataGrid</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Drop-in replacement for <code class="docs-inline">MudDataGrid</code>. Add <code class="docs-inline">AgentId</code> and the agent
+            gains <strong>filter_rows</strong>, <strong>sort_rows</strong>, and <strong>select_row</strong> automatically.
+            <code class="docs-inline">ColumnAliases</code> lets the agent understand natural names like "risk" → "RiskScore".
+        </MudText>
+        <pre class="docs-code">&lt;AgentDataGrid TItem="SupplierRow"
+               AgentId="supplier-grid"
+               Items="@@_suppliers"
+               RowKeyProperty="SupplierId"
+               ColumnAliases="@@_aliases"
+               Dense="true" Hover="true"&gt;
+    &lt;Columns&gt;
+        &lt;PropertyColumn T="SupplierRow" TProperty="string"
+                         Property="x => x.SupplierName" Title="Supplier" /&gt;
+        &lt;PropertyColumn T="SupplierRow" TProperty="int"
+                         Property="x => x.RiskScore" Title="Risk Score" /&gt;
+    &lt;/Columns&gt;
+&lt;/AgentDataGrid&gt;
+
+@@code {
+    private static readonly IReadOnlyDictionary&lt;string, string&gt; _aliases =
+        new Dictionary&lt;string, string&gt;(StringComparer.OrdinalIgnoreCase)
+        {
+            ["risk"]     = nameof(SupplierRow.RiskScore),
+            ["supplier"] = nameof(SupplierRow.SupplierName)
+        };
+}</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Prompts that now work: "filter to EMEA region" · "sort by risk score descending" · "select the highest-risk row"
+        </MudText>
+    </section>
+
+    <!-- ── 6. AgentTabs ───────────────────────────────────────── -->
+    <section class="docs-section" id="tabs">
+        <MudText Typo="Typo.h5" Class="docs-section__title">6. AgentTabs</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Wraps <code class="docs-inline">MudTabs</code>. The agent gains a <strong>switch_tab</strong> action that resolves
+            tab names to indices automatically.
+        </MudText>
+        <pre class="docs-code">&lt;AgentTabs AgentId="my-tabs"&gt;
+    &lt;MudTabPanel Text="Overview"&gt;
+        &lt;!-- content --&gt;
+    &lt;/MudTabPanel&gt;
+    &lt;MudTabPanel Text="Risk Analysis"&gt;
+        &lt;!-- content --&gt;
+    &lt;/MudTabPanel&gt;
+&lt;/AgentTabs&gt;</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Prompts that now work: "switch to the Risk Analysis tab" · "go to tab 2"
+        </MudText>
+    </section>
+
+    <!-- ── 7. AgentDialog + AgentForm ────────────────────────── -->
+    <section class="docs-section" id="forms">
+        <MudText Typo="Typo.h5" Class="docs-section__title">7. AgentDialog + AgentForm</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            <code class="docs-inline">AgentDialog</code> gives the agent <strong>open</strong> and <strong>close</strong> actions.
+            <code class="docs-inline">AgentForm</code> inside it gives the agent <strong>set_field</strong> for every bound field
+            plus a <strong>submit</strong> action.
+        </MudText>
+        <pre class="docs-code">&lt;AgentDialog @@ref="_dialog" AgentId="my-dialog"&gt;
+    &lt;TitleContent&gt;New Supplier&lt;/TitleContent&gt;
+    &lt;DialogContent&gt;
+        &lt;AgentForm AgentId="my-form"
+                   Model="@@_model"
+                   Submitted="OnSubmitted"&gt;
+            &lt;ChildContent Context="ctx"&gt;
+                &lt;DataAnnotationsValidator /&gt;
+                &lt;MudTextField T="string" Label="Supplier name"
+                              For="@@(() => _model.Name)"
+                              @@bind-Value="_model.Name" /&gt;
+                &lt;MudTextField T="string" Label="Country"
+                              For="@@(() => _model.Country)"
+                              @@bind-Value="_model.Country" /&gt;
+                &lt;MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"&gt;Submit&lt;/MudButton&gt;
+            &lt;/ChildContent&gt;
+        &lt;/AgentForm&gt;
+    &lt;/DialogContent&gt;
+&lt;/AgentDialog&gt;</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Prompts that now work: "open the form" · "set supplier name to Apex Components" · "submit the form"
+        </MudText>
+    </section>
+
+    <!-- ── 8. Generative UI ───────────────────────────────────── -->
+    <section class="docs-section" id="gen-ui">
+        <MudText Typo="Typo.h5" Class="docs-section__title">8. Generative UI</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Enable <code class="docs-inline">EnableGeneratedUi="true"</code> on any chat component, then register a
+            <code class="docs-inline">UseChartDataResolver</code> in Program.cs so the agent can load named data sources.
+        </MudText>
+        <pre class="docs-code">// Program.cs
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseOpenAI(apiKey, model);
+
+    options.UseChartDataResolver(async (name, args, ct) =>
+        name switch
+        {
+            "sales.by-region"  => await myService.GetSalesByRegionAsync(ct),
+            "orders.monthly"   => await myService.GetMonthlyOrdersAsync(ct),
+            _                  => null
+        });
+});</pre>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-2">
+            Tell the agent the source names in your instructions file:
+        </MudText>
+        <pre class="docs-code"># agent-instructions.txt
+For charts, prefer these named data sources:
+- sales.by-region   — revenue by region (bar chart)
+- orders.monthly    — monthly order volume (line chart)</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Prompts that now work: "show sales by region as a bar chart" · "create a monthly orders line chart"
+        </MudText>
+    </section>
+
+    <!-- ── 9. AgentActionRender ───────────────────────────────── -->
+    <section class="docs-section" id="action-render">
+        <MudText Typo="Typo.h5" Class="docs-section__title">9. Custom Action Rendering</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            <code class="docs-inline">AgentActionRender</code> replaces the default result pill in the chat with any Blazor markup.
+            Mount it anywhere on the page — it renders nothing visible itself.
+            The <code class="docs-inline">ctx</code> parameter gives you <code class="docs-inline">AgentId</code>,
+            <code class="docs-inline">ActionId</code>, <code class="docs-inline">Status</code>, <code class="docs-inline">Args</code>, and <code class="docs-inline">Result</code>.
+        </MudText>
+        <pre class="docs-code">&lt;AgentActionRender AgentId="supplier-grid" ActionId="filter_rows"&gt;
+
+    &lt;Complete Context="ctx"&gt;
+        &lt;MudAlert Severity="Severity.Success" Dense="true"&gt;
+            Filtered by &lt;strong&gt;@@ctx.Args["column"]&lt;/strong&gt;
+            = &lt;strong&gt;@@ctx.Args["value"]&lt;/strong&gt;
+        &lt;/MudAlert&gt;
+    &lt;/Complete&gt;
+
+    &lt;InProgress Context="_"&gt;
+        &lt;MudProgressLinear Indeterminate="true" /&gt;
+    &lt;/InProgress&gt;
+
+&lt;/AgentActionRender&gt;</pre>
+    </section>
+
+    <!-- ── 10. Custom Components ──────────────────────────────── -->
+    <section class="docs-section" id="custom">
+        <MudText Typo="Typo.h5" Class="docs-section__title">10. Custom Agent Components</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Inherit <code class="docs-inline">AgentControllableComponentBase</code> and decorate methods with
+            <code class="docs-inline">[AgentAction]</code>. Use <code class="docs-inline">[AgentReadable]</code> on properties the agent should see.
+            <code class="docs-inline">AvailableWhen</code> makes an action conditionally visible — the agent only sees it when the named
+            bool property returns <code class="docs-inline">true</code>.
+        </MudText>
+        <pre class="docs-code">// RiskCounter.razor.cs
+public partial class RiskCounter : AgentControllableComponentBase
+{
+    protected override string AgentId => "risk-counter";
+
+    [AgentReadable]
+    public int HighRiskCount { get; private set; }
+
+    // Action only visible to the agent when HasHighRisk is true
+    [AgentAction("clear_high_risk", "Clear all high-risk flags",
+        AvailableWhen = nameof(HasHighRisk))]
+    public void ClearHighRisk()
+    {
+        HighRiskCount = 0;
+        StateHasChanged();
+    }
+
+    public bool HasHighRisk => HighRiskCount > 0;
+}</pre>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2 mb-2">
+            Use <code class="docs-inline">[AgentParam]</code> to give method parameters descriptions and constraints:
+        </MudText>
+        <pre class="docs-code">[AgentAction("set_threshold", "Set the risk alert threshold")]
+public void SetThreshold(
+    [AgentParam("threshold", "Risk score 0–100 above which a supplier is flagged")]
+    int threshold)
+{
+    _threshold = threshold;
+    StateHasChanged();
+}</pre>
+    </section>
+
+    <!-- ── 11. Pro License ───────────────────────────────────── -->
+    <section class="docs-section" id="pro">
+        <MudText Typo="Typo.h5" Class="docs-section__title">11. Pro License (optional)</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            A Pro or Enterprise licence key activates two paid-tier features:
+        </MudText>
+        <MudStack Spacing="1" Class="mb-3">
+            <MudText Typo="Typo.body2"><strong>Action history recording</strong> — every agent action is stored in-process (cap 200/session), available for replay and auditing.</MudText>
+            <MudText Typo="Typo.body2"><strong>Adaptive suggestion chips</strong> — frequency-based chips appear above the chat input after each turn, suggesting next actions. No extra LLM calls.</MudText>
+        </MudStack>
+        <pre class="docs-code">// Program.cs
+var licenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
+    ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_LICENSE_KEY");
+
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseOpenAI(apiKey, model);
+
+    if (!string.IsNullOrWhiteSpace(licenseKey))
+        options.UseProLicense(licenseKey);
+});</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Pro keys start with <code>AB-PRO-</code> · Enterprise keys start with <code>AB-ENT-</code> · Minimum 24 characters
+        </MudText>
+    </section>
+
+    <!-- ── Summary ───────────────────────────────────────────── -->
+    <MudPaper Elevation="0" Class="docs-summary">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">Full capability summary</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.TableChart" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">AgentDataGrid</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Filter, sort, select rows via chat</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.Tab" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">AgentTabs</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Switch tabs by name</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.DynamicForm" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">AgentDialog + AgentForm</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Open dialogs, fill and submit fields</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Generative UI</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Agent-generated charts and cards in chat</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.Extension" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Custom Components</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">[AgentAction] on any Blazor component</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.Brush" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">AgentActionRender</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Custom Blazor markup per action result</MudText>
+                    </div>
+                </div>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+</div>

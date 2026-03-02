@@ -35,6 +35,7 @@ public static class AgentActionDiscovery
 
     /// <summary>
     /// Builds a ComponentCapability from the component's [AgentAction]-decorated methods.
+    /// Only includes actions that pass their AvailableWhen check at this moment.
     /// </summary>
     public static ComponentCapability BuildCapability(IAgentControllable component)
     {
@@ -44,6 +45,7 @@ public static class AgentActionDiscovery
 
         foreach (var info in entry.Actions)
         {
+            if (!CheckAvailability(component, info.AvailabilityCheck)) continue;
             capability.UpsertAction(new ComponentActionCapability(
                 info.ActionId,
                 info.Description,
@@ -78,6 +80,49 @@ public static class AgentActionDiscovery
         }
 
         return state;
+    }
+
+    /// <summary>
+    /// Returns a structured description of every [AgentAction] method on the component,
+    /// including parameter names, types, constraints, and approval requirements.
+    /// Used by the runtime to build MountedComponentState.Actions for the planner prompt.
+    /// </summary>
+    internal static IReadOnlyList<DiscoveredAction> GetDiscoveredActions(IAgentControllable component)
+    {
+        var entry = GetCacheEntry(component.GetType());
+        var result = new List<DiscoveredAction>(entry.Actions.Length);
+        foreach (var info in entry.Actions)
+        {
+            if (!CheckAvailability(component, info.AvailabilityCheck)) continue;
+            result.Add(new DiscoveredAction(
+                info.ActionId,
+                info.Description,
+                info.RequiresApproval,
+                BuildStructuredParameters(info.Method)));
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<DiscoveredParameter> BuildStructuredParameters(MethodInfo method)
+    {
+        var result = new List<DiscoveredParameter>();
+        foreach (var p in method.GetParameters())
+        {
+            if (p.ParameterType == typeof(CancellationToken)) continue;
+
+            var attr = p.GetCustomAttribute<AgentParamAttribute>();
+            var allowedValues = attr?.AllowedValues is { Length: > 0 }
+                ? Array.ConvertAll(attr.AllowedValues.Split(','), static v => v.Trim())
+                : null;
+
+            result.Add(new DiscoveredParameter(
+                p.Name ?? $"param{result.Count}",
+                GetTypeLabel(p.ParameterType),
+                Required: attr?.Required == true,
+                Description: attr?.Description,
+                AllowedValues: allowedValues));
+        }
+        return result;
     }
 
     /// <summary>
@@ -199,8 +244,10 @@ public static class AgentActionDiscovery
                 ActionId: x.Attr!.ActionId ?? ToSnakeCase(x.Method.Name),
                 Description: x.Attr.Description,
                 RequiresApproval: x.Attr.RequiresApproval,
+                FollowUp: x.Attr.FollowUp,
                 InputSchema: BuildInputSchema(x.Method),
-                Method: x.Method))
+                Method: x.Method,
+                AvailabilityCheck: ResolveAvailabilityMember(type, x.Attr.AvailableWhen)))
             .ToArray();
 
         var readables = type
@@ -230,6 +277,49 @@ public static class AgentActionDiscovery
             }
 
             baseType = baseType.BaseType;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Availability gating helpers
+    // -------------------------------------------------------------------------
+
+    private static MemberInfo? ResolveAvailabilityMember(Type type, string? memberName)
+    {
+        if (string.IsNullOrWhiteSpace(memberName)) return null;
+
+        // Try property first
+        var property = type.GetProperty(memberName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        if (property?.PropertyType == typeof(bool)) return property;
+
+        // Try parameterless method
+        var method = type.GetMethod(memberName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null, types: Type.EmptyTypes, modifiers: null);
+        if (method?.ReturnType == typeof(bool)) return method;
+
+        // Not found — warn at runtime (no logger available here; caller logs)
+        return null;
+    }
+
+    private static bool CheckAvailability(IAgentControllable component, MemberInfo? check)
+    {
+        if (check is null) return true;
+
+        try
+        {
+            return check switch
+            {
+                PropertyInfo prop => prop.GetValue(component) is true,
+                MethodInfo meth => meth.Invoke(component, null) is true,
+                _ => true
+            };
+        }
+        catch
+        {
+            // If availability check throws, treat action as available to avoid silent gating
+            return true;
         }
     }
 
@@ -276,6 +366,22 @@ public static class AgentActionDiscovery
     private static string GetTypeLabel(Type type)
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
+
+        // Array types: string[] → "array of string"
+        if (underlying.IsArray)
+            return $"array of {GetTypeLabel(underlying.GetElementType()!)}";
+
+        // List<T> → "array of T"
+        if (underlying.IsGenericType && underlying.GetGenericTypeDefinition() == typeof(List<>))
+            return $"array of {GetTypeLabel(underlying.GenericTypeArguments[0])}";
+
+        // IEnumerable<T> and IReadOnlyList<T> → "array of T"
+        if (underlying.IsGenericType &&
+            (underlying.GetGenericTypeDefinition() == typeof(IEnumerable<>) ||
+             underlying.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ||
+             underlying.GetGenericTypeDefinition() == typeof(IList<>)))
+            return $"array of {GetTypeLabel(underlying.GenericTypeArguments[0])}";
+
         return underlying switch
         {
             _ when underlying == typeof(string) => "string",
@@ -349,11 +455,25 @@ public static class AgentActionDiscovery
         // Unwrap System.Text.Json.JsonElement (common when args come from JSON deserialization)
         if (raw is System.Text.Json.JsonElement je)
         {
+            // Handle array JsonElement directly for collection targets
+            if (je.ValueKind == JsonValueKind.Array && IsCollectionTarget(targetType))
+            {
+                result = CoerceJsonArray(je, targetType);
+                return result is not null;
+            }
             raw = UnwrapJsonElement(je);
         }
 
-        // Already the right type
         var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        // Handle raw List<object?> (produced by UnwrapJsonElement for array JsonElements) → collection target
+        if (raw is List<object?> rawList && IsCollectionTarget(underlying))
+        {
+            result = CoerceObjectList(rawList, underlying);
+            return result is not null;
+        }
+
+        // Already the right type
         if (underlying.IsInstanceOfType(raw))
         {
             result = raw;
@@ -365,7 +485,7 @@ public static class AgentActionDiscovery
         {
             try
             {
-                result = Enum.Parse(underlying, raw.ToString()!, ignoreCase: true);
+                result = Enum.Parse(underlying, raw?.ToString() ?? string.Empty, ignoreCase: true);
                 return true;
             }
             catch
@@ -384,6 +504,72 @@ public static class AgentActionDiscovery
         {
             return false;
         }
+    }
+
+    private static bool IsCollectionTarget(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        return t.IsArray ||
+               (t.IsGenericType && (
+                   t.GetGenericTypeDefinition() == typeof(List<>) ||
+                   t.GetGenericTypeDefinition() == typeof(IEnumerable<>) ||
+                   t.GetGenericTypeDefinition() == typeof(IReadOnlyList<>) ||
+                   t.GetGenericTypeDefinition() == typeof(IList<>)));
+    }
+
+    private static object? CoerceJsonArray(System.Text.Json.JsonElement arrayElement, Type targetType)
+    {
+        var elementType = GetCollectionElementType(targetType);
+        if (elementType is null) return null;
+
+        var items = arrayElement.EnumerateArray()
+            .Select(e => CoerceScalar(UnwrapJsonElement(e), elementType))
+            .ToList();
+
+        return BuildCollectionResult(items, elementType, targetType);
+    }
+
+    private static object? CoerceObjectList(List<object?> rawList, Type targetType)
+    {
+        var elementType = GetCollectionElementType(targetType);
+        if (elementType is null) return null;
+
+        var items = rawList.Select(item => CoerceScalar(item, elementType)).ToList();
+        return BuildCollectionResult(items, elementType, targetType);
+    }
+
+    private static object? CoerceScalar(object? value, Type targetType)
+    {
+        if (value is null) return null;
+        if (targetType.IsInstanceOfType(value)) return value;
+        if (targetType.IsEnum) return Enum.Parse(targetType, value.ToString()!, ignoreCase: true);
+        try { return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture); }
+        catch { return value; }
+    }
+
+    private static object? BuildCollectionResult(List<object?> items, Type elementType, Type targetType)
+    {
+        var t = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (t.IsArray)
+        {
+            var arr = Array.CreateInstance(elementType, items.Count);
+            for (var i = 0; i < items.Count; i++) arr.SetValue(items[i], i);
+            return arr;
+        }
+
+        // List<T> or interface types — build a List<T>
+        var listType = typeof(List<>).MakeGenericType(elementType);
+        var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
+        foreach (var item in items) list.Add(item);
+        return list;
+    }
+
+    private static Type? GetCollectionElementType(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        if (t.IsArray) return t.GetElementType();
+        if (t.IsGenericType) return t.GenericTypeArguments.Length > 0 ? t.GenericTypeArguments[0] : null;
+        return null;
     }
 
     private static object? UnwrapJsonElement(System.Text.Json.JsonElement el)
@@ -443,8 +629,10 @@ public static class AgentActionDiscovery
         string ActionId,
         string Description,
         bool RequiresApproval,
+        bool FollowUp,
         string InputSchema,
-        MethodInfo Method);
+        MethodInfo Method,
+        MemberInfo? AvailabilityCheck);
 
     private sealed record ReadableCacheInfo(
         string StateKey,
@@ -452,3 +640,20 @@ public static class AgentActionDiscovery
         int MaxItems,
         PropertyInfo Property);
 }
+
+// -------------------------------------------------------------------------
+// Data transfer types for structured action discovery
+// -------------------------------------------------------------------------
+
+internal sealed record DiscoveredAction(
+    string ActionId,
+    string Description,
+    bool RequiresApproval,
+    IReadOnlyList<DiscoveredParameter> Parameters);
+
+internal sealed record DiscoveredParameter(
+    string Name,
+    string Type,
+    bool Required,
+    string? Description,
+    string[]? AllowedValues);

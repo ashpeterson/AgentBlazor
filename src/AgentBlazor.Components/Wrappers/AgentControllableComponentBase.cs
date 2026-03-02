@@ -25,9 +25,6 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
 
     [Inject]
-    private IComponentRouteRegistry? ComponentRouteRegistry { get; set; }
-
-    [Inject]
     private NavigationManager? Navigation { get; set; }
 
     [Inject]
@@ -43,23 +40,16 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
 
     public abstract string ComponentType { get; }
 
-    /// <summary>
-    /// Route registration id for this component type.
-    /// Defaults to ComponentType; override when the type name differs from the route key.
-    /// </summary>
-    protected virtual string ComponentIdForRoute => ComponentType;
-
     protected override void OnInitialized()
     {
         base.OnInitialized();
         _logger ??= LoggerFactory?.CreateLogger(GetType());
         ComponentRegistry.Register(this);
 
-        if (ComponentRouteRegistry is not null && Navigation is not null)
+        if (Navigation is not null)
         {
             var uri = Navigation.Uri;
             var path = string.IsNullOrEmpty(uri) ? "/" : new Uri(uri).AbsolutePath;
-            ComponentRouteRegistry.Register(ComponentIdForRoute, path);
             NavigationIntentService.MarkNavigationCompleted(path);
         }
     }
@@ -148,8 +138,6 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         {
             _ = ComponentRegistry.Unregister(AgentId);
         }
-
-        ComponentRouteRegistry?.Unregister(ComponentIdForRoute);
     }
 
     private static string? TryGetContextValue(

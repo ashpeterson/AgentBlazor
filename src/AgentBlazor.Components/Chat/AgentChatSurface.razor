@@ -1,9 +1,14 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Agents
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Components.Render
+@using AgentBlazor.Core.Models
+@using AgentBlazor.Core.Paid
+@using Markdig
 @implements IDisposable
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
+@using AgentBlazor.Core.Runtime.Discovery
 @using AgentBlazor.Core.Runtime.Interfaces
 @using AgentBlazor.Runtime
 @using Microsoft.JSInterop
@@ -14,6 +19,9 @@
 @inject IAgentComponentRegistry ComponentRegistry
 @inject IAgentChatSessionEvents SessionEvents
 @inject IJSRuntime JSRuntime
+@inject IAgentActionRenderRegistry ActionRenderRegistry
+@inject IAdaptiveSuggestionService SuggestionService
+@inject IProactiveInsightService ProactiveInsightService
 
 <section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
          data-theme="@(Theme?.DataTheme)"
@@ -65,17 +73,36 @@
              aria-label="Conversation">
             @foreach (var item in _timeline)
             {
-                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role @(item.GeneratedUi is null ? null : "ab-chat-surface__item--generated")"
+                <article class="ab-chat-surface__item ab-chat-surface__item--@item.Role @(item.GeneratedUi is null ? null : "ab-chat-surface__item--generated") @(item.IsProactive ? "ab-chat-surface__item--proactive" : null)"
                          aria-label="@item.RoleLabel">
-                    <div class="ab-chat-surface__item-role">@item.RoleLabel</div>
-                    <div class="ab-chat-surface__item-text">@item.Text</div>
+                    <div class="ab-chat-surface__item-role">
+                        @if (item.IsProactive)
+                        {
+                            <span class="ab-chat-surface__proactive-badge">Agent noticed:</span>
+                        }
+                        else
+                        {
+                            @item.RoleLabel
+                        }
+                    </div>
+                    @if (item.Role == "assistant" || item.IsProactive)
+                    {
+                        <div class="ab-chat-surface__item-text ab-chat-surface__item-text--markdown">@RenderMarkdown(item.Text)</div>
+                    }
+                    else
+                    {
+                        <div class="ab-chat-surface__item-text">@item.Text</div>
+                    }
 
                     @if (item.ActivityMessages.Count > 0)
                     {
-                        <ul class="ab-chat-surface__results" aria-label="Activity">
+                        <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in item.ActivityMessages)
                             {
-                                <li>@activity.Text</li>
+                                <li class="ab-chat-surface__activity-item ab-chat-surface__activity-item--done">
+                                    <span class="ab-chat-surface__activity-icon">&#10003;</span>
+                                    <span class="ab-chat-surface__activity-text">@activity.Text</span>
+                                </li>
                             }
                         </ul>
                     }
@@ -95,7 +122,20 @@
                         <ul class="ab-chat-surface__results" aria-label="Results">
                             @foreach (var result in item.ExecutionResults)
                             {
-                                <li>@result.Message</li>
+                                var fragments = ActionRenderRegistry.TryGet(result.ComponentId, result.ActionId);
+                                if (fragments?.Complete is not null)
+                                {
+                                    var ctx = new ActionRenderContext(
+                                        result.ComponentId, result.ActionId,
+                                        result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed,
+                                        new Dictionary<string, object?>(),
+                                        result.Message);
+                                    <li>@fragments.Complete(ctx)</li>
+                                }
+                                else
+                                {
+                                    <li>@result.Message</li>
+                                }
                             }
                         </ul>
                     }
@@ -116,20 +156,41 @@
                 </article>
             }
 
-            @if (!string.IsNullOrWhiteSpace(_streamingResponseText))
+            @if (_streamingActivityMessages.Count > 0 || !string.IsNullOrWhiteSpace(_streamingResponseText))
             {
                 <article class="ab-chat-surface__item ab-chat-surface__item--assistant"
                          aria-label="Assistant">
                     <div class="ab-chat-surface__item-role">@(_streamingAgentName ?? "Assistant")</div>
-                    <div class="ab-chat-surface__item-text">@_streamingResponseText</div>
                     @if (_streamingActivityMessages.Count > 0)
                     {
-                        <ul class="ab-chat-surface__results" aria-label="Activity">
+                        <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in _streamingActivityMessages)
                             {
-                                <li>@activity.Text</li>
+                                var isDone = _completedActivityKeys.Contains(activity.Key);
+                                <li class="ab-chat-surface__activity-item @(isDone ? "ab-chat-surface__activity-item--done" : string.Empty)">
+                                    @if (isDone)
+                                    {
+                                        <span class="ab-chat-surface__activity-icon">&#10003;</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ab-chat-surface__activity-spinner" aria-hidden="true"></span>
+                                    }
+                                    <span class="ab-chat-surface__activity-text">@activity.Text</span>
+                                </li>
                             }
                         </ul>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_streamingReasoningText))
+                    {
+                        <details class="ab-chat-surface__reasoning" open="@(_reasoningComplete ? null : string.Empty)">
+                            <summary class="ab-chat-surface__reasoning-summary">Thinking…</summary>
+                            <div class="ab-chat-surface__reasoning-body">@_streamingReasoningText</div>
+                        </details>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_streamingResponseText))
+                    {
+                        <div class="ab-chat-surface__item-text ab-chat-surface__item-text--markdown">@RenderMarkdown(_streamingResponseText)</div>
                     }
                 </article>
             }
@@ -198,6 +259,21 @@
         </div>
     }
 
+    @if (_suggestions.Count > 0 && !_isBusy)
+    {
+        <div class="ab-chat-surface__suggestions" role="list" aria-label="Suggestions">
+            @foreach (var suggestion in _suggestions)
+            {
+                <button type="button"
+                        class="ab-chat-surface__suggestion-chip"
+                        role="listitem"
+                        @onclick="() => AcceptSuggestion(suggestion.Text)">
+                    @suggestion.Text
+                </button>
+            }
+        </div>
+    }
+
     <EditForm class="ab-chat-surface__controls" Model="@this" FormName="@EffectiveFormName" OnValidSubmit="SendAsync">
         <label class="ab-chat-surface__label" for="@AgentSelectId">Agent</label>
         <select id="@AgentSelectId"
@@ -216,15 +292,39 @@
         </select>
 
         <label class="ab-chat-surface__label" for="@PromptId">Message</label>
-        <textarea id="@PromptId"
-                  class="ab-chat-surface__input"
-                  rows="3"
-                  @bind="_prompt"
-                  @bind:event="oninput"
-                  placeholder="@Placeholder"
-                  aria-describedby="@DescriptionId"
-                  aria-label="Message input"
-                  disabled="@_isBusy"></textarea>
+        <div class="ab-chat-surface__input-wrapper">
+            @if (_showSlashMenu && _slashItems.Count > 0)
+            {
+                <div class="ab-chat-surface__slash-menu" role="listbox" aria-label="Available commands">
+                    @foreach (var group in _slashItems.GroupBy(s => s.ComponentId))
+                    {
+                        <div class="ab-chat-surface__slash-group">
+                            <div class="ab-chat-surface__slash-group-label">@group.Key</div>
+                            @foreach (var item in group)
+                            {
+                                <button type="button"
+                                        class="ab-chat-surface__slash-item"
+                                        role="option"
+                                        @onclick="() => AcceptSlashItem(item)">
+                                    <span class="ab-chat-surface__slash-action">/@item.ActionId</span>
+                                    <span class="ab-chat-surface__slash-desc">@item.Label</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            <textarea id="@PromptId"
+                      class="ab-chat-surface__input"
+                      rows="3"
+                      value="@_prompt"
+                      @oninput="HandlePromptInput"
+                      @onkeydown="HandlePromptKeyDown"
+                      placeholder="@Placeholder"
+                      aria-describedby="@DescriptionId"
+                      aria-label="Message input"
+                      disabled="@_isBusy"></textarea>
+        </div>
 
         <button type="submit"
                 id="@SubmitButtonId"
@@ -238,6 +338,13 @@
 </section>
 
 @code {
+    private static readonly MarkdownPipeline _mdPipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    private static MarkupString RenderMarkdown(string? text) =>
+        new(string.IsNullOrWhiteSpace(text) ? string.Empty :
+            Markdown.ToHtml(text ?? string.Empty, _mdPipeline));
+
     private readonly List<string> _agentNames = [];
     private readonly List<ChatTimelineItem> _timeline = [];
     private string _prompt = string.Empty;
@@ -247,12 +354,21 @@
     private bool _clarificationShortcutAttached;
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
     private string _streamingResponseText = string.Empty;
+    private string _streamingReasoningText = string.Empty;
+    private bool _reasoningComplete;
     private string? _streamingAgentName;
     private string? _activeRunId;
     private readonly List<ActivityMessage> _streamingActivityMessages = [];
+    private readonly HashSet<string> _completedActivityKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
         new(StringComparer.OrdinalIgnoreCase);
     private string? _historyHydratedForSession;
+    private IReadOnlyList<AgentSuggestion> _suggestions = [];
+
+    // Slash command discovery
+    private bool _showSlashMenu;
+    private List<SlashItem> _slashItems = [];
+    private List<SlashItem>? _allSlashItems; // cached full list
 
     // Session ID is taken from the scoped circuit registry so the runtime
     // can look up this circuit's components via AgentComponentRegistryHub.
@@ -421,14 +537,19 @@
             return;
 
         _timeline.Add(ChatTimelineItem.User(message));
+        _suggestions = [];
         _prompt = string.Empty;
+        _showSlashMenu = false;
         _pendingClarification = null;
         _pendingApprovals.Clear();
         _clarificationResponse = string.Empty;
         _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _reasoningComplete = false;
         _streamingAgentName = null;
         _activeRunId = null;
         _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
@@ -442,6 +563,7 @@
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
             ApplyTurnOutcome(message, turnOutcome);
+            _ = FireProactiveInsightAsync(message, turnOutcome);
             _scrollRequested = true;
         }
         finally
@@ -449,6 +571,38 @@
             _isBusy = false;
             if (_agentState == AgentState.Thinking)
                 _agentState = AgentState.Idle;
+        }
+
+        await RefreshSuggestionsAsync();
+    }
+
+    /// <summary>Populates the chat input with <paramref name="text"/> without submitting.</summary>
+    public Task SetInputAsync(string text)
+    {
+        _prompt = text;
+        _suggestions = [];
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void AcceptSuggestion(string text)
+    {
+        _prompt = text;
+        _suggestions = [];
+        StateHasChanged();
+    }
+
+    private async Task RefreshSuggestionsAsync()
+    {
+        try
+        {
+            _suggestions = await SuggestionService.GetSuggestionsAsync(
+                EffectiveSessionId,
+                userId: null,
+                currentContext: _prompt);
+        }
+        catch
+        {
+            _suggestions = [];
         }
     }
 
@@ -466,6 +620,7 @@
         _streamingAgentName = null;
         _activeRunId = null;
         _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
         _isBusy = true;
         _scrollRequested = true;
         StateHasChanged();
@@ -514,6 +669,7 @@
         _streamingAgentName = null;
         _activeRunId = null;
         _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
@@ -547,6 +703,7 @@
         _streamingAgentName = null;
         _activeRunId = null;
         _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
         _agentState = AgentState.Idle;
         _scrollRequested = true;
         StateHasChanged();
@@ -561,8 +718,11 @@
         }
 
         _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _reasoningComplete = false;
         _streamingAgentName = null;
         _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
 
         AgentTurnResponse? finalResponse = null;
         string? clarificationQuestion = null;
@@ -589,10 +749,27 @@
             if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
                 streamEvent.ExecutionResult is not null)
             {
-                AddStreamingActivityMessage(
-                    BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId),
-                    FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
+                AddStreamingActivityMessage(resultKey, FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                _completedActivityKeys.Add(resultKey);
                 _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningContent &&
+                !string.IsNullOrEmpty(streamEvent.ReasoningDelta))
+            {
+                _streamingReasoningText += streamEvent.ReasoningDelta;
+                _reasoningComplete = false;
+                _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningEnd)
+            {
+                _reasoningComplete = true;
                 await InvokeAsync(StateHasChanged);
                 continue;
             }
@@ -638,6 +815,7 @@
         }
 
         _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
         _streamingAgentName = null;
 
         var response = finalResponse
@@ -1030,6 +1208,106 @@
         return messages;
     }
 
+    // ── Slash Command Discovery ─────────────────────────────────────────────
+
+    private void HandlePromptInput(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? string.Empty;
+        _prompt = value;
+
+        if (value.StartsWith('/'))
+        {
+            var filter = value.Length > 1 ? value[1..].ToLowerInvariant() : string.Empty;
+            _allSlashItems ??= BuildAllSlashItems();
+            _slashItems = string.IsNullOrEmpty(filter)
+                ? _allSlashItems
+                : _allSlashItems
+                    .Where(i => i.ActionId.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                             || i.Label.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            _showSlashMenu = _slashItems.Count > 0;
+        }
+        else
+        {
+            _showSlashMenu = false;
+        }
+    }
+
+    private void HandlePromptKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            _showSlashMenu = false;
+        }
+    }
+
+    private void AcceptSlashItem(SlashItem item)
+    {
+        _prompt = item.InsertText;
+        _showSlashMenu = false;
+        StateHasChanged();
+    }
+
+    private List<SlashItem> BuildAllSlashItems()
+    {
+        var items = new List<SlashItem>();
+        foreach (var component in ComponentRegistry.GetAll())
+        {
+            if (!AgentActionDiscovery.IsAttributeDriven(component))
+                continue;
+
+            var capability = AgentActionDiscovery.BuildCapability(component);
+            foreach (var action in capability.Actions)
+            {
+                items.Add(new SlashItem(
+                    component.ComponentType,
+                    action.ActionId,
+                    action.Description,
+                    action.Description));
+            }
+        }
+
+        return items;
+    }
+
+    // ── Proactive Insights ──────────────────────────────────────────────────
+
+    private async Task FireProactiveInsightAsync(string userMessage, StreamTurnOutcome turnOutcome)
+    {
+        try
+        {
+            var activitySummaries = turnOutcome.Response.ExecutionResults
+                .Select(r => $"{r.ComponentId}.{r.ActionId}")
+                .ToList();
+
+            if (activitySummaries.Count == 0)
+                return;
+
+            var agentName = turnOutcome.Response.AgentName;
+            var insight = await ProactiveInsightService.GetInsightAsync(
+                EffectiveSessionId,
+                userMessage,
+                activitySummaries,
+                componentContext: null);
+
+            if (string.IsNullOrWhiteSpace(insight))
+                return;
+
+            await InvokeAsync(() =>
+            {
+                _timeline.Add(ChatTimelineItem.Proactive(agentName, insight));
+                _scrollRequested = true;
+                StateHasChanged();
+            });
+        }
+        catch
+        {
+            // Never let insight errors affect the chat
+        }
+    }
+
+    private sealed record SlashItem(string ComponentId, string ActionId, string Label, string InsertText);
+
     private sealed record ChatTimelineItem(
         string Role,
         string RoleLabel,
@@ -1038,7 +1316,8 @@
         IReadOnlyList<PlannedComponentAction> PlannedActions,
         IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
         AgentUiDocument? GeneratedUi,
-        string? RunId)
+        string? RunId,
+        bool IsProactive = false)
     {
         public static ChatTimelineItem User(string text) =>
             new("user", "User", text, [], [], [], null, null);
@@ -1056,6 +1335,9 @@
                 response.ExecutionResults,
                 response.GeneratedUi,
                 runId);
+
+        public static ChatTimelineItem Proactive(string agentName, string insight) =>
+            new("assistant", agentName, insight, [], [], [], null, null, IsProactive: true);
 
         public static ChatTimelineItem Activity(string text, string? runId = null) =>
             new("activity", "Activity", text, [], [], [], null, runId);

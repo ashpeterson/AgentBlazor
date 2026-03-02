@@ -234,7 +234,7 @@
         var columns = GetFilterableColumns();
         var columnTypes = GetColumnTypes();
         var focusedRow = ResolveFocusedRowSnapshot();
-        var currentViewRows = BuildCurrentViewRowSnapshots(maxRows: 5);
+        var currentViewRows = BuildCurrentViewRowSnapshots(maxRows: 25);
         var rowCount = Items switch
         {
             null => 0,

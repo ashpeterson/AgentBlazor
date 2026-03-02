@@ -11,7 +11,10 @@ using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
+using AgentBlazor.Core.Runtime.Discovery;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Middleware;
+using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Options;
 using AgentBlazor.Telemetry;
@@ -43,12 +46,17 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private readonly IAgentUiToolCatalog _uiToolCatalog;
     private readonly IConversationStore? _conversationStore;
     private readonly AgentComponentRegistryHub? _registryHub;
-    private readonly IComponentRouteRegistry _componentRouteRegistry;
     private readonly IRouteRegistry _routeRegistry;
     private readonly IOptions<AgentBlazorOptions> _options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink;
     private readonly IOptions<PromptTracingOptions>? _tracingOptions;
     private readonly IPromptTraceStore? _traceStore;
+    private readonly AgentBlazor.Core.Paid.IActionHistoryStore? _actionHistoryStore;
+    private readonly IAgentServiceToolRegistry? _serviceToolRegistry;
+    private readonly IEnumerable<IMcpToolProvider>? _mcpToolProviders;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly AgentBlazor.Core.Paid.IAgentInspectorStore? _inspectorStore;
+    private readonly AgentMiddlewarePipeline? _middlewarePipeline;
     private readonly ILogger<AgentRuntime>? _logger;
 
     private sealed class StreamingRunState
@@ -76,12 +84,17 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IAgentUiToolCatalog uiToolCatalog,
         IConversationStore? conversationStore,
         AgentComponentRegistryHub? registryHub,
-        IComponentRouteRegistry componentRouteRegistry,
         IRouteRegistry routeRegistry,
         IOptions<AgentBlazorOptions> options,
         IAgentBlazorTelemetrySink telemetrySink,
         IOptions<PromptTracingOptions>? tracingOptions = null,
         IPromptTraceStore? traceStore = null,
+        AgentBlazor.Core.Paid.IActionHistoryStore? actionHistoryStore = null,
+        IAgentServiceToolRegistry? serviceToolRegistry = null,
+        IEnumerable<IMcpToolProvider>? mcpToolProviders = null,
+        IServiceProvider? serviceProvider = null,
+        AgentBlazor.Core.Paid.IAgentInspectorStore? inspectorStore = null,
+        AgentMiddlewarePipeline? middlewarePipeline = null,
         ILogger<AgentRuntime>? logger = null)
     {
         _planner = planner;
@@ -92,19 +105,34 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         _uiToolCatalog = uiToolCatalog;
         _conversationStore = conversationStore;
         _registryHub = registryHub;
-        _componentRouteRegistry = componentRouteRegistry;
         _routeRegistry = routeRegistry;
         _options = options;
         _telemetrySink = telemetrySink;
         _tracingOptions = tracingOptions;
         _traceStore = traceStore;
+        _actionHistoryStore = actionHistoryStore;
+        _serviceToolRegistry = serviceToolRegistry;
+        _mcpToolProviders = mcpToolProviders;
+        _serviceProvider = serviceProvider;
+        _inspectorStore = inspectorStore;
+        _middlewarePipeline = middlewarePipeline;
         _logger = logger;
     }
 
     public Task<AgentTurnResponse> RunTurnAsync(
         AgentTurnRequest request,
-        CancellationToken cancellationToken = default) =>
-        RunTurnCoreAsync(request, emitEvent: null, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (_middlewarePipeline is { HasMiddlewares: true })
+        {
+            return _middlewarePipeline.RunAsync(
+                request,
+                (req, ct) => RunTurnCoreAsync(req, emitEvent: null, ct),
+                cancellationToken);
+        }
+
+        return RunTurnCoreAsync(request, emitEvent: null, cancellationToken);
+    }
 
     public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
         AgentTurnRequest request,
@@ -207,6 +235,9 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         var traceBuilder = new PromptTraceBuilder(_tracingOptions);
         var sessionId = request.GetEffectiveSessionId();
         var conversationHistory = await BuildConversationHistoryAsync(sessionId, cancellationToken);
+        var inspectorRunId = Guid.NewGuid().ToString("N");
+        var inspectorStartedAt = DateTimeOffset.UtcNow;
+        var inspectorEvents = new List<AgentBlazor.Core.Paid.InspectorEvent>();
 
         // Resolve the per-circuit registry for this session
         IAgentComponentRegistry? registry = null;
@@ -232,6 +263,9 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         var allowedComponents = GetAllowedComponents(registration);
         var mountedComponents = GetMountedComponents(registry);
+        // Augment with any custom [AgentAction] components not already in the catalog
+        allowedComponents = AugmentAllowedWithMounted(allowedComponents, mountedComponents);
+        var currentRoute = ExtractCurrentRoute(mountedComponents);
         var providerConfigured = _planner.IsProviderConfigured;
 
         await TrackStartedAsync(registration.Name, request, providerConfigured);
@@ -258,6 +292,9 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 .Select(r => new AvailableRoute { Path = r.Path, Description = r.Description, Aliases = r.Aliases })
                 .ToList();
 
+            // Gather service tools from registry + MCP providers
+            var serviceTools = await GatherServiceToolsAsync(cancellationToken);
+
             var planRequest = new ActionPlanRequest
             {
                 UserMessage = request.UserMessage,
@@ -269,15 +306,15 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 MountedComponents = mountedComponents,
                 ConversationHistory = conversationHistory,
                 AvailableRoutes = availableRoutes,
-                AgentInstructions = registration.Instructions
+                AgentInstructions = registration.Instructions,
+                CurrentRoute = currentRoute,
+                ServiceTools = serviceTools
             };
 
             var plan = await _planner.PlanAsync(planRequest, cancellationToken);
 
             // Resolve agentId-based steps to canonical component types for validation
             plan = ResolveComponentTypes(plan, mountedComponents, allowedComponents);
-            plan = EnsureNavigationWhenTargetUnmounted(plan, mountedComponents, request.UserMessage);
-            plan = EnsureDialogOpenBeforeUnmountedFormAction(plan, mountedComponents, allowedComponents);
             plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
 
             // Determine response text from the plan's message or build one
@@ -427,17 +464,34 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     : null
             };
 
-            var executionResult = await _executor.ExecuteAsync(plan, executionOptions, cancellationToken);
+            // Partition plan steps: service tool steps vs component steps
+            var toolSteps = plan.Steps.Where(s => string.Equals(s.ComponentId, "tool", StringComparison.OrdinalIgnoreCase)).ToList();
+            var componentPlan = toolSteps.Count > 0
+                ? plan with { Steps = plan.Steps.Where(s => !string.Equals(s.ComponentId, "tool", StringComparison.OrdinalIgnoreCase)).ToList() }
+                : plan;
+
+            var executionResult = await _executor.ExecuteAsync(componentPlan, executionOptions, cancellationToken);
+
+            // Execute service tool steps
+            var toolResults = new List<ComponentActionExecutionResult>();
+            foreach (var toolStep in toolSteps)
+            {
+                var toolResult = await ExecuteServiceToolAsync(toolStep, cancellationToken);
+                toolResults.Add(toolResult);
+            }
 
             var executionResults = executionResult.StepResults
                 .Select(r => new ComponentActionExecutionResult(
                     r.Step.ComponentId, r.Step.ActionId, r.Outcome, r.Message))
+                .Concat(toolResults)
                 .ToArray();
             await EmitExecutionResultsAsync(executionResults, emitEvent);
 
             // When execution fully succeeded, use the LLM's plan message if available.
             // When any step failed (NeedsClarification, Failed, etc.), surface the execution message instead.
-            var responseText = executionResult.Succeeded
+            var allToolsSucceeded = toolResults.All(r => r.Succeeded);
+            var overallSucceeded = executionResult.Succeeded && allToolsSucceeded;
+            var responseText = overallSucceeded
                 ? (planMessage ?? BuildResponseText(executionResult))
                 : BuildResponseText(executionResult);
             stopwatch.Stop();
@@ -451,7 +505,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             }
 
             await TrackFinishedAsync(registration.Name, request,
-                executionResult.Succeeded ? AgentBlazorRunOutcome.Succeeded : AgentBlazorRunOutcome.Failed,
+                overallSucceeded ? AgentBlazorRunOutcome.Succeeded : AgentBlazorRunOutcome.Failed,
                 plannedActions.Length, executionResults.Length, providerConfigured);
 
             _logger?.LogInformation(
@@ -464,6 +518,18 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 PlannedActions: plannedActions,
                 ExecutionResults: executionResults), plan);
             await StoreConversationTurnAsync(sessionId, request.UserMessage, successResponse, cancellationToken);
+
+            // Record inspector data
+            RecordInspectorRun(inspectorRunId, sessionId, registration.Name,
+                inspectorStartedAt, plan, executionResults, inspectorEvents, succeeded: overallSucceeded, errorMessage: null);
+            await RecordActionHistoryAsync(
+                sessionId,
+                request.GetEffectiveUserId(),
+                request.UserMessage,
+                executionResults,
+                plan,
+                cancellationToken);
+            await EmitReasoningEventsAsync(registration.Name, plan.ReasoningContent, emitEvent);
             await EmitTextDeltasAsync(registration.Name, responseText, emitEvent);
             await EmitRunFinishedAsync(successResponse, emitEvent);
             return successResponse;
@@ -515,6 +581,8 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         var evaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
             components, registration.AllowedComponents, registration.AllowedActions);
 
+        // Catalog-sourced components drive validation and approval-gating.
+        // Parameters here are for the validator only; the prompt uses mounted.Actions from discovery.
         return evaluation.AllowedComponents
             .Select(c => new AvailableComponent
             {
@@ -523,12 +591,106 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 Actions = c.Actions.Select(a => new AvailableAction
                 {
                     ActionId = a.ActionId,
-                    Description = a.Description ?? $"{a.ActionId} action",
+                    Description = a.Description ?? a.ActionId,
                     RequiresApproval = a.RequiresApproval,
-                    Parameters = GetActionParameters(c.ComponentId, a.ActionId)
+                    Parameters = GetCatalogActionParameters(c.ComponentId, a.ActionId)
                 }).ToList()
             })
             .ToList();
+    }
+
+    /// <summary>
+    /// Returns required-parameter info for catalog built-in actions.
+    /// Used only by the validator — the prompt uses [AgentAction] discovery on mounted instances.
+    /// </summary>
+    private static IReadOnlyList<ActionParameter> GetCatalogActionParameters(string componentId, string actionId)
+    {
+        return (componentId, actionId) switch
+        {
+            (AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+                AgentComponentCapabilityProfile.NavigationNavigateToActionId) =>
+            [
+                new ActionParameter { Name = "uri", Type = "string", Required = true, Description = "The URI to navigate to" }
+            ],
+            (AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridFilterActionId) =>
+            [
+                new ActionParameter { Name = "column", Type = "string", Required = true },
+                new ActionParameter { Name = "operator", Type = "string", Required = true, AllowedValues = ["eq","neq","gt","gte","lt","lte","contains","startswith","endswith","in","notin","isnull","notnull"] }
+            ],
+            (AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridSortActionId) =>
+            [
+                new ActionParameter { Name = "column", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentDataGridComponentId,
+                AgentComponentCapabilityProfile.DataGridSelectRowActionId) =>
+            [
+                new ActionParameter { Name = "rowKey", Type = "string", Required = false }
+            ],
+            (AgentComponentCapabilityProfile.AgentFormComponentId,
+                AgentComponentCapabilityProfile.FormSetFieldActionId) =>
+            [
+                new ActionParameter { Name = "field", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentTabsComponentId,
+                AgentComponentCapabilityProfile.TabsSwitchTabActionId) =>
+            [
+                new ActionParameter { Name = "index", Type = "integer", Required = true }
+            ],
+            _ => []
+        };
+    }
+
+    /// <summary>
+    /// Adds any mounted custom components (not already in the catalog) to the allowed list
+    /// so that the planner prompt and validator both see their [AgentAction]-discovered capabilities.
+    /// </summary>
+    private static IReadOnlyList<AvailableComponent> AugmentAllowedWithMounted(
+        IReadOnlyList<AvailableComponent> allowedComponents,
+        IReadOnlyList<MountedComponentState> mountedComponents)
+    {
+        if (mountedComponents.Count == 0) return allowedComponents;
+
+        List<AvailableComponent>? augmented = null;
+        var seenTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mounted in mountedComponents)
+        {
+            if (mounted.Actions.Count == 0) continue;
+
+            // Already covered by the catalog (e.g. "DataGrid" → "AgentDataGrid")?
+            var canonicalId = ResolveAllowedComponentId(mounted.ComponentType, allowedComponents);
+            if (canonicalId is not null)
+            {
+                seenTypes.Add(mounted.ComponentType);
+                continue;
+            }
+
+            // Custom component: add once per type with its discovered actions
+            if (!seenTypes.Add(mounted.ComponentType)) continue;
+
+            augmented ??= [..allowedComponents];
+            augmented.Add(new AvailableComponent
+            {
+                ComponentId = mounted.ComponentType,
+                Description = $"{mounted.ComponentType} component",
+                Actions = mounted.Actions.ToList()
+            });
+        }
+
+        return augmented ?? allowedComponents;
+    }
+
+    private static string? ExtractCurrentRoute(IReadOnlyList<MountedComponentState> mountedComponents)
+    {
+        var navMenu = mountedComponents.FirstOrDefault(m =>
+            string.Equals(m.ComponentType, "NavMenu", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(m.ComponentType, "AgentNavMenu", StringComparison.OrdinalIgnoreCase));
+
+        return navMenu?.State.TryGetValue("uri", out var uri) == true
+            ? uri
+            : null;
     }
 
     private static IReadOnlyList<MountedComponentState> GetMountedComponents(IAgentComponentRegistry? registry)
@@ -540,6 +702,23 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             {
                 AgentId = c.AgentId,
                 ComponentType = c.ComponentType,
+                // Actions come from [AgentAction] attribute discovery — single source of truth.
+                // This ensures custom components and built-in wrappers both appear correctly.
+                Actions = AgentActionDiscovery.GetDiscoveredActions(c)
+                    .Select(static a => new AvailableAction
+                    {
+                        ActionId = a.ActionId,
+                        Description = a.Description,
+                        RequiresApproval = a.RequiresApproval,
+                        Parameters = a.Parameters.Select(static p => new ActionParameter
+                        {
+                            Name = p.Name,
+                            Type = p.Type,
+                            Required = p.Required,
+                            Description = p.Description,
+                            AllowedValues = p.AllowedValues?.ToList()
+                        }).ToList()
+                    }).ToList(),
                 State = c.GetCurrentState()
                     .ToDictionary(kv => kv.Key, kv => FormatMountedStateValue(kv.Value))
             })
@@ -632,178 +811,10 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         return prefixed?.ComponentId;
     }
 
-    private static IReadOnlyList<ActionParameter> GetActionParameters(string componentId, string actionId)
-    {
-        return (componentId, actionId) switch
-        {
-            ("AgentNavMenu", "navigate_to") =>
-            [
-                new ActionParameter { Name = "uri", Type = "string", Required = true, Description = "The URI to navigate to" }
-            ],
-            ("AgentDataGrid", "filter") =>
-            [
-                new ActionParameter { Name = "column", Type = "string", Required = true },
-                new ActionParameter { Name = "operator", Type = "string", Required = true, AllowedValues = ["eq","neq","gt","gte","lt","lte","contains","startsWith","endsWith","in","notin","isnull","notnull"] },
-                new ActionParameter { Name = "value", Type = "any", Required = true }
-            ],
-            ("AgentDataGrid", "sort") =>
-            [
-                new ActionParameter { Name = "column", Type = "string", Required = true },
-                new ActionParameter { Name = "direction", Type = "string", Required = false, AllowedValues = ["asc","desc"] }
-            ],
-            ("AgentDataGrid", "go_to_page") =>
-            [
-                new ActionParameter { Name = "pageIndex", Type = "int", Required = false },
-                new ActionParameter { Name = "pageSize", Type = "int", Required = false }
-            ],
-            ("AgentDataGrid", "select_row") =>
-            [
-                new ActionParameter { Name = "rowKey", Type = "string", Required = false }
-            ],
-            ("AgentForm", "set_field") =>
-            [
-                new ActionParameter { Name = "field", Type = "string", Required = true },
-                new ActionParameter { Name = "value", Type = "any", Required = true }
-            ],
-            ("AgentTabs", "switch_tab") =>
-            [
-                new ActionParameter { Name = "index", Type = "int", Required = true }
-            ],
-            _ => []
-        };
-    }
 
     // -------------------------------------------------------------------------
     // Plan post-processing
     // -------------------------------------------------------------------------
-
-    private ActionPlan EnsureNavigationWhenTargetUnmounted(
-        ActionPlan plan,
-        IReadOnlyList<MountedComponentState> mountedComponents,
-        string userMessage)
-    {
-        if (plan.Steps.Count == 0) return plan;
-
-        var first = plan.Steps[0];
-        if (string.Equals(first.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(first.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase))
-        {
-            return plan;
-        }
-
-        if (IsComponentTypeMounted(first.ComponentId, mountedComponents))
-            return plan;
-
-        var route = ResolveRouteForUnmountedComponent(first.ComponentId, userMessage);
-        if (string.IsNullOrWhiteSpace(route)) return plan;
-
-        var navigateStep = new PlannedStep
-        {
-            ComponentId = AgentComponentCapabilityProfile.AgentNavMenuComponentId,
-            ActionId = AgentComponentCapabilityProfile.NavigationNavigateToActionId,
-            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["uri"] = route }
-        };
-
-        _logger?.LogInformation("Prepending navigation to {Route} for unmounted {ComponentId}", route, first.ComponentId);
-        return plan with { Steps = [navigateStep, ..plan.Steps] };
-    }
-
-    private string? ResolveRouteForUnmountedComponent(string componentId, string userMessage)
-    {
-        if (_componentRouteRegistry.TryGetRoute(componentId, out var fromRegistry) &&
-            !string.IsNullOrWhiteSpace(fromRegistry))
-        {
-            return fromRegistry;
-        }
-
-        // Form/Dialog pairing heuristic
-        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
-        {
-            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentDialogComponentId, out var dialogRoute) &&
-                !string.IsNullOrWhiteSpace(dialogRoute))
-            {
-                return dialogRoute;
-            }
-            return null;
-        }
-
-        if (string.Equals(componentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase))
-        {
-            if (_componentRouteRegistry.TryGetRoute(AgentComponentCapabilityProfile.AgentFormComponentId, out var formRoute) &&
-                !string.IsNullOrWhiteSpace(formRoute))
-            {
-                return formRoute;
-            }
-            return null;
-        }
-
-        var matches = _routeRegistry.ResolveAll(userMessage, maxResults: 3);
-        if (matches.Count == 0 || matches[0].Confidence < 0.2f) return null;
-
-        return matches[0].Path;
-    }
-
-    private static bool IsComponentTypeMounted(string componentId, IReadOnlyList<MountedComponentState> mounted)
-    {
-        var typeName = componentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
-            ? componentId[5..] : componentId;
-        return mounted.Any(m =>
-            string.Equals(m.ComponentType, componentId, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(m.ComponentType, typeName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static ActionPlan EnsureDialogOpenBeforeUnmountedFormAction(
-        ActionPlan plan,
-        IReadOnlyList<MountedComponentState> mountedComponents,
-        IReadOnlyList<AvailableComponent> allowedComponents)
-    {
-        if (plan.Steps.Count == 0 ||
-            IsComponentTypeMounted(AgentComponentCapabilityProfile.AgentFormComponentId, mountedComponents))
-        {
-            return plan;
-        }
-
-        var firstFormIndex = -1;
-        for (var i = 0; i < plan.Steps.Count; i++)
-        {
-            if (string.Equals(plan.Steps[i].ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase))
-            {
-                firstFormIndex = i;
-                break;
-            }
-        }
-
-        if (firstFormIndex < 0) return plan;
-
-        var hasDialogOpen = plan.Steps.Take(firstFormIndex).Any(s =>
-            string.Equals(s.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(s.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
-
-        if (hasDialogOpen) return plan;
-
-        if (!allowedComponents.Any(c =>
-                string.Equals(c.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-                c.Actions.Any(a => string.Equals(a.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase))))
-        {
-            return plan;
-        }
-
-        var openDialog = new PlannedStep
-        {
-            ComponentId = AgentComponentCapabilityProfile.AgentDialogComponentId,
-            ActionId = AgentComponentCapabilityProfile.DialogOpenActionId,
-            Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        };
-
-        var rewritten = new List<PlannedStep>(plan.Steps.Count + 1);
-        for (var i = 0; i < plan.Steps.Count; i++)
-        {
-            if (i == firstFormIndex) rewritten.Add(openDialog);
-            rewritten.Add(plan.Steps[i]);
-        }
-
-        return plan with { Steps = rewritten };
-    }
 
     private static ActionPlan EnforceGeneratedUiActionPolicies(
         ActionPlan plan,
@@ -998,6 +1009,131 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to store conversation turn for session {SessionId}", sessionId);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Inspector
+    // -------------------------------------------------------------------------
+
+    private void RecordInspectorRun(
+        string runId,
+        string sessionId,
+        string agentName,
+        DateTimeOffset startedAt,
+        ActionPlan plan,
+        IReadOnlyList<AgentBlazor.Core.Runtime.Components.ComponentActionExecutionResult> executionResults,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> events,
+        bool succeeded,
+        string? errorMessage)
+    {
+        if (_inspectorStore is null) return;
+
+        try
+        {
+            var allEvents = new List<AgentBlazor.Core.Paid.InspectorEvent>(events);
+            foreach (var result in executionResults)
+            {
+                allEvents.Add(new AgentBlazor.Core.Paid.InspectorEvent(
+                    DateTimeOffset.UtcNow,
+                    result.Succeeded ? "ToolCallResult" : "ToolCallFailed",
+                    result.ComponentId,
+                    result.ActionId,
+                    result.Message));
+            }
+
+            _inspectorStore.RecordRun(new AgentBlazor.Core.Paid.InspectorRunRecord(
+                RunId: runId,
+                SessionId: sessionId,
+                AgentName: agentName,
+                StartedAt: startedAt,
+                FinishedAt: DateTimeOffset.UtcNow,
+                SystemPrompt: plan.SystemPrompt,
+                RawPlanResponse: plan.RawResponse,
+                Events: allEvents,
+                Succeeded: succeeded,
+                ErrorMessage: errorMessage));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to record inspector run");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Service tools
+    // -------------------------------------------------------------------------
+
+    private async Task<IReadOnlyList<AgentServiceTool>> GatherServiceToolsAsync(CancellationToken cancellationToken)
+    {
+        var registryTools = _serviceToolRegistry?.GetTools() ?? [];
+
+        if (_mcpToolProviders is null)
+            return registryTools;
+
+        try
+        {
+            var mcpResults = await Task.WhenAll(
+                _mcpToolProviders.Select(p => p.GetToolsAsync(cancellationToken)));
+            var all = registryTools.ToList();
+            foreach (var batch in mcpResults)
+                all.AddRange(batch);
+            return all;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to fetch MCP tools");
+            return registryTools;
+        }
+    }
+
+    internal async Task<ComponentActionExecutionResult> ExecuteServiceToolAsync(
+        PlannedStep step,
+        CancellationToken cancellationToken)
+    {
+        AgentServiceTool? tool = null;
+
+        // First try the hand-registered service tool registry
+        if (_serviceToolRegistry is not null)
+            _serviceToolRegistry.TryGetTool(step.ActionId, out tool);
+
+        // Fall back to MCP providers
+        if (tool is null && _mcpToolProviders is not null)
+        {
+            foreach (var provider in _mcpToolProviders)
+            {
+                var mcpTools = await provider.GetToolsAsync(cancellationToken);
+                tool = mcpTools.FirstOrDefault(t =>
+                    string.Equals(t.Name, step.ActionId, StringComparison.OrdinalIgnoreCase));
+                if (tool is not null) break;
+            }
+        }
+
+        if (tool is null)
+        {
+            return new ComponentActionExecutionResult(
+                step.ComponentId, step.ActionId,
+                Outcome: ActionOutcome.Failed,
+                Message: $"Unknown tool: {step.ActionId}");
+        }
+
+        try
+        {
+            var args = (IReadOnlyDictionary<string, object?>)step.Arguments;
+            var sp = _serviceProvider ?? throw new InvalidOperationException("IServiceProvider not available for tool execution.");
+            var result = await tool.Handler(args, sp, cancellationToken);
+            return new ComponentActionExecutionResult(
+                step.ComponentId, step.ActionId,
+                Outcome: ActionOutcome.Applied,
+                Message: result);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Service tool {ToolName} failed", step.ActionId);
+            return new ComponentActionExecutionResult(
+                step.ComponentId, step.ActionId,
+                Outcome: ActionOutcome.Failed,
+                Message: $"Tool error: {ex.Message}");
         }
     }
 
@@ -1214,6 +1350,33 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         }
     }
 
+    private static async ValueTask EmitReasoningEventsAsync(
+        string? agentName,
+        string? reasoningContent,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        if (emitEvent is null || string.IsNullOrWhiteSpace(reasoningContent)) return;
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ReasoningStart,
+            AgentName = agentName
+        });
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ReasoningContent,
+            AgentName = agentName,
+            ReasoningDelta = reasoningContent
+        });
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ReasoningEnd,
+            AgentName = agentName
+        });
+    }
+
     private static async ValueTask EmitTextDeltasAsync(
         string agentName,
         string responseText,
@@ -1239,6 +1402,51 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageContent, AgentName = agentName, TextDelta = buffer.ToString() });
 
         await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageEnd, AgentName = agentName });
+    }
+
+    // -------------------------------------------------------------------------
+    // Action history recording (Paid tier)
+    // -------------------------------------------------------------------------
+
+    private async Task RecordActionHistoryAsync(
+        string sessionId,
+        string? userId,
+        string userMessage,
+        ComponentActionExecutionResult[] executionResults,
+        ActionPlan plan,
+        CancellationToken cancellationToken)
+    {
+        if (_actionHistoryStore is null) return;
+
+        foreach (var result in executionResults)
+        {
+            if (!result.Succeeded) continue;
+
+            // Match result back to its planned step to extract args
+            var step = plan.Steps.FirstOrDefault(s =>
+                string.Equals(s.ActionId, result.ActionId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(s.ComponentId, result.ComponentId, StringComparison.OrdinalIgnoreCase));
+
+            IReadOnlyDictionary<string, object?> args = step?.Arguments
+                ?? (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>();
+
+            try
+            {
+                await _actionHistoryStore.RecordAsync(new AgentBlazor.Core.Paid.ActionHistoryEntry(
+                    SessionId: sessionId,
+                    UserId: userId,
+                    Timestamp: DateTimeOffset.UtcNow,
+                    UserMessage: userMessage,
+                    ActionId: result.ActionId,
+                    AgentId: result.ComponentId,
+                    Args: args),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to record action history for {ActionId}", result.ActionId);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -29,4 +29,16 @@ public sealed class AgentActionAttribute : Attribute
     /// When true, the runtime will request user approval before executing this action.
     /// </summary>
     public bool RequiresApproval { get; set; }
+
+    /// <summary>
+    /// Name of a bool property or parameterless bool method on the component that gates availability.
+    /// When the member returns false the action is excluded from the agent's capability list at runtime.
+    /// Example: AvailableWhen = nameof(CanDelete)
+    /// </summary>
+    public string? AvailableWhen { get; set; }
+
+    /// <summary>
+    /// Whether the agent should follow up after this action completes. Defaults to true.
+    /// </summary>
+    public bool FollowUp { get; set; } = true;
 }
