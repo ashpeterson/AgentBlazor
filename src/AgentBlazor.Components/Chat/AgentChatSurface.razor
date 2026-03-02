@@ -23,30 +23,39 @@
 @inject IAdaptiveSuggestionService SuggestionService
 @inject IProactiveInsightService ProactiveInsightService
 
-<section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
-         data-theme="@(Theme?.DataTheme)"
-         data-style="@(Theme?.DataStyle)"
-         data-radius="@(Theme?.DataRadius)"
-         data-spacing="@(Theme?.DataSpacing)"
-         style="@_themeStyle"
-         aria-label="@(Title ?? "Chat")">
-    @if (!string.IsNullOrWhiteSpace(Title))
-    {
-        <header class="ab-chat-surface__header" id="@HeaderId">@Title</header>
-    }
+<ErrorBoundary @ref="_errorBoundary">
+    <ChildContent>
+        <section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
+                 data-theme="@(Theme?.DataTheme)"
+                 data-style="@(Theme?.DataStyle)"
+                 data-radius="@(Theme?.DataRadius)"
+                 data-spacing="@(Theme?.DataSpacing)"
+                 style="@_themeStyle"
+                 aria-label="@(Title ?? "Chat")">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <header class="ab-chat-surface__header" id="@HeaderId">@Title</header>
+            }
 
-    @if (!string.IsNullOrWhiteSpace(Description))
-    {
-        <p class="ab-chat-surface__body" id="@DescriptionId">@Description</p>
-    }
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <p class="ab-chat-surface__body" id="@DescriptionId">@Description</p>
+            }
 
-    @if (_agentState != AgentState.Idle)
+            @if (_agentState != AgentState.Idle)
     {
-        <div class="ab-chat-surface__state ab-chat-surface__state--@_agentState.ToString().ToLower()">
+        <div class="ab-chat-surface__state ab-chat-surface__state--@_agentState.ToString().ToLower() @(_showTimeoutWarning ? "ab-chat-surface__state--timeout" : "")">
             @if (_agentState == AgentState.Thinking)
             {
                 <span class="ab-chat-surface__state-dot"></span>
-                <span>Thinking...</span>
+                @if (_showTimeoutWarning)
+                {
+                    <span>Taking longer than expected...</span>
+                }
+                else
+                {
+                    <span>Thinking...</span>
+                }
             }
             else if (_agentState == AgentState.WaitingForApproval)
             {
@@ -99,8 +108,8 @@
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in item.ActivityMessages)
                             {
-                                <li class="ab-chat-surface__activity-item ab-chat-surface__activity-item--done">
-                                    <span class="ab-chat-surface__activity-icon">&#10003;</span>
+                                <li class="ab-chat-surface__activity-item @(activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")">
+                                    <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
                                     <span class="ab-chat-surface__activity-text">@activity.Text</span>
                                 </li>
                             }
@@ -167,10 +176,13 @@
                             @foreach (var activity in _streamingActivityMessages)
                             {
                                 var isDone = _completedActivityKeys.Contains(activity.Key);
-                                <li class="ab-chat-surface__activity-item @(isDone ? "ab-chat-surface__activity-item--done" : string.Empty)">
+                                var statusClass = isDone
+                                    ? (activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")
+                                    : string.Empty;
+                                <li class="ab-chat-surface__activity-item @statusClass">
                                     @if (isDone)
                                     {
-                                        <span class="ab-chat-surface__activity-icon">&#10003;</span>
+                                        <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
                                     }
                                     else
                                     {
@@ -326,16 +338,39 @@
                       disabled="@_isBusy"></textarea>
         </div>
 
-        <button type="submit"
-                id="@SubmitButtonId"
-                class="ab-chat-surface__submit"
-                disabled="@(_isBusy || !_canSubmit)"
-                aria-busy="@_isBusy"
-                aria-label="@(_isBusy ? "Sending..." : "Send message")">
-            @(_isBusy ? "Sending…" : "Send")
-        </button>
-    </EditForm>
-</section>
+            <button type="submit"
+                    id="@SubmitButtonId"
+                    class="ab-chat-surface__submit"
+                    disabled="@(_isBusy || !_canSubmit)"
+                    aria-busy="@_isBusy"
+                    aria-label="@(_isBusy ? "Sending..." : "Send message")">
+                @(_isBusy ? "Sending…" : "Send")
+            </button>
+        </EditForm>
+    </section>
+    </ChildContent>
+    <ErrorContent Context="exception">
+        <section class="ab-chat-surface ab-chat-surface--error @(Theme?.CssClass) @CssClass"
+                 data-theme="@(Theme?.DataTheme)"
+                 style="@_themeStyle"
+                 aria-label="Error">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <header class="ab-chat-surface__header" id="@HeaderId">@Title</header>
+            }
+            <div class="ab-chat-surface__error-content">
+                <div class="ab-chat-surface__error-icon">⚠️</div>
+                <div class="ab-chat-surface__error-title">Something went wrong</div>
+                <div class="ab-chat-surface__error-message">@exception.Message</div>
+                <button type="button"
+                        class="ab-chat-surface__submit"
+                        @onclick="RecoverFromError">
+                    Try Again
+                </button>
+            </div>
+        </section>
+    </ErrorContent>
+</ErrorBoundary>
 
 @code {
     private static readonly MarkdownPipeline _mdPipeline =
@@ -344,6 +379,8 @@
     private static MarkupString RenderMarkdown(string? text) =>
         new(string.IsNullOrWhiteSpace(text) ? string.Empty :
             Markdown.ToHtml(text ?? string.Empty, _mdPipeline));
+
+    private ErrorBoundary? _errorBoundary;
 
     private readonly List<string> _agentNames = [];
     private readonly List<ChatTimelineItem> _timeline = [];
@@ -369,6 +406,11 @@
     private bool _showSlashMenu;
     private List<SlashItem> _slashItems = [];
     private List<SlashItem>? _allSlashItems; // cached full list
+
+    // Timeout warning
+    private bool _showTimeoutWarning;
+    private System.Timers.Timer? _timeoutTimer;
+    private const int TimeoutWarningMs = 10000; // Show warning after 10 seconds
 
     // Session ID is taken from the scoped circuit registry so the runtime
     // can look up this circuit's components via AgentComponentRegistryHub.
@@ -513,6 +555,9 @@
         if (SessionEvents is not null)
             SessionEvents.SessionUpdated -= HandleSessionUpdated;
 
+        StopTimeoutTimer();
+        _timeoutTimer?.Dispose();
+
         try
         {
             _ = JSRuntime.InvokeVoidAsync("AgentBlazor.chat.detachEnterSubmit", PromptId);
@@ -522,6 +567,47 @@
         {
             // Ignore when JS or component already torn down
         }
+    }
+
+    private void StartTimeoutTimer()
+    {
+        _showTimeoutWarning = false;
+        _timeoutTimer ??= new System.Timers.Timer(TimeoutWarningMs);
+        _timeoutTimer.Elapsed -= OnTimeoutElapsed;
+        _timeoutTimer.Elapsed += OnTimeoutElapsed;
+        _timeoutTimer.AutoReset = false;
+        _timeoutTimer.Start();
+    }
+
+    private void StopTimeoutTimer()
+    {
+        _timeoutTimer?.Stop();
+        _showTimeoutWarning = false;
+    }
+
+    private void OnTimeoutElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        _ = InvokeAsync(() =>
+        {
+            if (_isBusy && _agentState == AgentState.Thinking)
+            {
+                _showTimeoutWarning = true;
+                StateHasChanged();
+            }
+        });
+    }
+
+    private void RecoverFromError()
+    {
+        _errorBoundary?.Recover();
+        _isBusy = false;
+        _agentState = AgentState.Idle;
+        _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _streamingAgentName = null;
+        _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
+        StateHasChanged();
     }
 
     private async Task SendAsync()
@@ -553,6 +639,7 @@
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
+        StartTimeoutTimer();
         StateHasChanged();
 
         try
@@ -568,6 +655,7 @@
         }
         finally
         {
+            StopTimeoutTimer();
             _isBusy = false;
             if (_agentState == AgentState.Thinking)
                 _agentState = AgentState.Idle;
@@ -622,7 +710,9 @@
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
         _isBusy = true;
+        _agentState = AgentState.Thinking;
         _scrollRequested = true;
+        StartTimeoutTimer();
         StateHasChanged();
 
         try
@@ -637,7 +727,10 @@
         }
         finally
         {
+            StopTimeoutTimer();
             _isBusy = false;
+            if (_agentState == AgentState.Thinking)
+                _agentState = AgentState.Idle;
         }
     }
 
@@ -673,6 +766,7 @@
         _isBusy = true;
         _agentState = AgentState.Thinking;
         _scrollRequested = true;
+        StartTimeoutTimer();
         StateHasChanged();
 
         try
@@ -688,7 +782,10 @@
         }
         finally
         {
+            StopTimeoutTimer();
             _isBusy = false;
+            if (_agentState == AgentState.Thinking)
+                _agentState = AgentState.Idle;
         }
     }
 
@@ -750,7 +847,7 @@
                 streamEvent.ExecutionResult is not null)
             {
                 var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
-                AddStreamingActivityMessage(resultKey, FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                AddStreamingActivityMessage(resultKey, FormatToolCallResultMessage(streamEvent.ExecutionResult), streamEvent.ExecutionResult.Succeeded);
                 _completedActivityKeys.Add(resultKey);
                 _scrollRequested = true;
                 await InvokeAsync(StateHasChanged);
@@ -928,14 +1025,14 @@
         return false;
     }
 
-    private void AddStreamingActivityMessage(string key, string message)
+    private void AddStreamingActivityMessage(string key, string message, bool succeeded = true)
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
         {
             return;
         }
 
-        UpsertActivityMessage(_streamingActivityMessages, key, message);
+        UpsertActivityMessage(_streamingActivityMessages, key, message, succeeded);
     }
 
     private bool TryAttachActivityToAssociatedTurn(string key, string message, string? runId)
@@ -1005,11 +1102,11 @@
         return $"{normalizedComponent}.{normalizedAction}".ToLowerInvariant();
     }
 
-    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message)
+    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message, bool succeeded = true)
     {
         var index = target.FindIndex(activity =>
             string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase));
-        var entry = new ActivityMessage(key, message);
+        var entry = new ActivityMessage(key, message, succeeded);
         if (index >= 0)
         {
             target[index] = entry;
@@ -1022,10 +1119,11 @@
     private static IReadOnlyList<ActivityMessage> UpsertActivityMessage(
         IReadOnlyList<ActivityMessage> source,
         string key,
-        string message)
+        string message,
+        bool succeeded = true)
     {
         var copy = source.ToList();
-        UpsertActivityMessage(copy, key, message);
+        UpsertActivityMessage(copy, key, message, succeeded);
         return copy;
     }
 
@@ -1202,7 +1300,7 @@
         {
             var key = BuildActivityKey(result.ComponentId, result.ActionId);
             var text = FormatToolCallResultMessage(result);
-            messages.Add(new ActivityMessage(key, text));
+            messages.Add(new ActivityMessage(key, text, result.Succeeded));
         }
 
         return messages;
@@ -1343,7 +1441,7 @@
             new("activity", "Activity", text, [], [], [], null, runId);
     }
 
-    private sealed record ActivityMessage(string Key, string Text);
+    private sealed record ActivityMessage(string Key, string Text, bool Succeeded = true);
 
     private sealed record StreamTurnOutcome(
         AgentTurnResponse Response,

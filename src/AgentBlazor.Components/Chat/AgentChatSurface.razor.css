@@ -215,6 +215,17 @@
     color: var(--ab-chat-accent);
 }
 
+/* Timeout warning state - shows amber when taking longer than expected */
+.ab-chat-surface__state--timeout {
+    background: rgba(251, 191, 36, 0.12);
+    color: #d97706;
+}
+
+.ab-chat-surface[data-theme="dark"] .ab-chat-surface__state--timeout {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
 .ab-chat-surface__state--waitingforapproval,
 .ab-chat-surface__state--waitingforclarification {
     background: rgba(251, 191, 36, 0.1);
@@ -721,10 +732,19 @@
     color: var(--ab-chat-text-secondary);
 }
 
+.ab-chat-surface__activity-item--failed {
+    color: var(--ab-chat-text-secondary);
+    background: rgba(239, 68, 68, 0.08);
+}
+
 .ab-chat-surface__activity-icon {
     font-size: 0.7rem;
     color: #10b981;
     flex-shrink: 0;
+}
+
+.ab-chat-surface__activity-icon--failed {
+    color: #ef4444;
 }
 
 .ab-chat-surface__activity-spinner {
@@ -978,4 +998,39 @@
     margin-top: 0.35rem;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* ─── Error State ────────────────────────────────────────────────────────────── */
+
+.ab-chat-surface--error {
+    justify-content: center;
+    align-items: center;
+}
+
+.ab-chat-surface__error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    text-align: center;
+    max-width: 24rem;
+}
+
+.ab-chat-surface__error-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+}
+
+.ab-chat-surface__error-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ab-chat-text);
+}
+
+.ab-chat-surface__error-message {
+    font-size: 0.875rem;
+    color: var(--ab-chat-text-muted);
+    word-break: break-word;
+    max-width: 100%;
 }

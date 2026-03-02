@@ -40,6 +40,14 @@
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    /// <summary>
+    /// Callback invoked when the agent calls the Confirm action.
+    /// Wire this up to handle confirmation logic (e.g., form submission, delete confirmation).
+    /// Return ActionResult.Applied("Success message") or ActionResult.Failure("Error message").
+    /// </summary>
+    [Parameter]
+    public Func<Task<ActionResult>>? OnConfirm { get; set; }
+
     public override string ComponentType => "Dialog";
 
     [AgentReadable("Whether the dialog is currently visible")]
@@ -68,8 +76,17 @@
     }
 
     [AgentAction("Confirm the dialog action", RequiresApproval = true)]
-    public Task<ActionResult> Confirm()
-        => Task.FromResult(ActionResult.Failure("Confirm execution wiring is not implemented for this dialog."));
+    public async Task<ActionResult> Confirm()
+    {
+        if (OnConfirm is null)
+        {
+            return ActionResult.NeedsClarification("No confirm handler configured for this dialog. Set the OnConfirm parameter.");
+        }
+
+        ActionResult? result = null;
+        await InvokeAsync(async () => result = await OnConfirm());
+        return result ?? ActionResult.Failure("Confirm handler did not return a result.");
+    }
 
     public override ComponentState GetCurrentState() => new()
     {

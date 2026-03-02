@@ -195,6 +195,25 @@ public sealed class AgentBlazorRegistrationOptions
 
     internal void ApplyProvider(IServiceCollection services)
     {
+        if (_providerRegistration is null)
+        {
+            // Emit console warning at startup — easier to spot than buried logs
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine();
+            Console.WriteLine("╔═══════════════════════════════════════════════════════════════════════════════╗");
+            Console.WriteLine("║  AgentBlazor Warning: No AI provider configured.                             ║");
+            Console.WriteLine("║                                                                               ║");
+            Console.WriteLine("║  Add one of the following to your AddAgentBlazor() call:                     ║");
+            Console.WriteLine("║    options.UseOpenAI(apiKey, \"gpt-4o-mini\");                                  ║");
+            Console.WriteLine("║    options.UseAzureOpenAI(endpoint, deploymentName);                         ║");
+            Console.WriteLine("║    options.UseOllama(\"llama3.2\");  // Free, runs locally                      ║");
+            Console.WriteLine("║                                                                               ║");
+            Console.WriteLine("║  The chat will show an error until a provider is configured.                 ║");
+            Console.WriteLine("╚═══════════════════════════════════════════════════════════════════════════════╝");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+
         _providerRegistration?.Invoke(services);
         _serviceRegistration?.Invoke(services);
 

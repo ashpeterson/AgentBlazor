@@ -1637,11 +1637,22 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
     private async Task<AgentTurnResponse> BuildProviderMissingResponseAsync(string agentName, PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
     {
-        const string message = "No provider is configured. Register an AgentBlazor provider chat client.";
+        const string message =
+            "**No AI provider configured.** " +
+            "Add one of the following to your `Program.cs`:\n\n" +
+            "```csharp\n" +
+            "// OpenAI\n" +
+            "options.UseOpenAI(apiKey: \"sk-...\", model: \"gpt-4o-mini\");\n\n" +
+            "// Azure OpenAI\n" +
+            "options.UseAzureOpenAI(endpoint: \"https://...\", deploymentName: \"...\");\n\n" +
+            "// Ollama (free, local)\n" +
+            "options.UseOllama(model: \"llama3.2\");\n" +
+            "```\n\n" +
+            "Set your API key via environment variable `OPENAI_API_KEY` or in `appsettings.json`.";
 
         if (traceBuilder.IsEnabled)
         {
-            traceBuilder.RecordFailure(message);
+            traceBuilder.RecordFailure("No AI provider configured");
             await StoreTraceAsync(traceBuilder, cancellationToken);
         }
 

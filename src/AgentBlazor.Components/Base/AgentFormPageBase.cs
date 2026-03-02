@@ -139,20 +139,58 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
     /// </summary>
     public override ComponentState GetCurrentState()
     {
-        var state = new ComponentState
-        {
-            ["dialogOpen"] = _dialogVisible,
-            ["formName"] = FormDisplayName
-        };
+        var fieldNames = ModelProperties.Select(p => p.Name).ToArray();
+        var fieldValues = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var fieldMetadata = new Dictionary<string, FieldMetadata>(StringComparer.OrdinalIgnoreCase);
 
-        // Add current field values
         foreach (var prop in ModelProperties)
         {
-            var value = prop.GetValue(_model);
-            state[ToCamelCase(prop.Name)] = value;
+            fieldValues[prop.Name] = prop.GetValue(_model);
+            fieldMetadata[prop.Name] = BuildFieldMetadata(prop);
         }
 
-        return state;
+        return new ComponentState
+        {
+            ["dialogOpen"] = _dialogVisible,
+            ["formName"] = FormDisplayName,
+            ["fieldCount"] = ModelProperties.Length,
+            ["fields"] = fieldNames,
+            ["fieldValues"] = fieldValues,
+            ["fieldMetadata"] = fieldMetadata
+        };
+    }
+
+    private static FieldMetadata BuildFieldMetadata(PropertyInfo prop)
+    {
+        var propType = prop.PropertyType;
+        var underlying = Nullable.GetUnderlyingType(propType);
+        var effective = underlying ?? propType;
+
+        string[]? allowed = effective.IsEnum ? Enum.GetNames(effective) : null;
+        var req = prop.GetCustomAttribute<RequiredAttribute>();
+        var maxLen = prop.GetCustomAttribute<MaxLengthAttribute>();
+        var minLen = prop.GetCustomAttribute<MinLengthAttribute>();
+        var strLen = prop.GetCustomAttribute<StringLengthAttribute>();
+        var range = prop.GetCustomAttribute<RangeAttribute>();
+        var regex = prop.GetCustomAttribute<RegularExpressionAttribute>();
+        var display = prop.GetCustomAttribute<DisplayAttribute>();
+        var displayName = prop.GetCustomAttribute<DisplayNameAttribute>();
+        var description = prop.GetCustomAttribute<DescriptionAttribute>();
+
+        return new FieldMetadata
+        {
+            Type = GetFriendlyTypeName(propType),
+            IsRequired = req is not null,
+            IsNullable = underlying is not null || !propType.IsValueType,
+            MaxLength = maxLen?.Length ?? strLen?.MaximumLength,
+            MinLength = minLen?.Length ?? strLen?.MinimumLength,
+            Pattern = regex?.Pattern,
+            MinValue = range?.Minimum,
+            MaxValue = range?.Maximum,
+            AllowedValues = allowed,
+            DisplayName = display?.Name ?? displayName?.DisplayName,
+            Description = description?.Description ?? display?.Description ?? display?.Prompt
+        };
     }
 
     /// <summary>
