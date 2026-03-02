@@ -57,28 +57,27 @@
         EnsureEditContext();
     }
 
-    [AgentAction("Set a form field value by name")]
-    public async Task<ActionResult> SetField(
-        [AgentParam("Field name (property name on the form model)", Required = true)] string field,
-        [AgentParam("Value to set the field to")] object? value = null)
-    {
-        EnsureEditContext();
-        var property = ResolveProperty(field);
-        if (property is null)
-        {
-            var available = string.Join(", ", GetSettableFieldNames());
-            return ActionResult.NeedsClarification(
-                $"Field '{field}' not found on form model '{Model.GetType().Name}'. Available fields: {available}.");
-        }
-
-        var normalized = NormalizeValue(value);
-        if (!TrySetValue(property, normalized, out var message))
-            return ActionResult.Failure(message);
-
-        _editContext!.NotifyFieldChanged(new FieldIdentifier(Model, property.Name));
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied(message);
-    }
+    // NOTE: The SetField action has been removed because it's unreliable for forms inside dialogs.
+    // Forms inside closed dialogs are not rendered/mounted, so the agent cannot target them.
+    //
+    // RECOMMENDED PATTERN (CopilotKit-style):
+    // Create a dedicated workflow agent component that exposes a compound action with explicit
+    // parameters for each field. The action handler opens the dialog AND fills all fields
+    // atomically. See SupplierOnboardingAgent.razor for an example.
+    //
+    // Example:
+    //   [AgentAction("Fill out the order form")]
+    //   public async Task<ActionResult> FillOrderForm(
+    //       [AgentParam("Customer name")] string customer,
+    //       [AgentParam("Product ID")] string productId,
+    //       [AgentParam("Quantity")] int quantity)
+    //   {
+    //       await _dialog.Open();
+    //       _model.Customer = customer;
+    //       _model.ProductId = productId;
+    //       _model.Quantity = quantity;
+    //       return ActionResult.Applied("Filled order form.");
+    //   }
 
     [AgentAction("Validate the form")]
     public async Task<ActionResult> Validate()
@@ -122,10 +121,17 @@
         EnsureEditContext();
         var values = CaptureValues();
         var metadata = GetFieldMetadata();
+
+        // Note: We avoid calling _editContext.Validate() here because it triggers
+        // StateHasChanged via MudBlazor's validation handlers, which fails when
+        // GetCurrentState is called from background threads (planner/executor).
+        // Instead, we check if there are any existing validation messages.
+        var hasValidationMessages = _editContext!.GetValidationMessages().Any();
+
         return new ComponentState
         {
             ["fieldCount"] = values.Count,
-            ["isValid"] = _editContext!.Validate(),
+            ["hasValidationErrors"] = hasValidationMessages,
             ["fields"] = values.Keys.ToArray(),
             ["fieldValues"] = values,
             ["fieldMetadata"] = metadata

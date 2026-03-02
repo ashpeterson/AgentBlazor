@@ -116,9 +116,21 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         sb.AppendLine("- `message` is always required — it is shown directly to the user.");
         sb.AppendLine("- `actions` executes component operations. Use only agentIds and action names listed in ACTIVE COMPONENTS.");
         sb.AppendLine("- `ui` is optional — include when it adds value (charts, tables, summaries, forms).");
-        sb.AppendLine("- If key information is missing, set needsClarification=true with a specific clarificationQuestion.");
+        sb.AppendLine("- Only set needsClarification=true if CRITICAL information is truly missing and cannot be inferred.");
+        sb.AppendLine("- If the user provides ANY data values, use them — do not ask for clarification.");
         sb.AppendLine("- Do not invent agentIds, action names, or routes not listed below.");
         sb.AppendLine("- Include all required parameters for each action.");
+        sb.AppendLine();
+        sb.AppendLine("# ACTION TARGETING RULES");
+        sb.AppendLine("- CRITICAL: Each action can ONLY be called on the agentId that lists it in ACTIVE COMPONENTS.");
+        sb.AppendLine("- The 'setField' action is on Form components, NOT Dialog components.");
+        sb.AppendLine("- The 'open'/'close' actions are on Dialog components.");
+        sb.AppendLine("- Look at ACTIVE COMPONENTS below: find which agentId lists 'setField' under its Actions.");
+        sb.AppendLine("- Use EXACT parameter names from ACTIVE COMPONENTS (e.g., 'field' not 'fieldName').");
+        sb.AppendLine();
+        sb.AppendLine("# MULTI-STEP FORM FILLING");
+        sb.AppendLine("- When the user provides data values, fill them in without asking for clarification.");
+        sb.AppendLine("- Steps: 1) open Dialog, 2) setField on Form for each value, 3) submit only if asked.");
         sb.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(request.AgentInstructions))
@@ -402,6 +414,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
     /// <summary>
     /// Converts a raw args dictionary (whose values may be JsonElement from deserialization)
     /// to a dictionary with native CLR types so callers get int, string, bool, etc.
+    /// Also normalizes common parameter name variations.
     /// </summary>
     private static Dictionary<string, object?> NormalizeArgs(Dictionary<string, object?>? args)
     {
@@ -410,9 +423,28 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         var result = new Dictionary<string, object?>(args.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in args)
         {
-            result[key] = value is JsonElement je ? UnwrapJsonElement(je) : value;
+            var normalizedKey = NormalizeParameterName(key);
+            result[normalizedKey] = value is JsonElement je ? UnwrapJsonElement(je) : value;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Normalizes common parameter name variations that LLMs might use.
+    /// </summary>
+    private static string NormalizeParameterName(string name)
+    {
+        return name.ToLowerInvariant() switch
+        {
+            "fieldname" => "field",
+            "columnname" => "column",
+            "rowindex" => "rowKey",
+            "tabindex" => "index",
+            "sortdirection" => "direction",
+            "filtervalue" => "value",
+            "filteroperator" => "operator",
+            _ => name
+        };
     }
 
     private static object? UnwrapJsonElement(JsonElement je) => je.ValueKind switch

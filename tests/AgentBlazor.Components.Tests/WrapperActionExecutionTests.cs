@@ -282,8 +282,9 @@ public class WrapperActionExecutionTests
     }
 
     [Fact]
-    public async Task AgentForm_ExecutesSetValidateSubmitAndReset_Actions()
+    public async Task AgentForm_ExecutesValidateSubmitAndReset_Actions()
     {
+        // Note: SetField was removed - see comment below for recommended pattern
         var model = new SupplierFormModel
         {
             SupplierName = "Contoso",
@@ -302,77 +303,22 @@ public class WrapperActionExecutionTests
         form.ValidationChanged = callbacks.Create<bool>(this, valid => observedValidation = valid);
         form.Submitted = callbacks.Create(this, () => submitCount++);
 
-        var setField = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
-        {
-            ["field"] = nameof(SupplierFormModel.SupplierName),
-            ["value"] = "Northwind"
-        }));
-
         var validate = await form.ExecuteActionAsync(AgentAction.Create("validate"));
         var submit = await form.ExecuteActionAsync(AgentAction.Create("submit"));
         var reset = await form.ExecuteActionAsync(AgentAction.Create("reset"));
 
-        Assert.True(setField.Succeeded);
         Assert.True(validate.Succeeded);
         Assert.True(submit.Succeeded);
         Assert.True(reset.Succeeded);
-        Assert.Equal("Contoso", model.SupplierName);
+        Assert.Equal("Contoso", model.SupplierName); // Reset restores original value
         Assert.Equal(1, submitCount);
-        Assert.False(observedValidation);
+        Assert.False(observedValidation); // Reset clears validation state
     }
 
-    [Fact]
-    public async Task AgentForm_SetField_ResolvesNaturalFieldHint_ToCanonicalProperty()
-    {
-        var model = new SupplierFormModel
-        {
-            SupplierName = "Contoso",
-            RequestedBudget = 1000m
-        };
-
-        var form = new AgentForm
-        {
-            AgentId = "supplier-form",
-            Model = model
-        };
-
-        var result = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
-        {
-            ["field"] = "SupplierName",
-            ["value"] = "Ash"
-        }));
-
-        Assert.True(result.Succeeded);
-        Assert.Equal("Ash", model.SupplierName);
-        Assert.Contains("SupplierName", result.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task AgentForm_SetField_FailsWhenFieldHintIsAmbiguous()
-    {
-        var model = new PersonFormModel
-        {
-            FirstName = "Ada",
-            LastName = "Lovelace"
-        };
-
-        var form = new AgentForm
-        {
-            AgentId = "person-form",
-            Model = model
-        };
-
-        var result = await form.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
-        {
-            ["field"] = "name",
-            ["value"] = "Ash"
-        }));
-
-        Assert.False(result.Succeeded);
-        Assert.Contains("not found", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("Ada", model.FirstName);
-        Assert.Equal("Lovelace", model.LastName);
-    }
+    // NOTE: SetField tests removed because the SetField action was removed from AgentForm.
+    // The generic SetField approach is unreliable for forms inside dialogs (forms aren't mounted
+    // when dialog is closed). The recommended pattern is to create compound workflow actions
+    // with explicit parameters. See SupplierOnboardingAgent.razor for an example.
 
     private sealed record SupplierRow(string SupplierId, string Region, int RiskScore);
 

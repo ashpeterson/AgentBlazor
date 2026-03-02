@@ -45,7 +45,7 @@
     [AgentReadable("Whether the dialog is currently visible")]
     public bool IsVisible => Visible;
 
-    [AgentAction("Open this dialog")]
+    [AgentAction("Open this dialog. Call this BEFORE setting any form fields inside if the dialog is closed.")]
     public async Task Open()
     {
         await InvokeAsync(async () =>

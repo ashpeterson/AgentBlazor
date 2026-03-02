@@ -741,6 +741,12 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     /// <summary>
     /// After planning, the new AgentPlanner emits steps where ComponentId = agentId (instance ID).
     /// This method resolves each step's ComponentId to the canonical component type so validation works.
+    /// It also reroutes actions to the correct component when the LLM targets the wrong one.
+    /// </summary>
+    /// <summary>
+    /// Resolves agentId-based component targeting to canonical component types.
+    /// This handles the case where the LLM uses an agentId (like "supplier-onboarding")
+    /// instead of a component type (like "SupplierOnboardingWorkflow").
     /// </summary>
     private static ActionPlan ResolveComponentTypes(
         ActionPlan plan,
@@ -752,49 +758,81 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         var mountedByAgentId = mountedComponents.ToDictionary(
             static m => m.AgentId, StringComparer.OrdinalIgnoreCase);
 
-        var changed = false;
+        var anyChanged = false;
         var steps = new List<PlannedStep>(plan.Steps.Count);
 
         foreach (var step in plan.Steps)
         {
             var componentId = step.ComponentId;
             var targetAgentId = step.TargetAgentId;
+            var actionId = step.ActionId;
+            var stepChanged = false;
 
             // If componentId looks like an agentId (not a known component type), resolve it
             if (!IsAllowedComponent(componentId, allowedComponents))
             {
                 if (mountedByAgentId.TryGetValue(componentId, out var mounted))
                 {
+                    // Resolve agentId to component type
                     var canonical = ResolveAllowedComponentId(mounted.ComponentType, allowedComponents);
                     if (!string.IsNullOrWhiteSpace(canonical))
                     {
                         targetAgentId ??= componentId;
                         componentId = canonical;
-                        changed = true;
+
+                        // Normalize actionId to match component's actual action ID (camelCase/snake_case)
+                        var matchingAction = mounted.Actions.FirstOrDefault(a => ActionIdMatches(a.ActionId, actionId));
+                        if (matchingAction is not null)
+                        {
+                            actionId = matchingAction.ActionId;
+                        }
+
+                        stepChanged = true;
                     }
                 }
                 else
                 {
-                    // Last resort: try resolving by type name
+                    // Try resolving by type name directly
                     var canonical = ResolveAllowedComponentId(componentId, allowedComponents);
                     if (!string.IsNullOrWhiteSpace(canonical))
                     {
                         componentId = canonical;
-                        changed = true;
+                        stepChanged = true;
                     }
                 }
             }
 
-            steps.Add(changed && componentId != step.ComponentId
-                ? step with { ComponentId = componentId, TargetAgentId = targetAgentId }
-                : step);
+            if (stepChanged)
+            {
+                anyChanged = true;
+                steps.Add(step with { ComponentId = componentId, TargetAgentId = targetAgentId, ActionId = actionId });
+            }
+            else
+            {
+                steps.Add(step);
+            }
         }
 
-        return changed ? plan with { Steps = steps } : plan;
+        return anyChanged ? plan with { Steps = steps } : plan;
     }
 
     private static bool IsAllowedComponent(string componentId, IReadOnlyList<AvailableComponent> allowedComponents)
         => allowedComponents.Any(c => string.Equals(c.ComponentId, componentId, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Compares action IDs, handling both camelCase (LLM output) and snake_case (discovery output).
+    /// e.g., "setField" matches "set_field"
+    /// </summary>
+    private static bool ActionIdMatches(string actionA, string actionB)
+    {
+        if (string.Equals(actionA, actionB, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Normalize both to lowercase without underscores for comparison
+        var normalizedA = actionA.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+        var normalizedB = actionB.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+        return string.Equals(normalizedA, normalizedB, StringComparison.Ordinal);
+    }
 
     private static string? ResolveAllowedComponentId(string? typeOrId, IReadOnlyList<AvailableComponent> allowedComponents)
     {

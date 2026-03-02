@@ -609,7 +609,9 @@ public class ServiceRegistrationTests
             "test"));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("No executor mapping is registered", result.Message, StringComparison.Ordinal);
+        // With the fallback executor, unknown components try registry lookup first
+        // and fail with "No component registry found" when no session context exists
+        Assert.Contains("No component registry found for session", result.Message, StringComparison.Ordinal);
         Assert.Contains("UnknownComponent.unknown_action", result.Message, StringComparison.Ordinal);
     }
 
