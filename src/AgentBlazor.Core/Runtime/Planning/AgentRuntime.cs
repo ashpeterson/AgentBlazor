@@ -702,27 +702,111 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             {
                 AgentId = c.AgentId,
                 ComponentType = c.ComponentType,
-                // Actions come from [AgentAction] attribute discovery — single source of truth.
-                // This ensures custom components and built-in wrappers both appear correctly.
-                Actions = AgentActionDiscovery.GetDiscoveredActions(c)
+                // Try attribute discovery first, then fall back to GetCapability() for components
+                // that generate actions dynamically (like AgentFormPageBase<TModel>).
+                Actions = GetActionsForComponent(c),
+                State = c.GetCurrentState()
+                    .ToDictionary(kv => kv.Key, kv => FormatMountedStateValue(kv.Value))
+            })
+            .ToList();
+    }
+
+    private static List<AvailableAction> GetActionsForComponent(IAgentControllable component)
+    {
+        // First try [AgentAction] attribute discovery
+        var discoveredActions = AgentActionDiscovery.GetDiscoveredActions(component);
+        if (discoveredActions.Count > 0)
+        {
+            return discoveredActions
+                .Select(static a => new AvailableAction
+                {
+                    ActionId = a.ActionId,
+                    Description = a.Description,
+                    RequiresApproval = a.RequiresApproval,
+                    Parameters = a.Parameters.Select(static p => new ActionParameter
+                    {
+                        Name = p.Name,
+                        Type = p.Type,
+                        Required = p.Required,
+                        Description = p.Description,
+                        AllowedValues = p.AllowedValues?.ToList()
+                    }).ToList()
+                }).ToList();
+        }
+
+        // Fall back to GetCapability() for components that override it dynamically
+        // (e.g., AgentFormPageBase<TModel> which generates actions from model properties)
+        try
+        {
+            var capability = component.GetCapability();
+            if (capability.Actions.Count > 0)
+            {
+                return capability.Actions
                     .Select(static a => new AvailableAction
                     {
                         ActionId = a.ActionId,
                         Description = a.Description,
                         RequiresApproval = a.RequiresApproval,
-                        Parameters = a.Parameters.Select(static p => new ActionParameter
-                        {
-                            Name = p.Name,
-                            Type = p.Type,
-                            Required = p.Required,
-                            Description = p.Description,
-                            AllowedValues = p.AllowedValues?.ToList()
-                        }).ToList()
-                    }).ToList(),
-                State = c.GetCurrentState()
-                    .ToDictionary(kv => kv.Key, kv => FormatMountedStateValue(kv.Value))
-            })
-            .ToList();
+                        Parameters = ParseInputSchemaToParameters(a.InputSchema)
+                    }).ToList();
+            }
+        }
+        catch
+        {
+            // Keep runtime resilient to capability faults
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Parses a simple input schema string like "(string field [required], string value)"
+    /// into structured ActionParameter objects for the planner prompt.
+    /// </summary>
+    private static List<ActionParameter> ParseInputSchemaToParameters(string? inputSchema)
+    {
+        if (string.IsNullOrWhiteSpace(inputSchema) || inputSchema == "()")
+            return [];
+
+        var result = new List<ActionParameter>();
+
+        // Remove outer parentheses
+        var content = inputSchema.Trim();
+        if (content.StartsWith('(')) content = content[1..];
+        if (content.EndsWith(')')) content = content[..^1];
+
+        // Split by comma (simple parsing, doesn't handle nested commas)
+        var parts = content.Split(',', StringSplitOptions.TrimEntries);
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrWhiteSpace(part)) continue;
+
+            // Parse: "type name [required] — description"
+            var tokens = part.Split(' ', 2, StringSplitOptions.TrimEntries);
+            if (tokens.Length < 2) continue;
+
+            var type = tokens[0];
+            var rest = tokens[1];
+
+            // Extract name (first word)
+            var spaceIdx = rest.IndexOf(' ');
+            var name = spaceIdx > 0 ? rest[..spaceIdx] : rest;
+            var suffix = spaceIdx > 0 ? rest[spaceIdx..] : "";
+
+            var required = suffix.Contains("[required]", StringComparison.OrdinalIgnoreCase);
+            var descIdx = suffix.IndexOf('—');
+            var description = descIdx > 0 ? suffix[(descIdx + 1)..].Trim() : null;
+
+            result.Add(new ActionParameter
+            {
+                Name = name,
+                Type = type,
+                Required = required,
+                Description = description
+            });
+        }
+
+        return result;
     }
 
     private static string FormatMountedStateValue(object? value)

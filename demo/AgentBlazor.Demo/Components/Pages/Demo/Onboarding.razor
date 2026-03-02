@@ -1,14 +1,10 @@
 @page "/demo/onboarding"
 @layout DemoLayout
 @using System.ComponentModel.DataAnnotations
-@using AgentBlazor.Attributes
-@using AgentBlazor.Components
-@using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Demo.Services
-@using AgentBlazor.Runtime
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
-@inherits AgentControllableComponentBase
+@inherits AgentFormPageBase<SupplierOnboardingModel>
 @inject SupplierWorkflowService WorkflowService
 @inject ISnackbar Snackbar
 
@@ -17,7 +13,7 @@
 <MudText Typo="Typo.h5" Class="mb-1">Form Workflow</MudText>
 <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
     The agent can fill out the entire supplier onboarding form from a single natural-language prompt.
-    The page itself exposes compound actions — no separate agent component needed.
+    The page inherits from <code>AgentFormPageBase&lt;TModel&gt;</code> — actions are auto-generated from the model.
 </MudText>
 
 <MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
@@ -39,7 +35,7 @@
     </MudAlert>
 }
 
-<MudDialog @bind-Visible="_dialogVisible">
+<MudDialog @bind-Visible="DialogVisible">
     <TitleContent>
         <MudText Typo="Typo.h6">New Supplier</MudText>
     </TitleContent>
@@ -48,65 +44,65 @@
             <DataAnnotationsValidator />
             <MudTextField T="string"
                           Label="Supplier name"
-                          For="@(() => _model.SupplierName)"
-                          @bind-Value="_model.SupplierName" />
+                          For="@(() => Model.SupplierName)"
+                          @bind-Value="Model.SupplierName" />
             <MudTextField T="string"
                           Label="Contact email"
-                          For="@(() => _model.ContactEmail)"
-                          @bind-Value="_model.ContactEmail" />
+                          For="@(() => Model.ContactEmail)"
+                          @bind-Value="Model.ContactEmail" />
             <MudTextField T="string"
                           Label="Contact phone"
-                          For="@(() => _model.ContactPhone)"
-                          @bind-Value="_model.ContactPhone" />
+                          For="@(() => Model.ContactPhone)"
+                          @bind-Value="Model.ContactPhone" />
             <MudTextField T="string"
                           Label="Risk tier"
-                          For="@(() => _model.RiskTier)"
-                          @bind-Value="_model.RiskTier" />
+                          For="@(() => Model.RiskTier)"
+                          @bind-Value="Model.RiskTier" />
             <MudTextField T="string"
                           Label="Country"
-                          For="@(() => _model.Country)"
-                          @bind-Value="_model.Country" />
+                          For="@(() => Model.Country)"
+                          @bind-Value="Model.Country" />
             <MudTextField T="string"
                           Label="Category"
-                          For="@(() => _model.Category)"
-                          @bind-Value="_model.Category" />
+                          For="@(() => Model.Category)"
+                          @bind-Value="Model.Category" />
             <MudTextField T="string"
                           Label="Payment terms"
-                          For="@(() => _model.PaymentTerms)"
-                          @bind-Value="_model.PaymentTerms" />
+                          For="@(() => Model.PaymentTerms)"
+                          @bind-Value="Model.PaymentTerms" />
             <MudTextField T="string"
                           Label="Preferred currency"
-                          For="@(() => _model.PreferredCurrency)"
-                          @bind-Value="_model.PreferredCurrency" />
+                          For="@(() => Model.PreferredCurrency)"
+                          @bind-Value="Model.PreferredCurrency" />
             <MudNumericField T="decimal"
                              Label="Requested budget"
-                             For="@(() => _model.RequestedBudget)"
-                             @bind-Value="_model.RequestedBudget"
+                             For="@(() => Model.RequestedBudget)"
+                             @bind-Value="Model.RequestedBudget"
                              Adornment="Adornment.End"
                              AdornmentText="USD" />
             <MudNumericField T="decimal"
                              Label="Expected monthly spend"
-                             For="@(() => _model.ExpectedMonthlySpend)"
-                             @bind-Value="_model.ExpectedMonthlySpend"
+                             For="@(() => Model.ExpectedMonthlySpend)"
+                             @bind-Value="Model.ExpectedMonthlySpend"
                              Adornment="Adornment.End"
                              AdornmentText="USD" />
             <MudNumericField T="int"
                              Label="Priority (1-5)"
-                             For="@(() => _model.Priority)"
-                             @bind-Value="_model.Priority" />
+                             For="@(() => Model.Priority)"
+                             @bind-Value="Model.Priority" />
             <MudCheckBox T="bool"
                          Label="Sanctions screened"
-                         For="@(() => _model.SanctionsScreened)"
-                         @bind-Value="_model.SanctionsScreened" />
+                         For="@(() => Model.SanctionsScreened)"
+                         @bind-Value="Model.SanctionsScreened" />
             <MudCheckBox T="bool"
                          Label="NDA required"
-                         For="@(() => _model.NdaRequired)"
-                         @bind-Value="_model.NdaRequired" />
+                         For="@(() => Model.NdaRequired)"
+                         @bind-Value="Model.NdaRequired" />
             <MudTextField T="string"
                           Label="Notes"
                           Lines="2"
-                          For="@(() => _model.Notes)"
-                          @bind-Value="_model.Notes" />
+                          For="@(() => Model.Notes)"
+                          @bind-Value="Model.Notes" />
             <MudStack Row="true" Justify="Justify.FlexEnd">
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
@@ -124,105 +120,17 @@
 </MudDialog>
 
 @code {
-    private SupplierOnboardingModel _model = new();
     private EditContext? _editContext;
     private SupplierOnboardingResult? _lastSubmission;
-    private bool _dialogVisible;
 
-    // Required by AgentControllableComponentBase
-    public override string ComponentType => "SupplierOnboarding";
+    // Required by AgentFormPageBase<TModel>
+    protected override string AgentIdValue => "supplier-onboarding";
+    protected override string FormDisplayName => "Supplier Onboarding";
 
     protected override void OnInitialized()
     {
-        // Set AgentId for this page (required by base class)
-        AgentId = "supplier-onboarding";
         base.OnInitialized();
-        _editContext = new EditContext(_model);
-    }
-
-    // -------------------------------------------------------------------------
-    // Agent Actions (CopilotKit-style: defined directly in the page)
-    // -------------------------------------------------------------------------
-
-    [AgentAction("Fill out the supplier onboarding form. Opens the dialog and populates fields. Use when user wants to onboard a new supplier.")]
-    public async Task<ActionResult> FillSupplierOnboardingForm(
-        [AgentParam("Name of the supplier company", Required = true)] string supplierName,
-        [AgentParam("Country where the supplier is located", Required = true)] string country,
-        [AgentParam("Risk tier: low, medium, or high")] string? riskTier = null,
-        [AgentParam("Priority level from 1 (highest) to 5 (lowest)")] int? priority = null,
-        [AgentParam("Contact email address")] string? contactEmail = null,
-        [AgentParam("Contact phone number")] string? contactPhone = null,
-        [AgentParam("Supplier category")] string? category = null,
-        [AgentParam("Payment terms")] string? paymentTerms = null,
-        [AgentParam("Preferred currency (e.g., USD, EUR)")] string? preferredCurrency = null,
-        [AgentParam("Requested budget amount")] decimal? requestedBudget = null,
-        [AgentParam("Expected monthly spend amount")] decimal? expectedMonthlySpend = null,
-        [AgentParam("Whether sanctions screening has been completed")] bool? sanctionsScreened = null,
-        [AgentParam("Whether an NDA is required")] bool? ndaRequired = null,
-        [AgentParam("Additional notes")] string? notes = null)
-    {
-        // Fill all provided fields
-        _model.SupplierName = supplierName;
-        _model.Country = country;
-
-        if (!string.IsNullOrWhiteSpace(riskTier))
-            _model.RiskTier = riskTier;
-        if (priority.HasValue)
-            _model.Priority = priority.Value;
-        if (!string.IsNullOrWhiteSpace(contactEmail))
-            _model.ContactEmail = contactEmail;
-        if (!string.IsNullOrWhiteSpace(contactPhone))
-            _model.ContactPhone = contactPhone;
-        if (!string.IsNullOrWhiteSpace(category))
-            _model.Category = category;
-        if (!string.IsNullOrWhiteSpace(paymentTerms))
-            _model.PaymentTerms = paymentTerms;
-        if (!string.IsNullOrWhiteSpace(preferredCurrency))
-            _model.PreferredCurrency = preferredCurrency;
-        if (requestedBudget.HasValue)
-            _model.RequestedBudget = requestedBudget.Value;
-        if (expectedMonthlySpend.HasValue)
-            _model.ExpectedMonthlySpend = expectedMonthlySpend.Value;
-        if (sanctionsScreened.HasValue)
-            _model.SanctionsScreened = sanctionsScreened.Value;
-        if (ndaRequired.HasValue)
-            _model.NdaRequired = ndaRequired.Value;
-        if (!string.IsNullOrWhiteSpace(notes))
-            _model.Notes = notes;
-
-        // Open dialog and refresh UI (must be on dispatcher thread)
-        _dialogVisible = true;
-        await RequestComponentRefreshAsync();
-
-        return ActionResult.Applied($"Opened supplier onboarding form for {supplierName} from {country}.");
-    }
-
-    [AgentAction("Open the supplier onboarding dialog.")]
-    public async Task<ActionResult> OpenSupplierOnboarding()
-    {
-        _dialogVisible = true;
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Opened supplier onboarding dialog.");
-    }
-
-    [AgentAction("Close the supplier onboarding dialog.")]
-    public async Task<ActionResult> CloseSupplierOnboarding()
-    {
-        _dialogVisible = false;
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Closed supplier onboarding dialog.");
-    }
-
-    public override ComponentState GetCurrentState()
-    {
-        return new ComponentState
-        {
-            ["dialogOpen"] = _dialogVisible,
-            ["supplierName"] = _model.SupplierName,
-            ["country"] = _model.Country,
-            ["riskTier"] = _model.RiskTier,
-            ["priority"] = _model.Priority
-        };
+        _editContext = new EditContext(Model);
     }
 
     // -------------------------------------------------------------------------
@@ -231,33 +139,33 @@
 
     private Task OpenDialogAsync()
     {
-        _dialogVisible = true;
+        DialogVisible = true;
         return Task.CompletedTask;
     }
 
     private Task CloseDialogAsync()
     {
-        _dialogVisible = false;
+        DialogVisible = false;
         return Task.CompletedTask;
     }
 
     private async Task OnSubmittedAsync()
     {
         var submission = new SupplierOnboardingSubmission(
-            _model.SupplierName,
-            _model.ContactEmail,
-            _model.ContactPhone,
-            _model.RiskTier,
-            _model.Country,
-            _model.Category,
-            _model.PaymentTerms,
-            _model.PreferredCurrency,
-            _model.RequestedBudget,
-            _model.ExpectedMonthlySpend,
-            _model.Priority,
-            _model.SanctionsScreened,
-            _model.NdaRequired,
-            _model.Notes);
+            Model.SupplierName,
+            Model.ContactEmail,
+            Model.ContactPhone,
+            Model.RiskTier,
+            Model.Country,
+            Model.Category,
+            Model.PaymentTerms,
+            Model.PreferredCurrency,
+            Model.RequestedBudget,
+            Model.ExpectedMonthlySpend,
+            Model.Priority,
+            Model.SanctionsScreened,
+            Model.NdaRequired,
+            Model.Notes);
 
         var result = await WorkflowService.SubmitOnboardingAsync(submission, CancellationToken.None);
         _lastSubmission = result;
@@ -265,8 +173,8 @@
             $"Submitted {result.RequestId} and created supplier {result.SupplierId} (risk score {result.RiskScore}).",
             Severity.Success);
 
-        _model = new SupplierOnboardingModel();
-        _editContext = new EditContext(_model);
-        _dialogVisible = false;
+        ResetForm();
+        _editContext = new EditContext(Model);
+        DialogVisible = false;
     }
 }

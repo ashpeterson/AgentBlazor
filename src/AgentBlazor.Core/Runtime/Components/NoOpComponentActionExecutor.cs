@@ -79,12 +79,18 @@ internal sealed class NoOpComponentActionExecutor(
                 Message: $"No component registry found for session. Cannot execute '{action.ComponentId}.{action.ActionId}'.");
         }
 
-        // Try to find a component by agentId first (from arguments or TargetAgentId)
+        // Try to find a component by agentId first (from arguments)
         var agentId = RegisteredComponentActionExecutorBridge.TryGetAgentId(action.Arguments);
 
         if (!string.IsNullOrWhiteSpace(agentId) && registry.TryGet(agentId, out var targetedComponent))
         {
             return await ExecuteOnComponentAsync(targetedComponent, action, cancellationToken);
+        }
+
+        // Try to find by ComponentId matching AgentId directly (most common case)
+        if (registry.TryGet(action.ComponentId, out var componentByAgentId))
+        {
+            return await ExecuteOnComponentAsync(componentByAgentId, action, cancellationToken);
         }
 
         // Try to find a component by ComponentType matching ComponentId

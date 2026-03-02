@@ -122,15 +122,15 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         sb.AppendLine("- Include all required parameters for each action.");
         sb.AppendLine();
         sb.AppendLine("# ACTION TARGETING RULES");
-        sb.AppendLine("- CRITICAL: Each action can ONLY be called on the agentId that lists it in ACTIVE COMPONENTS.");
-        sb.AppendLine("- The 'setField' action is on Form components, NOT Dialog components.");
-        sb.AppendLine("- The 'open'/'close' actions are on Dialog components.");
-        sb.AppendLine("- Look at ACTIVE COMPONENTS below: find which agentId lists 'setField' under its Actions.");
-        sb.AppendLine("- Use EXACT parameter names from ACTIVE COMPONENTS (e.g., 'field' not 'fieldName').");
+        sb.AppendLine("- CRITICAL: Use ONLY the action names listed in ACTIVE COMPONENTS below.");
+        sb.AppendLine("- Each action can ONLY be called on the agentId that lists it.");
+        sb.AppendLine("- For forms, look for fill_* actions (e.g., 'fill_supplier_onboarding') that accept all fields at once.");
+        sb.AppendLine("- Use EXACT parameter names from ACTIVE COMPONENTS.");
         sb.AppendLine();
-        sb.AppendLine("# MULTI-STEP FORM FILLING");
+        sb.AppendLine("# FORM FILLING");
         sb.AppendLine("- When the user provides data values, fill them in without asking for clarification.");
-        sb.AppendLine("- Steps: 1) open Dialog, 2) setField on Form for each value, 3) submit only if asked.");
+        sb.AppendLine("- Use compound fill actions that accept all form fields as parameters in a single call.");
+        sb.AppendLine("- Check the ACTIVE COMPONENTS section for available fill_* actions and their parameters.");
         sb.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(request.AgentInstructions))
