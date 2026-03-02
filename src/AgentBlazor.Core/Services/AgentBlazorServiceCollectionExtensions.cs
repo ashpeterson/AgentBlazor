@@ -75,7 +75,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();
         services.TryAddSingleton<IAgentDeferredActionEvents, AgentDeferredActionEvents>();
 
-        // Conversation store — direct InMemory (no feature gating)
+        // Conversation store — default InMemory (can be replaced via builder.UseConversationStore*)
         services.AddOptions<ConversationOptions>();
         services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
 

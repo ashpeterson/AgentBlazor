@@ -329,6 +329,59 @@ public class AgentRuntimeIntegrationTests
     }
 
     [Fact]
+    public async Task RunTurnAsync_InvokesRuntimeEventSubscribers_OnSuccessPath()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<CountingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddSingleton<CapturingRuntimeEventSubscriber>();
+        services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var subscriber = provider.GetRequiredService<CapturingRuntimeEventSubscriber>();
+
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
+
+        Assert.Single(subscriber.TurnStartedEvents);
+        Assert.Single(subscriber.TurnFinishedEvents);
+        Assert.Single(subscriber.ToolStartedEvents);
+        Assert.Single(subscriber.ToolFinishedEvents);
+        Assert.Empty(subscriber.ErrorEvents);
+        Assert.Equal("AgentDialog", subscriber.ToolStartedEvents[0].Action.ComponentId);
+        Assert.Equal("open", subscriber.ToolStartedEvents[0].Action.ActionId);
+        Assert.Equal("AgentDialog", subscriber.ToolFinishedEvents[0].Result.ComponentId);
+        Assert.Equal("open", subscriber.ToolFinishedEvents[0].Result.ActionId);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_InvokesRuntimeEventSubscribers_OnErrorPath()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ThrowingChatClient("Simulated planner failure."));
+        services.AddSingleton<CapturingRuntimeEventSubscriber>();
+        services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var subscriber = provider.GetRequiredService<CapturingRuntimeEventSubscriber>();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runtime.RunTurnAsync(new AgentTurnRequest("trigger planner error")));
+
+        Assert.Equal("Simulated planner failure.", exception.Message);
+        Assert.Single(subscriber.TurnStartedEvents);
+        Assert.Empty(subscriber.TurnFinishedEvents);
+        Assert.Empty(subscriber.ToolStartedEvents);
+        Assert.Empty(subscriber.ToolFinishedEvents);
+        var error = Assert.Single(subscriber.ErrorEvents);
+        Assert.Contains("Simulated planner failure.", error.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunTurnAsync_IncludesRegisteredWrapperSnapshot_InInstructions()
     {
         var services = new ServiceCollection();
@@ -1035,6 +1088,107 @@ public class AgentRuntimeIntegrationTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class ThrowingChatClient(string message) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            throw new InvalidOperationException(message);
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            await Task.CompletedTask;
+
+            if (DateTime.UtcNow.Ticks < 0)
+            {
+                yield return new ChatResponseUpdate(ChatRole.Assistant, string.Empty);
+            }
+
+            throw new InvalidOperationException(message);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class CapturingRuntimeEventSubscriber : IAgentRuntimeEventSubscriber
+    {
+        public List<AgentRuntimeTurnStartedEvent> TurnStartedEvents { get; } = [];
+
+        public List<AgentRuntimeTurnFinishedEvent> TurnFinishedEvents { get; } = [];
+
+        public List<AgentRuntimeToolExecutionStartedEvent> ToolStartedEvents { get; } = [];
+
+        public List<AgentRuntimeToolExecutionFinishedEvent> ToolFinishedEvents { get; } = [];
+
+        public List<AgentRuntimeErrorEvent> ErrorEvents { get; } = [];
+
+        public ValueTask OnTurnStartedAsync(
+            AgentRuntimeTurnStartedEvent runtimeEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            TurnStartedEvents.Add(runtimeEvent);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask OnTurnFinishedAsync(
+            AgentRuntimeTurnFinishedEvent runtimeEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            TurnFinishedEvents.Add(runtimeEvent);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask OnToolExecutionStartedAsync(
+            AgentRuntimeToolExecutionStartedEvent runtimeEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            ToolStartedEvents.Add(runtimeEvent);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask OnToolExecutionFinishedAsync(
+            AgentRuntimeToolExecutionFinishedEvent runtimeEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            ToolFinishedEvents.Add(runtimeEvent);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask OnErrorAsync(
+            AgentRuntimeErrorEvent runtimeEvent,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            ErrorEvents.Add(runtimeEvent);
+            return ValueTask.CompletedTask;
         }
     }
 

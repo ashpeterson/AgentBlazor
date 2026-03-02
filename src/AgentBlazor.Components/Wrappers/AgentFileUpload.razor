@@ -1,0 +1,139 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Attributes
+@using AgentBlazor.Runtime
+@inherits AgentControllableComponentBase
+
+<div id="@AgentId"
+     class="agent-file-upload"
+     data-ab-type="file-upload"
+     data-ab-agentid="@AgentId"
+     @attributes="AdditionalAttributes">
+    <ul>
+        @foreach (var file in GetFiles())
+        {
+            <li>@file</li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter]
+    public IEnumerable<string>? Files { get; set; }
+
+    [Parameter]
+    public EventCallback<IReadOnlyList<string>> FilesChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private readonly HashSet<string> _files = new(StringComparer.OrdinalIgnoreCase);
+    private bool _filesInitialized;
+
+    public override string ComponentType => "FileUpload";
+
+    [AgentReadable("Attached file names")]
+    public string[] AttachedFiles => GetFiles().ToArray();
+
+    [AgentReadable("Attached file count")]
+    public int AttachedFileCount => GetFiles().Count;
+
+    [AgentAction("Attach one file name to the current upload list", ActionId = "attach")]
+    public async Task<ActionResult> Attach(
+        [AgentParam("File name to attach", Required = true)] string fileName)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot attach files while upload is disabled or read-only.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return ActionResult.NeedsClarification("File name is required.");
+        }
+
+        EnsureFilesInitialized();
+        _files.Add(fileName.Trim());
+        await FilesChanged.InvokeAsync(GetFiles());
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Attached '{fileName}'.");
+    }
+
+    [AgentAction("Remove one file name from the current upload list", ActionId = "remove")]
+    public async Task<ActionResult> Remove(
+        [AgentParam("File name to remove", Required = true)] string fileName)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot remove files while upload is disabled or read-only.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return ActionResult.NeedsClarification("File name is required.");
+        }
+
+        EnsureFilesInitialized();
+        if (!_files.Remove(fileName.Trim()))
+        {
+            return ActionResult.NeedsClarification($"File '{fileName}' is not attached.");
+        }
+
+        await FilesChanged.InvokeAsync(GetFiles());
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Removed '{fileName}'.");
+    }
+
+    [AgentAction("List currently attached files", ActionId = "list_files")]
+    public Task<ActionResult> ListFiles()
+    {
+        var files = GetFiles();
+        if (files.Count == 0)
+        {
+            return Task.FromResult(ActionResult.Applied("No files are attached."));
+        }
+
+        return Task.FromResult(ActionResult.Applied($"Attached files: {string.Join(", ", files)}"));
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["files"] = GetFiles().ToArray(),
+        ["fileCount"] = GetFiles().Count,
+        ["disabled"] = Disabled,
+        ["readOnly"] = ReadOnly
+    };
+
+    private IReadOnlyList<string> GetFiles()
+    {
+        EnsureFilesInitialized();
+        return [.. _files.OrderBy(static f => f, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private void EnsureFilesInitialized()
+    {
+        if (_filesInitialized)
+        {
+            return;
+        }
+
+        _filesInitialized = true;
+        if (Files is null)
+        {
+            return;
+        }
+
+        foreach (var file in Files)
+        {
+            if (!string.IsNullOrWhiteSpace(file))
+            {
+                _files.Add(file.Trim());
+            }
+        }
+    }
+}

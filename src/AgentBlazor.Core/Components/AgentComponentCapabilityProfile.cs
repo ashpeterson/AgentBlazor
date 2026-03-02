@@ -14,6 +14,14 @@ public static class AgentComponentCapabilityProfile
     public const string AgentFormComponentId = "AgentForm";
     public const string AgentNavMenuComponentId = "AgentNavMenu";
     public const string AgentTabsComponentId = "AgentTabs";
+    public const string AgentSelectComponentId = "AgentSelect";
+    public const string AgentAutocompleteComponentId = "AgentAutocomplete";
+    public const string AgentDatePickerComponentId = "AgentDatePicker";
+    public const string AgentDateRangePickerComponentId = "AgentDateRangePicker";
+    public const string AgentTreeViewComponentId = "AgentTreeView";
+    public const string AgentStepperComponentId = "AgentStepper";
+    public const string AgentCommandBarComponentId = "AgentCommandBar";
+    public const string AgentFileUploadComponentId = "AgentFileUpload";
 
     public const string DataGridFilterActionId = "filter";
     public const string DataGridClearFiltersActionId = "clear_filters";
@@ -37,13 +45,51 @@ public static class AgentComponentCapabilityProfile
 
     public const string TabsSwitchTabActionId = "switch_tab";
 
+    public const string SelectOpenActionId = "open";
+    public const string SelectCloseActionId = "close";
+    public const string SelectSetValueActionId = "set_value";
+    public const string SelectClearActionId = "clear";
+
+    public const string AutocompleteSetQueryActionId = "set_query";
+    public const string AutocompleteSelectOptionActionId = "select_option";
+    public const string AutocompleteClearActionId = "clear";
+
+    public const string DatePickerSetDateActionId = "set_date";
+    public const string DatePickerClearActionId = "clear";
+
+    public const string DateRangePickerSetRangeActionId = "set_range";
+    public const string DateRangePickerClearActionId = "clear";
+
+    public const string TreeViewExpandActionId = "expand";
+    public const string TreeViewCollapseActionId = "collapse";
+    public const string TreeViewSelectNodeActionId = "select_node";
+
+    public const string StepperGoToStepActionId = "go_to_step";
+    public const string StepperNextActionId = "next";
+    public const string StepperPreviousActionId = "previous";
+
+    public const string CommandBarInvokeCommandActionId = "invoke_command";
+    public const string CommandBarListCommandsActionId = "list_commands";
+
+    public const string FileUploadAttachActionId = "attach";
+    public const string FileUploadRemoveActionId = "remove";
+    public const string FileUploadListFilesActionId = "list_files";
+
     public static IReadOnlyList<string> ComponentIds { get; } =
     [
         AgentDataGridComponentId,
         AgentDialogComponentId,
         AgentFormComponentId,
         AgentNavMenuComponentId,
-        AgentTabsComponentId
+        AgentTabsComponentId,
+        AgentSelectComponentId,
+        AgentAutocompleteComponentId,
+        AgentDatePickerComponentId,
+        AgentDateRangePickerComponentId,
+        AgentTreeViewComponentId,
+        AgentStepperComponentId,
+        AgentCommandBarComponentId,
+        AgentFileUploadComponentId
     ];
 
     public static void Apply(ComponentCapabilityCatalogBuilder builder)
@@ -154,6 +200,148 @@ public static class AgentComponentCapabilityProfile
                 "Switch active tab by index.",
                 RequiresApproval: false,
                 InputSchema: TabsSwitchTabInputSchema));
+
+        builder.AddComponent(
+            AgentSelectComponentId,
+            "AgentSelect interactions for opening, closing, choosing, and clearing single values.",
+            new ComponentActionCapability(
+                SelectOpenActionId,
+                "Open the select list.",
+                RequiresApproval: false,
+                InputSchema: SelectOpenInputSchema),
+            new ComponentActionCapability(
+                SelectCloseActionId,
+                "Close the select list.",
+                RequiresApproval: false,
+                InputSchema: SelectCloseInputSchema),
+            new ComponentActionCapability(
+                SelectSetValueActionId,
+                "Select one option value.",
+                RequiresApproval: false,
+                InputSchema: SelectSetValueInputSchema),
+            new ComponentActionCapability(
+                SelectClearActionId,
+                "Clear the selected option.",
+                RequiresApproval: false,
+                InputSchema: SelectClearInputSchema));
+
+        builder.AddComponent(
+            AgentAutocompleteComponentId,
+            "AgentAutocomplete interactions for query text, option selection, and clear.",
+            new ComponentActionCapability(
+                AutocompleteSetQueryActionId,
+                "Set query text for autocomplete.",
+                RequiresApproval: false,
+                InputSchema: AutocompleteSetQueryInputSchema),
+            new ComponentActionCapability(
+                AutocompleteSelectOptionActionId,
+                "Select a single suggested option value.",
+                RequiresApproval: false,
+                InputSchema: AutocompleteSelectOptionInputSchema),
+            new ComponentActionCapability(
+                AutocompleteClearActionId,
+                "Clear autocomplete query and selected value.",
+                RequiresApproval: false,
+                InputSchema: AutocompleteClearInputSchema));
+
+        builder.AddComponent(
+            AgentDatePickerComponentId,
+            "AgentDatePicker interactions for selecting and clearing one date.",
+            new ComponentActionCapability(
+                DatePickerSetDateActionId,
+                "Set the selected date.",
+                RequiresApproval: false,
+                InputSchema: DatePickerSetDateInputSchema),
+            new ComponentActionCapability(
+                DatePickerClearActionId,
+                "Clear the selected date.",
+                RequiresApproval: false,
+                InputSchema: DatePickerClearInputSchema));
+
+        builder.AddComponent(
+            AgentDateRangePickerComponentId,
+            "AgentDateRangePicker interactions for setting and clearing a start/end range.",
+            new ComponentActionCapability(
+                DateRangePickerSetRangeActionId,
+                "Set start and end dates for the range.",
+                RequiresApproval: false,
+                InputSchema: DateRangePickerSetRangeInputSchema),
+            new ComponentActionCapability(
+                DateRangePickerClearActionId,
+                "Clear selected date range.",
+                RequiresApproval: false,
+                InputSchema: DateRangePickerClearInputSchema));
+
+        builder.AddComponent(
+            AgentTreeViewComponentId,
+            "AgentTreeView interactions for expanding, collapsing, and selecting nodes.",
+            new ComponentActionCapability(
+                TreeViewExpandActionId,
+                "Expand one tree node.",
+                RequiresApproval: false,
+                InputSchema: TreeViewExpandInputSchema),
+            new ComponentActionCapability(
+                TreeViewCollapseActionId,
+                "Collapse one tree node.",
+                RequiresApproval: false,
+                InputSchema: TreeViewCollapseInputSchema),
+            new ComponentActionCapability(
+                TreeViewSelectNodeActionId,
+                "Select one tree node.",
+                RequiresApproval: false,
+                InputSchema: TreeViewSelectNodeInputSchema));
+
+        builder.AddComponent(
+            AgentStepperComponentId,
+            "AgentStepper interactions for workflow step navigation.",
+            new ComponentActionCapability(
+                StepperGoToStepActionId,
+                "Go to an exact step index.",
+                RequiresApproval: false,
+                InputSchema: StepperGoToStepInputSchema),
+            new ComponentActionCapability(
+                StepperNextActionId,
+                "Move to the next step.",
+                RequiresApproval: false,
+                InputSchema: StepperNextInputSchema),
+            new ComponentActionCapability(
+                StepperPreviousActionId,
+                "Move to the previous step.",
+                RequiresApproval: false,
+                InputSchema: StepperPreviousInputSchema));
+
+        builder.AddComponent(
+            AgentCommandBarComponentId,
+            "AgentCommandBar interactions for command discovery and invocation.",
+            new ComponentActionCapability(
+                CommandBarInvokeCommandActionId,
+                "Invoke one command by id or name.",
+                RequiresApproval: false,
+                InputSchema: CommandBarInvokeCommandInputSchema),
+            new ComponentActionCapability(
+                CommandBarListCommandsActionId,
+                "List available commands.",
+                RequiresApproval: false,
+                InputSchema: CommandBarListCommandsInputSchema));
+
+        builder.AddComponent(
+            AgentFileUploadComponentId,
+            "AgentFileUpload interactions for attaching, removing, and listing file names.",
+            new ComponentActionCapability(
+                FileUploadAttachActionId,
+                "Attach one file name to the current upload list.",
+                RequiresApproval: false,
+                InputSchema: FileUploadAttachInputSchema),
+            new ComponentActionCapability(
+                FileUploadRemoveActionId,
+                "Remove one file name from the current upload list.",
+                RequiresApproval: false,
+                InputSchema: FileUploadRemoveInputSchema),
+            new ComponentActionCapability(
+                FileUploadListFilesActionId,
+                "List currently attached files.",
+                RequiresApproval: false,
+                InputSchema: FileUploadListFilesInputSchema));
     }
 
     /// <summary>
@@ -197,6 +385,60 @@ public static class AgentComponentCapabilityProfile
             AgentTabsComponentId,
             "AgentTabs interactions for switching active tabs.",
             new ComponentActionCapability(TabsSwitchTabActionId, "Switch active tab by index.", RequiresApproval: false, InputSchema: TabsSwitchTabInputSchema));
+
+        builder.AddComponent(
+            AgentSelectComponentId,
+            "AgentSelect interactions for opening, closing, choosing, and clearing single values.",
+            new ComponentActionCapability(SelectOpenActionId, "Open the select list.", RequiresApproval: false, InputSchema: SelectOpenInputSchema),
+            new ComponentActionCapability(SelectCloseActionId, "Close the select list.", RequiresApproval: false, InputSchema: SelectCloseInputSchema),
+            new ComponentActionCapability(SelectSetValueActionId, "Select one option value.", RequiresApproval: false, InputSchema: SelectSetValueInputSchema),
+            new ComponentActionCapability(SelectClearActionId, "Clear the selected option.", RequiresApproval: false, InputSchema: SelectClearInputSchema));
+
+        builder.AddComponent(
+            AgentAutocompleteComponentId,
+            "AgentAutocomplete interactions for query text, option selection, and clear.",
+            new ComponentActionCapability(AutocompleteSetQueryActionId, "Set query text for autocomplete.", RequiresApproval: false, InputSchema: AutocompleteSetQueryInputSchema),
+            new ComponentActionCapability(AutocompleteSelectOptionActionId, "Select a single suggested option value.", RequiresApproval: false, InputSchema: AutocompleteSelectOptionInputSchema),
+            new ComponentActionCapability(AutocompleteClearActionId, "Clear autocomplete query and selected value.", RequiresApproval: false, InputSchema: AutocompleteClearInputSchema));
+
+        builder.AddComponent(
+            AgentDatePickerComponentId,
+            "AgentDatePicker interactions for selecting and clearing one date.",
+            new ComponentActionCapability(DatePickerSetDateActionId, "Set the selected date.", RequiresApproval: false, InputSchema: DatePickerSetDateInputSchema),
+            new ComponentActionCapability(DatePickerClearActionId, "Clear the selected date.", RequiresApproval: false, InputSchema: DatePickerClearInputSchema));
+
+        builder.AddComponent(
+            AgentDateRangePickerComponentId,
+            "AgentDateRangePicker interactions for setting and clearing a start/end range.",
+            new ComponentActionCapability(DateRangePickerSetRangeActionId, "Set start and end dates for the range.", RequiresApproval: false, InputSchema: DateRangePickerSetRangeInputSchema),
+            new ComponentActionCapability(DateRangePickerClearActionId, "Clear selected date range.", RequiresApproval: false, InputSchema: DateRangePickerClearInputSchema));
+
+        builder.AddComponent(
+            AgentTreeViewComponentId,
+            "AgentTreeView interactions for expanding, collapsing, and selecting nodes.",
+            new ComponentActionCapability(TreeViewExpandActionId, "Expand one tree node.", RequiresApproval: false, InputSchema: TreeViewExpandInputSchema),
+            new ComponentActionCapability(TreeViewCollapseActionId, "Collapse one tree node.", RequiresApproval: false, InputSchema: TreeViewCollapseInputSchema),
+            new ComponentActionCapability(TreeViewSelectNodeActionId, "Select one tree node.", RequiresApproval: false, InputSchema: TreeViewSelectNodeInputSchema));
+
+        builder.AddComponent(
+            AgentStepperComponentId,
+            "AgentStepper interactions for workflow step navigation.",
+            new ComponentActionCapability(StepperGoToStepActionId, "Go to an exact step index.", RequiresApproval: false, InputSchema: StepperGoToStepInputSchema),
+            new ComponentActionCapability(StepperNextActionId, "Move to the next step.", RequiresApproval: false, InputSchema: StepperNextInputSchema),
+            new ComponentActionCapability(StepperPreviousActionId, "Move to the previous step.", RequiresApproval: false, InputSchema: StepperPreviousInputSchema));
+
+        builder.AddComponent(
+            AgentCommandBarComponentId,
+            "AgentCommandBar interactions for command discovery and invocation.",
+            new ComponentActionCapability(CommandBarInvokeCommandActionId, "Invoke one command by id or name.", RequiresApproval: false, InputSchema: CommandBarInvokeCommandInputSchema),
+            new ComponentActionCapability(CommandBarListCommandsActionId, "List available commands.", RequiresApproval: false, InputSchema: CommandBarListCommandsInputSchema));
+
+        builder.AddComponent(
+            AgentFileUploadComponentId,
+            "AgentFileUpload interactions for attaching, removing, and listing file names.",
+            new ComponentActionCapability(FileUploadAttachActionId, "Attach one file name to the current upload list.", RequiresApproval: false, InputSchema: FileUploadAttachInputSchema),
+            new ComponentActionCapability(FileUploadRemoveActionId, "Remove one file name from the current upload list.", RequiresApproval: false, InputSchema: FileUploadRemoveInputSchema),
+            new ComponentActionCapability(FileUploadListFilesActionId, "List currently attached files.", RequiresApproval: false, InputSchema: FileUploadListFilesInputSchema));
     }
 
     public const string DataGridFilterInputSchema = """
@@ -381,6 +623,219 @@ public static class AgentComponentCapabilityProfile
             "index": { "type": "integer", "minimum": 0 }
           },
           "required": ["index"]
+        }
+        """;
+
+    public const string SelectOpenInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string SelectCloseInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string SelectSetValueInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "string" }
+          },
+          "required": ["value"]
+        }
+        """;
+
+    public const string SelectClearInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string AutocompleteSetQueryInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "query": { "type": "string" }
+          },
+          "required": ["query"]
+        }
+        """;
+
+    public const string AutocompleteSelectOptionInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "string" }
+          },
+          "required": ["value"]
+        }
+        """;
+
+    public const string AutocompleteClearInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string DatePickerSetDateInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "date": { "type": "string", "description": "Date in yyyy-MM-dd or natural-language form." }
+          },
+          "required": ["date"]
+        }
+        """;
+
+    public const string DatePickerClearInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string DateRangePickerSetRangeInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "startDate": { "type": "string", "description": "Range start date." },
+            "endDate": { "type": "string", "description": "Range end date." }
+          },
+          "required": ["startDate", "endDate"]
+        }
+        """;
+
+    public const string DateRangePickerClearInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string TreeViewExpandInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeId": { "type": "string" }
+          },
+          "required": ["nodeId"]
+        }
+        """;
+
+    public const string TreeViewCollapseInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeId": { "type": "string" }
+          },
+          "required": ["nodeId"]
+        }
+        """;
+
+    public const string TreeViewSelectNodeInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeId": { "type": "string" }
+          },
+          "required": ["nodeId"]
+        }
+        """;
+
+    public const string StepperGoToStepInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "index": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["index"]
+        }
+        """;
+
+    public const string StepperNextInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string StepperPreviousInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string CommandBarInvokeCommandInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": { "type": "string" }
+          },
+          "required": ["command"]
+        }
+        """;
+
+    public const string CommandBarListCommandsInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+        """;
+
+    public const string FileUploadAttachInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fileName": { "type": "string" }
+          },
+          "required": ["fileName"]
+        }
+        """;
+
+    public const string FileUploadRemoveInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fileName": { "type": "string" }
+          },
+          "required": ["fileName"]
+        }
+        """;
+
+    public const string FileUploadListFilesInputSchema = """
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
         }
         """;
 }

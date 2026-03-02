@@ -1,0 +1,102 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Attributes
+@using AgentBlazor.Runtime
+@inherits AgentControllableComponentBase
+
+<div id="@AgentId"
+     class="agent-command-bar"
+     data-ab-type="command-bar"
+     data-ab-agentid="@AgentId"
+     @attributes="AdditionalAttributes">
+    @foreach (var command in GetCommands())
+    {
+        <button type="button"
+                disabled="@(Disabled || ReadOnly)"
+                @onclick="() => ExecuteCommandFromUiAsync(command)">
+            @command
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public IEnumerable<string>? Commands { get; set; }
+
+    [Parameter]
+    public EventCallback<string> CommandInvoked { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string? _lastInvokedCommand;
+
+    public override string ComponentType => "CommandBar";
+
+    [AgentReadable("Available command ids")]
+    public string[] AvailableCommands => GetCommands().ToArray();
+
+    [AgentReadable("Last invoked command id")]
+    public string? LastInvokedCommand => _lastInvokedCommand;
+
+    [AgentAction("Invoke one command by id or name", ActionId = "invoke_command")]
+    public async Task<ActionResult> InvokeCommand(
+        [AgentParam("Command id to invoke", Required = true)] string command)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot invoke commands while command bar is disabled or read-only.");
+        }
+
+        if (!ContainsCommand(command))
+        {
+            return ActionResult.NeedsClarification($"Command '{command}' is not available.");
+        }
+
+        _lastInvokedCommand = command;
+        await CommandInvoked.InvokeAsync(command);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Invoked command '{command}'.");
+    }
+
+    [AgentAction("List available commands", ActionId = "list_commands")]
+    public Task<ActionResult> ListCommands()
+    {
+        var commands = GetCommands();
+        if (commands.Count == 0)
+        {
+            return Task.FromResult(ActionResult.Applied("No commands are currently available."));
+        }
+
+        return Task.FromResult(ActionResult.Applied($"Available commands: {string.Join(", ", commands)}"));
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["commands"] = GetCommands().ToArray(),
+        ["lastInvokedCommand"] = _lastInvokedCommand,
+        ["disabled"] = Disabled,
+        ["readOnly"] = ReadOnly
+    };
+
+    private Task ExecuteCommandFromUiAsync(string command) =>
+        InvokeCommand(command);
+
+    private IReadOnlyList<string> GetCommands() =>
+        Commands?
+            .Where(static c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        ?? [];
+
+    private bool ContainsCommand(string command)
+    {
+        var commands = GetCommands();
+        return commands.Count == 0 || commands.Contains(command, StringComparer.OrdinalIgnoreCase);
+    }
+}

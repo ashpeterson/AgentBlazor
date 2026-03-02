@@ -1,97 +1,94 @@
 # AgentBlazor Development Status
 
-**Last Updated:** 2026-03-02
+Last updated: 2026-03-02
 
----
+## Completed Recently
 
-## Completed This Session
+- Root README quickstart created with install/setup/provider guidance
+- Provider-missing UX improved:
+  - Startup console warning when no provider configured
+  - User-facing chat error message with setup snippet
+- Chat resiliency improved:
+  - `ErrorBoundary` wrapper and `Try Again` recovery
+  - 10-second "taking longer than expected" warning
+  - Activity success/failure visuals (`✓` / `✗`)
+- Form workflow improvements:
+  - `AgentFormPageBase<TModel>` state now includes `fields`, `fieldValues`, `fieldMetadata`
+  - Demo onboarding moved to `AgentFormPageBase<TModel>` pattern
+- Model discovery/runtime updates:
+  - Dynamic capability fallback via `GetCapability()` when attribute discovery is not enough
+  - Improved component resolution path in no-op executor
+- Phase 0 completed:
+  - Dynamic input schema parser hardened for comma/parenthesis-heavy descriptions
+  - Core provider-missing assertion updated
+- Phase 1 completed (core surface):
+  - Added `AgentSelect` (`open`, `close`, `set_value`, `clear`)
+  - Added `AgentAutocomplete` (`set_query`, `select_option`, `clear`)
+- Phase 2 completed (core surface):
+  - Added `AgentDatePicker` (`set_date`, `clear`)
+  - Added `AgentDateRangePicker` (`set_range`, `clear`)
+  - Added runtime fallback matching for Agent-prefixed catalog IDs to component types
+- Phase 3 completed (core surface):
+  - Added `AgentTreeView` (`expand`, `collapse`, `select_node`)
+  - Added `AgentStepper` (`go_to_step`, `next`, `previous`)
+- Phase 4 completed (core surface):
+  - Added `AgentCommandBar` (`invoke_command`, `list_commands`)
+  - Added `AgentFileUpload` (`attach`, `remove`, `list_files`)
+- Phase 5 completed (open-source ergonomics):
+  - Added public runtime subscriber hooks via `IAgentRuntimeEventSubscriber`
+    (`OnTurnStartedAsync`, `OnTurnFinishedAsync`, tool start/finish, error surfaced)
+  - Added pluggable conversation store registration APIs:
+    - `UseConversationStore<TStore>()`
+    - `UseJsonFileConversationStore(path, configure?)`
+  - Added file-backed `JsonFileConversationStore` for restart-safe history
+  - Added core/integration tests for subscriber + persistence behavior
 
-| Task | Details |
-|------|---------|
-| **README.md** | Created root quickstart guide with installation, setup, AI providers, and demo instructions |
-| **API key validation** | Console warning at startup + user-friendly chat error with setup instructions for OpenAI/Azure/Ollama |
-| **Error boundary** | Wrapped AgentChatSurface with ErrorBoundary, "Try Again" recovery button, user-friendly error UI |
-| **Form field metadata** | `AgentFormPageBase<TModel>.GetCurrentState()` now exposes `fields`, `fieldValues`, `fieldMetadata` |
-| **Timeout warning** | 10-second timer shows "Taking longer than expected..." with amber styling |
+## Docs and Architecture Audit (This Review)
 
----
+The `/docs` folder was re-reviewed against current code.
 
-## Completed Previously
+### Updated to match code
 
-- Fixed unreliable form-filling (CopilotKit compound action pattern)
-- Created `AgentFormPageBase<TModel>` for auto-generated fill actions
-- Fixed action discovery with `GetCapability()` fallback
-- Fixed executor lookup by AgentId
-- Approval & clarification UI (already working)
-- Error feedback styling (checkmark/X icons, red failed state)
-- `OnConfirm` callback for `AgentDialog`
+- `docs/architecture.md` rewritten to current architecture boundaries and runtime flow
+- `docs/pricing-tiers.md` rewritten to current tier wiring and enforcement status
+- `docs/STATUS.md` updated to reflect current project state
 
----
+### Corrected stale assumptions
 
-## Outstanding: Landing Page + Demo Split
+- Demo/Landing work is already implemented (`DemoLayout`, `DemoNavMenu`, landing section composition)
+- Current registration path is `AddAgentBlazor(...)` + `MapAgentBlazorEndpoints()`
+- Current runtime is `AgentRuntime` with Plan -> Validate -> Execute
+- AG-UI hosting is mapped through `MapAgentBlazorAgUiRun(...)`
 
-The **major remaining work** from the plan file has not been started:
+## Current Capability Snapshot
 
-### Phase 1: Demo Layout & Pages
+### Shipped and actively used
 
-- [ ] Create `DemoLayout.razor` (sidebar, top bar, conditional chat)
-- [ ] Create `DemoNavMenu.razor`
-- [ ] Create `Demo/` folder and move pages to `/demo/*` routes
+- Wrappers:
+  - `AgentDataGrid`, `AgentDialog`, `AgentForm`, `AgentNavMenu`, `AgentTabs`
+  - `AgentSelect`, `AgentAutocomplete`, `AgentDatePicker`, `AgentDateRangePicker`
+  - `AgentTreeView`, `AgentStepper`
+  - `AgentCommandBar`, `AgentFileUpload`
+- Chat surfaces: `AgentChatSurface`, `AgentChatWidget`, streaming updates, approvals/clarifications
+- Generative UI rendering components (card/form/table/chart)
+- Service tools (`AddTool`) and MCP tool providers (`UseMcpServer`)
+- Route scanning and intent-to-route matching (`InMemoryRouteRegistry`)
+- Circuit-scoped component registry model
+- Demo route `/demo/components` showcasing new wrapper actions and prompt examples
 
-### Phase 2: Landing Page Sections
+### Known technical gaps
 
-- [ ] Create `LandingHero.razor`
-- [ ] Create `LandingFeatures.razor`
-- [ ] Create `LandingPricing.razor`
-- [ ] Create `LandingReviews.razor`
-- [ ] Create `LandingContact.razor`
-- [ ] Create `LandingFooter.razor`
-- [ ] Update `Home.razor` to compose landing sections
+- Tier boundaries are defined, but full action-level hard enforcement remains partial
+- New wrappers are implemented/test-covered and have a consolidated demo route;
+  richer domain-specific scenarios are still limited
 
-### Phase 3-4: Navigation & Cleanup
+## Next Plan
 
-- [ ] Update `LandingLayout.razor` with anchor nav
-- [ ] Update `_Imports.razor` with Demo namespace
-- [ ] Clean up old pages
+Detailed expansion plan is tracked in:
 
----
+- `docs/component-expansion-plan.md`
 
-## Next Task
+Immediate implementation sequence:
 
-**Start Phase 1: Create Demo Layout & Move Pages**
-
-This involves:
-
-1. Create `DemoLayout.razor` with sidebar nav and conditional full-screen chat
-2. Create `DemoNavMenu.razor` with links to demo pages
-3. Move existing demo pages to `Demo/` folder with `/demo/*` routes
-
----
-
-## Route Structure (Target)
-
-```
-LANDING (LandingLayout)
-/                    → Single-page landing with sections
-
-DEMO (DemoLayout)
-/demo                → Full-screen AgentChatSurface
-/demo/suppliers      → Suppliers grid + floating chat widget
-/demo/workspace      → Workspace tabs + floating chat widget
-/demo/status         → AgentBlazor status + floating chat widget
-/demo/onboarding     → Supplier onboarding + floating chat widget
-```
-
----
-
-## Design System
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| Font | Manrope 400-800 | All text |
-| Accent | `#e03a58` | CTAs, highlights |
-| Background | `#03040a` | Page bg |
-| Surface | `#0d1120` | Cards, panels |
-| Text | `#e8f0ff` | Primary text |
-| Muted | `#7a92bb` | Secondary text |
-| Border | `rgba(255,255,255,0.07)` | Dividers |
+1. Add deeper business workflow demos for tree/stepper/command/file actions
+2. Add end-to-end file service integration samples (local policy vs remote handoff)

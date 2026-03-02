@@ -174,6 +174,29 @@ app.Run();</pre>
         </MudText>
     </section>
 
+    <!-- ── 7b. Component Kit (new wrappers) ───────────────────── -->
+    <section class="docs-section" id="component-kit">
+        <MudText Typo="Typo.h5" Class="docs-section__title">7b. Component Kit (Select, Date, Tree, Stepper, Command, Files)</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Use the <code class="docs-inline">/demo/components</code> route to test the newer wrappers in one place:
+            <code class="docs-inline">AgentSelect</code>, <code class="docs-inline">AgentAutocomplete</code>,
+            <code class="docs-inline">AgentDatePicker</code>, <code class="docs-inline">AgentDateRangePicker</code>,
+            <code class="docs-inline">AgentTreeView</code>, <code class="docs-inline">AgentStepper</code>,
+            <code class="docs-inline">AgentCommandBar</code>, and <code class="docs-inline">AgentFileUpload</code>.
+        </MudText>
+        <pre class="docs-code">&lt;!-- Example: command + file wrappers --&gt;
+&lt;AgentCommandBar AgentId="kit-command-bar"
+                 Commands="@@new [] { \"publish_report\", \"show_local_upload_policy\" }"
+                 CommandInvoked="OnCommandInvoked" /&gt;
+
+&lt;AgentFileUpload AgentId="kit-file-upload"
+                 Files="@@_attachedFiles"
+                 FilesChanged="OnFilesChanged" /&gt;</pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+            Prompts that now work: "set country select value to Germany" · "expand node compliance and select node policy-documents" · "attach file risk-summary-q1.pdf then list files"
+        </MudText>
+    </section>
+
     <!-- ── 8. Generative UI ───────────────────────────────────── -->
     <section class="docs-section" id="gen-ui">
         <MudText Typo="Typo.h5" Class="docs-section__title">8. Generative UI</MudText>
@@ -317,6 +340,15 @@ builder.Services.AddAgentBlazor(options =>
                     <div>
                         <MudText Typo="Typo.subtitle2">AgentTabs</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Switch tabs by name</MudText>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <div class="docs-summary__item">
+                    <MudIcon Icon="@Icons.Material.Filled.Widgets" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Component Kit</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Select, date, tree, stepper, command, and file actions</MudText>
                     </div>
                 </div>
             </MudItem>

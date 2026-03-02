@@ -315,6 +315,324 @@ public class WrapperActionExecutionTests
         Assert.False(observedValidation); // Reset clears validation state
     }
 
+    [Fact]
+    public async Task AgentSelect_ExecutesOpenSetValueClearAndClose_Actions()
+    {
+        var select = new AgentSelect
+        {
+            AgentId = "country-select",
+            Options = ["United Kingdom", "United States", "Canada"]
+        };
+
+        string? observedValue = null;
+        var callbacks = new EventCallbackFactory();
+        select.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
+
+        var open = await select.ExecuteActionAsync(AgentAction.Create("open"));
+        var set = await select.ExecuteActionAsync(AgentAction.Create("set_value", new Dictionary<string, object?>
+        {
+            ["value"] = "Canada"
+        }));
+        var clear = await select.ExecuteActionAsync(AgentAction.Create("clear"));
+        var close = await select.ExecuteActionAsync(AgentAction.Create("close"));
+
+        Assert.True(open.Succeeded);
+        Assert.True(set.Succeeded);
+        Assert.True(clear.Succeeded);
+        Assert.True(close.Succeeded);
+
+        Assert.Null(select.Value);
+        Assert.Null(observedValue);
+
+        var state = select.GetCurrentState();
+        Assert.Equal(false, state["isOpen"]);
+        Assert.Equal(3, ((string[])state["options"]!).Length);
+        Assert.Null(state["value"]);
+    }
+
+    [Fact]
+    public async Task AgentAutocomplete_ExecutesSetQuerySelectOptionAndClear_Actions()
+    {
+        var autocomplete = new AgentAutocomplete
+        {
+            AgentId = "country-autocomplete",
+            Options = ["United Kingdom", "United States", "Canada"]
+        };
+
+        string? observedQuery = null;
+        string? observedValue = null;
+        var callbacks = new EventCallbackFactory();
+        autocomplete.QueryChanged = callbacks.Create<string?>(this, query => observedQuery = query);
+        autocomplete.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
+
+        var setQuery = await autocomplete.ExecuteActionAsync(AgentAction.Create("set_query", new Dictionary<string, object?>
+        {
+            ["query"] = "Uni"
+        }));
+        var selectOption = await autocomplete.ExecuteActionAsync(AgentAction.Create("select_option", new Dictionary<string, object?>
+        {
+            ["value"] = "United States"
+        }));
+        var clear = await autocomplete.ExecuteActionAsync(AgentAction.Create("clear"));
+
+        Assert.True(setQuery.Succeeded);
+        Assert.True(selectOption.Succeeded);
+        Assert.True(clear.Succeeded);
+
+        Assert.Null(autocomplete.Query);
+        Assert.Null(autocomplete.Value);
+        Assert.Null(observedQuery);
+        Assert.Null(observedValue);
+
+        var state = autocomplete.GetCurrentState();
+        Assert.Null(state["query"]);
+        Assert.Null(state["selectedValue"]);
+        Assert.Equal(3, ((string[])state["options"]!).Length);
+    }
+
+    [Fact]
+    public async Task AgentDatePicker_ExecutesSetDateAndClear_Actions()
+    {
+        var picker = new AgentDatePicker
+        {
+            AgentId = "invoice-date",
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31)
+        };
+
+        DateTime? observed = null;
+        var callbacks = new EventCallbackFactory();
+        picker.ValueChanged = callbacks.Create<DateTime?>(this, value => observed = value);
+
+        var set = await picker.ExecuteActionAsync(AgentAction.Create("set_date", new Dictionary<string, object?>
+        {
+            ["date"] = "2026-03-15"
+        }));
+        var clear = await picker.ExecuteActionAsync(AgentAction.Create("clear"));
+
+        Assert.True(set.Succeeded);
+        Assert.True(clear.Succeeded);
+        Assert.Null(picker.Value);
+        Assert.Null(observed);
+
+        var state = picker.GetCurrentState();
+        Assert.Null(state["value"]);
+        Assert.Equal("2026-01-01", state["minDate"]);
+        Assert.Equal("2026-12-31", state["maxDate"]);
+    }
+
+    [Fact]
+    public async Task AgentDateRangePicker_ExecutesSetRangeAndClear_Actions()
+    {
+        var range = new AgentDateRangePicker
+        {
+            AgentId = "travel-range",
+            MinDate = new DateTime(2026, 1, 1),
+            MaxDate = new DateTime(2026, 12, 31)
+        };
+
+        DateTime? observedStart = null;
+        DateTime? observedEnd = null;
+        var callbacks = new EventCallbackFactory();
+        range.StartDateChanged = callbacks.Create<DateTime?>(this, value => observedStart = value);
+        range.EndDateChanged = callbacks.Create<DateTime?>(this, value => observedEnd = value);
+
+        var set = await range.ExecuteActionAsync(AgentAction.Create("set_range", new Dictionary<string, object?>
+        {
+            ["startDate"] = "2026-05-01",
+            ["endDate"] = "2026-05-15"
+        }));
+        var clear = await range.ExecuteActionAsync(AgentAction.Create("clear"));
+
+        Assert.True(set.Succeeded);
+        Assert.True(clear.Succeeded);
+        Assert.Null(range.StartDate);
+        Assert.Null(range.EndDate);
+        Assert.Null(observedStart);
+        Assert.Null(observedEnd);
+
+        var state = range.GetCurrentState();
+        Assert.Null(state["startDate"]);
+        Assert.Null(state["endDate"]);
+        Assert.Equal("2026-01-01", state["minDate"]);
+        Assert.Equal("2026-12-31", state["maxDate"]);
+    }
+
+    [Fact]
+    public async Task AgentDateRangePicker_SetRange_Fails_WhenStartIsAfterEnd()
+    {
+        var range = new AgentDateRangePicker
+        {
+            AgentId = "travel-range"
+        };
+
+        var result = await range.ExecuteActionAsync(AgentAction.Create("set_range", new Dictionary<string, object?>
+        {
+            ["startDate"] = "2026-06-30",
+            ["endDate"] = "2026-06-01"
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Start date cannot be after end date", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AgentTreeView_ExecutesExpandSelectAndCollapse_Actions()
+    {
+        var tree = new AgentTreeView
+        {
+            AgentId = "supplier-tree",
+            NodeIds = ["root", "supplier-a", "supplier-b"]
+        };
+
+        string? observedSelected = null;
+        IReadOnlyList<string>? observedExpanded = null;
+        var callbacks = new EventCallbackFactory();
+        tree.SelectedNodeIdChanged = callbacks.Create<string?>(this, value => observedSelected = value);
+        tree.ExpandedNodeIdsChanged = callbacks.Create<IReadOnlyList<string>>(this, value => observedExpanded = value);
+
+        var expand = await tree.ExecuteActionAsync(AgentAction.Create("expand", new Dictionary<string, object?>
+        {
+            ["nodeId"] = "root"
+        }));
+        var select = await tree.ExecuteActionAsync(AgentAction.Create("select_node", new Dictionary<string, object?>
+        {
+            ["nodeId"] = "supplier-a"
+        }));
+        var collapse = await tree.ExecuteActionAsync(AgentAction.Create("collapse", new Dictionary<string, object?>
+        {
+            ["nodeId"] = "root"
+        }));
+
+        Assert.True(expand.Succeeded);
+        Assert.True(select.Succeeded);
+        Assert.True(collapse.Succeeded);
+
+        Assert.Equal("supplier-a", tree.SelectedNodeId);
+        Assert.Equal("supplier-a", observedSelected);
+        Assert.NotNull(observedExpanded);
+        Assert.Empty(observedExpanded!);
+
+        var state = tree.GetCurrentState();
+        Assert.Equal("supplier-a", state["selectedNodeId"]);
+        Assert.Empty((string[])state["expandedNodeIds"]!);
+    }
+
+    [Fact]
+    public async Task AgentStepper_ExecutesGoToNextAndPrevious_Actions()
+    {
+        var stepper = new AgentStepper
+        {
+            AgentId = "onboarding-steps",
+            TotalSteps = 4
+        };
+
+        int observedStep = -1;
+        var callbacks = new EventCallbackFactory();
+        stepper.CurrentStepIndexChanged = callbacks.Create<int>(this, value => observedStep = value);
+
+        var goTo = await stepper.ExecuteActionAsync(AgentAction.Create("go_to_step", new Dictionary<string, object?>
+        {
+            ["index"] = 1
+        }));
+        var next = await stepper.ExecuteActionAsync(AgentAction.Create("next"));
+        var previous = await stepper.ExecuteActionAsync(AgentAction.Create("previous"));
+
+        Assert.True(goTo.Succeeded);
+        Assert.True(next.Succeeded);
+        Assert.True(previous.Succeeded);
+
+        Assert.Equal(1, stepper.CurrentStepIndex);
+        Assert.Equal(1, observedStep);
+
+        var state = stepper.GetCurrentState();
+        Assert.Equal(1, state["currentStepIndex"]);
+        Assert.Equal(4, state["totalSteps"]);
+        Assert.Equal(true, state["canGoNext"]);
+        Assert.Equal(true, state["canGoPrevious"]);
+    }
+
+    [Fact]
+    public async Task AgentStepper_GoToStep_FailsWhenIndexIsOutOfRange()
+    {
+        var stepper = new AgentStepper
+        {
+            AgentId = "onboarding-steps",
+            TotalSteps = 2
+        };
+
+        var result = await stepper.ExecuteActionAsync(AgentAction.Create("go_to_step", new Dictionary<string, object?>
+        {
+            ["index"] = 4
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("out of range", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AgentCommandBar_ExecutesInvokeAndList_Actions()
+    {
+        var bar = new AgentCommandBar
+        {
+            AgentId = "global-command-bar",
+            Commands = ["refresh", "export", "archive"]
+        };
+
+        string? observedCommand = null;
+        var callbacks = new EventCallbackFactory();
+        bar.CommandInvoked = callbacks.Create<string>(this, command => observedCommand = command);
+
+        var invoke = await bar.ExecuteActionAsync(AgentAction.Create("invoke_command", new Dictionary<string, object?>
+        {
+            ["command"] = "export"
+        }));
+        var list = await bar.ExecuteActionAsync(AgentAction.Create("list_commands"));
+
+        Assert.True(invoke.Succeeded);
+        Assert.True(list.Succeeded);
+        Assert.Equal("export", observedCommand);
+        Assert.Contains("refresh", list.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("export", list.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("archive", list.Message, StringComparison.OrdinalIgnoreCase);
+
+        var state = bar.GetCurrentState();
+        Assert.Equal("export", state["lastInvokedCommand"]);
+    }
+
+    [Fact]
+    public async Task AgentFileUpload_ExecutesAttachListAndRemove_Actions()
+    {
+        var upload = new AgentFileUpload
+        {
+            AgentId = "attachments"
+        };
+
+        IReadOnlyList<string>? observedFiles = null;
+        var callbacks = new EventCallbackFactory();
+        upload.FilesChanged = callbacks.Create<IReadOnlyList<string>>(this, files => observedFiles = files);
+
+        var attach = await upload.ExecuteActionAsync(AgentAction.Create("attach", new Dictionary<string, object?>
+        {
+            ["fileName"] = "quote.pdf"
+        }));
+        var list = await upload.ExecuteActionAsync(AgentAction.Create("list_files"));
+        var remove = await upload.ExecuteActionAsync(AgentAction.Create("remove", new Dictionary<string, object?>
+        {
+            ["fileName"] = "quote.pdf"
+        }));
+
+        Assert.True(attach.Succeeded);
+        Assert.True(list.Succeeded);
+        Assert.True(remove.Succeeded);
+        Assert.NotNull(observedFiles);
+        Assert.Empty(observedFiles!);
+        Assert.Contains("quote.pdf", list.Message, StringComparison.OrdinalIgnoreCase);
+
+        var state = upload.GetCurrentState();
+        Assert.Equal(0, state["fileCount"]);
+    }
+
     // NOTE: SetField tests removed because the SetField action was removed from AgentForm.
     // The generic SetField approach is unreliable for forms inside dialogs (forms aren't mounted
     // when dialog is closed). The recommended pattern is to create compound workflow actions

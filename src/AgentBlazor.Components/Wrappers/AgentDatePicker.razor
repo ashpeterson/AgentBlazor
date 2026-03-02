@@ -1,0 +1,163 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Attributes
+@using AgentBlazor.Runtime
+@inherits AgentControllableComponentBase
+
+<input id="@AgentId"
+       class="agent-date-picker"
+       type="date"
+       value="@FormatDate(Value)"
+       min="@FormatDate(MinDate)"
+       max="@FormatDate(MaxDate)"
+       disabled="@(Disabled || ReadOnly)"
+       data-ab-type="date-picker"
+       data-ab-agentid="@AgentId"
+       @onchange="HandleChangeAsync"
+       @attributes="AdditionalAttributes" />
+
+@code {
+    [Parameter]
+    public DateTime? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    [Parameter]
+    public DateTime? MinDate { get; set; }
+
+    [Parameter]
+    public DateTime? MaxDate { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public override string ComponentType => "DatePicker";
+
+    [AgentReadable("Currently selected date (yyyy-MM-dd)")]
+    public string? CurrentDate => FormatDate(Value);
+
+    [AgentReadable("Minimum allowed date (yyyy-MM-dd)")]
+    public string? MinimumDate => FormatDate(MinDate);
+
+    [AgentReadable("Maximum allowed date (yyyy-MM-dd)")]
+    public string? MaximumDate => FormatDate(MaxDate);
+
+    [AgentAction("Set selected date from an ISO date or natural-language date", ActionId = "set_date")]
+    public async Task<ActionResult> SetDateValue(
+        [AgentParam("Date value (for example 2026-03-02 or March 2 2026)", Required = true)] string date)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot set date while date picker is disabled or read-only.");
+        }
+
+        if (!TryParseDate(date, out var parsed))
+        {
+            return ActionResult.NeedsClarification($"Could not parse '{date}' as a date.");
+        }
+
+        if (!IsWithinRange(parsed))
+        {
+            return ActionResult.Failure("Date is outside the allowed range.");
+        }
+
+        Value = parsed;
+        await ValueChanged.InvokeAsync(Value);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Set date to {FormatDate(Value)}.");
+    }
+
+    [AgentAction("Clear selected date")]
+    public async Task<ActionResult> Clear()
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot clear date while date picker is disabled or read-only.");
+        }
+
+        Value = null;
+        await ValueChanged.InvokeAsync(Value);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Cleared date.");
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["value"] = FormatDate(Value),
+        ["minDate"] = FormatDate(MinDate),
+        ["maxDate"] = FormatDate(MaxDate),
+        ["disabled"] = Disabled,
+        ["readOnly"] = ReadOnly
+    };
+
+    private async Task HandleChangeAsync(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            Value = null;
+            await ValueChanged.InvokeAsync(Value);
+            return;
+        }
+
+        if (TryParseDate(raw, out var parsed) && IsWithinRange(parsed))
+        {
+            Value = parsed;
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private static string? FormatDate(DateTime? value) =>
+        value?.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private bool IsWithinRange(DateTime value)
+    {
+        var date = value.Date;
+        if (MinDate is { } min && date < min.Date) return false;
+        if (MaxDate is { } max && date > max.Date) return false;
+        return true;
+    }
+
+    private static bool TryParseDate(string raw, out DateTime date)
+    {
+        if (DateOnly.TryParseExact(
+                raw,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var dateOnly))
+        {
+            date = dateOnly.ToDateTime(TimeOnly.MinValue);
+            return true;
+        }
+
+        if (DateTime.TryParse(
+                raw,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out var parsedInvariant))
+        {
+            date = parsedInvariant.Date;
+            return true;
+        }
+
+        if (DateTime.TryParse(
+                raw,
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces,
+                out var parsedCurrent))
+        {
+            date = parsedCurrent.Date;
+            return true;
+        }
+
+        date = default;
+        return false;
+    }
+}

@@ -136,6 +136,49 @@ public class ConversationStoreTests
         Assert.Same(executionResults, turn.ExecutionResults);
     }
 
+    [Fact]
+    public async Task JsonFileConversationStore_PersistsTurnsAcrossStoreInstances()
+    {
+        var tempPath = Path.Combine(
+            Path.GetTempPath(),
+            "agentblazor-tests",
+            $"{Guid.NewGuid():N}",
+            "conversations.json");
+        var options = MsOptions.Create(new ConversationOptions
+        {
+            MaxTurnsPerSession = 10,
+            SessionTimeout = TimeSpan.FromHours(24),
+            EnableAutoCleanup = false
+        });
+
+        try
+        {
+            using (var store = new JsonFileConversationStore(tempPath, options))
+            {
+                await store.AppendTurnAsync("session-1", CreateTurn("Hello", "Hi!"));
+                await store.AppendTurnAsync("session-1", CreateTurn("Need report", "Generating report."));
+                await store.SetUserIdAsync("session-1", "user-42");
+            }
+
+            using var reloaded = new JsonFileConversationStore(tempPath, options);
+            var history = await reloaded.GetHistoryAsync("session-1");
+            var sessions = await reloaded.GetSessionsForUserAsync("user-42");
+
+            Assert.NotNull(history);
+            Assert.Equal(2, history.Turns.Count);
+            Assert.Equal("Need report", history.Turns[1].UserMessage);
+            Assert.Contains("session-1", sessions);
+        }
+        finally
+        {
+            var directory = Path.GetDirectoryName(tempPath);
+            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
     private static InMemoryConversationStore CreateStore()
     {
         var options = MsOptions.Create(new ConversationOptions

@@ -2,6 +2,7 @@ using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
+using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
@@ -237,6 +238,54 @@ public class ServiceRegistrationTests
             AgentComponentTierBoundaries.GetRequiredTier(
                 AgentComponentCapabilityProfile.AgentFormComponentId,
                 AgentComponentCapabilityProfile.FormSubmitActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentSelectComponentId,
+                AgentComponentCapabilityProfile.SelectSetValueActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentAutocompleteComponentId,
+                AgentComponentCapabilityProfile.AutocompleteSelectOptionActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentDatePickerComponentId,
+                AgentComponentCapabilityProfile.DatePickerSetDateActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentDateRangePickerComponentId,
+                AgentComponentCapabilityProfile.DateRangePickerSetRangeActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentTreeViewComponentId,
+                AgentComponentCapabilityProfile.TreeViewSelectNodeActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentStepperComponentId,
+                AgentComponentCapabilityProfile.StepperGoToStepActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentCommandBarComponentId,
+                AgentComponentCapabilityProfile.CommandBarInvokeCommandActionId));
+
+        Assert.Equal(
+            AgentBlazorTier.Free,
+            AgentComponentTierBoundaries.GetRequiredTier(
+                AgentComponentCapabilityProfile.AgentFileUploadComponentId,
+                AgentComponentCapabilityProfile.FileUploadAttachActionId));
     }
 
     [Fact]
@@ -250,7 +299,7 @@ public class ServiceRegistrationTests
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the chat widget"));
 
-        Assert.Contains("No provider is configured", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No AI provider configured", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(response.PlannedActions);
     }
 
@@ -311,6 +360,80 @@ public class ServiceRegistrationTests
         deferredEvents.Publish(expected);
 
         Assert.Equal(expected, observed);
+    }
+
+    [Fact]
+    public void AddRuntimeEventSubscriber_RegistersSubscriberImplementation()
+    {
+        var services = new ServiceCollection();
+        services
+            .AddAgentBlazorServices()
+            .AddRuntimeEventSubscriber<TestRuntimeEventSubscriber>();
+
+        using var provider = services.BuildServiceProvider();
+        var subscribers = provider.GetServices<IAgentRuntimeEventSubscriber>();
+
+        Assert.Contains(subscribers, static s => s is TestRuntimeEventSubscriber);
+    }
+
+    [Fact]
+    public async Task UseJsonFileConversationStore_ReplacesDefaultInMemoryStore()
+    {
+        var tempPath = Path.Combine(
+            Path.GetTempPath(),
+            "agentblazor-tests",
+            $"{Guid.NewGuid():N}",
+            "conversations.json");
+
+        try
+        {
+            var services = new ServiceCollection();
+            services
+                .AddAgentBlazorServices()
+                .UseJsonFileConversationStore(tempPath, options =>
+                {
+                    options.EnableAutoCleanup = false;
+                });
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var store = provider.GetRequiredService<IConversationStore>();
+                Assert.IsType<JsonFileConversationStore>(store);
+
+                await store.AppendTurnAsync("session-1", new ConversationTurn
+                {
+                    Timestamp = DateTime.UtcNow,
+                    UserMessage = "hello",
+                    AgentResponse = "hi",
+                    PlannedActions = [],
+                    ExecutionResults = []
+                });
+            }
+
+            var reloadedServices = new ServiceCollection();
+            reloadedServices
+                .AddAgentBlazorServices()
+                .UseJsonFileConversationStore(tempPath, options =>
+                {
+                    options.EnableAutoCleanup = false;
+                });
+
+            using var reloadedProvider = reloadedServices.BuildServiceProvider();
+            var reloadedStore = reloadedProvider.GetRequiredService<IConversationStore>();
+            var history = await reloadedStore.GetHistoryAsync("session-1");
+
+            Assert.NotNull(history);
+            Assert.Single(history.Turns);
+            Assert.Equal("hello", history.Turns[0].UserMessage);
+        }
+        finally
+        {
+            var directory = Path.GetDirectoryName(tempPath);
+            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -615,6 +738,36 @@ public class ServiceRegistrationTests
         Assert.Contains("UnknownComponent.unknown_action", result.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ComponentActionExecutor_Fallback_ResolvesAgentPrefixedCatalogId_ToComponentType()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        var sessionId = registry.SessionId;
+        registry.Register(new TypedStubAgentControllable(
+            agentId: "country-select",
+            componentType: "Select",
+            supportedActionId: AgentComponentCapabilityProfile.SelectSetValueActionId));
+
+        var executor = provider.GetRequiredService<IComponentActionExecutor>();
+        var result = await executor.ExecuteAsync(new PlannedComponentAction(
+            AgentComponentCapabilityProfile.AgentSelectComponentId,
+            AgentComponentCapabilityProfile.SelectSetValueActionId,
+            "test",
+            new Dictionary<string, object?>
+            {
+                [AgentRuntimeContextKeys.SessionId] = sessionId,
+                ["agentId"] = "country-select",
+                ["value"] = "Canada"
+            }));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("country-select", result.Message);
+    }
+
     private sealed class StubDataGridActionExecutor : IDataGridActionExecutor
     {
         public Task<ComponentActionExecutionResult> ExecuteAsync(
@@ -693,6 +846,10 @@ public class ServiceRegistrationTests
                 Succeeded: true,
                 Message: "custom-tabs"));
         }
+    }
+
+    private sealed class TestRuntimeEventSubscriber : IAgentRuntimeEventSubscriber
+    {
     }
 
     private sealed class StubAgentControllable(string agentId) : IAgentControllable

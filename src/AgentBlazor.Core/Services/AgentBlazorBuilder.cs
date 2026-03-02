@@ -1,7 +1,10 @@
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Conversation;
+using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentBlazor.Services;
 
@@ -56,5 +59,70 @@ public sealed class AgentBlazorBuilder
             configure?.Invoke(options);
         });
         return this;
+    }
+
+    /// <summary>
+    /// Registers a runtime lifecycle event subscriber.
+    /// Multiple subscribers can be registered and are invoked in registration order.
+    /// </summary>
+    public AgentBlazorBuilder AddRuntimeEventSubscriber<TSubscriber>()
+        where TSubscriber : class, IAgentRuntimeEventSubscriber
+    {
+        Services.AddSingleton<IAgentRuntimeEventSubscriber, TSubscriber>();
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a runtime lifecycle event subscriber instance.
+    /// </summary>
+    public AgentBlazorBuilder AddRuntimeEventSubscriber(IAgentRuntimeEventSubscriber subscriber)
+    {
+        ArgumentNullException.ThrowIfNull(subscriber);
+        Services.AddSingleton(subscriber);
+        Services.AddSingleton<IAgentRuntimeEventSubscriber>(subscriber);
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default conversation store with a custom implementation.
+    /// </summary>
+    public AgentBlazorBuilder UseConversationStore<TStore>()
+        where TStore : class, IConversationStore
+    {
+        Services.RemoveAll<IConversationStore>();
+        Services.AddSingleton<IConversationStore, TStore>();
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default conversation store with a factory-backed implementation.
+    /// </summary>
+    public AgentBlazorBuilder UseConversationStore(Func<IServiceProvider, IConversationStore> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        Services.RemoveAll<IConversationStore>();
+        Services.AddSingleton(factory);
+        return this;
+    }
+
+    /// <summary>
+    /// Uses a JSON file-backed conversation store for persistence across process restarts.
+    /// </summary>
+    public AgentBlazorBuilder UseJsonFileConversationStore(
+        string filePath,
+        Action<ConversationOptions>? configure = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        Services.Configure<ConversationOptions>(options =>
+        {
+            options.PersistAcrossRestarts = true;
+            configure?.Invoke(options);
+        });
+
+        return UseConversationStore(sp => new JsonFileConversationStore(
+            filePath,
+            sp.GetService<Microsoft.Extensions.Options.IOptions<ConversationOptions>>(),
+            sp.GetService<Microsoft.Extensions.Logging.ILogger<JsonFileConversationStore>>()));
     }
 }

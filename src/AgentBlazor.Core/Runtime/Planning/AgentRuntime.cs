@@ -49,6 +49,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private readonly IRouteRegistry _routeRegistry;
     private readonly IOptions<AgentBlazorOptions> _options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink;
+    private readonly IReadOnlyList<IAgentRuntimeEventSubscriber> _runtimeEventSubscribers;
     private readonly IOptions<PromptTracingOptions>? _tracingOptions;
     private readonly IPromptTraceStore? _traceStore;
     private readonly AgentBlazor.Core.Paid.IActionHistoryStore? _actionHistoryStore;
@@ -87,6 +88,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IRouteRegistry routeRegistry,
         IOptions<AgentBlazorOptions> options,
         IAgentBlazorTelemetrySink telemetrySink,
+        IEnumerable<IAgentRuntimeEventSubscriber>? runtimeEventSubscribers = null,
         IOptions<PromptTracingOptions>? tracingOptions = null,
         IPromptTraceStore? traceStore = null,
         AgentBlazor.Core.Paid.IActionHistoryStore? actionHistoryStore = null,
@@ -108,6 +110,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         _routeRegistry = routeRegistry;
         _options = options;
         _telemetrySink = telemetrySink;
+        _runtimeEventSubscribers = runtimeEventSubscribers?.ToArray() ?? [];
         _tracingOptions = tracingOptions;
         _traceStore = traceStore;
         _actionHistoryStore = actionHistoryStore;
@@ -234,6 +237,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         var stopwatch = Stopwatch.StartNew();
         var traceBuilder = new PromptTraceBuilder(_tracingOptions);
         var sessionId = request.GetEffectiveSessionId();
+        var runId = GetContextRunId(request.Context);
         var conversationHistory = await BuildConversationHistoryAsync(sessionId, cancellationToken);
         var inspectorRunId = Guid.NewGuid().ToString("N");
         var inspectorStartedAt = DateTimeOffset.UtcNow;
@@ -251,6 +255,12 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             Kind = AgentTurnStreamEventKind.RunStarted,
             AgentName = registration?.Name ?? "none"
         });
+        await NotifyTurnStartedAsync(
+            sessionId,
+            runId,
+            registration?.Name ?? "none",
+            request.UserMessage,
+            CancellationToken.None);
 
         if (registration is null)
         {
@@ -258,6 +268,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             await StoreConversationTurnAsync(sessionId, request.UserMessage, noAgentResponse, cancellationToken);
             await EmitTextDeltasAsync(noAgentResponse.AgentName, noAgentResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(noAgentResponse, emitEvent);
+            await NotifyTurnFinishedAsync(
+                sessionId,
+                runId,
+                noAgentResponse.AgentName,
+                request.UserMessage,
+                noAgentResponse,
+                CancellationToken.None);
             return noAgentResponse;
         }
 
@@ -280,6 +297,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             await StoreConversationTurnAsync(sessionId, request.UserMessage, providerMissingResponse, cancellationToken);
             await EmitTextDeltasAsync(providerMissingResponse.AgentName, providerMissingResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(providerMissingResponse, emitEvent);
+            await NotifyTurnFinishedAsync(
+                sessionId,
+                runId,
+                providerMissingResponse.AgentName,
+                request.UserMessage,
+                providerMissingResponse,
+                CancellationToken.None);
             return providerMissingResponse;
         }
 
@@ -338,6 +362,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 });
                 await EmitTextDeltasAsync(registration.Name, planMessage ?? clarificationText, emitEvent);
                 await EmitRunFinishedAsync(clarificationResponse, emitEvent);
+                await NotifyTurnFinishedAsync(
+                    sessionId,
+                    runId,
+                    registration.Name,
+                    request.UserMessage,
+                    clarificationResponse,
+                    CancellationToken.None);
                 return clarificationResponse;
             }
 
@@ -353,6 +384,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 await StoreConversationTurnAsync(sessionId, request.UserMessage, emptyResponse, cancellationToken);
                 await EmitTextDeltasAsync(registration.Name, emptyText, emitEvent);
                 await EmitRunFinishedAsync(emptyResponse, emitEvent);
+                await NotifyTurnFinishedAsync(
+                    sessionId,
+                    runId,
+                    registration.Name,
+                    request.UserMessage,
+                    emptyResponse,
+                    CancellationToken.None);
                 return emptyResponse;
             }
 
@@ -360,6 +398,12 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
             var plannedActions = CreatePlannedActions(plan);
             await EmitPlannedActionsAsync(plannedActions, emitEvent);
+            await NotifyToolExecutionStartedAsync(
+                sessionId,
+                runId,
+                registration.Name,
+                plannedActions,
+                CancellationToken.None);
 
             var runtimeContext = request.Context is null
                 ? null
@@ -404,6 +448,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 await EmitExecutionResultsAsync(blockedResults, emitEvent);
                 await EmitTextDeltasAsync(registration.Name, approvalText, emitEvent);
                 await EmitRunFinishedAsync(approvalResponse, emitEvent);
+                await NotifyTurnFinishedAsync(
+                    sessionId,
+                    runId,
+                    registration.Name,
+                    request.UserMessage,
+                    approvalResponse,
+                    CancellationToken.None);
                 return approvalResponse;
             }
 
@@ -447,6 +498,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 });
                 await EmitTextDeltasAsync(registration.Name, clarification, emitEvent);
                 await EmitRunFinishedAsync(validationResponse, emitEvent);
+                await NotifyTurnFinishedAsync(
+                    sessionId,
+                    runId,
+                    registration.Name,
+                    request.UserMessage,
+                    validationResponse,
+                    CancellationToken.None);
                 return validationResponse;
             }
 
@@ -486,6 +544,12 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 .Concat(toolResults)
                 .ToArray();
             await EmitExecutionResultsAsync(executionResults, emitEvent);
+            await NotifyToolExecutionFinishedAsync(
+                sessionId,
+                runId,
+                registration.Name,
+                executionResults,
+                CancellationToken.None);
 
             // When execution fully succeeded, use the LLM's plan message if available.
             // When any step failed (NeedsClarification, Failed, etc.), surface the execution message instead.
@@ -532,6 +596,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             await EmitReasoningEventsAsync(registration.Name, plan.ReasoningContent, emitEvent);
             await EmitTextDeltasAsync(registration.Name, responseText, emitEvent);
             await EmitRunFinishedAsync(successResponse, emitEvent);
+            await NotifyTurnFinishedAsync(
+                sessionId,
+                runId,
+                registration.Name,
+                request.UserMessage,
+                successResponse,
+                CancellationToken.None);
             return successResponse;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -551,6 +622,13 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 AgentName = registration?.Name,
                 ErrorMessage = ex.Message
             });
+            await NotifyErrorAsync(
+                sessionId,
+                runId,
+                registration?.Name ?? "none",
+                request.UserMessage,
+                ex.Message,
+                CancellationToken.None);
             throw;
         }
     }
@@ -637,6 +715,55 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 AgentComponentCapabilityProfile.TabsSwitchTabActionId) =>
             [
                 new ActionParameter { Name = "index", Type = "integer", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentSelectComponentId,
+                AgentComponentCapabilityProfile.SelectSetValueActionId) =>
+            [
+                new ActionParameter { Name = "value", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentAutocompleteComponentId,
+                AgentComponentCapabilityProfile.AutocompleteSetQueryActionId) =>
+            [
+                new ActionParameter { Name = "query", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentAutocompleteComponentId,
+                AgentComponentCapabilityProfile.AutocompleteSelectOptionActionId) =>
+            [
+                new ActionParameter { Name = "value", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentDatePickerComponentId,
+                AgentComponentCapabilityProfile.DatePickerSetDateActionId) =>
+            [
+                new ActionParameter { Name = "date", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentDateRangePickerComponentId,
+                AgentComponentCapabilityProfile.DateRangePickerSetRangeActionId) =>
+            [
+                new ActionParameter { Name = "startDate", Type = "string", Required = true },
+                new ActionParameter { Name = "endDate", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentTreeViewComponentId,
+                AgentComponentCapabilityProfile.TreeViewExpandActionId or
+                AgentComponentCapabilityProfile.TreeViewCollapseActionId or
+                AgentComponentCapabilityProfile.TreeViewSelectNodeActionId) =>
+            [
+                new ActionParameter { Name = "nodeId", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentStepperComponentId,
+                AgentComponentCapabilityProfile.StepperGoToStepActionId) =>
+            [
+                new ActionParameter { Name = "index", Type = "integer", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentCommandBarComponentId,
+                AgentComponentCapabilityProfile.CommandBarInvokeCommandActionId) =>
+            [
+                new ActionParameter { Name = "command", Type = "string", Required = true }
+            ],
+            (AgentComponentCapabilityProfile.AgentFileUploadComponentId,
+                AgentComponentCapabilityProfile.FileUploadAttachActionId or
+                AgentComponentCapabilityProfile.FileUploadRemoveActionId) =>
+            [
+                new ActionParameter { Name = "fileName", Type = "string", Required = true }
             ],
             _ => []
         };
@@ -763,51 +890,8 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     /// Parses a simple input schema string like "(string field [required], string value)"
     /// into structured ActionParameter objects for the planner prompt.
     /// </summary>
-    private static List<ActionParameter> ParseInputSchemaToParameters(string? inputSchema)
-    {
-        if (string.IsNullOrWhiteSpace(inputSchema) || inputSchema == "()")
-            return [];
-
-        var result = new List<ActionParameter>();
-
-        // Remove outer parentheses
-        var content = inputSchema.Trim();
-        if (content.StartsWith('(')) content = content[1..];
-        if (content.EndsWith(')')) content = content[..^1];
-
-        // Split by comma (simple parsing, doesn't handle nested commas)
-        var parts = content.Split(',', StringSplitOptions.TrimEntries);
-        foreach (var part in parts)
-        {
-            if (string.IsNullOrWhiteSpace(part)) continue;
-
-            // Parse: "type name [required] — description"
-            var tokens = part.Split(' ', 2, StringSplitOptions.TrimEntries);
-            if (tokens.Length < 2) continue;
-
-            var type = tokens[0];
-            var rest = tokens[1];
-
-            // Extract name (first word)
-            var spaceIdx = rest.IndexOf(' ');
-            var name = spaceIdx > 0 ? rest[..spaceIdx] : rest;
-            var suffix = spaceIdx > 0 ? rest[spaceIdx..] : "";
-
-            var required = suffix.Contains("[required]", StringComparison.OrdinalIgnoreCase);
-            var descIdx = suffix.IndexOf('—');
-            var description = descIdx > 0 ? suffix[(descIdx + 1)..].Trim() : null;
-
-            result.Add(new ActionParameter
-            {
-                Name = name,
-                Type = type,
-                Required = required,
-                Description = description
-            });
-        }
-
-        return result;
-    }
+    private static List<ActionParameter> ParseInputSchemaToParameters(string? inputSchema) =>
+        InputSchemaParameterParser.Parse(inputSchema);
 
     private static string FormatMountedStateValue(object? value)
     {
@@ -1524,6 +1608,182 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageContent, AgentName = agentName, TextDelta = buffer.ToString() });
 
         await EmitEventAsync(emitEvent, new AgentTurnStreamEvent { Kind = AgentTurnStreamEventKind.TextMessageEnd, AgentName = agentName });
+    }
+
+    // -------------------------------------------------------------------------
+    // Runtime event subscribers
+    // -------------------------------------------------------------------------
+
+    private static string? GetContextRunId(IDictionary<string, string>? context)
+        => context is not null &&
+           context.TryGetValue(RunIdContextKey, out var runId) &&
+           !string.IsNullOrWhiteSpace(runId)
+            ? runId
+            : null;
+
+    private async ValueTask NotifyTurnStartedAsync(
+        string sessionId,
+        string? runId,
+        string agentName,
+        string userMessage,
+        CancellationToken cancellationToken)
+    {
+        if (_runtimeEventSubscribers.Count == 0) return;
+
+        var runtimeEvent = new AgentRuntimeTurnStartedEvent(
+            SessionId: sessionId,
+            RunId: runId,
+            AgentName: agentName,
+            UserMessage: userMessage,
+            OccurredAt: DateTimeOffset.UtcNow);
+
+        foreach (var subscriber in _runtimeEventSubscribers)
+        {
+            try
+            {
+                await subscriber.OnTurnStartedAsync(runtimeEvent, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Runtime event subscriber failed for turn start.");
+            }
+        }
+    }
+
+    private async ValueTask NotifyTurnFinishedAsync(
+        string sessionId,
+        string? runId,
+        string agentName,
+        string userMessage,
+        AgentTurnResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (_runtimeEventSubscribers.Count == 0) return;
+
+        var runtimeEvent = new AgentRuntimeTurnFinishedEvent(
+            SessionId: sessionId,
+            RunId: runId,
+            AgentName: agentName,
+            UserMessage: userMessage,
+            Response: response,
+            OccurredAt: DateTimeOffset.UtcNow);
+
+        foreach (var subscriber in _runtimeEventSubscribers)
+        {
+            try
+            {
+                await subscriber.OnTurnFinishedAsync(runtimeEvent, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Runtime event subscriber failed for turn finish.");
+            }
+        }
+    }
+
+    private async ValueTask NotifyToolExecutionStartedAsync(
+        string sessionId,
+        string? runId,
+        string agentName,
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        CancellationToken cancellationToken)
+    {
+        if (_runtimeEventSubscribers.Count == 0 || plannedActions.Count == 0) return;
+
+        for (var index = 0; index < plannedActions.Count; index++)
+        {
+            var runtimeEvent = new AgentRuntimeToolExecutionStartedEvent(
+                SessionId: sessionId,
+                RunId: runId,
+                AgentName: agentName,
+                StepIndex: index,
+                Action: plannedActions[index],
+                OccurredAt: DateTimeOffset.UtcNow);
+
+            foreach (var subscriber in _runtimeEventSubscribers)
+            {
+                try
+                {
+                    await subscriber.OnToolExecutionStartedAsync(runtimeEvent, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(
+                        ex,
+                        "Runtime event subscriber failed for tool start {ComponentId}.{ActionId}.",
+                        plannedActions[index].ComponentId,
+                        plannedActions[index].ActionId);
+                }
+            }
+        }
+    }
+
+    private async ValueTask NotifyToolExecutionFinishedAsync(
+        string sessionId,
+        string? runId,
+        string agentName,
+        IReadOnlyList<ComponentActionExecutionResult> results,
+        CancellationToken cancellationToken)
+    {
+        if (_runtimeEventSubscribers.Count == 0 || results.Count == 0) return;
+
+        for (var index = 0; index < results.Count; index++)
+        {
+            var runtimeEvent = new AgentRuntimeToolExecutionFinishedEvent(
+                SessionId: sessionId,
+                RunId: runId,
+                AgentName: agentName,
+                StepIndex: index,
+                Result: results[index],
+                OccurredAt: DateTimeOffset.UtcNow);
+
+            foreach (var subscriber in _runtimeEventSubscribers)
+            {
+                try
+                {
+                    await subscriber.OnToolExecutionFinishedAsync(runtimeEvent, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(
+                        ex,
+                        "Runtime event subscriber failed for tool finish {ComponentId}.{ActionId}.",
+                        results[index].ComponentId,
+                        results[index].ActionId);
+                }
+            }
+        }
+    }
+
+    private async ValueTask NotifyErrorAsync(
+        string sessionId,
+        string? runId,
+        string agentName,
+        string userMessage,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        if (_runtimeEventSubscribers.Count == 0) return;
+
+        var runtimeEvent = new AgentRuntimeErrorEvent(
+            SessionId: sessionId,
+            RunId: runId,
+            AgentName: agentName,
+            UserMessage: userMessage,
+            ErrorMessage: errorMessage,
+            OccurredAt: DateTimeOffset.UtcNow);
+
+        foreach (var subscriber in _runtimeEventSubscribers)
+        {
+            try
+            {
+                await subscriber.OnErrorAsync(runtimeEvent, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Runtime event subscriber failed for error event.");
+            }
+        }
     }
 
     // -------------------------------------------------------------------------

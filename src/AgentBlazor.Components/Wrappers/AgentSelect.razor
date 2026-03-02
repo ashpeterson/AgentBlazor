@@ -1,0 +1,147 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Attributes
+@using AgentBlazor.Runtime
+@inherits AgentControllableComponentBase
+
+<select id="@AgentId"
+        class="agent-select"
+        value="@Value"
+        disabled="@(Disabled || ReadOnly)"
+        data-ab-type="select"
+        data-ab-agentid="@AgentId"
+        @onchange="HandleChangeAsync"
+        @attributes="AdditionalAttributes">
+    @if (AllowEmptyOption)
+    {
+        <option value="">@EmptyOptionText</option>
+    }
+    @foreach (var option in GetOptions())
+    {
+        <option value="@option">@option</option>
+    }
+</select>
+
+@code {
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public IEnumerable<string>? Options { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public bool AllowEmptyOption { get; set; } = true;
+
+    [Parameter]
+    public string EmptyOptionText { get; set; } = "-- select --";
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private bool _isOpen;
+
+    public override string ComponentType => "Select";
+
+    [AgentReadable("Currently selected value")]
+    public string? SelectedValue => Value;
+
+    [AgentReadable("Whether the select is currently disabled")]
+    public bool IsDisabled => Disabled;
+
+    [AgentReadable("Whether the select is currently read-only")]
+    public bool IsReadOnly => ReadOnly;
+
+    [AgentReadable("Available option values")]
+    public string[] AvailableOptions => GetOptions().ToArray();
+
+    [AgentAction("Open the select list")]
+    public async Task<ActionResult> Open()
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot open select while it is disabled or read-only.");
+        }
+
+        _isOpen = true;
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Opened select list.");
+    }
+
+    [AgentAction("Close the select list")]
+    public async Task<ActionResult> Close()
+    {
+        _isOpen = false;
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Closed select list.");
+    }
+
+    [AgentAction("Set selected option value", ActionId = "set_value")]
+    public async Task<ActionResult> SetSelectedValue(
+        [AgentParam("Value to select", Required = true)] string value)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot change select value while it is disabled or read-only.");
+        }
+
+        if (!ContainsOption(value))
+        {
+            return ActionResult.NeedsClarification($"Option '{value}' is not available.");
+        }
+
+        Value = value;
+        await ValueChanged.InvokeAsync(Value);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Selected '{value}'.");
+    }
+
+    [AgentAction("Clear current selection")]
+    public async Task<ActionResult> Clear()
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot clear select while it is disabled or read-only.");
+        }
+
+        Value = null;
+        await ValueChanged.InvokeAsync(Value);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Cleared selection.");
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["value"] = Value,
+        ["options"] = GetOptions().ToArray(),
+        ["disabled"] = Disabled,
+        ["readOnly"] = ReadOnly,
+        ["isOpen"] = _isOpen
+    };
+
+    private async Task HandleChangeAsync(ChangeEventArgs args)
+    {
+        Value = args.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private IReadOnlyList<string> GetOptions() =>
+        Options?
+            .Where(static o => !string.IsNullOrWhiteSpace(o))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        ?? [];
+
+    private bool ContainsOption(string value)
+    {
+        var options = GetOptions();
+        return options.Count == 0 || options.Contains(value, StringComparer.OrdinalIgnoreCase);
+    }
+}

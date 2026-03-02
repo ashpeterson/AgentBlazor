@@ -1,0 +1,300 @@
+@page "/demo/components"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+@inject ISnackbar Snackbar
+
+<PageTitle>Component Kit — AgentBlazor Demo</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1">Input + Utility Component Kit</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+    This page mounts all newer open-source wrappers in one place: <strong>AgentSelect</strong>,
+    <strong>AgentAutocomplete</strong>, <strong>AgentDatePicker</strong>, <strong>AgentDateRangePicker</strong>,
+    <strong>AgentTreeView</strong>, <strong>AgentStepper</strong>, <strong>AgentCommandBar</strong>, and
+    <strong>AgentFileUpload</strong>.
+</MudText>
+
+<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
+<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set country select value to Germany</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set supplier search query to Apex and select option Apex Components</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set review date to March 18 2026</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set review range from 2026-03-01 to 2026-03-15</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">expand node compliance and select node policy-documents</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">go to step 2</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">invoke command publish_report</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">attach file risk-summary-q1.pdf then list files</MudChip>
+    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">remove file vendor-evidence.csv</MudChip>
+</MudStack>
+
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-4">
+    <strong>File upload policy examples</strong>:
+    local mode uses file names as trusted references only (no direct file-system operations),
+    and remote mode uses file names as handoff tokens for downstream storage services.
+</MudAlert>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 mb-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Select + Autocomplete</MudText>
+            <MudStack Spacing="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Country Select</MudText>
+                    <AgentSelect AgentId="kit-country-select"
+                                 Value="@_selectedCountry"
+                                 ValueChanged="OnCountryChanged"
+                                 Options="@_countryOptions" />
+                    <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
+                </div>
+
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Supplier Autocomplete</MudText>
+                    <AgentAutocomplete AgentId="kit-supplier-autocomplete"
+                                       Query="@_supplierQuery"
+                                       QueryChanged="OnSupplierQueryChanged"
+                                       Value="@_selectedSupplier"
+                                       ValueChanged="OnSupplierValueChanged"
+                                       Options="@_supplierOptions"
+                                       Placeholder="Search suppliers..." />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Query: @_supplierQuery | Selected: @_selectedSupplier
+                    </MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 mb-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Date Pickers</MudText>
+            <MudStack Spacing="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Single Date</MudText>
+                    <AgentDatePicker AgentId="kit-review-date"
+                                     Value="@_reviewDate"
+                                     ValueChanged="OnReviewDateChanged"
+                                     MinDate="@_minReviewDate"
+                                     MaxDate="@_maxReviewDate" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Review date: @FormatDate(_reviewDate)
+                    </MudText>
+                </div>
+
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Date Range</MudText>
+                    <AgentDateRangePicker AgentId="kit-review-range"
+                                          StartDate="@_rangeStart"
+                                          StartDateChanged="OnRangeStartChanged"
+                                          EndDate="@_rangeEnd"
+                                          EndDateChanged="OnRangeEndChanged"
+                                          MinDate="@_minReviewDate"
+                                          MaxDate="@_maxReviewDate" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)
+                    </MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 mb-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Tree + Stepper</MudText>
+            <MudStack Spacing="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Workflow Tree</MudText>
+                    <AgentTreeView AgentId="kit-workflow-tree"
+                                   NodeIds="@_treeNodeIds"
+                                   SelectedNodeId="@_selectedTreeNodeId"
+                                   SelectedNodeIdChanged="OnTreeNodeSelected"
+                                   ExpandedNodeIds="@_expandedTreeNodeIds"
+                                   ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)
+                    </MudText>
+                </div>
+
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Onboarding Stepper</MudText>
+                    <AgentStepper AgentId="kit-onboarding-stepper"
+                                  CurrentStepIndex="@_currentStepIndex"
+                                  CurrentStepIndexChanged="OnCurrentStepChanged"
+                                  StepIds="@_stepIds" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])
+                    </MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-4 mb-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Command + Files</MudText>
+            <MudStack Spacing="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Command Bar</MudText>
+                    <AgentCommandBar AgentId="kit-command-bar"
+                                     Commands="@_commands"
+                                     CommandInvoked="OnCommandInvoked" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Last command: @_lastCommand
+                    </MudText>
+                </div>
+
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">File Upload (names only)</MudText>
+                    <AgentFileUpload AgentId="kit-file-upload"
+                                     Files="@_attachedFiles"
+                                     FilesChanged="OnFilesChanged" />
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Attached files: @(string.Join(", ", _attachedFiles))
+                    </MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string? _selectedCountry = "United States";
+    private string? _supplierQuery = "Apex";
+    private string? _selectedSupplier = "Apex Components";
+    private DateTime? _reviewDate = new DateTime(2026, 3, 18);
+    private DateTime? _rangeStart = new DateTime(2026, 3, 1);
+    private DateTime? _rangeEnd = new DateTime(2026, 3, 15);
+    private readonly DateTime _minReviewDate = new(2026, 1, 1);
+    private readonly DateTime _maxReviewDate = new(2026, 12, 31);
+    private string? _selectedTreeNodeId = "policy-documents";
+    private IReadOnlyList<string> _expandedTreeNodeIds = ["compliance"];
+    private int _currentStepIndex = 1;
+    private string _lastCommand = "none";
+    private IReadOnlyList<string> _attachedFiles =
+    [
+        "vendor-evidence.csv",
+        "risk-summary-q1.pdf"
+    ];
+
+    private static readonly IReadOnlyList<string> _countryOptions =
+    [
+        "United States",
+        "Germany",
+        "Japan",
+        "United Kingdom",
+        "Canada"
+    ];
+
+    private static readonly IReadOnlyList<string> _supplierOptions =
+    [
+        "Apex Components",
+        "Northwind Industrial",
+        "Summit Fabrication",
+        "Helios Logistics",
+        "Vertex Medical"
+    ];
+
+    private static readonly IReadOnlyList<string> _treeNodeIds =
+    [
+        "intake",
+        "compliance",
+        "policy-documents",
+        "risk-review",
+        "sign-off"
+    ];
+
+    private static readonly IReadOnlyList<string> _stepIds =
+    [
+        "collect-intake",
+        "run-compliance",
+        "risk-assessment",
+        "approval"
+    ];
+
+    private static readonly IReadOnlyList<string> _commands =
+    [
+        "publish_report",
+        "show_local_upload_policy",
+        "show_remote_upload_policy",
+        "create_audit_bundle"
+    ];
+
+    private Task OnCountryChanged(string? value)
+    {
+        _selectedCountry = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnSupplierQueryChanged(string? value)
+    {
+        _supplierQuery = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnSupplierValueChanged(string? value)
+    {
+        _selectedSupplier = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnReviewDateChanged(DateTime? value)
+    {
+        _reviewDate = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnRangeStartChanged(DateTime? value)
+    {
+        _rangeStart = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnRangeEndChanged(DateTime? value)
+    {
+        _rangeEnd = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnTreeNodeSelected(string? nodeId)
+    {
+        _selectedTreeNodeId = nodeId;
+        return Task.CompletedTask;
+    }
+
+    private Task OnTreeExpandedChanged(IReadOnlyList<string> nodeIds)
+    {
+        _expandedTreeNodeIds = nodeIds;
+        return Task.CompletedTask;
+    }
+
+    private Task OnCurrentStepChanged(int index)
+    {
+        _currentStepIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnFilesChanged(IReadOnlyList<string> files)
+    {
+        _attachedFiles = files;
+        return Task.CompletedTask;
+    }
+
+    private Task OnCommandInvoked(string command)
+    {
+        _lastCommand = command;
+
+        var message = command switch
+        {
+            "show_local_upload_policy" =>
+                "Local policy: keep file names as references only; do not read/write local files directly.",
+            "show_remote_upload_policy" =>
+                "Remote policy: treat file names as tokens and hand off uploads to approved external storage services.",
+            _ => $"Invoked '{command}'."
+        };
+
+        Snackbar.Add(message, Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    private static string FormatDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "(none)";
+}

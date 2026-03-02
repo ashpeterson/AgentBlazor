@@ -1,0 +1,162 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Attributes
+@using AgentBlazor.Runtime
+@inherits AgentControllableComponentBase
+
+<input id="@AgentId"
+       list="@_optionsListId"
+       class="agent-autocomplete"
+       value="@Query"
+       placeholder="@Placeholder"
+       disabled="@(Disabled || ReadOnly)"
+       data-ab-type="autocomplete"
+       data-ab-agentid="@AgentId"
+       @oninput="HandleInputAsync"
+       @attributes="AdditionalAttributes" />
+
+<datalist id="@_optionsListId">
+    @foreach (var option in GetOptions())
+    {
+        <option value="@option"></option>
+    }
+</datalist>
+
+@code {
+    private readonly string _optionsListId = $"ab-ac-{Guid.NewGuid():N}";
+
+    [Parameter]
+    public string? Query { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> QueryChanged { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public IEnumerable<string>? Options { get; set; }
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public override string ComponentType => "Autocomplete";
+
+    [AgentReadable("Current query text")]
+    public string? CurrentQuery => Query;
+
+    [AgentReadable("Currently selected value")]
+    public string? SelectedValue => Value;
+
+    [AgentReadable("Available option values")]
+    public string[] AvailableOptions => GetOptions().ToArray();
+
+    [AgentAction("Set autocomplete query text", ActionId = "set_query")]
+    public async Task<ActionResult> SetQueryText(
+        [AgentParam("Query text", Required = true)] string query)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot change autocomplete query while it is disabled or read-only.");
+        }
+
+        Query = query;
+        if (ContainsOption(query))
+        {
+            Value = query;
+            await ValueChanged.InvokeAsync(Value);
+        }
+        else
+        {
+            Value = null;
+            await ValueChanged.InvokeAsync(Value);
+        }
+
+        await QueryChanged.InvokeAsync(Query);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Set query to '{query}'.");
+    }
+
+    [AgentAction("Select one autocomplete option by value", ActionId = "select_option")]
+    public async Task<ActionResult> SelectOption(
+        [AgentParam("Option value to select", Required = true)] string value)
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot select an autocomplete option while disabled or read-only.");
+        }
+
+        if (!ContainsOption(value))
+        {
+            return ActionResult.NeedsClarification($"Option '{value}' is not available.");
+        }
+
+        Value = value;
+        Query = value;
+        await ValueChanged.InvokeAsync(Value);
+        await QueryChanged.InvokeAsync(Query);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Selected '{value}'.");
+    }
+
+    [AgentAction("Clear query text and selected value")]
+    public async Task<ActionResult> Clear()
+    {
+        if (Disabled || ReadOnly)
+        {
+            return ActionResult.Failure("Cannot clear autocomplete while disabled or read-only.");
+        }
+
+        Query = null;
+        Value = null;
+        await QueryChanged.InvokeAsync(Query);
+        await ValueChanged.InvokeAsync(Value);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Cleared autocomplete input.");
+    }
+
+    public override ComponentState GetCurrentState() => new()
+    {
+        ["query"] = Query,
+        ["selectedValue"] = Value,
+        ["options"] = GetOptions().ToArray(),
+        ["disabled"] = Disabled,
+        ["readOnly"] = ReadOnly
+    };
+
+    private async Task HandleInputAsync(ChangeEventArgs args)
+    {
+        Query = args.Value?.ToString();
+        await QueryChanged.InvokeAsync(Query);
+
+        if (!string.IsNullOrWhiteSpace(Query) && ContainsOption(Query))
+        {
+            Value = Query;
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    private IReadOnlyList<string> GetOptions() =>
+        Options?
+            .Where(static o => !string.IsNullOrWhiteSpace(o))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        ?? [];
+
+    private bool ContainsOption(string value)
+    {
+        var options = GetOptions();
+        return options.Count == 0 || options.Contains(value, StringComparer.OrdinalIgnoreCase);
+    }
+}

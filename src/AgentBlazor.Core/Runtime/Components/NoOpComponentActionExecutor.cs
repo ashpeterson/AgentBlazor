@@ -93,9 +93,9 @@ internal sealed class NoOpComponentActionExecutor(
             return await ExecuteOnComponentAsync(componentByAgentId, action, cancellationToken);
         }
 
-        // Try to find a component by ComponentType matching ComponentId
+        // Try to find by component type, allowing Agent-prefixed catalog IDs.
         var matchingComponents = registry.GetAll()
-            .Where(c => string.Equals(c.ComponentType, action.ComponentId, StringComparison.OrdinalIgnoreCase))
+            .Where(c => IsMatchingComponentType(c.ComponentType, action.ComponentId))
             .ToArray();
 
         if (matchingComponents.Length == 1)
@@ -133,5 +133,22 @@ internal sealed class NoOpComponentActionExecutor(
             action.ActionId,
             Outcome: result.Outcome,
             Message: result.Message);
+    }
+
+    private static bool IsMatchingComponentType(string componentType, string plannedComponentId)
+    {
+        if (string.Equals(componentType, plannedComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (plannedComponentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(componentType, plannedComponentId[5..], StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return componentType.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(componentType[5..], plannedComponentId, StringComparison.OrdinalIgnoreCase);
     }
 }
