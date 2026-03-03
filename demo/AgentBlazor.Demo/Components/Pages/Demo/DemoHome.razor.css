@@ -1,38 +1,221 @@
-/* ─── KPI Cards ───────────────────────────────────────────────── */
-
-.showcase-kpis {
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
+.demo-dashboard {
+    display: grid;
 }
 
-.showcase-kpi {
-    flex: 1;
-    min-width: 80px;
-    padding: 0.65rem 0.85rem;
-    border-radius: 0.6rem;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(13, 17, 32, 0.6);
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+.demo-dashboard__canvas {
+    max-width: 1760px;
+    margin: 0 auto;
+    padding: 0.1rem 0 1.8rem;
 }
 
-.showcase-kpi__value {
-    font-size: 1.55rem;
-    font-weight: 800;
-    line-height: 1;
-    color: #e8f0ff;
+.demo-dashboard__hero {
+    padding: 1.25rem 1.25rem 1.15rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background:
+        radial-gradient(circle at 16% 0%, rgba(74, 158, 221, 0.23), rgba(74, 158, 221, 0) 50%),
+        radial-gradient(circle at 96% 6%, rgba(224, 58, 88, 0.2), rgba(224, 58, 88, 0) 44%),
+        linear-gradient(155deg, rgba(12, 20, 39, 0.9), rgba(8, 12, 23, 0.95));
 }
 
-.showcase-kpi__label {
-    font-size: 0.68rem;
-    color: #3a4a6a;
-    font-weight: 600;
+.demo-dashboard__hero-side {
+    padding: 0.9rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(7, 12, 24, 0.72);
+}
+
+.demo-dashboard__kpi {
+    padding: 0.85rem 0.9rem;
+    border-radius: 0.78rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, rgba(11, 16, 31, 0.9), rgba(8, 12, 23, 0.86));
+}
+
+.demo-dashboard__kpi--danger h5 {
+    color: #ff4d6a;
+}
+
+.demo-dashboard__kpi--warn h5 {
+    color: #f0a030;
+}
+
+.demo-dashboard__kpi--success h5 {
+    color: #2ecc87;
+}
+
+.demo-dashboard__panel {
+    height: 100%;
+    padding: 1rem;
+    border-radius: 0.92rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(160deg, rgba(11, 16, 32, 0.88), rgba(8, 12, 23, 0.82));
+}
+
+.demo-dashboard__field-group {
+    display: grid;
+}
+
+.demo-dashboard__control-input,
+.demo-dashboard__control-range,
+.demo-dashboard__tree,
+.demo-dashboard__stepper,
+.demo-dashboard__commands,
+.demo-dashboard__files {
+    width: 100%;
+}
+
+.demo-dashboard ::deep .mud-tab {
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
 }
 
-.showcase-kpi--danger .showcase-kpi__value { color: #ff4d6a; }
-.showcase-kpi--warn    .showcase-kpi__value { color: #f0a030; }
-.showcase-kpi--success .showcase-kpi__value { color: #2ecc87; }
+.demo-dashboard ::deep .agent-select,
+.demo-dashboard ::deep .agent-autocomplete,
+.demo-dashboard ::deep .agent-date-picker,
+.demo-dashboard ::deep .agent-date-range-picker input {
+    width: 100%;
+    min-height: 2.2rem;
+    padding: 0.35rem 0.55rem;
+    color: #e8f0ff;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(2, 5, 12, 0.95);
+    box-sizing: border-box;
+}
+
+.demo-dashboard ::deep .agent-date-range-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+}
+
+.demo-dashboard ::deep .agent-tree-view {
+    margin: 0;
+    padding: 0.35rem 0;
+    list-style: none;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.demo-dashboard ::deep .agent-tree-node {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.55rem;
+    background: rgba(5, 9, 18, 0.85);
+    color: #b8cbea;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+}
+
+.demo-dashboard ::deep .agent-tree-node.selected {
+    border-color: rgba(74, 158, 221, 0.48);
+    background: rgba(74, 158, 221, 0.16);
+    color: #d7e8ff;
+}
+
+.demo-dashboard ::deep .agent-stepper {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.65rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(4, 8, 16, 0.86);
+}
+
+.demo-dashboard ::deep .agent-stepper-status {
+    font-size: 0.82rem;
+    color: #9ab3d8;
+    font-weight: 700;
+}
+
+.demo-dashboard ::deep .agent-stepper-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.demo-dashboard ::deep .agent-stepper-actions button {
+    flex: 1;
+    min-height: 2rem;
+    border-radius: 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(6, 11, 21, 0.9);
+    color: #d9e8ff;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.demo-dashboard ::deep .agent-command-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.42rem;
+}
+
+.demo-dashboard ::deep .agent-command-bar button {
+    min-height: 2rem;
+    padding: 0.3rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(6, 12, 22, 0.92);
+    color: #d0e2ff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.demo-dashboard ::deep .agent-command-bar button:hover {
+    border-color: rgba(74, 158, 221, 0.5);
+    background: rgba(74, 158, 221, 0.18);
+}
+
+.demo-dashboard ::deep .agent-file-upload {
+    padding: 0.6rem 0.65rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(4, 8, 16, 0.86);
+}
+
+.demo-dashboard ::deep .agent-file-upload ul {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.26rem;
+}
+
+.demo-dashboard ::deep .agent-file-upload li {
+    color: #b8cbea;
+    font-size: 0.82rem;
+}
+
+.demo-dashboard__nav ::deep .mud-nav-link {
+    border-radius: 0.55rem;
+    margin: 0.1rem 0;
+    font-weight: 700;
+}
+
+.demo-dashboard__panel ::deep .mud-table-container {
+    max-height: 24rem;
+    overflow: auto;
+}
+
+@media (max-width: 1280px) {
+    .demo-dashboard__panel ::deep .mud-table-container {
+        max-height: 20rem;
+    }
+}
+
+@media (max-width: 960px) {
+    .demo-dashboard__hero {
+        padding: 0.9rem;
+    }
+
+    .demo-dashboard__panel {
+        padding: 0.78rem;
+    }
+
+    .demo-dashboard__kpi {
+        padding: 0.66rem 0.72rem;
+    }
+}
