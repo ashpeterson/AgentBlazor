@@ -17,6 +17,7 @@ builder.Logging.AddFilter("AgentBlazor", LogLevel.Information);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
+builder.Services.AddScoped<DojoWorkspaceService>();
 
 var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_LICENSE_KEY");

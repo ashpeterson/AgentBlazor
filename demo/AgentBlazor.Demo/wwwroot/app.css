@@ -1,25 +1,25 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
 
 :root {
-    --ab-bg: #03040a;
-    --ab-bg-soft: #080c18;
-    --ab-ink: #e8f0ff;
-    --ab-ink-muted: #7a92bb;
-    --ab-border: rgba(255, 255, 255, 0.07);
-    --ab-border-strong: rgba(255, 255, 255, 0.12);
-    --ab-accent: #e03a58;
-    --ab-accent-soft: rgba(224, 58, 88, 0.15);
-    --ab-surface: rgba(13, 17, 32, 0.9);
+    --ab-bg: #070c16;
+    --ab-bg-soft: #0f1625;
+    --ab-ink: #e9f1ff;
+    --ab-ink-muted: #8da3c7;
+    --ab-border: rgba(255, 255, 255, 0.1);
+    --ab-border-strong: rgba(255, 255, 255, 0.18);
+    --ab-accent: #6ea8fe;
+    --ab-accent-soft: rgba(110, 168, 254, 0.18);
+    --ab-surface: rgba(16, 26, 43, 0.92);
     --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
-    --ab-nav-start: #06090f;
-    --ab-nav-mid: #090d1a;
-    --ab-nav-end: #0c1122;
-    --ab-nav-border: rgba(255, 255, 255, 0.07);
-    --ab-nav-link: rgba(200, 218, 255, 0.75);
+    --ab-nav-start: #0d1626;
+    --ab-nav-mid: #101b2d;
+    --ab-nav-end: #121f34;
+    --ab-nav-border: rgba(255, 255, 255, 0.09);
+    --ab-nav-link: rgba(210, 224, 246, 0.84);
     --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
     --ab-nav-active-ink: #ffffff;
-    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
-    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
+    --ab-nav-active-bg-start: rgba(110, 168, 254, 0.24);
+    --ab-nav-active-bg-end: rgba(110, 168, 254, 0.1);
 }
 
 html,
@@ -27,53 +27,53 @@ body {
     margin: 0;
     padding: 0;
     min-height: 100%;
-    font-family: "Manrope", "Segoe UI", sans-serif;
+    font-family: "Public Sans", "Segoe UI", sans-serif;
     color: var(--ab-ink);
     background: var(--ab-bg);
 }
 
 .demo-theme--aurora {
-    --ab-bg: #03040a;
-    --ab-bg-soft: #080c18;
-    --ab-ink: #e8f0ff;
-    --ab-ink-muted: #7a92bb;
-    --ab-border: rgba(255, 255, 255, 0.07);
-    --ab-border-strong: rgba(255, 255, 255, 0.12);
-    --ab-accent: #e03a58;
-    --ab-accent-soft: rgba(224, 58, 88, 0.15);
-    --ab-surface: rgba(13, 17, 32, 0.9);
+    --ab-bg: #070c16;
+    --ab-bg-soft: #0f1625;
+    --ab-ink: #e9f1ff;
+    --ab-ink-muted: #8da3c7;
+    --ab-border: rgba(255, 255, 255, 0.1);
+    --ab-border-strong: rgba(255, 255, 255, 0.18);
+    --ab-accent: #6ea8fe;
+    --ab-accent-soft: rgba(110, 168, 254, 0.18);
+    --ab-surface: rgba(16, 26, 43, 0.92);
     --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
-    --ab-nav-start: #06090f;
-    --ab-nav-mid: #090d1a;
-    --ab-nav-end: #0c1122;
-    --ab-nav-border: rgba(255, 255, 255, 0.07);
-    --ab-nav-link: rgba(200, 218, 255, 0.75);
+    --ab-nav-start: #0d1626;
+    --ab-nav-mid: #101b2d;
+    --ab-nav-end: #121f34;
+    --ab-nav-border: rgba(255, 255, 255, 0.09);
+    --ab-nav-link: rgba(210, 224, 246, 0.84);
     --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
     --ab-nav-active-ink: #ffffff;
-    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
-    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
+    --ab-nav-active-bg-start: rgba(110, 168, 254, 0.24);
+    --ab-nav-active-bg-end: rgba(110, 168, 254, 0.1);
 }
 
 .demo-theme--coastline {
-    --ab-bg: #03050a;
-    --ab-bg-soft: #060d0b;
-    --ab-ink: #e0f4ee;
-    --ab-ink-muted: #6a9a8a;
-    --ab-border: rgba(255, 255, 255, 0.07);
-    --ab-border-strong: rgba(255, 255, 255, 0.12);
-    --ab-accent: #e03a58;
-    --ab-accent-soft: rgba(224, 58, 88, 0.15);
-    --ab-surface: rgba(12, 20, 16, 0.92);
+    --ab-bg: #07120f;
+    --ab-bg-soft: #0b1a16;
+    --ab-ink: #e8f7f2;
+    --ab-ink-muted: #78aa9a;
+    --ab-border: rgba(255, 255, 255, 0.1);
+    --ab-border-strong: rgba(255, 255, 255, 0.18);
+    --ab-accent: #66c7b0;
+    --ab-accent-soft: rgba(102, 199, 176, 0.18);
+    --ab-surface: rgba(15, 33, 27, 0.92);
     --ab-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
-    --ab-nav-start: #050e0a;
-    --ab-nav-mid: #081410;
-    --ab-nav-end: #0a1a14;
-    --ab-nav-border: rgba(255, 255, 255, 0.07);
-    --ab-nav-link: rgba(180, 228, 210, 0.75);
+    --ab-nav-start: #0d1c18;
+    --ab-nav-mid: #11231e;
+    --ab-nav-end: #152922;
+    --ab-nav-border: rgba(255, 255, 255, 0.09);
+    --ab-nav-link: rgba(198, 236, 224, 0.84);
     --ab-nav-link-hover: rgba(255, 255, 255, 0.06);
     --ab-nav-active-ink: #ffffff;
-    --ab-nav-active-bg-start: rgba(224, 58, 88, 0.18);
-    --ab-nav-active-bg-end: rgba(224, 58, 88, 0.08);
+    --ab-nav-active-bg-start: rgba(102, 199, 176, 0.24);
+    --ab-nav-active-bg-end: rgba(102, 199, 176, 0.1);
 }
 
 a {
@@ -136,6 +136,86 @@ h3 {
     font-weight: 650;
 }
 
+.demo-doc-page {
+    display: grid;
+    gap: 1.15rem;
+}
+
+.demo-doc-page__hero {
+    padding: 1.3rem 1.35rem;
+    border: 1px solid var(--ab-border);
+    border-radius: 1rem;
+    background: linear-gradient(145deg, rgba(16, 25, 41, 0.9), rgba(13, 21, 35, 0.96));
+}
+
+.demo-doc-page__eyebrow {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ab-ink-muted);
+}
+
+.demo-doc-page__toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.8rem;
+}
+
+.demo-doc-page__toc-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.1rem;
+    padding: 0 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--ab-border);
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--ab-ink-muted);
+}
+
+.demo-doc-page__toc-link:hover {
+    color: var(--ab-ink);
+    border-color: var(--ab-border-strong);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.demo-doc-page__section {
+    border: 1px solid var(--ab-border);
+    border-radius: 1rem;
+    background: rgba(14, 22, 36, 0.76);
+    padding: 1.2rem;
+}
+
+.demo-doc-page__section-head {
+    margin-bottom: 0.7rem;
+}
+
+.demo-doc-page__prompt-box {
+    border: 1px solid var(--ab-border);
+    border-radius: 0.85rem;
+    background: rgba(10, 16, 28, 0.75);
+    padding: 0.9rem 0.95rem;
+}
+
+.demo-doc-page__prompt-list {
+    margin: 0.42rem 0 0;
+    padding-left: 1.15rem;
+    display: grid;
+    gap: 0.42rem;
+    color: var(--ab-ink-muted);
+    font-size: 0.88rem;
+}
+
+.demo-doc-page__prompt-code {
+    color: var(--ab-ink);
+    font-weight: 650;
+}
+
 .mud-button-root.mud-button-filled {
     border-radius: 0.7rem;
 }
@@ -145,7 +225,34 @@ h3 {
 }
 
 .mud-input-slot {
-    font-family: "Manrope", "Segoe UI", sans-serif;
+    font-family: "Public Sans", "Segoe UI", sans-serif;
+}
+
+.mud-table-root {
+    border-radius: 0.9rem;
+    overflow: hidden;
+}
+
+.mud-table-head .mud-table-cell {
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ab-ink-muted);
+    background: rgba(14, 22, 36, 0.94);
+}
+
+.mud-table-cell {
+    padding: 0.68rem 0.78rem;
+    border-color: var(--ab-border);
+}
+
+.mud-table-striped .mud-table-container table tbody tr:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.mud-table-hover .mud-table-container table tbody tr:hover {
+    background: rgba(110, 168, 254, 0.1);
 }
 
 .valid.modified:not([type=checkbox]) {
@@ -171,6 +278,14 @@ h3 {
 }
 
 @media (max-width: 760px) {
+    .demo-doc-page__hero {
+        padding: 0.95rem;
+    }
+
+    .demo-doc-page__section {
+        padding: 0.85rem;
+    }
+
     .demo-hero::after {
         width: 12rem;
         height: 12rem;

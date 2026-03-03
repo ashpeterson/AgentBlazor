@@ -4,9 +4,9 @@
     grid-template-rows: auto 1fr;
     color: #e8f0ff;
     background:
-        radial-gradient(circle at 10% -20%, rgba(74, 158, 221, 0.2), rgba(74, 158, 221, 0) 35%),
-        radial-gradient(circle at 88% -10%, rgba(224, 58, 88, 0.2), rgba(224, 58, 88, 0) 40%),
-        #03040a;
+        radial-gradient(circle at 10% -20%, rgba(110, 168, 254, 0.18), rgba(110, 168, 254, 0) 35%),
+        radial-gradient(circle at 88% -10%, rgba(111, 211, 194, 0.16), rgba(111, 211, 194, 0) 40%),
+        #070c16;
 }
 
 .demo-dashboard-shell__topbar {
@@ -53,7 +53,7 @@
     width: 1.9rem;
     height: 1.9rem;
     border-radius: 0.35rem;
-    filter: drop-shadow(0 0 7px rgba(224, 58, 88, 0.5));
+    filter: drop-shadow(0 0 7px rgba(110, 168, 254, 0.45));
 }
 
 .demo-dashboard-shell__eyebrow {
@@ -119,6 +119,34 @@
 
 .demo-dashboard-shell__chat-card ::deep .ab-chat-surface__header {
     padding-top: 0.9rem;
+}
+
+.demo-dashboard-shell__chat-card ::deep .ab-chat-surface__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.45rem;
+    padding: 0.6rem 0.72rem 0.75rem;
+}
+
+.demo-dashboard-shell__chat-card ::deep .ab-chat-surface__controls > .ab-chat-surface__label,
+.demo-dashboard-shell__chat-card ::deep .ab-chat-surface__controls > .ab-chat-surface__select {
+    display: none;
+}
+
+.demo-dashboard-shell__chat-card ::deep .ab-chat-surface__input {
+    min-height: 2.65rem;
+    max-height: 7rem;
+    border-radius: 0.95rem;
+}
+
+.demo-dashboard-shell__chat-card ::deep .ab-chat-surface__submit {
+    height: 2.65rem;
+    min-width: 2.65rem;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
 }
 
 @media (max-width: 1400px) {

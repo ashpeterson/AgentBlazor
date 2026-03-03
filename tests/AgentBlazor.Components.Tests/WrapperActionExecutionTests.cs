@@ -1,5 +1,6 @@
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor;
 using Microsoft.AspNetCore.Components;
 
 #pragma warning disable BL0005 // Setting parameters directly is intentional in wrapper logic unit tests.
@@ -313,6 +314,38 @@ public class WrapperActionExecutionTests
         Assert.Equal("Contoso", model.SupplierName); // Reset restores original value
         Assert.Equal(1, submitCount);
         Assert.False(observedValidation); // Reset clears validation state
+    }
+
+    [Fact]
+    public async Task AgentFormPageBase_SetField_UpdatesSingleField_AndOpensDialog()
+    {
+        var page = new RecipeFormPage();
+
+        var result = await page.ExecuteActionAsync(AgentAction.Create("set_field", new Dictionary<string, object?>
+        {
+            ["field"] = "recipe title",
+            ["value"] = "Test Recipe"
+        }));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Test Recipe", page.CurrentModel.Title);
+        Assert.True(page.IsDialogOpen);
+    }
+
+    [Fact]
+    public async Task AgentFormPageBase_SetAliasAction_AllowsPartialUpdates()
+    {
+        var page = new RecipeFormPage();
+
+        var result = await page.ExecuteActionAsync(AgentAction.Create("set_recipe", new Dictionary<string, object?>
+        {
+            ["title"] = "Refined Recipe"
+        }));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Refined Recipe", page.CurrentModel.Title);
+        Assert.Equal(15, page.CurrentModel.Minutes);
+        Assert.True(page.IsDialogOpen);
     }
 
     [Fact]
@@ -656,6 +689,24 @@ public class WrapperActionExecutionTests
         public string FirstName { get; set; } = string.Empty;
 
         public string LastName { get; set; } = string.Empty;
+    }
+
+    private sealed class RecipeFormPage : AgentFormPageBase<RecipeModel>
+    {
+        protected override string AgentIdValue => "recipe-form-workflow";
+
+        protected override string FormDisplayName => "Recipe";
+
+        public RecipeModel CurrentModel => Model;
+
+        public bool IsDialogOpen => DialogVisible;
+    }
+
+    private sealed class RecipeModel
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public int Minutes { get; set; } = 15;
     }
 }
 

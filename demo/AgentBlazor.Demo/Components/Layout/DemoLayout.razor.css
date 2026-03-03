@@ -1,98 +1,180 @@
-/* ── Demo App Shell ─────────────────────────────── */
-
 .demo-app {
-    min-height: 100vh;
+    min-height: 100dvh;
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 14.5rem minmax(0, 1fr) 22.5rem;
     gap: 1rem;
     padding: 1rem;
     color: var(--ab-ink);
-    background: var(--ab-bg);
+    background:
+        radial-gradient(90rem 42rem at -10% -20%, rgba(110, 168, 254, 0.16), rgba(110, 168, 254, 0)),
+        radial-gradient(80rem 40rem at 120% -10%, rgba(111, 211, 194, 0.13), rgba(111, 211, 194, 0)),
+        var(--ab-bg);
 }
 
-.demo-app__sidebar {
+.demo-app__sidebar,
+.demo-app__assistant-pane {
     position: sticky;
-    top: 1.1rem;
-    align-self: start;
+    top: 0.9rem;
+    height: calc(100dvh - 1.8rem);
+    min-height: 0;
+}
+
+.demo-app__sidebar-card {
+    height: 100%;
+    padding: 0.9rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border);
+    background: linear-gradient(180deg, rgba(16, 25, 41, 0.92), rgba(12, 19, 31, 0.98));
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: 0.7rem;
+    overflow: hidden;
+}
+
+.demo-app__sidebar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    text-decoration: none;
+}
+
+.demo-app__sidebar-logo {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.45rem;
+    filter: drop-shadow(0 0 8px rgba(110, 168, 254, 0.35));
+}
+
+.demo-app__sidebar-brand-text {
+    display: grid;
+    line-height: 1.1;
+}
+
+.demo-app__sidebar-brand-text strong {
+    color: var(--ab-ink);
+    font-size: 0.94rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.demo-app__sidebar-brand-text small {
+    color: var(--ab-ink-muted);
+    font-size: 0.78rem;
+}
+
+.demo-app__sidebar-copy {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--ab-ink-muted);
+}
+
+.demo-app__sidebar-card ::deep .mud-navmenu {
+    margin-top: 0.1rem;
+    overflow: auto;
+    padding-right: 0.15rem;
+}
+
+.demo-app__sidebar-card ::deep .mud-nav-link {
+    border-radius: 0.6rem;
+    min-height: 2.15rem;
+    margin-bottom: 0.2rem;
+    color: var(--ab-nav-link);
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.demo-app__sidebar-card ::deep .mud-nav-link:hover {
+    color: var(--ab-ink);
+    background: var(--ab-nav-link-hover);
+}
+
+.demo-app__sidebar-card ::deep .mud-nav-link.active,
+.demo-app__sidebar-card ::deep .mud-nav-link[aria-current="page"] {
+    color: var(--ab-nav-active-ink);
+    background: linear-gradient(90deg, var(--ab-nav-active-bg-start), var(--ab-nav-active-bg-end));
+    border: 1px solid var(--ab-border-strong);
+}
+
+.demo-app__sidebar-card ::deep .mud-divider {
+    margin: 0.45rem 0;
+    border-color: var(--ab-border);
 }
 
 .demo-app__main {
     min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 0.85rem;
 }
-
-/* ── Top Bar ────────────────────────────────────── */
 
 .demo-app__topbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 1.2rem;
-    border-radius: 0.85rem;
+    justify-content: space-between;
+    gap: 0.9rem;
+    padding: 1rem 1.1rem;
+    border-radius: 1rem;
     border: 1px solid var(--ab-border);
-    background: rgba(8, 10, 20, 0.85);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: linear-gradient(145deg, rgba(14, 22, 37, 0.9), rgba(11, 17, 30, 0.94));
+}
+
+.demo-app__topbar-intro {
+    display: grid;
+    gap: 0.5rem;
 }
 
 .demo-app__back {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     color: var(--ab-ink-muted);
     text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    padding: 0.4rem 0.75rem;
-    border-radius: 0.5rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+    width: fit-content;
+    padding: 0.28rem 0.48rem;
+    border-radius: 0.52rem;
     border: 1px solid transparent;
-    transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .demo-app__back:hover {
     color: var(--ab-ink);
-    background: rgba(255, 255, 255, 0.06);
     border-color: var(--ab-border);
+    background: rgba(255, 255, 255, 0.05);
 }
 
-.demo-app__brand {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
+.demo-app__title-block {
+    display: grid;
+    gap: 0.08rem;
 }
 
-.demo-app__brand-logo {
-    width: 1.9rem;
-    height: 1.9rem;
-    object-fit: contain;
-    border-radius: 0.35rem;
-    filter: drop-shadow(0 0 6px rgba(220, 50, 60, 0.4));
-}
-
-.demo-app__brand-name {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+.demo-app__title-eyebrow {
+    margin: 0;
+    font-size: 0.76rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
+    color: var(--ab-ink-muted);
+    font-weight: 700;
+}
+
+.demo-app__title {
+    margin: 0;
+    font-size: 1.46rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
     color: var(--ab-ink);
 }
 
 .demo-app__controls {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
-}
-
-.demo-app__quick-links {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
+    gap: 0.5rem;
 }
 
 .demo-app__theme-select {
-    min-width: 11.3rem;
+    min-width: 11.5rem;
 }
 
 .demo-app__theme-select ::deep .mud-input-control {
@@ -100,37 +182,125 @@
 }
 
 .demo-app__theme-select ::deep .mud-input-slot {
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     font-weight: 600;
 }
 
-/* ── Content ────────────────────────────────────── */
-
 .demo-app__content {
-    padding: 1.25rem 0.2rem 27rem;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.15rem 0.2rem 2.8rem;
 }
 
-.demo-app__assistant-widget ::deep .ab-chat-widget__window {
+.demo-app__assistant-card {
+    height: 100%;
+    min-height: 0;
+    border-radius: 1rem;
     border: 1px solid var(--ab-border);
-    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
+    background: linear-gradient(180deg, rgba(13, 20, 35, 0.96), rgba(10, 16, 28, 0.98));
+    display: grid;
+    grid-template-rows: auto 1fr;
     overflow: hidden;
 }
 
-.demo-app__assistant-widget ::deep .ab-chat-surface__timeline {
-    max-height: min(43vh, 28rem);
+.demo-app__assistant-head {
+    padding: 0.95rem 0.95rem 0.75rem;
+    border-bottom: 1px solid var(--ab-border);
+    display: grid;
+    gap: 0.22rem;
 }
 
-.demo-app__assistant-widget ::deep .ab-chat-surface__controls {
-    background: rgba(6, 8, 16, 0.96);
-    backdrop-filter: blur(8px);
+.demo-app__assistant-eyebrow {
+    margin: 0;
+    color: var(--ab-ink-muted);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
 }
 
-.demo-app__assistant-widget ::deep .ab-chat-surface__header {
-    font-size: 0.9rem;
-    letter-spacing: 0.01em;
+.demo-app__assistant-title {
+    margin: 0;
+    font-size: 1.08rem;
+    line-height: 1.3;
 }
 
-/* ── Error UI ───────────────────────────────────── */
+.demo-app__assistant-copy {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.4;
+    color: var(--ab-ink-muted);
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+    padding-top: 0.75rem;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__header {
+    display: none;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.55rem;
+    padding: 0.7rem 0.8rem 0.85rem;
+    background: rgba(8, 13, 23, 0.97);
+    border-top: 1px solid var(--ab-border);
+    border-radius: 0;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__controls > .ab-chat-surface__label,
+.demo-app__assistant-card ::deep .ab-chat-surface__controls > .ab-chat-surface__select {
+    display: none;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__input-wrapper {
+    grid-column: 1;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__input {
+    min-height: 2.9rem;
+    max-height: 7rem;
+    padding: 0.78rem 0.92rem;
+    border-radius: 0.95rem;
+    resize: vertical;
+    background: rgba(18, 27, 43, 0.95);
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__submit {
+    grid-column: 2;
+    height: 2.9rem;
+    min-width: 2.9rem;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__suggestions {
+    padding: 0 0.1rem;
+    gap: 0.42rem;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__suggestion-chip {
+    font-size: 0.8rem;
+    padding: 0.34rem 0.76rem;
+    border-radius: 999px;
+}
+
+.demo-app__assistant-card ::deep .ab-chat-surface__timeline {
+    padding-right: 0.1rem;
+}
+
+.demo-app__assistant-widget {
+    display: none;
+}
 
 #blazor-error-ui {
     color-scheme: light only;
@@ -154,44 +324,60 @@
     top: 0.55rem;
 }
 
-/* ── Responsive ─────────────────────────────────── */
+@media (max-width: 1440px) {
+    .demo-app {
+        grid-template-columns: 14rem minmax(0, 1fr) 21rem;
+    }
+}
+
+@media (max-width: 1180px) {
+    .demo-app {
+        grid-template-columns: 15rem minmax(0, 1fr);
+    }
+
+    .demo-app__assistant-pane {
+        display: none;
+    }
+
+    .demo-app__assistant-widget {
+        display: block;
+    }
+
+    .demo-app__content {
+        padding-bottom: 6.2rem;
+    }
+}
 
 @media (max-width: 980px) {
     .demo-app {
         grid-template-columns: 1fr;
-        gap: 0.8rem;
-        padding: 0.7rem;
+        gap: 0.65rem;
+        padding: 0.65rem;
     }
 
-    .demo-app__sidebar {
+    .demo-app__sidebar,
+    .demo-app__assistant-pane {
         position: static;
+        height: auto;
+    }
+
+    .demo-app__sidebar-card {
+        max-height: none;
+        grid-template-rows: auto auto auto;
     }
 
     .demo-app__topbar {
-        padding: 0.8rem 0.95rem;
         flex-wrap: wrap;
+        padding: 0.75rem 0.85rem;
     }
 
     .demo-app__controls {
         width: 100%;
+        justify-content: space-between;
         flex-wrap: wrap;
-    }
-
-    .demo-app__quick-links {
-        width: 100%;
-        justify-content: flex-end;
     }
 
     .demo-app__theme-select {
         min-width: 100%;
-    }
-
-    .demo-app__content {
-        padding-bottom: 26rem;
-    }
-
-    .demo-app__assistant-widget {
-        --ab-chat-widget-right: 0.7rem;
-        --ab-chat-widget-bottom: 0.7rem;
     }
 }

@@ -10,114 +10,140 @@
 
 <PageTitle>Supplier Onboarding — AgentBlazor Demo</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Form Workflow</MudText>
-<MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
-    The agent can fill out the entire supplier onboarding form from a single natural-language prompt.
-    The page inherits from <code>AgentFormPageBase&lt;TModel&gt;</code> — actions are auto-generated from the model.
-</MudText>
+<div class="demo-doc-page onboarding-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Form Automation</p>
+        <MudText Typo="Typo.h5">Supplier Onboarding Workflow</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            The page inherits from <code class="demo-code">AgentFormPageBase&lt;TModel&gt;</code>,
+            so form actions are generated directly from model fields.
+        </MudText>
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
+            <a class="demo-doc-page__toc-link" href="#dialog">Dialog + Form</a>
+            <a class="demo-doc-page__toc-link" href="#result">Last Submission</a>
+        </div>
+    </MudPaper>
 
-<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
-<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">open the onboarding form</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">onboard Apex Components from Germany, high risk tier, priority 2</MudChip>
-</MudStack>
+    <section id="prompt-set" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Prompt Set</MudText>
+        </div>
+        <div class="demo-doc-page__prompt-box">
+            <ul class="demo-doc-page__prompt-list">
+                <li><span class="demo-doc-page__prompt-code">open the onboarding form</span></li>
+                <li><span class="demo-doc-page__prompt-code">onboard Apex Components from Germany, high risk tier, priority 2</span></li>
+            </ul>
+        </div>
+    </section>
 
-<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
-    Open Onboarding Dialog
-</MudButton>
-
-@if (_lastSubmission is not null)
-{
-    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-        Submitted <strong>@_lastSubmission.RequestId</strong> and created supplier
-        <strong>@_lastSubmission.SupplierId</strong> with computed risk score
-        <strong>@_lastSubmission.RiskScore</strong>.
-    </MudAlert>
-}
-
-<MudDialog @bind-Visible="DialogVisible">
-    <TitleContent>
-        <MudText Typo="Typo.h6">New Supplier</MudText>
-    </TitleContent>
-    <DialogContent>
-        <EditForm EditContext="_editContext" OnValidSubmit="OnSubmittedAsync">
-            <DataAnnotationsValidator />
-            <MudTextField T="string"
-                          Label="Supplier name"
-                          For="@(() => Model.SupplierName)"
-                          @bind-Value="Model.SupplierName" />
-            <MudTextField T="string"
-                          Label="Contact email"
-                          For="@(() => Model.ContactEmail)"
-                          @bind-Value="Model.ContactEmail" />
-            <MudTextField T="string"
-                          Label="Contact phone"
-                          For="@(() => Model.ContactPhone)"
-                          @bind-Value="Model.ContactPhone" />
-            <MudTextField T="string"
-                          Label="Risk tier"
-                          For="@(() => Model.RiskTier)"
-                          @bind-Value="Model.RiskTier" />
-            <MudTextField T="string"
-                          Label="Country"
-                          For="@(() => Model.Country)"
-                          @bind-Value="Model.Country" />
-            <MudTextField T="string"
-                          Label="Category"
-                          For="@(() => Model.Category)"
-                          @bind-Value="Model.Category" />
-            <MudTextField T="string"
-                          Label="Payment terms"
-                          For="@(() => Model.PaymentTerms)"
-                          @bind-Value="Model.PaymentTerms" />
-            <MudTextField T="string"
-                          Label="Preferred currency"
-                          For="@(() => Model.PreferredCurrency)"
-                          @bind-Value="Model.PreferredCurrency" />
-            <MudNumericField T="decimal"
-                             Label="Requested budget"
-                             For="@(() => Model.RequestedBudget)"
-                             @bind-Value="Model.RequestedBudget"
-                             Adornment="Adornment.End"
-                             AdornmentText="USD" />
-            <MudNumericField T="decimal"
-                             Label="Expected monthly spend"
-                             For="@(() => Model.ExpectedMonthlySpend)"
-                             @bind-Value="Model.ExpectedMonthlySpend"
-                             Adornment="Adornment.End"
-                             AdornmentText="USD" />
-            <MudNumericField T="int"
-                             Label="Priority (1-5)"
-                             For="@(() => Model.Priority)"
-                             @bind-Value="Model.Priority" />
-            <MudCheckBox T="bool"
-                         Label="Sanctions screened"
-                         For="@(() => Model.SanctionsScreened)"
-                         @bind-Value="Model.SanctionsScreened" />
-            <MudCheckBox T="bool"
-                         Label="NDA required"
-                         For="@(() => Model.NdaRequired)"
-                         @bind-Value="Model.NdaRequired" />
-            <MudTextField T="string"
-                          Label="Notes"
-                          Lines="2"
-                          For="@(() => Model.Notes)"
-                          @bind-Value="Model.Notes" />
-            <MudStack Row="true" Justify="Justify.FlexEnd">
-                <MudButton ButtonType="ButtonType.Submit"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary">
-                    Submit Onboarding
-                </MudButton>
-            </MudStack>
-        </EditForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseDialogAsync">
-            Close
+    <section id="dialog" class="demo-doc-page__section">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenDialogAsync">
+            Open Onboarding Dialog
         </MudButton>
-    </DialogActions>
-</MudDialog>
+    </section>
+
+    <section id="result" class="demo-doc-page__section">
+        @if (_lastSubmission is not null)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+                Submitted <strong>@_lastSubmission.RequestId</strong> and created supplier
+                <strong>@_lastSubmission.SupplierId</strong> with computed risk score
+                <strong>@_lastSubmission.RiskScore</strong>.
+            </MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No submission yet. Run a prompt or open the dialog and submit.
+            </MudText>
+        }
+    </section>
+
+    <MudDialog @bind-Visible="DialogVisible">
+        <TitleContent>
+            <MudText Typo="Typo.h6">New Supplier</MudText>
+        </TitleContent>
+        <DialogContent>
+            <EditForm EditContext="_editContext" OnValidSubmit="OnSubmittedAsync">
+                <DataAnnotationsValidator />
+                <MudTextField T="string"
+                              Label="Supplier name"
+                              For="@(() => Model.SupplierName)"
+                              @bind-Value="Model.SupplierName" />
+                <MudTextField T="string"
+                              Label="Contact email"
+                              For="@(() => Model.ContactEmail)"
+                              @bind-Value="Model.ContactEmail" />
+                <MudTextField T="string"
+                              Label="Contact phone"
+                              For="@(() => Model.ContactPhone)"
+                              @bind-Value="Model.ContactPhone" />
+                <MudTextField T="string"
+                              Label="Risk tier"
+                              For="@(() => Model.RiskTier)"
+                              @bind-Value="Model.RiskTier" />
+                <MudTextField T="string"
+                              Label="Country"
+                              For="@(() => Model.Country)"
+                              @bind-Value="Model.Country" />
+                <MudTextField T="string"
+                              Label="Category"
+                              For="@(() => Model.Category)"
+                              @bind-Value="Model.Category" />
+                <MudTextField T="string"
+                              Label="Payment terms"
+                              For="@(() => Model.PaymentTerms)"
+                              @bind-Value="Model.PaymentTerms" />
+                <MudTextField T="string"
+                              Label="Preferred currency"
+                              For="@(() => Model.PreferredCurrency)"
+                              @bind-Value="Model.PreferredCurrency" />
+                <MudNumericField T="decimal"
+                                 Label="Requested budget"
+                                 For="@(() => Model.RequestedBudget)"
+                                 @bind-Value="Model.RequestedBudget"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="USD" />
+                <MudNumericField T="decimal"
+                                 Label="Expected monthly spend"
+                                 For="@(() => Model.ExpectedMonthlySpend)"
+                                 @bind-Value="Model.ExpectedMonthlySpend"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="USD" />
+                <MudNumericField T="int"
+                                 Label="Priority (1-5)"
+                                 For="@(() => Model.Priority)"
+                                 @bind-Value="Model.Priority" />
+                <MudCheckBox T="bool"
+                             Label="Sanctions screened"
+                             For="@(() => Model.SanctionsScreened)"
+                             @bind-Value="Model.SanctionsScreened" />
+                <MudCheckBox T="bool"
+                             Label="NDA required"
+                             For="@(() => Model.NdaRequired)"
+                             @bind-Value="Model.NdaRequired" />
+                <MudTextField T="string"
+                              Label="Notes"
+                              Lines="2"
+                              For="@(() => Model.Notes)"
+                              @bind-Value="Model.Notes" />
+                <MudStack Row="true" Justify="Justify.FlexEnd">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Submit Onboarding
+                    </MudButton>
+                </MudStack>
+            </EditForm>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseDialogAsync">
+                Close
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</div>
 
 @code {
     private EditContext? _editContext;

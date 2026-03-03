@@ -9,63 +9,67 @@
 
 <PageTitle>AgentBlazor Status</PageTitle>
 
-<MudPaper Class="demo-surface demo-hero pa-5" Elevation="0">
-    <MudText Typo="Typo.h4" GutterBottom="true">Runtime Status</MudText>
-    <MudText Typo="Typo.body2" Class="demo-subtitle">
-        Live snapshot of configured provider, registered agents, and exposed component capabilities.
-    </MudText>
+<div class="demo-doc-page status-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Diagnostics</p>
+        <MudText Typo="Typo.h4" GutterBottom="true">Runtime Status</MudText>
+        <MudText Typo="Typo.body2" Class="demo-subtitle">
+            Live snapshot of provider configuration, registered agents, and component catalog coverage.
+        </MudText>
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#provider">Provider</a>
+            <a class="demo-doc-page__toc-link" href="#agents">Agents</a>
+            <a class="demo-doc-page__toc-link" href="#catalog">Capability Catalog</a>
+        </div>
+    </MudPaper>
 
-    <MudGrid Class="mt-4">
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.subtitle2">Provider Kind</MudText>
-                <MudText Typo="Typo.h6">@AgentOptions.Value.Provider.Kind</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="6">
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.subtitle2">Provider Model</MudText>
-                <MudText Typo="Typo.h6">@(AgentOptions.Value.Provider.Model ?? "(none)")</MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
+    <section id="provider" class="demo-doc-page__section">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="status-page__card" Outlined="true">
+                    <MudText Typo="Typo.subtitle2">Provider Kind</MudText>
+                    <MudText Typo="Typo.h6">@AgentOptions.Value.Provider.Kind</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="status-page__card" Outlined="true">
+                    <MudText Typo="Typo.subtitle2">Provider Model</MudText>
+                    <MudText Typo="Typo.h6">@(AgentOptions.Value.Provider.Model ?? "(none)")</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
 
-<MudGrid Class="mt-4">
-    <MudItem xs="12" lg="6">
-        <MudPaper Class="demo-surface pa-4" Elevation="0">
-            <MudText Typo="Typo.h6">Agents</MudText>
-            <MudList T="string" Dense="true" Class="mt-2">
-                @foreach (var agent in AgentRegistry.GetAll().OrderBy(a => a.Name))
-                {
-                    <MudListItem T="string">
-                        <MudText Typo="Typo.subtitle2">@agent.Name</MudText>
-                        @if (!string.IsNullOrWhiteSpace(agent.Description))
-                        {
-                            <MudText Typo="Typo.body2" Class="demo-muted">@agent.Description</MudText>
-                        }
-                    </MudListItem>
-                }
-            </MudList>
-        </MudPaper>
-    </MudItem>
+    <section id="agents" class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Agents</MudText>
+        <MudList T="string" Dense="true" Class="mt-2">
+            @foreach (var agent in AgentRegistry.GetAll().OrderBy(a => a.Name))
+            {
+                <MudListItem T="string">
+                    <MudText Typo="Typo.subtitle2">@agent.Name</MudText>
+                    @if (!string.IsNullOrWhiteSpace(agent.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="demo-muted">@agent.Description</MudText>
+                    }
+                </MudListItem>
+            }
+        </MudList>
+    </section>
 
-    <MudItem xs="12" lg="6">
-        <MudPaper Class="demo-surface pa-4" Elevation="0">
-            <MudText Typo="Typo.h6">Component Capability Catalog</MudText>
-            <MudTable Items="@_catalogRows" Dense="true" Hover="true" Bordered="true" Class="mt-2">
-                <HeaderContent>
-                    <MudTh>Component</MudTh>
-                    <MudTh>Actions</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Component">@context.ComponentId</MudTd>
-                    <MudTd DataLabel="Actions">@context.ActionCount</MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+    <section id="catalog" class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Component Capability Catalog</MudText>
+        <MudTable Items="@_catalogRows" Dense="false" Hover="true" Bordered="true" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Component</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Component">@context.ComponentId</MudTd>
+                <MudTd DataLabel="Actions">@context.ActionCount</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </section>
+</div>
 
 @code {
     private IReadOnlyList<ComponentRow> _catalogRows = [];

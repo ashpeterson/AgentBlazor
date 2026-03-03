@@ -5,37 +5,56 @@
 
 <PageTitle>Generative UI — AgentBlazor Demo</PageTitle>
 
-<section class="gen-ui-demo">
-    <header class="gen-ui-demo__header">
+<div class="demo-doc-page gen-ui-demo">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Generated Output</p>
         <MudText Typo="Typo.h5">Generative UI</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            The agent renders live charts, KPI cards, and action buttons directly inside the chat —
-            backed by real data from the demo database. No grids or forms are mounted on this page;
-            everything appears inline in the Assistant widget.
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            The agent renders charts, KPI cards, and action buttons directly in chat from
+            named data sources. No grids/forms are mounted here.
         </MudText>
-    </header>
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
+            <a class="demo-doc-page__toc-link" href="#data-sources">Named Data Sources</a>
+            <a class="demo-doc-page__toc-link" href="#notes">Execution Notes</a>
+        </div>
+    </MudPaper>
 
-    <MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
-    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-4">
-        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            show supplier risk by region as a bar chart
-        </MudChip>
-        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            show risk tier distribution as a pie chart
-        </MudChip>
-        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            chart onboarding intake for the last 9 months
-        </MudChip>
-        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            chart mitigation task volume for the last 6 months
-        </MudChip>
-        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">
-            create a risk summary card with action buttons
-        </MudChip>
-    </MudStack>
+    <section id="prompt-set" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Prompt Set</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Use these to verify chart/card generation and follow-up interactive actions.
+            </MudText>
+        </div>
+        <div class="demo-doc-page__prompt-box">
+            <ul class="demo-doc-page__prompt-list">
+                <li><span class="demo-doc-page__prompt-code">show supplier risk by region as a bar chart</span></li>
+                <li><span class="demo-doc-page__prompt-code">show risk tier distribution as a pie chart</span></li>
+                <li><span class="demo-doc-page__prompt-code">chart onboarding intake for the last 9 months</span></li>
+                <li><span class="demo-doc-page__prompt-code">chart mitigation task volume for the last 6 months</span></li>
+                <li><span class="demo-doc-page__prompt-code">create a risk summary card with action buttons</span></li>
+            </ul>
+        </div>
+    </section>
 
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-        Open the <strong>Assistant</strong> widget at the bottom-right and type any prompt above.
-        Charts and cards appear directly in the conversation and can include follow-up action buttons.
-    </MudAlert>
-</section>
+    <section id="data-sources" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Named Data Sources</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Prompts resolve to these registered sources:
+            </MudText>
+        </div>
+        <pre class="docs-code">demo.suppliers.risk.by-region
+demo.suppliers.risk.tier-distribution
+demo.onboarding.volume.monthly
+demo.mitigation.volume.monthly</pre>
+    </section>
+
+    <section id="notes" class="demo-doc-page__section">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+            Open the <strong>Assistant</strong> widget at the bottom-right and run any prompt above.
+            Generated content appears directly in the conversation and can include follow-up action buttons.
+        </MudAlert>
+    </section>
+</div>

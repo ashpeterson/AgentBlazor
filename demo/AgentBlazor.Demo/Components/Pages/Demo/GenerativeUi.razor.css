@@ -1,21 +1,8 @@
 .gen-ui-demo {
-    display: grid;
-    gap: 1rem;
-    max-width: 980px;
+    max-width: 1040px;
 }
 
 .gen-ui-demo__header {
     display: grid;
     gap: 0.35rem;
-}
-
-.gen-ui-demo__chat {
-    height: min(78vh, 820px);
-    overflow: hidden;
-}
-
-@media (max-width: 1100px) {
-    .gen-ui-demo__chat {
-        height: min(70vh, 680px);
-    }
 }

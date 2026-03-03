@@ -86,6 +86,20 @@ internal sealed class PlanValidator : IPlanValidator
             };
         }
 
+        // When a matching component type is mounted, ensure the action is actually
+        // available on the live component instance as well (not just in static catalog data).
+        if (!IsActionAvailableOnMountedComponent(step, component.ComponentId, context))
+        {
+            errors.Add($"Action '{step.ActionId}' is not available on the mounted component '{step.ComponentId}'.");
+            return new StepValidationResult
+            {
+                Step = step,
+                IsValid = false,
+                Errors = errors,
+                MissingParameters = missingParams
+            };
+        }
+
         // Check required parameters
         foreach (var param in action.Parameters.Where(p => p.Required))
         {
@@ -129,5 +143,49 @@ internal sealed class PlanValidator : IPlanValidator
             Errors = errors,
             MissingParameters = missingParams
         };
+    }
+
+    private static bool IsActionAvailableOnMountedComponent(
+        PlannedStep step,
+        string allowedComponentId,
+        PlanValidationContext context)
+    {
+        var mountedCandidates = context.MountedComponents
+            .Where(m => ComponentTypeMatchesAllowedId(m.ComponentType, allowedComponentId))
+            .ToArray();
+
+        if (mountedCandidates.Length == 0)
+        {
+            // Component not mounted on this route; keep existing behavior for cross-route flows.
+            return true;
+        }
+
+        return mountedCandidates.Any(m => m.Actions.Any(a => ActionIdMatches(a.ActionId, step.ActionId)));
+    }
+
+    private static bool ComponentTypeMatchesAllowedId(string mountedType, string allowedComponentId)
+    {
+        if (string.Equals(mountedType, allowedComponentId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalizedAllowed = allowedComponentId.StartsWith("Agent", StringComparison.OrdinalIgnoreCase)
+            ? allowedComponentId[5..]
+            : allowedComponentId;
+
+        return string.Equals(mountedType, normalizedAllowed, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ActionIdMatches(string a, string b)
+    {
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalizedA = a.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+        var normalizedB = b.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
+        return string.Equals(normalizedA, normalizedB, StringComparison.Ordinal);
     }
 }

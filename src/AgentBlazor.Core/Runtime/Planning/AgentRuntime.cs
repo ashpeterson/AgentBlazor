@@ -1027,9 +1027,9 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         GeneratedUiActionInvocation? generatedUiAction,
         string userMessage)
     {
-        if (generatedUiAction is null || plan.Steps.Count == 0) return plan;
+        if (plan.Steps.Count == 0) return plan;
 
-        if (IsExplicitSubmitIntent(userMessage) || IsExplicitSubmitIntent(generatedUiAction.ActionId))
+        if (IsExplicitSubmitIntent(userMessage) || IsExplicitSubmitIntent(generatedUiAction?.ActionId))
             return plan;
 
         var filtered = plan.Steps

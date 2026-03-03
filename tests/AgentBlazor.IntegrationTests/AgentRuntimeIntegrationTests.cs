@@ -202,6 +202,80 @@ public class AgentRuntimeIntegrationTests
     }
 
     [Fact]
+    public async Task RunTurnAsync_FormSubmitStep_IsFiltered_WhenPromptDoesNotAskToSubmit()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddSingleton<CountingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var executor = provider.GetRequiredService<CountingExecutor>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("set the recipe title to test"));
+
+        Assert.Equal(0, executor.CallCount);
+        Assert.False(response.RequiresApproval);
+        Assert.DoesNotContain(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_FormSubmitStep_Remains_WhenPromptExplicitlyAsksToSave()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("save and submit the form"));
+
+        Assert.True(response.RequiresApproval);
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_AgentFormSetField_IsRejected_WhenMountedFormDoesNotExposeIt()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
+            "agentblazor_agentform_set_field",
+            new Dictionary<string, object?>
+            {
+                ["field"] = "SupplierName",
+                ["value"] = "Contoso"
+            }));
+        services.AddSingleton<CountingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new StubRegisteredComponent(
+            "supplier-form",
+            "Form",
+            new Dictionary<string, object?>(),
+            actions: ["validate", "reset", "submit"]));
+
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var executor = provider.GetRequiredService<CountingExecutor>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "set supplier name to Contoso",
+            SessionId: registry.SessionId));
+
+        Assert.Equal(0, executor.CallCount);
+        Assert.Contains("not available on the mounted component", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunTurnAsync_WhenNavigationActionIsMissingUriFamily_RespondsWithSingleRouteQuestion()
     {
         var services = new ServiceCollection();
@@ -864,6 +938,7 @@ public class AgentRuntimeIntegrationTests
             "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
             "agentblazor_agentdialog_confirm" => Resolve("AgentDialog", "confirm", out componentId, out actionId),
             "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
+            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
             "agentblazor_agentform_submit" => Resolve("AgentForm", "submit", out componentId, out actionId),
             "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
             _ => false
@@ -1195,7 +1270,8 @@ public class AgentRuntimeIntegrationTests
     private sealed class StubRegisteredComponent(
         string agentId,
         string componentType,
-        IReadOnlyDictionary<string, object?> state) : IAgentControllable
+        IReadOnlyDictionary<string, object?> state,
+        IReadOnlyList<string>? actions = null) : IAgentControllable
     {
         public string AgentId { get; } = agentId;
 
@@ -1204,8 +1280,10 @@ public class AgentRuntimeIntegrationTests
         public ComponentCapability GetCapability()
         {
             var capability = new ComponentCapability(AgentId, "Registered wrapper component.");
-            capability.UpsertAction(new ComponentActionCapability("sort", "Sort data."));
-            capability.UpsertAction(new ComponentActionCapability("filter", "Filter data."));
+            foreach (var actionId in actions ?? ["sort", "filter"])
+            {
+                capability.UpsertAction(new ComponentActionCapability(actionId, $"{actionId} action."));
+            }
             return capability;
         }
 

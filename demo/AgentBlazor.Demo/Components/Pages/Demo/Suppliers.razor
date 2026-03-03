@@ -10,7 +10,7 @@
 <PageTitle>Suppliers — AgentBlazor Demo</PageTitle>
 
 @* Register custom chat UI for the filter action on the supplier grid *@
-<AgentActionRender AgentId="supplier-grid" ActionId="filter_rows">
+<AgentActionRender AgentId="supplier-grid" ActionId="filter">
     <Complete Context="ctx">
         <MudAlert Severity="Severity.Success" Dense="true" Class="my-1">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
@@ -34,67 +34,83 @@
     </InProgress>
 </AgentActionRender>
 
-<MudText Typo="Typo.h5" Class="mb-1">Data Grid</MudText>
-<MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
-    A single <strong>AgentDataGrid</strong> is mounted. Ask the agent to filter rows, sort columns, or select a specific row — and watch the custom action result appear in the chat.
-</MudText>
-
-<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
-<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">show me the highest risk supplier</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">filter to EMEA region</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">sort by risk score descending</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">show suppliers with risk above 75</MudChip>
-</MudStack>
-
-<MudPaper Elevation="1" Class="pa-4 mb-4">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
-        <MudButton Size="Size.Small"
-                   Variant="Variant.Outlined"
-                   StartIcon="@Icons.Material.Filled.Refresh"
-                   Disabled="@_isLoading"
-                   OnClick="ReloadAsync">
-            Refresh Data
-        </MudButton>
-        <MudSpacer />
-        <MudText Typo="Typo.caption" Color="Color.Secondary">
-            @if (_isLoading)
-            {
-                <text>Loading suppliers...</text>
-            }
-            else
-            {
-                <text>@_suppliers.Count suppliers loaded</text>
-            }
+<div class="demo-doc-page suppliers-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Grid Focus</p>
+        <MudText Typo="Typo.h5">Data Grid</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            One <strong>AgentDataGrid</strong> mounted for deterministic filter/sort/select behavior testing,
+            plus custom action rendering in assistant responses.
         </MudText>
-    </MudStack>
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
+            <a class="demo-doc-page__toc-link" href="#grid">Supplier Grid</a>
+        </div>
+    </MudPaper>
 
-    <AgentDataGrid TItem="SupplierRow"
-                   AgentId="supplier-grid"
-                   Items="@_suppliers"
-                   Dense="true"
-                   Hover="true"
-                   Bordered="true"
-                   Striped="true"
-                   RowKeyProperty="SupplierId">
-        <Columns>
-            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
-            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
-            <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
-            <TemplateColumn T="SupplierRow" Title="Risk Score">
-                <CellTemplate>
-                    <MudChip T="string"
-                             Size="Size.Small"
-                             Variant="Variant.Filled"
-                             Color="@RiskColor(context.Item.RiskScore)">
-                        @context.Item.RiskScore
-                    </MudChip>
-                </CellTemplate>
-            </TemplateColumn>
-            <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
-        </Columns>
-    </AgentDataGrid>
-</MudPaper>
+    <section id="prompt-set" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Prompt Set</MudText>
+        </div>
+        <div class="demo-doc-page__prompt-box">
+            <ul class="demo-doc-page__prompt-list">
+                <li><span class="demo-doc-page__prompt-code">show me the highest risk supplier</span></li>
+                <li><span class="demo-doc-page__prompt-code">filter to EMEA region</span></li>
+                <li><span class="demo-doc-page__prompt-code">sort by risk score descending</span></li>
+                <li><span class="demo-doc-page__prompt-code">show suppliers with risk above 75</span></li>
+            </ul>
+        </div>
+    </section>
+
+    <section id="grid" class="demo-doc-page__section">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_isLoading"
+                       OnClick="ReloadAsync">
+                Refresh Data
+            </MudButton>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @if (_isLoading)
+                {
+                    <text>Loading suppliers...</text>
+                }
+                else
+                {
+                    <text>@_suppliers.Count suppliers loaded</text>
+                }
+            </MudText>
+        </MudStack>
+
+        <AgentDataGrid TItem="SupplierRow"
+                       AgentId="supplier-grid"
+                       Items="@_suppliers"
+                       Dense="true"
+                       Hover="true"
+                       Bordered="true"
+                       Striped="true"
+                       RowKeyProperty="SupplierId">
+            <Columns>
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierId" Title="ID" />
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.SupplierName" Title="Supplier" />
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                <TemplateColumn T="SupplierRow" Title="Risk Score">
+                    <CellTemplate>
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Variant="Variant.Filled"
+                                 Color="@RiskColor(context.Item.RiskScore)">
+                            @context.Item.RiskScore
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn T="SupplierRow" TProperty="DateTime" Property="x => x.LastAuditDate" Title="Last Audit" Format="yyyy-MM-dd" />
+            </Columns>
+        </AgentDataGrid>
+    </section>
+</div>
 
 @code {
     private List<SupplierRow> _suppliers = [];

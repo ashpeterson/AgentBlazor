@@ -1,254 +1,218 @@
-# Non-Paid Feature Expansion Plan
+# Product Expansion Plan
 
-Last updated: 2026-03-02
+Last updated: 2026-03-03
 
 ## Goal
 
-Increase open-source/non-paid product value by expanding component coverage and extension ergonomics while preserving current architecture boundaries.
+Move AgentBlazor from wrapper-complete demo framework to product-ready agentic platform parity on core workflows:
+
+- shared state
+- multi-agent orchestration
+- runtime inspection/debugging
+- production-grade demo flows
+
+while preserving the current architecture boundaries and keeping the default user setup lightweight.
 
 ## Architecture Guardrails
 
-All new work should follow:
+All work must respect:
 
-- `AgentBlazor.Core`: contracts, capability profile, planner/runtime, policy, telemetry
-- `AgentBlazor.Components`: wrapper UI components and chat UX
-- `AgentBlazor.Hosting`: registration options and AG-UI host mapping
-- `AgentBlazor.ProviderAdapters`: LLM provider integration only
-- `AgentBlazor.Licensing`: tier primitives and entitlement contracts
+- `AgentBlazor.Core`: runtime contracts, planning/validation/execution, policy, state/event contracts
+- `AgentBlazor.Components`: UI wrappers, chat surfaces, inspector UI
+- `AgentBlazor.Hosting`: endpoint and host integration boundaries
+- `AgentBlazor.ProviderAdapters`: LLM integrations only
+- `AgentBlazor.Licensing`: tier primitives and entitlement wiring
 
-Do not move runtime orchestration into Components.
-Do not put provider-specific code in Core or Components.
+Non-negotiables:
 
-## Review Findings That Drive This Plan
+- no provider-specific behavior in Core/Components
+- no runtime orchestration moved into Components
+- no mandatory extra infrastructure for baseline usage
 
-Current wrapper surface in code now includes:
+## Current Baseline
 
-- `AgentDataGrid`
-- `AgentDialog`
-- `AgentForm`
-- `AgentNavMenu`
-- `AgentTabs`
-- `AgentSelect`
-- `AgentAutocomplete`
-- `AgentDatePicker`
-- `AgentDateRangePicker`
-- `AgentTreeView`
-- `AgentStepper`
-- `AgentCommandBar`
-- `AgentFileUpload`
+### Completed Foundation
 
-Current non-paid gaps are no longer wrapper availability; they are depth gaps:
+- Deterministic runtime pipeline (`Plan -> Validate -> Execute`) is operational.
+- Wrapper breadth for core UI controls is complete.
+- Runtime subscriber and conversation persistence hooks are shipped.
+- Demo route map is broad and docs-first.
 
-- richer domain-specific demo scenarios using the new wrappers
-- end-to-end file integration samples (local policy mode vs remote handoff mode)
+### Completed Reliability Refinement (2026-03-03)
 
-## Phase 0 (Stability, Completed)
+- `AgentFormPageBase<TModel>` partial-update action aliases added:
+  - `fill_<form>`
+  - `set_<form>`
+  - `update_<form>`
+  - `set_field`
+- Planner prompt guardrails now explicitly discourage submit unless user intent is explicit.
+- Runtime submit filtering enforces that policy even when model output is overly aggressive.
+- `PlanValidator` now validates against mounted live component actions, not only static catalog actions.
+- Dojo/demo readability and prompt guidance refined for first-run success.
 
-### P0.1 Dynamic Form Schema Parsing Hardening
+## Gap Analysis (What Is Missing)
 
-Problem:
+1. Shared state API and synchronization semantics are not first-class.
+2. Multi-agent runtime mode and per-agent tooling/thread semantics are not first-class.
+3. Embedded runtime inspector is not yet a complete product console.
+4. Demo production depth is still limited by in-memory/service-seeded patterns.
+5. Tier enforcement is not yet complete at fine-grained action level.
 
-- `ParseInputSchemaToParameters` splits by comma and can mis-parse descriptions with commas.
+## Roadmap Phases
 
-Work:
+### Phase A: Shared State API (Priority 1)
 
-- Replace naive split parser with a tokenizer that respects description boundaries
-- Add unit tests for descriptions containing commas and parenthesized examples
+### Objective
 
-Status:
+Deliver a first-class agent<->UI shared state contract with no extra setup burden.
 
-- Completed in code and tests.
+### Scope
 
-### P0.2 Test Suite Alignment
+- Core contracts:
+  - shared state snapshot
+  - state delta events
+  - conflict/merge semantics for concurrent edits
+- Runtime integration:
+  - state in turn context
+  - state update stream events
+- Storage:
+  - in-memory default provider
+  - optional persistent provider (JSON/file-backed first)
+- Developer API:
+  - simple registration in `AddAgentBlazor(...)`
+  - no mandatory external service dependency
 
-Problem:
+### Acceptance Criteria
 
-- One core test still expects old provider-missing message text.
+- Works out of the box with in-memory defaults.
+- State round-trips agent->UI->agent in a single session.
+- Persistent mode survives restart when enabled.
+- Integration tests cover concurrent state updates and reconnect behavior.
 
-Work:
+### Phase B: Multi-Agent Runtime Mode (Priority 2)
 
-- Update assertion to current message contract
+### Objective
 
-Status:
+Support multiple named agents with route/agent lock and per-agent tool scoping.
 
-- Completed (`AgentBlazor.Core.Tests` green).
+### Scope
 
-## Phase 1 (Component Breadth: Form Inputs, Completed - Core Wiring)
+- Multiple agent registration and discovery in runtime metadata.
+- Agent selection strategy:
+  - explicit lock mode
+  - optional router mode
+- Per-agent tool visibility and execution boundaries.
+- Session/thread separation and state isolation by agent.
+- Demo UX:
+  - visible active agent
+  - controlled handoff flow between agents
 
-### P1.1 `AgentSelect`
+### Acceptance Criteria
 
-Actions:
+- Multiple agents can execute independently in one app instance.
+- Tools can be scoped to specific agents.
+- Route transitions do not leak state between agents unless explicitly configured.
+- End-to-end tests validate lock mode and handoff behavior.
 
-- `open`
-- `close`
-- `set_value`
-- `clear`
+### Phase C: Embedded Inspector Console (Priority 3)
 
-State:
+### Objective
 
-- current value
-- allowed options
-- disabled/read-only flags
+Ship a product-grade in-app inspector for runtime transparency and debugging.
 
-### P1.2 `AgentAutocomplete`
+### Scope
 
-Actions:
-
-- `set_query`
-- `select_option`
-- `clear`
-
-State:
-
-- query text
-- selected value
-- options snapshot (if available)
-
-Status for Phase 1:
-
-- Added to `AgentComponentCapabilityProfile`
-- Added to `AgentComponentTierBoundaries` with Free defaults
-- Wrapper execution tests added
-- Added demo route + prompts in `/demo/components`
-- Remaining: richer workflow-specific prompt packs
-
-## Phase 2 (Component Breadth: Date and Time, Completed - Core Wiring)
-
-### P2.1 `AgentDatePicker`
-
-Actions:
-
-- `set_date`
-- `clear`
-
-State:
-
-- selected date
-- min/max constraints
-
-### P2.2 `AgentDateRangePicker`
-
-Actions:
-
-- `set_range`
-- `clear`
-
-State:
-
-- start/end
-- min/max constraints
-
-Status for Phase 2:
-
-- Core wrappers + capabilities + tier map added
-- Wrapper execution tests added
-- Added demo route + prompts in `/demo/components`
-- Remaining: deeper culture/timezone-focused scenario docs
-
-## Phase 3 (Component Breadth: Navigation and Workflow, Completed - Core Wiring)
-
-### P3.1 `AgentTreeView`
-
-Actions:
-
-- `expand`
-- `collapse`
-- `select_node`
-
-### P3.2 `AgentStepper`
-
-Actions:
-
-- `go_to_step`
-- `next`
-- `previous`
-
-Status for Phase 3:
-
-- Core wrappers + capabilities + tier map added
-- Wrapper execution tests added
-- Added demo route + prompts in `/demo/components`
-- Remaining: richer tree/step workflow scenarios tied to business models
-
-## Phase 4 (Component Breadth: Commands and Files, Completed - Core Wiring)
-
-### P4.1 `AgentCommandBar`
-
-Actions:
-
-- `invoke_command`
-- `list_commands`
-
-### P4.2 `AgentFileUpload`
-
-Actions:
-
-- `attach`
-- `remove`
-- `list_files`
-
-Status for Phase 4:
-
-- Core wrappers + capabilities + tier map added
-- Wrapper execution tests added
-- Added demo route + prompts in `/demo/components`
-- Added explicit local/remote file-upload policy examples in demo docs/page content
-- Remaining: end-to-end integration samples with real file services
-
-## Phase 5 (Open-Source Ergonomics Parity, Completed - Core Wiring)
-
-### P5.1 Event Subscription API
-
-Add lightweight runtime subscriber hooks for:
-
-- turn started/finished
-- tool execution started/finished
-- error surfaced
-
-### P5.2 Persistent Conversation Store Option
-
-Add pluggable store options beyond in-memory for non-paid users.
-
-Acceptance for Phase 5:
-
-- Public API docs with one in-memory and one persistent sample
-- No changes to core planning semantics
-
-Status for Phase 5:
-
-- Added public `IAgentRuntimeEventSubscriber` contract with runtime hooks for:
+- Event timeline:
   - turn started/finished
-  - tool execution started/finished
-  - surfaced runtime errors
-- Added builder APIs:
-  - `AddRuntimeEventSubscriber<TSubscriber>()`
-  - `UseConversationStore<TStore>()`
-  - `UseJsonFileConversationStore(path, configure?)`
-- Added file-backed `JsonFileConversationStore` for restart-safe conversation history
-- Added core + integration test coverage for event subscriber and persistent store behavior
+  - planning output summary
+  - validation failures
+  - action execution results
+  - approval blocks
+- State inspection:
+  - mounted component snapshots
+  - per-turn diffs where available
+- Prompt trace visibility:
+  - system prompt and model response references when enabled
+- Developer ergonomics:
+  - enable/disable toggle
+  - no impact on default end-user UX if disabled
 
-## Delivery Status
+### Acceptance Criteria
 
-Completed sequence:
+- All core runtime stages are visible in inspector.
+- Approval and validation failure causes are inspectable without logs.
+- Inspector can be enabled in demo and local apps with one option.
 
-1. Phase 0
-2. Phase 1
-3. Phase 2
-4. Phase 3
-5. Phase 4
-6. Phase 5
+### Phase D: Production-Grade Demo Workflows (Priority 4)
 
-Next sequence (post-phase polish):
+### Objective
 
-1. Deepen workflow scenarios for tree/stepper/command/file interactions
-2. Add real file service integration examples (local-reference policy and remote-handoff policy)
+Convert Dojo and scenario demos from seed-centric behavior to realistic workflow implementation.
 
-## Definition of Done for Each New Component
+### Scope
 
-- Wrapper implemented in `AgentBlazor.Components/Wrappers`
-- Capability + schema added in `AgentComponentCapabilityProfile`
-- Tier mapping added in `AgentComponentTierBoundaries`
-- Planner prompt visibility verified (mounted component + action metadata)
-- Runtime execution path tested (success and failure)
-- Demo route + prompts added
-- Documentation updated (`architecture.md`, capability/tier docs, quickstart snippets)
+- Persisted session/workspace model for Dojo.
+- Deterministic action/run note history replay.
+- Realistic file pipeline sample:
+  - local-reference mode
+  - remote handoff mode
+- Replace fragile demo-hardcoded assumptions with service-backed workflows.
+
+### Acceptance Criteria
+
+- Dojo state persists between reloads in configured mode.
+- Run notes align with executed actions.
+- File flow samples demonstrate real integration boundary patterns.
+
+### Phase E: Tier and Policy Hardening (Priority 5)
+
+### Objective
+
+Complete action-level enforcement and predictable entitlement behavior.
+
+### Scope
+
+- Fine-grained action gating by entitlement tier.
+- Consistent error messaging for gated actions.
+- Runtime diagnostics surface showing why action was blocked.
+- Coverage tests for free/paid/premium transitions.
+
+### Acceptance Criteria
+
+- No paid-only action executes in free tier.
+- All blocked actions return deterministic, user-readable reasons.
+- Tier behavior is fully covered in automated tests.
+
+## Cross-Cutting Requirements
+
+For every phase:
+
+- No new mandatory external infrastructure for baseline local usage.
+- Maintain backwards-compatible defaults where possible.
+- Add docs and examples at the same time as implementation.
+- Add unit + integration tests for each new behavior.
+
+## Definition of Done (Per Deliverable)
+
+- Implementation is complete in correct layer(s).
+- Public API surface is documented with at least one minimal and one realistic sample.
+- Validation includes:
+  - Core tests
+  - Integration tests
+  - Demo build
+- Status and architecture docs updated to reflect shipped behavior.
+
+## Recommended Delivery Sequence
+
+1. Phase A (Shared State)
+2. Phase B (Multi-Agent)
+3. Phase C (Inspector)
+4. Phase D (Production Demo Flows)
+5. Phase E (Tier Hardening)
+
+## Risk Register
+
+- Shared state merge semantics can become brittle without strict event contracts.
+- Multi-agent routing can introduce hidden cross-agent leakage if session boundaries are weak.
+- Inspector scope creep can delay platform features if not phased.
+- Demo hardening can overfit to recipe/supplier examples unless abstractions are generalized.

@@ -6,155 +6,177 @@
 
 <PageTitle>Component Kit — AgentBlazor Demo</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-1">Input + Utility Component Kit</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-    This page mounts all newer open-source wrappers in one place: <strong>AgentSelect</strong>,
-    <strong>AgentAutocomplete</strong>, <strong>AgentDatePicker</strong>, <strong>AgentDateRangePicker</strong>,
-    <strong>AgentTreeView</strong>, <strong>AgentStepper</strong>, <strong>AgentCommandBar</strong>, and
-    <strong>AgentFileUpload</strong>.
-</MudText>
+<div class="demo-doc-page components-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Wrapper Catalog</p>
+        <MudText Typo="Typo.h5">Input + Utility Component Kit</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            One page for direct wrapper action testing:
+            <strong> AgentSelect</strong>, <strong>AgentAutocomplete</strong>, <strong>AgentDatePicker</strong>,
+            <strong>AgentDateRangePicker</strong>, <strong>AgentTreeView</strong>, <strong>AgentStepper</strong>,
+            <strong>AgentCommandBar</strong>, and <strong>AgentFileUpload</strong>.
+        </MudText>
 
-<MudText Typo="Typo.subtitle2" Class="mb-2">Try these prompts in the Assistant widget:</MudText>
-<MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-3">
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set country select value to Germany</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set supplier search query to Apex and select option Apex Components</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set review date to March 18 2026</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">set review range from 2026-03-01 to 2026-03-15</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">expand node compliance and select node policy-documents</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">go to step 2</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">invoke command publish_report</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">attach file risk-summary-q1.pdf then list files</MudChip>
-    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small">remove file vendor-evidence.csv</MudChip>
-</MudStack>
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
+            <a class="demo-doc-page__toc-link" href="#input-controls">Select + Autocomplete</a>
+            <a class="demo-doc-page__toc-link" href="#date-controls">Date Controls</a>
+            <a class="demo-doc-page__toc-link" href="#workflow-controls">Tree + Stepper</a>
+            <a class="demo-doc-page__toc-link" href="#utility-controls">Command + Files</a>
+        </div>
+    </MudPaper>
 
-<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-4">
-    <strong>File upload policy examples</strong>:
-    local mode uses file names as trusted references only (no direct file-system operations),
-    and remote mode uses file names as handoff tokens for downstream storage services.
-</MudAlert>
+    <section id="prompt-set" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Prompt Set</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Use these prompts to validate each mounted wrapper action.
+            </MudText>
+        </div>
+        <div class="demo-doc-page__prompt-box">
+            <ul class="demo-doc-page__prompt-list">
+                <li><span class="demo-doc-page__prompt-code">set country select value to Germany</span></li>
+                <li><span class="demo-doc-page__prompt-code">set supplier search query to Apex and select option Apex Components</span></li>
+                <li><span class="demo-doc-page__prompt-code">set review date to March 18 2026</span></li>
+                <li><span class="demo-doc-page__prompt-code">set review range from 2026-03-01 to 2026-03-15</span></li>
+                <li><span class="demo-doc-page__prompt-code">expand node compliance and select node policy-documents</span></li>
+                <li><span class="demo-doc-page__prompt-code">go to step 2</span></li>
+                <li><span class="demo-doc-page__prompt-code">invoke command publish_report</span></li>
+                <li><span class="demo-doc-page__prompt-code">attach file risk-summary-q1.pdf then list files</span></li>
+                <li><span class="demo-doc-page__prompt-code">remove file vendor-evidence.csv</span></li>
+            </ul>
+        </div>
+    </section>
 
-<MudGrid>
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="1" Class="pa-4 mb-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Select + Autocomplete</MudText>
-            <MudStack Spacing="2">
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Country Select</MudText>
-                    <AgentSelect AgentId="kit-country-select"
-                                 Value="@_selectedCountry"
-                                 ValueChanged="OnCountryChanged"
-                                 Options="@_countryOptions" />
-                    <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
-                </div>
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+        <strong>File upload policy examples</strong>:
+        local mode uses file names as trusted references only (no direct file-system operations),
+        and remote mode uses file names as handoff tokens for downstream storage services.
+    </MudAlert>
 
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Supplier Autocomplete</MudText>
-                    <AgentAutocomplete AgentId="kit-supplier-autocomplete"
-                                       Query="@_supplierQuery"
-                                       QueryChanged="OnSupplierQueryChanged"
-                                       Value="@_selectedSupplier"
-                                       ValueChanged="OnSupplierValueChanged"
-                                       Options="@_supplierOptions"
-                                       Placeholder="Search suppliers..." />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Query: @_supplierQuery | Selected: @_selectedSupplier
-                    </MudText>
-                </div>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
+    <MudGrid Class="components-page__grid">
+        <MudItem xs="12" md="6" id="input-controls">
+            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Select + Autocomplete</MudText>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Country Select</MudText>
+                        <AgentSelect AgentId="kit-country-select"
+                                     Value="@_selectedCountry"
+                                     ValueChanged="OnCountryChanged"
+                                     Options="@_countryOptions" />
+                        <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
+                    </div>
 
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="1" Class="pa-4 mb-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Date Pickers</MudText>
-            <MudStack Spacing="2">
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Single Date</MudText>
-                    <AgentDatePicker AgentId="kit-review-date"
-                                     Value="@_reviewDate"
-                                     ValueChanged="OnReviewDateChanged"
-                                     MinDate="@_minReviewDate"
-                                     MaxDate="@_maxReviewDate" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Review date: @FormatDate(_reviewDate)
-                    </MudText>
-                </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Supplier Autocomplete</MudText>
+                        <AgentAutocomplete AgentId="kit-supplier-autocomplete"
+                                           Query="@_supplierQuery"
+                                           QueryChanged="OnSupplierQueryChanged"
+                                           Value="@_selectedSupplier"
+                                           ValueChanged="OnSupplierValueChanged"
+                                           Options="@_supplierOptions"
+                                           Placeholder="Search suppliers..." />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Query: @_supplierQuery | Selected: @_selectedSupplier
+                        </MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Date Range</MudText>
-                    <AgentDateRangePicker AgentId="kit-review-range"
-                                          StartDate="@_rangeStart"
-                                          StartDateChanged="OnRangeStartChanged"
-                                          EndDate="@_rangeEnd"
-                                          EndDateChanged="OnRangeEndChanged"
-                                          MinDate="@_minReviewDate"
-                                          MaxDate="@_maxReviewDate" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)
-                    </MudText>
-                </div>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" md="6" id="date-controls">
+            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Date Pickers</MudText>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Single Date</MudText>
+                        <AgentDatePicker AgentId="kit-review-date"
+                                         Value="@_reviewDate"
+                                         ValueChanged="OnReviewDateChanged"
+                                         MinDate="@_minReviewDate"
+                                         MaxDate="@_maxReviewDate" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Review date: @FormatDate(_reviewDate)
+                        </MudText>
+                    </div>
 
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="1" Class="pa-4 mb-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Tree + Stepper</MudText>
-            <MudStack Spacing="2">
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Workflow Tree</MudText>
-                    <AgentTreeView AgentId="kit-workflow-tree"
-                                   NodeIds="@_treeNodeIds"
-                                   SelectedNodeId="@_selectedTreeNodeId"
-                                   SelectedNodeIdChanged="OnTreeNodeSelected"
-                                   ExpandedNodeIds="@_expandedTreeNodeIds"
-                                   ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)
-                    </MudText>
-                </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Date Range</MudText>
+                        <AgentDateRangePicker AgentId="kit-review-range"
+                                              StartDate="@_rangeStart"
+                                              StartDateChanged="OnRangeStartChanged"
+                                              EndDate="@_rangeEnd"
+                                              EndDateChanged="OnRangeEndChanged"
+                                              MinDate="@_minReviewDate"
+                                              MaxDate="@_maxReviewDate" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)
+                        </MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Onboarding Stepper</MudText>
-                    <AgentStepper AgentId="kit-onboarding-stepper"
-                                  CurrentStepIndex="@_currentStepIndex"
-                                  CurrentStepIndexChanged="OnCurrentStepChanged"
-                                  StepIds="@_stepIds" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])
-                    </MudText>
-                </div>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" md="6" id="workflow-controls">
+            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Tree + Stepper</MudText>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Workflow Tree</MudText>
+                        <AgentTreeView AgentId="kit-workflow-tree"
+                                       NodeIds="@_treeNodeIds"
+                                       SelectedNodeId="@_selectedTreeNodeId"
+                                       SelectedNodeIdChanged="OnTreeNodeSelected"
+                                       ExpandedNodeIds="@_expandedTreeNodeIds"
+                                       ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)
+                        </MudText>
+                    </div>
 
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="1" Class="pa-4 mb-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Command + Files</MudText>
-            <MudStack Spacing="2">
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Command Bar</MudText>
-                    <AgentCommandBar AgentId="kit-command-bar"
-                                     Commands="@_commands"
-                                     CommandInvoked="OnCommandInvoked" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Last command: @_lastCommand
-                    </MudText>
-                </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Onboarding Stepper</MudText>
+                        <AgentStepper AgentId="kit-onboarding-stepper"
+                                      CurrentStepIndex="@_currentStepIndex"
+                                      CurrentStepIndexChanged="OnCurrentStepChanged"
+                                      StepIds="@_stepIds" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])
+                        </MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-                <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">File Upload (names only)</MudText>
-                    <AgentFileUpload AgentId="kit-file-upload"
-                                     Files="@_attachedFiles"
-                                     FilesChanged="OnFilesChanged" />
-                    <MudText Typo="Typo.caption" Class="mt-1">
-                        Attached files: @(string.Join(", ", _attachedFiles))
-                    </MudText>
-                </div>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+        <MudItem xs="12" md="6" id="utility-controls">
+            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Command + Files</MudText>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Command Bar</MudText>
+                        <AgentCommandBar AgentId="kit-command-bar"
+                                         Commands="@_commands"
+                                         CommandInvoked="OnCommandInvoked" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Last command: @_lastCommand
+                        </MudText>
+                    </div>
+
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">File Upload (names only)</MudText>
+                        <AgentFileUpload AgentId="kit-file-upload"
+                                         Files="@_attachedFiles"
+                                         FilesChanged="OnFilesChanged" />
+                        <MudText Typo="Typo.caption" Class="mt-1">
+                            Attached files: @(string.Join(", ", _attachedFiles))
+                        </MudText>
+                    </div>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</div>
 
 @code {
     private string? _selectedCountry = "United States";

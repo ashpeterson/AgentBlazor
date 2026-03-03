@@ -10,37 +10,38 @@
 
 <div class="demo-app @CurrentThemeCssClass">
     <aside class="demo-app__sidebar">
-        <DemoNavMenu />
+        <MudPaper Elevation="0" Class="demo-app__sidebar-card">
+            <a href="/demo" class="demo-app__sidebar-brand">
+                <img src="logo.png" class="demo-app__sidebar-logo" alt="AgentBlazor" />
+                <span class="demo-app__sidebar-brand-text">
+                    <strong>AgentBlazor</strong>
+                    <small>Interactive Dojo</small>
+                </span>
+            </a>
+
+            <p class="demo-app__sidebar-copy">
+                Navigate focused demos and run assistant-driven actions against mounted wrappers.
+            </p>
+
+            <DemoNavMenu />
+        </MudPaper>
     </aside>
 
     <main class="demo-app__main">
         <header class="demo-app__topbar">
-            <a href="/" class="demo-app__back">
-                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                <span>Back to Home</span>
-            </a>
+            <div class="demo-app__topbar-intro">
+                <a href="/" class="demo-app__back">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                    <span>Back to Home</span>
+                </a>
 
-            <a href="/demo" class="demo-app__brand">
-                <img src="logo.png" class="demo-app__brand-logo" alt="AgentBlazor" />
-                <span class="demo-app__brand-name">AgentBlazor Demo</span>
-            </a>
+                <div class="demo-app__title-block">
+                    <p class="demo-app__title-eyebrow">Component-aware UI automation</p>
+                    <h1 class="demo-app__title">AgentBlazor Demo Workspace</h1>
+                </div>
+            </div>
 
             <div class="demo-app__controls">
-                <div class="demo-app__quick-links">
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               Href="/demo/components">
-                        Component Kit
-                    </MudButton>
-                    <MudButton Variant="Variant.Text"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               Href="/demo/docs">
-                        Integration Guide
-                    </MudButton>
-                </div>
-
                 <MudSelect T="string"
                            Value="_selectedThemeKey"
                            ValueChanged="OnThemeChanged"
@@ -60,17 +61,36 @@
             @Body
         </article>
     </main>
+
+    <aside class="demo-app__assistant-pane">
+        <MudPaper Elevation="0" Class="demo-app__assistant-card">
+            <div class="demo-app__assistant-head">
+                <p class="demo-app__assistant-eyebrow">AI Assistant</p>
+                <h2 class="demo-app__assistant-title">Control This Workspace</h2>
+                <p class="demo-app__assistant-copy">
+                    Edit forms, navigate routes, and generate UI from live data sources without leaving this page.
+                </p>
+            </div>
+
+            <AgentChatSurface Title="Assistant"
+                              Description="Everything in this workspace is agent-controllable on the current route."
+                              EnableGeneratedUi="true"
+                              Placeholder="Try: set recipe title to test, add optional ingredient chives, switch to run notes."
+                              Theme="_assistantTheme"
+                              CssClass="demo-app__assistant-surface" />
+        </MudPaper>
+    </aside>
 </div>
 
 <AgentChatWidget Title="Assistant"
                  Description="Generated UI mode is enabled for this chat."
                  EnableGeneratedUi="true"
                  Placeholder="Ask me to navigate, analyze data, draft UI, and run workflow actions across this app..."
-                 Theme="ChatTheme.Dark()"
-                 Width="31rem"
+                 Theme="_assistantTheme"
+                 Width="26rem"
                  Height="68vh"
-                 Right="1.1rem"
-                 Bottom="1rem"
+                 Right="0.85rem"
+                 Bottom="0.85rem"
                  CssClass="demo-app__assistant-widget" />
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -83,32 +103,44 @@
     private const string AuroraThemeKey = "aurora";
     private const string CoastlineThemeKey = "coastline";
 
+    private static readonly ChatTheme _assistantTheme = new()
+    {
+        Variant = ChatThemeVariant.Dark,
+        Style = ChatVisualStyle.Minimal,
+        Spacing = ChatSpacing.Compact,
+        BorderRadius = ChatBorderRadius.Medium,
+        EnableGlassEffect = false,
+        AccentColor = "#6ea8fe",
+        FontFamily = "\"Public Sans\", \"Segoe UI\", sans-serif",
+        FontSize = "0.92rem"
+    };
+
     private static readonly MudTheme AuroraTheme = new()
     {
         PaletteDark = new PaletteDark
         {
-            Primary = "#e03a58",
-            Secondary = "#4a9edd",
-            Tertiary = "#7a5af8",
-            Info = "#3a8fd4",
+            Primary = "#6ea8fe",
+            Secondary = "#6fd3c2",
+            Tertiary = "#8ea6ff",
+            Info = "#6ea8fe",
             Success = "#2ecc87",
             Warning = "#f0a030",
-            Error = "#ff4d6a",
-            Background = "#03040a",
-            BackgroundGray = "#0a0d18",
-            Surface = "#0d1120",
-            AppbarBackground = "#080b16",
-            AppbarText = "#e8f0ff",
-            DrawerBackground = "#080b16",
-            DrawerText = "#c8d8f0",
-            TextPrimary = "#e8f0ff",
-            TextSecondary = "#7a92bb",
-            TableLines = "#1a2040",
-            Divider = "#1a2040",
-            LinesDefault = "#1a2040",
-            ActionDefault = "#7a92bb",
-            ActionDisabled = "#3a4a6a",
-            ActionDisabledBackground = "#0d1120"
+            Error = "#ff5d7b",
+            Background = "#070c16",
+            BackgroundGray = "#0d1422",
+            Surface = "#101a2b",
+            AppbarBackground = "#0e1624",
+            AppbarText = "#e9f1ff",
+            DrawerBackground = "#0e1624",
+            DrawerText = "#c5d6ef",
+            TextPrimary = "#e9f1ff",
+            TextSecondary = "#8da3c7",
+            TableLines = "#22324a",
+            Divider = "#22324a",
+            LinesDefault = "#22324a",
+            ActionDefault = "#8da3c7",
+            ActionDisabled = "#44597a",
+            ActionDisabledBackground = "#101a2b"
         }
     };
 
@@ -116,28 +148,28 @@
     {
         PaletteDark = new PaletteDark
         {
-            Primary = "#e03a58",
-            Secondary = "#2ecc87",
-            Tertiary = "#2a9faa",
-            Info = "#2a8ab0",
-            Success = "#2ecc87",
+            Primary = "#66c7b0",
+            Secondary = "#88b3ff",
+            Tertiary = "#4ab29a",
+            Info = "#88b3ff",
+            Success = "#40c89b",
             Warning = "#f0a030",
-            Error = "#ff4d6a",
-            Background = "#03040a",
-            BackgroundGray = "#08100e",
-            Surface = "#0c1410",
-            AppbarBackground = "#080e0c",
-            AppbarText = "#e0f4ee",
-            DrawerBackground = "#080e0c",
-            DrawerText = "#b8d8cc",
-            TextPrimary = "#e0f4ee",
-            TextSecondary = "#6a9a8a",
-            TableLines = "#142418",
-            Divider = "#142418",
-            LinesDefault = "#142418",
-            ActionDefault = "#6a9a8a",
-            ActionDisabled = "#2a4038",
-            ActionDisabledBackground = "#0c1410"
+            Error = "#ff5d7b",
+            Background = "#07120f",
+            BackgroundGray = "#0b1a16",
+            Surface = "#0f211b",
+            AppbarBackground = "#0d1c18",
+            AppbarText = "#e8f7f2",
+            DrawerBackground = "#0d1c18",
+            DrawerText = "#b9ddd1",
+            TextPrimary = "#e8f7f2",
+            TextSecondary = "#78aa9a",
+            TableLines = "#214034",
+            Divider = "#214034",
+            LinesDefault = "#214034",
+            ActionDefault = "#78aa9a",
+            ActionDisabled = "#355f52",
+            ActionDisabledBackground = "#0f211b"
         }
     };
 

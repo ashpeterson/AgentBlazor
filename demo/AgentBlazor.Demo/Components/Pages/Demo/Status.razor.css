@@ -1,0 +1,10 @@
+.status-page {
+    max-width: 1080px;
+}
+
+.status-page__card {
+    padding: 0.85rem;
+    border-radius: 0.72rem;
+    border-color: var(--ab-border) !important;
+    background: rgba(8, 13, 24, 0.72);
+}

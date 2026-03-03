@@ -1,15 +1,15 @@
 /* ─── Docs Layout ─────────────────────────────────────────────── */
 
 .docs {
-    max-width: 820px;
+    max-width: 1180px;
 }
 
 /* ─── Section ─────────────────────────────────────────────────── */
 
 .docs-section {
-    margin-bottom: 2.5rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin: 0;
+    padding: 0;
+    border: 0;
 }
 
 .docs-section__title {
@@ -57,20 +57,6 @@
 .docs-comment { color: #3a4a6a; font-style: italic; }
 
 /* ─── Summary Grid ────────────────────────────────────────────── */
-
-.docs-summary {
-    background: rgba(13, 17, 32, 0.5) !important;
-    border: 1px solid rgba(255, 255, 255, 0.06) !important;
-    border-radius: 0.8rem !important;
-    padding: 1.5rem !important;
-}
-
-.docs-summary__item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-}
 
 .docs-ordered {
     margin: 0.2rem 0 0;

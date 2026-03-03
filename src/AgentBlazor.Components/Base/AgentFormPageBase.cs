@@ -82,11 +82,26 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
         // Add the auto-generated fill action
         var fillAction = new ComponentActionCapability(
             GetFillActionId(),
-            $"Fill out the {FormDisplayName} form. Opens the dialog and populates all fields.",
+            $"Fill or update the {FormDisplayName} form. Accepts partial updates and opens the dialog.",
             RequiresApproval: false,
             InputSchema: BuildInputSchema());
 
         capability.UpsertAction(fillAction);
+        capability.UpsertAction(new ComponentActionCapability(
+            GetSetActionId(),
+            $"Set or update one or more {FormDisplayName} fields (partial update).",
+            RequiresApproval: false,
+            InputSchema: BuildInputSchema()));
+        capability.UpsertAction(new ComponentActionCapability(
+            GetUpdateActionId(),
+            $"Update one or more {FormDisplayName} fields (partial update).",
+            RequiresApproval: false,
+            InputSchema: BuildInputSchema()));
+        capability.UpsertAction(new ComponentActionCapability(
+            "set_field",
+            $"Set one specific {FormDisplayName} field by name and value.",
+            RequiresApproval: false,
+            InputSchema: BuildSetFieldInputSchema()));
 
         // Add open/close actions
         capability.UpsertAction(new ComponentActionCapability(
@@ -111,10 +126,17 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
     {
         var actionId = action.Name.ToLowerInvariant().Replace("_", "");
         var fillActionId = GetFillActionId().ToLowerInvariant().Replace("_", "");
+        var setActionId = GetSetActionId().ToLowerInvariant().Replace("_", "");
+        var updateActionId = GetUpdateActionId().ToLowerInvariant().Replace("_", "");
 
-        if (actionId == fillActionId || actionId == "fill")
+        if (actionId == fillActionId || actionId == setActionId || actionId == updateActionId || actionId == "fill")
         {
             return await ExecuteFillActionAsync(action.Parameters);
+        }
+
+        if (actionId == "setfield")
+        {
+            return await ExecuteSetFieldActionAsync(action.Parameters);
         }
 
         if (actionId == "open")
@@ -206,6 +228,55 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
         _model = new TModel();
     }
 
+    private async Task<ActionResult> ExecuteSetFieldActionAsync(IReadOnlyDictionary<string, object?>? parameters)
+    {
+        if (parameters is null || parameters.Count == 0)
+        {
+            return ActionResult.NeedsClarification(
+                $"Please provide both field and value. Available fields: {GetAvailableFieldsText()}.");
+        }
+
+        var fieldHint = TryReadStringParameter(parameters, "field")
+            ?? TryReadStringParameter(parameters, "fieldName")
+            ?? TryReadStringParameter(parameters, "name")
+            ?? TryReadStringParameter(parameters, "property");
+
+        if (string.IsNullOrWhiteSpace(fieldHint))
+        {
+            return ActionResult.NeedsClarification(
+                $"Please specify which field to set. Available fields: {GetAvailableFieldsText()}.");
+        }
+
+        var property = ResolveProperty(fieldHint);
+        if (property is null)
+        {
+            return ActionResult.NeedsClarification(
+                $"Unknown field '{fieldHint}'. Available fields: {GetAvailableFieldsText()}.");
+        }
+
+        var hasValue =
+            TryReadParameter(parameters, "value", out var rawValue) ||
+            TryReadParameter(parameters, "fieldValue", out rawValue) ||
+            TryReadParameter(parameters, property.Name, out rawValue) ||
+            TryReadParameter(parameters, ToCamelCase(property.Name), out rawValue) ||
+            TryReadParameter(parameters, ToSnakeCase(property.Name), out rawValue);
+
+        if (!hasValue)
+        {
+            return ActionResult.NeedsClarification($"Please provide a value for '{property.Name}'.");
+        }
+
+        if (!TrySetProperty(property, rawValue))
+        {
+            return ActionResult.NeedsClarification(
+                $"Could not set '{property.Name}' from the provided value '{rawValue}'.");
+        }
+
+        _dialogVisible = true;
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Opened {FormDisplayName} and set '{property.Name}'.");
+    }
+
     private async Task<ActionResult> ExecuteFillActionAsync(IReadOnlyDictionary<string, object?>? parameters)
     {
         if (parameters is null || parameters.Count == 0)
@@ -237,6 +308,74 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
 
         return ActionResult.Applied($"Opened {FormDisplayName} and filled {filledFields.Count} field(s): {string.Join(", ", filledFields)}.");
     }
+
+    private static bool TryReadParameter(
+        IReadOnlyDictionary<string, object?> parameters,
+        string key,
+        out object? value)
+    {
+        if (parameters.TryGetValue(key, out value))
+        {
+            return true;
+        }
+
+        foreach (var kv in parameters)
+        {
+            if (string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = kv.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static string? TryReadStringParameter(
+        IReadOnlyDictionary<string, object?> parameters,
+        string key)
+    {
+        if (!TryReadParameter(parameters, key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            string s => s,
+            JsonElement { ValueKind: JsonValueKind.String } json => json.GetString(),
+            JsonElement json => json.ToString(),
+            _ => value.ToString()
+        };
+    }
+
+    private static PropertyInfo? ResolveProperty(string fieldHint)
+    {
+        if (string.IsNullOrWhiteSpace(fieldHint))
+        {
+            return null;
+        }
+
+        var normalizedHint = NormalizeName(fieldHint);
+
+        return ModelProperties.FirstOrDefault(prop =>
+        {
+            var normalizedPropertyName = NormalizeName(prop.Name);
+            return string.Equals(prop.Name, fieldHint, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(ToCamelCase(prop.Name), fieldHint, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(ToSnakeCase(prop.Name), fieldHint, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalizedPropertyName, normalizedHint, StringComparison.Ordinal) ||
+                   normalizedHint.EndsWith(normalizedPropertyName, StringComparison.Ordinal) ||
+                   normalizedHint.Contains(normalizedPropertyName, StringComparison.Ordinal);
+        });
+    }
+
+    private static string NormalizeName(string value)
+        => string.Concat(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant));
+
+    private static string GetAvailableFieldsText()
+        => string.Join(", ", ModelProperties.Select(static p => p.Name));
 
     private object? TryGetParameterValue(IReadOnlyDictionary<string, object?> parameters, string propertyName)
     {
@@ -328,6 +467,8 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
     }
 
     private string GetFillActionId() => $"fill_{ToSnakeCase(typeof(TModel).Name.Replace("Model", ""))}";
+    private string GetSetActionId() => $"set_{ToSnakeCase(typeof(TModel).Name.Replace("Model", ""))}";
+    private string GetUpdateActionId() => $"update_{ToSnakeCase(typeof(TModel).Name.Replace("Model", ""))}";
 
     private static string GetDefaultFormName()
     {
@@ -361,6 +502,12 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
         }
 
         return $"({string.Join(", ", parts)})";
+    }
+
+    private string BuildSetFieldInputSchema()
+    {
+        var allowed = string.Join("|", ModelProperties.Select(static p => p.Name));
+        return $"(string field [required] [allowed: {allowed}] — Field to set, any value [required] — New value)";
     }
 
     private static PropertyInfo[] GetSettableProperties()

@@ -1,6 +1,6 @@
 # AgentBlazor Architecture (Current State)
 
-Last updated: 2026-03-02
+Last updated: 2026-03-03
 
 ## Purpose
 
@@ -117,9 +117,10 @@ What `AddAgentBlazor(...)` does:
 1. Build request context (session, mounted components, allowed components/actions, routes, tools, history)
 2. Plan with `AgentPlanner`
 3. Normalize/resolution pass (component/action targeting)
-4. Validate plan with `PlanValidator`
-5. Execute via `PlanExecutor`
-6. Persist conversation turn and emit telemetry/stream events
+4. Apply policy filtering (for example non-explicit form submit suppression)
+5. Validate plan with `PlanValidator`
+6. Execute via `PlanExecutor`
+7. Persist conversation turn and emit telemetry/stream events
 
 `AgentRuntime` implements both:
 
@@ -149,6 +150,16 @@ Runtime action discovery is hybrid:
 - First uses `[AgentAction]` discovery
 - Falls back to `GetCapability()` for dynamic components (notably `AgentFormPageBase<TModel>`)
 
+`AgentFormPageBase<TModel>` now exposes partial-update aliases for dynamic form control:
+
+- `fill_<form>`
+- `set_<form>`
+- `update_<form>`
+- `set_field`
+
+This is intentionally distinct from the generic `AgentForm` wrapper behavior.
+`AgentForm` remains intentionally limited to reliable wrapper actions (`validate`, `reset`, `submit`) for mounted form instances.
+
 ## Circuit and Session Model
 
 Blazor component registry is circuit-scoped:
@@ -161,6 +172,15 @@ This avoids cross-circuit leakage and supports reconnect/replay flows.
 
 Execution fallback in `NoOpComponentActionExecutor` also resolves Agent-prefixed catalog IDs
 (for example `AgentSelect`) to wrapper component types (for example `Select`) when dispatching to mounted components.
+
+## Validation and Policy Guardrails
+
+Recent runtime hardening adds two important protections:
+
+- `PlanValidator` validates actions against mounted live component action sets when a matching component is mounted on the route.
+  This prevents executing catalog-defined actions that are not actually exposed on the live component instance.
+- `AgentRuntime` suppresses `AgentForm.submit` unless submit intent is explicit (`submit`, `save`, `confirm`, `finalize`, `send`).
+  This prevents non-submit edit prompts from being diverted into approval loops.
 
 ## Runtime Event Subscription Hooks
 
@@ -284,3 +304,17 @@ For new work, keep this direction:
 - Keep provider-specific behavior in ProviderAdapters
 - Keep endpoint/protocol adaptation in Hosting
 - Keep domain policies and capability logic in Core
+
+## Current Strategic Gaps
+
+The architecture is stable for current wrapper automation, but product-level parity work is still required for:
+
+- first-class shared state contracts and sync semantics
+- first-class multi-agent runtime modes and agent-specific tooling boundaries
+- complete embedded inspector experience for planning/validation/execution transparency
+- production-grade persistence-backed demo workflows
+
+Tracking for these is maintained in:
+
+- `docs/STATUS.md`
+- `docs/component-expansion-plan.md`

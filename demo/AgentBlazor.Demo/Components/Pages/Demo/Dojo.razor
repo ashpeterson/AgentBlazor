@@ -1,0 +1,421 @@
+@page "/demo/dojo"
+@layout DemoLayout
+@using AgentBlazor
+@using AgentBlazor.Components
+@using AgentBlazor.Demo.Services
+@using MudBlazor
+@inherits AgentFormPageBase<DojoRecipeModel>
+@inject ISnackbar Snackbar
+@inject DojoWorkspaceService WorkspaceService
+
+<PageTitle>Dojo Workspace — AgentBlazor Demo</PageTitle>
+
+<div class="demo-dojo">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero demo-dojo__hero">
+        <p class="demo-doc-page__eyebrow">Interactive Dojo</p>
+
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="demo-dojo__hero-head">
+            <MudText Typo="Typo.h5">AI Recipe Workspace</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Live Workspace</MudChip>
+        </MudStack>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            A calm, structured canvas inspired by CopilotKit-style workflows. Edit the recipe, manage ingredients,
+            and run assistant prompts without jumping between pages.
+        </MudText>
+
+        <div class="demo-doc-page__toc">
+            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
+            <a class="demo-doc-page__toc-link" href="#canvas">Recipe Canvas</a>
+            <a class="demo-doc-page__toc-link" href="#run-notes">Run Notes</a>
+            <a class="demo-doc-page__toc-link" href="#data-sources">Data Sources</a>
+        </div>
+    </MudPaper>
+
+    <section id="prompt-set" class="demo-doc-page__section">
+        <div class="demo-doc-page__section-head">
+            <MudText Typo="Typo.h6">Prompt Set</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Use these prompts to validate smooth, multi-component control.
+            </MudText>
+        </div>
+
+        <div class="demo-doc-page__prompt-box">
+            <ul class="demo-doc-page__prompt-list">
+                <li><span class="demo-doc-page__prompt-code">set recipe title to test</span></li>
+                <li><span class="demo-doc-page__prompt-code">set duration to 45</span></li>
+                <li><span class="demo-doc-page__prompt-code">show only ingredients where optional is false</span></li>
+                <li><span class="demo-doc-page__prompt-code">open ingredient dialog and add chives optional amount 1 tbsp</span></li>
+                <li><span class="demo-doc-page__prompt-code">switch to run notes tab</span></li>
+            </ul>
+        </div>
+    </section>
+
+    <MudGrid Spacing="2">
+        <MudItem xs="12" xl="8" id="canvas">
+            <MudPaper Elevation="0" Class="demo-doc-page__section demo-dojo__canvas">
+                <AgentTabs AgentId="dojo-tabs">
+                    <MudTabPanel Text="Recipe Canvas">
+                        <AgentForm AgentId="dojo-recipe-form"
+                                   Model="@Model"
+                                   Submitted="OnRecipeSubmittedAsync">
+                            <ChildContent Context="formContext">
+                                <DataAnnotationsValidator />
+
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="7">
+                                        <MudTextField T="string"
+                                                      Label="Recipe Title"
+                                                      For="@(() => Model.Title)"
+                                                      @bind-Value="Model.Title" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6" md="3">
+                                        <MudNumericField T="int"
+                                                         Label="Minutes"
+                                                         For="@(() => Model.Minutes)"
+                                                         @bind-Value="Model.Minutes" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="6" md="2">
+                                        <MudSelect T="string"
+                                                   Label="Difficulty"
+                                                   For="@(() => Model.Difficulty)"
+                                                   @bind-Value="Model.Difficulty">
+                                            <MudSelectItem T="string" Value="@("Beginner")">Beginner</MudSelectItem>
+                                            <MudSelectItem T="string" Value="@("Intermediate")">Intermediate</MudSelectItem>
+                                            <MudSelectItem T="string" Value="@("Advanced")">Advanced</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+                                </MudGrid>
+
+                                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Dietary Preferences</MudText>
+                                <div class="demo-dojo__flags">
+                                    <MudCheckBox T="bool" @bind-Value="Model.HighProtein" Label="High Protein" />
+                                    <MudCheckBox T="bool" @bind-Value="Model.LowCarb" Label="Low Carb" />
+                                    <MudCheckBox T="bool" @bind-Value="Model.Spicy" Label="Spicy" />
+                                    <MudCheckBox T="bool" @bind-Value="Model.Vegetarian" Label="Vegetarian" />
+                                </div>
+
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-3">
+                                    <MudText Typo="Typo.subtitle2">Ingredients</MudText>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="OpenIngredientDialogAsync">
+                                            Add Ingredient
+                                        </MudButton>
+                                        <MudButton ButtonType="ButtonType.Submit"
+                                                   Variant="Variant.Filled"
+                                                   Size="Size.Small"
+                                                   Color="Color.Primary">
+                                            Save Draft
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </ChildContent>
+                        </AgentForm>
+
+                        <AgentDataGrid TItem="DojoIngredientRow"
+                                       AgentId="dojo-ingredients-grid"
+                                       Items="@_ingredients"
+                                       Dense="false"
+                                       Hover="true"
+                                       Bordered="true"
+                                       Striped="true"
+                                       RowKeyProperty="IngredientId"
+                                       ColumnAliases="@_ingredientAliases"
+                                       Class="mt-2">
+                            <Columns>
+                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Name" Title="Ingredient" />
+                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Amount" Title="Amount" />
+                                <PropertyColumn T="DojoIngredientRow" TProperty="bool" Property="x => x.Optional" Title="Optional" />
+                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Notes" Title="Notes" />
+                            </Columns>
+                        </AgentDataGrid>
+
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-3 mb-1">
+                            <MudText Typo="Typo.subtitle2">Instructions</MudText>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="OpenStepDialogAsync">
+                                Add Step
+                            </MudButton>
+                        </MudStack>
+                        <ol class="demo-dojo__steps">
+                            @for (var i = 0; i < _steps.Count; i++)
+                            {
+                                <li>@_steps[i]</li>
+                            }
+                        </ol>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Run Notes">
+                        <div id="run-notes"></div>
+                        <MudStack Spacing="1">
+                            @foreach (var note in _runNotes)
+                            {
+                                <MudPaper Elevation="0" Class="demo-dojo__note">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@note.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudText>
+                                    <MudText Typo="Typo.body2">@note.Message</MudText>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Data Sources">
+                        <div id="data-sources"></div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            These are recommended chart/card sources for generated UI from the assistant.
+                        </MudText>
+                        <pre class="docs-code">demo.suppliers.risk.by-region
+demo.suppliers.risk.tier-distribution
+demo.onboarding.volume.monthly
+demo.mitigation.volume.monthly</pre>
+                    </MudTabPanel>
+                </AgentTabs>
+            </MudPaper>
+
+            <AgentDialog @ref="_ingredientDialog"
+                         AgentId="dojo-ingredient-dialog"
+                         Visible="@_ingredientDialogVisible"
+                         VisibleChanged="OnIngredientDialogVisibleChanged">
+                <TitleContent>
+                    <MudText Typo="Typo.h6">Add Ingredient</MudText>
+                </TitleContent>
+                <DialogContent>
+                    <AgentForm AgentId="dojo-ingredient-form"
+                               Model="@_ingredientDraft"
+                               Submitted="OnIngredientSubmittedAsync">
+                        <ChildContent Context="formContext">
+                            <DataAnnotationsValidator />
+                            <MudTextField T="string"
+                                          Label="Ingredient name"
+                                          For="@(() => _ingredientDraft.Name)"
+                                          @bind-Value="_ingredientDraft.Name" />
+                            <MudTextField T="string"
+                                          Label="Amount"
+                                          For="@(() => _ingredientDraft.Amount)"
+                                          @bind-Value="_ingredientDraft.Amount" />
+                            <MudCheckBox T="bool"
+                                         Label="Optional"
+                                         @bind-Value="_ingredientDraft.Optional" />
+                            <MudTextField T="string"
+                                          Label="Notes"
+                                          For="@(() => _ingredientDraft.Notes)"
+                                          @bind-Value="_ingredientDraft.Notes" />
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary">
+                                    Save Ingredient
+                                </MudButton>
+                            </MudStack>
+                        </ChildContent>
+                    </AgentForm>
+                </DialogContent>
+                <DialogActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseIngredientDialogAsync">
+                        Close
+                    </MudButton>
+                </DialogActions>
+            </AgentDialog>
+
+            <AgentDialog @ref="_stepDialog"
+                         AgentId="dojo-step-dialog"
+                         Visible="@_stepDialogVisible"
+                         VisibleChanged="OnStepDialogVisibleChanged">
+                <TitleContent>
+                    <MudText Typo="Typo.h6">Add Instruction Step</MudText>
+                </TitleContent>
+                <DialogContent>
+                    <AgentForm AgentId="dojo-step-form"
+                               Model="@_stepDraft"
+                               Submitted="OnStepSubmittedAsync">
+                        <ChildContent Context="formContext">
+                            <DataAnnotationsValidator />
+                            <MudTextField T="string"
+                                          Label="Step text"
+                                          Lines="3"
+                                          For="@(() => _stepDraft.Text)"
+                                          @bind-Value="_stepDraft.Text" />
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary">
+                                    Save Step
+                                </MudButton>
+                            </MudStack>
+                        </ChildContent>
+                    </AgentForm>
+                </DialogContent>
+                <DialogActions>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseStepDialogAsync">
+                        Close
+                    </MudButton>
+                </DialogActions>
+            </AgentDialog>
+        </MudItem>
+
+        <MudItem xs="12" xl="4">
+            <MudPaper Elevation="0" Class="demo-doc-page__section demo-dojo__sidebar-card">
+                <MudText Typo="Typo.subtitle1">Current Session</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                    Keep this panel open while testing natural-language edits and cross-wrapper actions.
+                </MudText>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small" Class="mb-2">
+                    Service-backed session state
+                </MudChip>
+
+                <MudList T="string" Dense="false" Class="demo-dojo__meta-list">
+                    <MudListItem>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Recipe</MudText>
+                        <MudText Typo="Typo.body2">@Model.Title</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Duration</MudText>
+                        <MudText Typo="Typo.body2">@Model.Minutes min</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Ingredients</MudText>
+                        <MudText Typo="Typo.body2">@_ingredients.Count tracked</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Steps</MudText>
+                        <MudText Typo="Typo.body2">@_steps.Count instructions</MudText>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Last save</MudText>
+                        <MudText Typo="Typo.body2">@LastSavedLabel</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    protected override string AgentIdValue => "dojo-recipe-workflow";
+    protected override string FormDisplayName => "Recipe";
+
+    private List<DojoIngredientRow> _ingredients = [];
+    private List<string> _steps = [];
+    private List<DojoRunNote> _runNotes = [];
+
+    private AgentDialog? _ingredientDialog;
+    private bool _ingredientDialogVisible;
+    private DojoIngredientDraft _ingredientDraft = new();
+    private AgentDialog? _stepDialog;
+    private bool _stepDialogVisible;
+    private DojoStepDraft _stepDraft = new();
+    private DateTime? _lastSavedUtc;
+
+    private static readonly IReadOnlyDictionary<string, string> _ingredientAliases =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ingredient"] = nameof(DojoIngredientRow.Name),
+            ["name"] = nameof(DojoIngredientRow.Name),
+            ["amount"] = nameof(DojoIngredientRow.Amount),
+            ["optional"] = nameof(DojoIngredientRow.Optional),
+            ["notes"] = nameof(DojoIngredientRow.Notes)
+        };
+
+    private string LastSavedLabel =>
+        _lastSavedUtc is null
+            ? "Not saved yet"
+            : _lastSavedUtc.Value.ToLocalTime().ToString("HH:mm:ss");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSnapshotAsync();
+    }
+
+    private async Task OnRecipeSubmittedAsync()
+    {
+        var snapshot = await WorkspaceService.SaveRecipeAsync(Model, CancellationToken.None);
+        ApplySnapshot(snapshot);
+        Snackbar.Add("Recipe draft saved.", Severity.Success);
+    }
+
+    private async Task OpenIngredientDialogAsync()
+    {
+        _ingredientDraft = new DojoIngredientDraft();
+        _ingredientDialogVisible = true;
+        if (_ingredientDialog is not null)
+        {
+            await _ingredientDialog.Open();
+        }
+    }
+
+    private async Task CloseIngredientDialogAsync()
+    {
+        _ingredientDialogVisible = false;
+        if (_ingredientDialog is not null)
+        {
+            await _ingredientDialog.Close();
+        }
+    }
+
+    private Task OnIngredientDialogVisibleChanged(bool visible)
+    {
+        _ingredientDialogVisible = visible;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnIngredientSubmittedAsync()
+    {
+        var snapshot = await WorkspaceService.AddIngredientAsync(_ingredientDraft, CancellationToken.None);
+        ApplySnapshot(snapshot);
+
+        Snackbar.Add($"Added ingredient: {_ingredientDraft.Name.Trim()}", Severity.Success);
+        await CloseIngredientDialogAsync();
+    }
+
+    private async Task OpenStepDialogAsync()
+    {
+        _stepDraft = new DojoStepDraft();
+        _stepDialogVisible = true;
+        if (_stepDialog is not null)
+        {
+            await _stepDialog.Open();
+        }
+    }
+
+    private async Task CloseStepDialogAsync()
+    {
+        _stepDialogVisible = false;
+        if (_stepDialog is not null)
+        {
+            await _stepDialog.Close();
+        }
+    }
+
+    private Task OnStepDialogVisibleChanged(bool visible)
+    {
+        _stepDialogVisible = visible;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnStepSubmittedAsync()
+    {
+        var snapshot = await WorkspaceService.AddStepAsync(_stepDraft, CancellationToken.None);
+        ApplySnapshot(snapshot);
+        Snackbar.Add($"Added step {_steps.Count}.", Severity.Success);
+        await CloseStepDialogAsync();
+    }
+
+    private async Task LoadSnapshotAsync()
+    {
+        var snapshot = await WorkspaceService.GetSnapshotAsync(CancellationToken.None);
+        ApplySnapshot(snapshot);
+    }
+
+    private void ApplySnapshot(DojoWorkspaceSnapshot snapshot)
+    {
+        Model = snapshot.Recipe;
+        _ingredients = snapshot.Ingredients.ToList();
+        _steps = snapshot.Steps.ToList();
+        _runNotes = snapshot.RunNotes.ToList();
+        _lastSavedUtc = snapshot.LastSavedUtc;
+    }
+}

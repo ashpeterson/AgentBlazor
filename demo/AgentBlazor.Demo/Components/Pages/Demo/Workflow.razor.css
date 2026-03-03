@@ -1,0 +1,28 @@
+.workflow-page__hero-head {
+    gap: 0.85rem;
+}
+
+.workflow-page__kpis {
+    margin-bottom: 0;
+}
+
+.workflow-page__kpi {
+    height: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--ab-border);
+    border-radius: 0.7rem;
+    background: rgba(7, 12, 22, 0.72);
+}
+
+.workflow-page__tabs-card {
+    border: 1px solid var(--ab-border);
+    border-radius: 0.8rem;
+    background: rgba(8, 13, 24, 0.72);
+    padding: 0.85rem;
+}
+
+@media (max-width: 760px) {
+    .workflow-page__tabs-card {
+        padding: 0.65rem;
+    }
+}

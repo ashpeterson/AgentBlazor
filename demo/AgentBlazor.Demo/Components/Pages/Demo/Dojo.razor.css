@@ -1,0 +1,95 @@
+.demo-dojo {
+    display: grid;
+    gap: 1.1rem;
+}
+
+.demo-dojo__hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.demo-dojo__hero::after {
+    content: "";
+    position: absolute;
+    right: -6rem;
+    top: -6rem;
+    width: 14rem;
+    height: 14rem;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(110, 168, 254, 0.22), rgba(110, 168, 254, 0) 65%);
+    pointer-events: none;
+}
+
+.demo-dojo__hero-head {
+    margin-bottom: 0.45rem;
+}
+
+.demo-dojo__canvas {
+    display: grid;
+    gap: 1rem;
+}
+
+.demo-dojo__canvas ::deep .mud-tabs-toolbar {
+    margin-bottom: 0.8rem;
+}
+
+.demo-dojo__canvas ::deep .mud-tab {
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.demo-dojo__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1rem;
+}
+
+.demo-dojo__steps {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 0.5rem;
+    color: var(--ab-ink-muted);
+}
+
+.demo-dojo__steps li {
+    line-height: 1.45;
+}
+
+.demo-dojo__note {
+    padding: 0.75rem 0.82rem;
+    border-radius: 0.8rem;
+    border: 1px solid var(--ab-border);
+    background: rgba(16, 25, 40, 0.82);
+    display: grid;
+    gap: 0.25rem;
+}
+
+.demo-dojo__sidebar-card {
+    position: sticky;
+    top: 0.4rem;
+}
+
+.demo-dojo__meta-list {
+    border-top: 1px solid var(--ab-border);
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+}
+
+.demo-dojo__meta-list ::deep .mud-list-item {
+    padding-inline: 0;
+    padding-block: 0.45rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 1400px) {
+    .demo-dojo__sidebar-card {
+        position: static;
+    }
+}
+
+@media (max-width: 760px) {
+    .demo-dojo__flags {
+        gap: 0.45rem 0.65rem;
+    }
+}

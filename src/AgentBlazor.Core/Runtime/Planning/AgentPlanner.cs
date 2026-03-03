@@ -126,10 +126,12 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         sb.AppendLine("- Each action can ONLY be called on the agentId that lists it.");
         sb.AppendLine("- For forms, look for fill_* actions (e.g., 'fill_supplier_onboarding') that accept all fields at once.");
         sb.AppendLine("- Use EXACT parameter names from ACTIVE COMPONENTS.");
+        sb.AppendLine("- Do NOT call form submit actions unless the user explicitly asks to submit/save/confirm/send.");
         sb.AppendLine();
         sb.AppendLine("# FORM FILLING");
         sb.AppendLine("- When the user provides data values, fill them in without asking for clarification.");
-        sb.AppendLine("- Use compound fill actions that accept all form fields as parameters in a single call.");
+        sb.AppendLine("- Use compound fill/set/update actions even for partial edits (single-field updates are valid).");
+        sb.AppendLine("- Do not ask for all fields when the user asks to change only one field.");
         sb.AppendLine("- Check the ACTIVE COMPONENTS section for available fill_* actions and their parameters.");
         sb.AppendLine();
 
