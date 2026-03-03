@@ -2,12 +2,13 @@
 @using MudBlazor
 
 <AgentNavMenu AgentId="demo-nav" Dense="true">
-    <MudNavLink Href="demo" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Start Here</MudNavLink>
-    <MudNavLink Href="demo/workflow" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">Workflow</MudNavLink>
-    <MudNavLink Href="demo/components" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Component Kit</MudNavLink>
-    <MudNavLink Href="demo/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.TableChart">Data Grid</MudNavLink>
-    <MudNavLink Href="demo/generative-ui" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoAwesome">Generative UI</MudNavLink>
-    <MudNavLink Href="demo/onboarding" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PersonAdd">Form Workflow</MudNavLink>
+    <MudNavLink Href="/demo" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Explore">Demo Guide</MudNavLink>
+    <MudNavLink Href="/demo/components" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Component Kit</MudNavLink>
+    <MudNavLink Href="/demo/workflow" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">Workflow Orchestration</MudNavLink>
+    <MudNavLink Href="/demo/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.TableChart">Data Grid Focus</MudNavLink>
+    <MudNavLink Href="/demo/onboarding" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.DynamicForm">Form Automation</MudNavLink>
+    <MudNavLink Href="/demo/generative-ui" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoAwesome">Generative UI</MudNavLink>
+    <MudNavLink Href="/demo/status" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MonitorHeart">Runtime Status</MudNavLink>
     <MudDivider Class="my-1" />
-    <MudNavLink Href="demo/docs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MenuBook">Getting Started</MudNavLink>
+    <MudNavLink Href="/demo/docs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MenuBook">Integration Guide</MudNavLink>
 </AgentNavMenu>

@@ -114,10 +114,25 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     /// Dispatches an agent action to the matching [AgentAction]-decorated method.
     /// Override to handle actions manually instead of via attribute discovery.
     /// </summary>
-    public virtual Task<ActionResult> ExecuteActionAsync(
+    public virtual async Task<ActionResult> ExecuteActionAsync(
         AgentAction action,
         CancellationToken cancellationToken = default)
-        => AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
+    {
+        try
+        {
+            ActionResult result = ActionResult.Applied($"Executed '{action.Name}'.");
+            await InvokeAsync(async () =>
+            {
+                result = await AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
+            });
+            return result;
+        }
+        catch (InvalidOperationException)
+        {
+            // Unit tests may instantiate wrappers without a renderer — execute directly.
+            return await AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
+        }
+    }
 
     protected Task RequestComponentRefreshAsync()
     {

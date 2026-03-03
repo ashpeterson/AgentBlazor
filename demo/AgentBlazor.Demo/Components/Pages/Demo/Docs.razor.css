@@ -71,3 +71,11 @@
     gap: 0.75rem;
     padding: 0.5rem 0;
 }
+
+.docs-ordered {
+    margin: 0.2rem 0 0;
+    padding-left: 1.25rem;
+    display: grid;
+    gap: 0.5rem;
+    color: var(--ab-ink-muted);
+}

@@ -1,0 +1,41 @@
+@page "/debug"
+@page "/agent-routing-demo"
+@page "/agent-grid-demo"
+@page "/suppliers-debug"
+@page "/supplier-onboarding-debug"
+@page "/workspace-debug"
+@page "/demo/workspace"
+@page "/agentblazor-status"
+@page "/suppliers"
+@page "/supplier-onboarding"
+@page "/workspace"
+@inject NavigationManager Navigation
+
+<PageTitle>Redirecting...</PageTitle>
+
+<MudText Typo="Typo.body2">Redirecting to the updated demo flow...</MudText>
+
+@code {
+    protected override void OnInitialized()
+    {
+        var route = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].ToLowerInvariant();
+
+        var target = route switch
+        {
+            "agent-grid-demo" => "/demo/suppliers",
+            "suppliers-debug" => "/demo/suppliers",
+            "suppliers" => "/demo/suppliers",
+            "supplier-onboarding-debug" => "/demo/onboarding",
+            "supplier-onboarding" => "/demo/onboarding",
+            "workspace-debug" => "/demo/workflow",
+            "workspace" => "/demo/workflow",
+            "demo/workspace" => "/demo/workflow",
+            "agentblazor-status" => "/demo/status",
+            "agent-routing-demo" => "/demo",
+            "debug" => "/demo",
+            _ => "/demo"
+        };
+
+        Navigation.NavigateTo(target, replace: true);
+    }
+}

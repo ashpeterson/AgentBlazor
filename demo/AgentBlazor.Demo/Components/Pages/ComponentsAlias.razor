@@ -1,0 +1,13 @@
+@page "/components"
+@inject NavigationManager Navigation
+
+<PageTitle>Redirecting...</PageTitle>
+
+<MudText Typo="Typo.body2">Redirecting to the Component Kit...</MudText>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/demo/components", replace: true);
+    }
+}

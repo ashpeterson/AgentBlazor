@@ -15,17 +15,32 @@
 
     <main class="demo-app__main">
         <header class="demo-app__topbar">
-            <a href="" class="demo-app__back">
+            <a href="/" class="demo-app__back">
                 <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
                 <span>Back to Home</span>
             </a>
 
-            <div class="demo-app__brand">
+            <a href="/demo" class="demo-app__brand">
                 <img src="logo.png" class="demo-app__brand-logo" alt="AgentBlazor" />
                 <span class="demo-app__brand-name">AgentBlazor Demo</span>
-            </div>
+            </a>
 
             <div class="demo-app__controls">
+                <div class="demo-app__quick-links">
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Href="/demo/components">
+                        Component Kit
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Href="/demo/docs">
+                        Integration Guide
+                    </MudButton>
+                </div>
+
                 <MudSelect T="string"
                            Value="_selectedThemeKey"
                            ValueChanged="OnThemeChanged"
