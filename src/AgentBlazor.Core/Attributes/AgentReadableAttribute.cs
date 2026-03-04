@@ -11,13 +11,17 @@ namespace AgentBlazor.Attributes;
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 public sealed class AgentReadableAttribute : Attribute
 {
+    public AgentReadableAttribute()
+    {
+    }
+
     public AgentReadableAttribute(string description)
     {
         Description = description;
     }
 
     /// <summary>Human-readable description included in the state snapshot.</summary>
-    public string Description { get; }
+    public string? Description { get; }
 
     /// <summary>
     /// Override the state key name. Defaults to the property name camelCased.

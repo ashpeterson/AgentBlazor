@@ -32,6 +32,8 @@
                                  SessionId="@SessionId"
                                  Placeholder="@Placeholder"
                                  EnableGeneratedUi="@EnableGeneratedUi"
+                                 ShowDevTools="@ShowDevTools"
+                                 AutoShowDevTools="@AutoShowDevTools"
                                  Theme="@Theme"
                                  CssClass="@CssClass" />
             </div>
@@ -94,6 +96,12 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    [Parameter]
+    public bool? ShowDevTools { get; set; }
+
+    [Parameter]
+    public bool? AutoShowDevTools { get; set; }
 
     private string HeaderLabelId => $"ab-chat-widget-header-{_instanceId}";
 

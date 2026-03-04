@@ -4,6 +4,7 @@
 @using AgentBlazor.Components.Render
 @using AgentBlazor.Core.Models
 @using AgentBlazor.Core.Paid
+@using AgentBlazor.Options
 @using Markdig
 @implements IDisposable
 @using AgentBlazor.Core.Runtime.Agents
@@ -11,6 +12,7 @@
 @using AgentBlazor.Core.Runtime.Discovery
 @using AgentBlazor.Core.Runtime.Interfaces
 @using AgentBlazor.Runtime
+@using Microsoft.Extensions.Options
 @using Microsoft.JSInterop
 @inject IAgentRegistry AgentRegistry
 @inject IAgentRuntime AgentRuntime
@@ -22,6 +24,7 @@
 @inject IAgentActionRenderRegistry ActionRenderRegistry
 @inject IAdaptiveSuggestionService SuggestionService
 @inject IProactiveInsightService ProactiveInsightService
+@inject IOptions<AgentBlazorOptions> AgentBlazorOptionsAccessor
 
 <ErrorBoundary @ref="_errorBoundary">
     <ChildContent>
@@ -348,6 +351,11 @@
             </button>
         </EditForm>
     </section>
+    @if (ResolvedShowDevTools)
+    {
+        <AgentInspectorPanel SessionId="@EffectiveSessionId"
+                             AutoShowOnDebug="@ResolvedAutoShowDevTools" />
+    }
     </ChildContent>
     <ErrorContent Context="exception">
         <section class="ab-chat-surface ab-chat-surface--error @(Theme?.CssClass) @CssClass"
@@ -450,10 +458,22 @@
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
 
+    [Parameter]
+    public bool? ShowDevTools { get; set; }
+
+    [Parameter]
+    public bool? AutoShowDevTools { get; set; }
+
     private string EffectiveSessionId =>
         string.IsNullOrWhiteSpace(SessionId)
             ? CircuitSessionId
             : SessionId.Trim();
+
+    private bool ResolvedShowDevTools =>
+        ShowDevTools ?? AgentBlazorOptionsAccessor.Value.EnableDevTools;
+
+    private bool ResolvedAutoShowDevTools =>
+        AutoShowDevTools ?? AgentBlazorOptionsAccessor.Value.AutoShowDevTools;
 
     private string EffectiveFormName =>
         string.IsNullOrWhiteSpace(FormName)

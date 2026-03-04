@@ -26,6 +26,7 @@ public static class AgentActionDiscovery
     // Cache reflection results per component type to avoid repeated scanning
     private static readonly Dictionary<Type, DiscoveryCacheEntry> Cache = new();
     private static readonly Lock CacheLock = new();
+    private static readonly NullabilityInfoContext NullabilityContext = new();
 
     /// <summary>
     /// Returns true when the component type has at least one [AgentAction]-decorated method.
@@ -111,14 +112,12 @@ public static class AgentActionDiscovery
             if (p.ParameterType == typeof(CancellationToken)) continue;
 
             var attr = p.GetCustomAttribute<AgentParamAttribute>();
-            var allowedValues = attr?.AllowedValues is { Length: > 0 }
-                ? Array.ConvertAll(attr.AllowedValues.Split(','), static v => v.Trim())
-                : null;
+            var allowedValues = GetAllowedValues(p, attr);
 
             result.Add(new DiscoveredParameter(
                 p.Name ?? $"param{result.Count}",
                 GetTypeLabel(p.ParameterType),
-                Required: attr?.Required == true,
+                Required: IsParameterRequired(p, attr),
                 Description: attr?.Description,
                 AllowedValues: allowedValues));
         }
@@ -169,7 +168,7 @@ public static class AgentActionDiscovery
 
             if (!TryGetArgValue(action.Parameters, key, param.ParameterType, out var argValue))
             {
-                if (paramAttr?.Required == true)
+                if (IsParameterRequired(param, paramAttr))
                 {
                     return ActionResult.NeedsClarification(
                         $"Required parameter '{key}' is missing for action '{actionId}'.");
@@ -242,7 +241,7 @@ public static class AgentActionDiscovery
             .Where(x => x.Attr is not null)
             .Select(x => new ActionCacheInfo(
                 ActionId: x.Attr!.ActionId ?? ToSnakeCase(x.Method.Name),
-                Description: x.Attr.Description,
+                Description: ResolveActionDescription(x.Method, x.Attr.Description),
                 RequiresApproval: x.Attr.RequiresApproval,
                 FollowUp: x.Attr.FollowUp,
                 InputSchema: BuildInputSchema(x.Method),
@@ -256,7 +255,7 @@ public static class AgentActionDiscovery
             .Where(x => x.Attr is not null)
             .Select(x => new ReadableCacheInfo(
                 StateKey: x.Attr!.StateKey ?? ToCamelCase(x.Prop.Name),
-                Description: x.Attr.Description,
+                Description: ResolveReadableDescription(x.Prop, x.Attr.Description),
                 MaxItems: x.Attr.MaxItems,
                 Property: x.Prop))
             .ToArray();
@@ -340,6 +339,8 @@ public static class AgentActionDiscovery
         {
             var p = parameters[i];
             var attr = p.GetCustomAttribute<AgentParamAttribute>();
+            var allowedValues = GetAllowedValues(p, attr);
+            var isRequired = IsParameterRequired(p, attr);
 
             if (i > 0) sb.Append(", ");
 
@@ -347,13 +348,13 @@ public static class AgentActionDiscovery
             sb.Append(' ');
             sb.Append(p.Name ?? $"param{i}");
 
-            if (attr?.Required == true)
+            if (isRequired)
                 sb.Append(" [required]");
             else if (!p.HasDefaultValue)
                 sb.Append(" [optional]");
 
-            if (attr?.AllowedValues is { Length: > 0 } av)
-                sb.Append($" [allowed: {av}]");
+            if (allowedValues is { Length: > 0 })
+                sb.Append($" [allowed: {string.Join(",", allowedValues)}]");
 
             if (attr?.Description is { Length: > 0 } desc)
                 sb.Append($" — {desc}");
@@ -591,9 +592,102 @@ public static class AgentActionDiscovery
     private static object? GetDefault(Type type)
         => type.IsValueType ? Activator.CreateInstance(type) : null;
 
+    private static string[]? GetAllowedValues(ParameterInfo parameter, AgentParamAttribute? attr)
+    {
+        if (!string.IsNullOrWhiteSpace(attr?.AllowedValues))
+        {
+            return attr.AllowedValues
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        var underlying = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
+        return underlying.IsEnum ? Enum.GetNames(underlying) : null;
+    }
+
+    private static bool IsParameterRequired(ParameterInfo parameter, AgentParamAttribute? attr)
+    {
+        if (attr is not null)
+        {
+            return attr.Required;
+        }
+
+        if (parameter.HasDefaultValue)
+        {
+            return false;
+        }
+
+        var type = parameter.ParameterType;
+        if (type.IsValueType)
+        {
+            return Nullable.GetUnderlyingType(type) is null;
+        }
+
+        try
+        {
+            return NullabilityContext.Create(parameter).WriteState == NullabilityState.NotNull;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string ResolveActionDescription(MethodInfo method, string? configuredDescription)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredDescription))
+        {
+            return configuredDescription.Trim();
+        }
+
+        return HumanizeName(method.Name);
+    }
+
+    private static string ResolveReadableDescription(PropertyInfo property, string? configuredDescription)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredDescription))
+        {
+            return configuredDescription.Trim();
+        }
+
+        return HumanizeName(property.Name);
+    }
+
     // -------------------------------------------------------------------------
     // Name helpers
     // -------------------------------------------------------------------------
+
+    private static string HumanizeName(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return "Value";
+        }
+
+        var source = identifier.Replace('_', ' ').Replace('-', ' ');
+        var sb = new StringBuilder(source.Length + 8);
+
+        for (var i = 0; i < source.Length; i++)
+        {
+            var current = source[i];
+            if (i > 0 &&
+                char.IsUpper(current) &&
+                char.IsLetterOrDigit(source[i - 1]) &&
+                source[i - 1] != ' ')
+            {
+                sb.Append(' ');
+            }
+
+            sb.Append(current);
+        }
+
+        var text = sb.ToString().Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "Value";
+        }
+
+        return char.ToUpperInvariant(text[0]) + text[1..];
+    }
 
     private static string ToSnakeCase(string name)
     {

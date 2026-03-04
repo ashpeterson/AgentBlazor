@@ -13,13 +13,17 @@ namespace AgentBlazor.Attributes;
 [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
 public sealed class AgentParamAttribute : Attribute
 {
+    public AgentParamAttribute()
+    {
+    }
+
     public AgentParamAttribute(string description)
     {
         Description = description;
     }
 
     /// <summary>Human-readable description of what this parameter expects.</summary>
-    public string Description { get; }
+    public string? Description { get; }
 
     /// <summary>
     /// Whether the agent must always supply this parameter.

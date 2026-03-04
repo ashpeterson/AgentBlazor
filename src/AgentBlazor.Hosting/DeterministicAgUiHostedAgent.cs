@@ -78,6 +78,25 @@ internal sealed class DeterministicAgUiHostedAgent(
             invocation.HasContext,
             AgentBlazorRunEventKind.Started));
 
+        if (invocation.Operation is HostedRunOperation.Stop && _streamingRuntime is not null)
+        {
+            var stopped = await _streamingRuntime.StopRunAsync(invocation.RunId, cancellationToken);
+            var stopResponse = new AgentTurnResponse(
+                invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
+                stopped
+                    ? "Run stop requested."
+                    : "No active run was found for stop request.",
+                PlannedActions: [],
+                ExecutionResults: []);
+
+            await TrackRunEventAsync(CreateRunEvent(
+                stopResponse.AgentName,
+                invocation.HasContext,
+                AgentBlazorRunEventKind.Finished,
+                AgentBlazorRunOutcome.Succeeded));
+            return ToAgentResponse(stopResponse, invocation);
+        }
+
         AgentTurnResponse response;
         try
         {
@@ -128,6 +147,38 @@ internal sealed class DeterministicAgUiHostedAgent(
             invocation.HasContext,
             AgentBlazorRunEventKind.Started));
 
+        if (invocation.Operation is HostedRunOperation.Stop && _streamingRuntime is not null)
+        {
+            var stopped = await _streamingRuntime.StopRunAsync(invocation.RunId, cancellationToken);
+            var timestamp = DateTimeOffset.UtcNow;
+            var stopPayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["kind"] = "run_stop",
+                ["stopped"] = stopped
+            };
+
+            yield return CreateStateSnapshotUpdate(
+                invocation.RunId,
+                $"{invocation.RunId}:state:stop",
+                stopPayload,
+                timestamp);
+            yield return CreateTextUpdate(
+                invocation.RunId,
+                $"{invocation.RunId}:assistant:stop",
+                stopped
+                    ? "Run stop requested."
+                    : "No active run was found for stop request.",
+                timestamp,
+                invocation.Request.AgentName);
+
+            await TrackRunEventAsync(CreateRunEvent(
+                invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
+                invocation.HasContext,
+                AgentBlazorRunEventKind.Finished,
+                AgentBlazorRunOutcome.Succeeded));
+            yield break;
+        }
+
         if (_streamingRuntime is null)
         {
             AgentTurnResponse nonStreamingResponse;
@@ -172,9 +223,11 @@ internal sealed class DeterministicAgUiHostedAgent(
         }
 
         var mappingState = new MappingState(invocation.RunId);
-        var stream = _streamingRuntime
-            .RunTurnStreamingAsync(invocation.Request, cancellationToken)
+        var stream = (invocation.Operation is HostedRunOperation.Connect
+                ? _streamingRuntime.ConnectRunStreamAsync(invocation.RunId, cancellationToken)
+                : _streamingRuntime.RunTurnStreamingAsync(invocation.Request, cancellationToken))
             .GetAsyncEnumerator(cancellationToken);
+        var switchedToReconnectStream = invocation.Operation is HostedRunOperation.Connect;
         try
         {
             while (true)
@@ -201,6 +254,18 @@ internal sealed class DeterministicAgUiHostedAgent(
                 }
                 catch (Exception ex)
                 {
+                    if (!switchedToReconnectStream &&
+                        invocation.Operation is HostedRunOperation.Run &&
+                        IsRunAlreadyActiveException(ex))
+                    {
+                        await stream.DisposeAsync();
+                        stream = _streamingRuntime
+                            .ConnectRunStreamAsync(invocation.RunId, cancellationToken)
+                            .GetAsyncEnumerator(cancellationToken);
+                        switchedToReconnectStream = true;
+                        continue;
+                    }
+
                     await TrackRunEventAsync(CreateRunEvent(
                         invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
                         invocation.HasContext,
@@ -261,6 +326,7 @@ internal sealed class DeterministicAgUiHostedAgent(
         var context = BuildContext(properties, threadId, runId);
         var userMessage = ResolveUserMessage(messages);
         var requestedAgentName = ResolveRequestedAgentName(context, properties);
+        var operation = ResolveRunOperation(properties);
         var userId = context.TryGetValue(UserIdContextKey, out var userIdValue) &&
                      !string.IsNullOrWhiteSpace(userIdValue)
             ? userIdValue
@@ -273,7 +339,7 @@ internal sealed class DeterministicAgUiHostedAgent(
             UserId: userId,
             Context: context.Count == 0 ? null : context);
 
-        return new TurnInvocation(request, runId, context.Count > 0);
+        return new TurnInvocation(request, runId, context.Count > 0, operation);
     }
 
     private static AdditionalPropertiesDictionary? ResolveAdditionalProperties(AgentRunOptions? options)
@@ -416,21 +482,52 @@ internal sealed class DeterministicAgUiHostedAgent(
             return fromContext;
         }
 
-        if (properties is null ||
-            !properties.TryGetValue("ag_ui_forwarded_properties", out var forwardedProps) ||
-            forwardedProps is not JsonElement { ValueKind: JsonValueKind.Object } forwardedJson)
-        {
-            return null;
-        }
-
-        if (TryGetString(forwardedJson, "agentName", out var agentName) ||
+        if (TryResolveForwardedProperty(properties, out var forwardedJson) &&
+            (TryGetString(forwardedJson, "agentName", out var agentName) ||
             TryGetString(forwardedJson, "agent", out agentName) ||
-            TryGetString(forwardedJson, "agent_name", out agentName))
+            TryGetString(forwardedJson, "agent_name", out agentName)))
         {
             return agentName;
         }
 
         return null;
+    }
+
+    private static HostedRunOperation ResolveRunOperation(AdditionalPropertiesDictionary? properties)
+    {
+        var operation = ResolveStringProperty(properties, "ag_ui_operation");
+
+        if (string.IsNullOrWhiteSpace(operation) &&
+            TryResolveForwardedProperty(properties, out var forwardedJson))
+        {
+            _ = TryGetString(forwardedJson, "ag_ui_operation", out operation) ||
+                TryGetString(forwardedJson, "agUiOperation", out operation) ||
+                TryGetString(forwardedJson, "operation", out operation) ||
+                TryGetString(forwardedJson, "mode", out operation);
+        }
+
+        return operation?.Trim().ToLowerInvariant() switch
+        {
+            "connect" or "reconnect" or "resume" => HostedRunOperation.Connect,
+            "stop" or "cancel" or "abort" => HostedRunOperation.Stop,
+            _ => HostedRunOperation.Run
+        };
+    }
+
+    private static bool TryResolveForwardedProperty(
+        AdditionalPropertiesDictionary? properties,
+        out JsonElement forwardedJson)
+    {
+        forwardedJson = default;
+        if (properties is null ||
+            !properties.TryGetValue("ag_ui_forwarded_properties", out var forwardedProps) ||
+            forwardedProps is not JsonElement { ValueKind: JsonValueKind.Object } resolved)
+        {
+            return false;
+        }
+
+        forwardedJson = resolved;
+        return true;
     }
 
     private static bool TryGetString(JsonElement jsonElement, string propertyName, out string? value)
@@ -460,6 +557,12 @@ internal sealed class DeterministicAgUiHostedAgent(
             JsonElement { ValueKind: JsonValueKind.String } json => json.GetString(),
             _ => null
         };
+    }
+
+    private static bool IsRunAlreadyActiveException(Exception exception)
+    {
+        return exception is InvalidOperationException invalidOperation &&
+               invalidOperation.Message.Contains("already active", StringComparison.OrdinalIgnoreCase);
     }
 
     private static AgentResponseUpdate CreateTextUpdate(
@@ -536,6 +639,31 @@ internal sealed class DeterministicAgUiHostedAgent(
         };
     }
 
+    private static Dictionary<string, object?> CreatePlannedActionPayload(PlannedComponentAction plannedAction)
+    {
+        var arguments = plannedAction.Arguments;
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["componentId"] = plannedAction.ComponentId,
+            ["actionId"] = plannedAction.ActionId,
+            ["arguments"] = arguments is null || arguments.Count == 0
+                ? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, object?>(arguments, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static Dictionary<string, object?> CreateExecutionResultPayload(ComponentActionExecutionResult executionResult)
+    {
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["componentId"] = executionResult.ComponentId,
+            ["actionId"] = executionResult.ActionId,
+            ["outcome"] = executionResult.Outcome.ToString(),
+            ["succeeded"] = executionResult.Succeeded,
+            ["message"] = executionResult.Message
+        };
+    }
+
     private static IEnumerable<AgentResponseUpdate> MapStreamEvent(
         TurnInvocation invocation,
         MappingState mappingState,
@@ -548,6 +676,26 @@ internal sealed class DeterministicAgUiHostedAgent(
 
         switch (streamEvent.Kind)
         {
+            case AgentTurnStreamEventKind.StepStarted:
+            {
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "step_started",
+                    ["stepIndex"] = streamEvent.StepIndex
+                };
+                if (streamEvent.PlannedAction is not null)
+                {
+                    payload["plannedAction"] = CreatePlannedActionPayload(streamEvent.PlannedAction);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
             case AgentTurnStreamEventKind.TextMessageStart:
                 mappingState.ActiveTextMessageId = $"{invocation.RunId}:assistant:{++mappingState.TextMessageCount}";
                 yield break;
@@ -596,6 +744,26 @@ internal sealed class DeterministicAgUiHostedAgent(
                 mappingState.UpdateToolCallArguments(streamEvent.StepIndex, streamEvent.ToolArguments);
                 yield break;
 
+            case AgentTurnStreamEventKind.ToolCallEnd:
+            {
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "tool_call_end",
+                    ["stepIndex"] = streamEvent.StepIndex
+                };
+                if (streamEvent.PlannedAction is not null)
+                {
+                    payload["plannedAction"] = CreatePlannedActionPayload(streamEvent.PlannedAction);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
             case AgentTurnStreamEventKind.ToolCallResult:
             {
                 var pending = mappingState.ResolveToolCall(streamEvent.StepIndex, streamEvent.ExecutionResult);
@@ -608,6 +776,27 @@ internal sealed class DeterministicAgUiHostedAgent(
                         streamEvent.Timestamp);
                 }
 
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.StepFinished:
+            {
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "step_finished",
+                    ["stepIndex"] = streamEvent.StepIndex,
+                    ["succeeded"] = streamEvent.StepSucceeded
+                };
+                if (streamEvent.ExecutionResult is not null)
+                {
+                    payload["executionResult"] = CreateExecutionResultPayload(streamEvent.ExecutionResult);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
                 yield break;
             }
 
@@ -640,6 +829,54 @@ internal sealed class DeterministicAgUiHostedAgent(
                 {
                     ["kind"] = "approval_required",
                     ["pendingApprovals"] = pendingApprovals
+                };
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.ReasoningStart:
+            {
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "reasoning_start"
+                };
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.ReasoningContent:
+            {
+                if (string.IsNullOrWhiteSpace(streamEvent.ReasoningDelta))
+                {
+                    yield break;
+                }
+
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "reasoning_content",
+                    ["content"] = streamEvent.ReasoningDelta
+                };
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.ReasoningEnd:
+            {
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "reasoning_end"
                 };
                 yield return CreateStateSnapshotUpdate(
                     invocation.RunId,
@@ -712,7 +949,15 @@ internal sealed class DeterministicAgUiHostedAgent(
     private sealed record TurnInvocation(
         AgentTurnRequest Request,
         string RunId,
-        bool HasContext);
+        bool HasContext,
+        HostedRunOperation Operation);
+
+    private enum HostedRunOperation
+    {
+        Run,
+        Connect,
+        Stop
+    }
 
     private sealed class MappingState(string runId)
     {

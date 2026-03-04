@@ -1,0 +1,74 @@
+@page "/demo/compare/wrappers"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>Wrapper-First Pattern</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Approach A</p>
+        <MudText Typo="Typo.h5">Wrapper-First (Built-in Agent Components)</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Use shipped wrappers like <code>AgentDataGrid</code>, <code>AgentForm</code>, <code>AgentDialog</code>.
+            This is the fastest path when your UI maps to existing wrappers.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Exactly What You Need</MudText>
+        <pre class="docs-code">builder.Services.AddAgentBlazor(options =&gt;
+{
+    options.UseOpenAI("&lt;api-key&gt;", "gpt-4o-mini");
+    // optional:
+    // options.UseDevTools();
+});
+
+app.MapAgentBlazorEndpoints();</pre>
+        <pre class="docs-code">&lt;AgentDataGrid TItem="SupplierRow"
+               AgentId="supplier-grid"
+               Items="@Rows"
+               RowKeyProperty="Id"&gt;
+    &lt;Columns&gt;
+        &lt;PropertyColumn T="SupplierRow" TProperty="string" Property="x =&gt; x.Id" Title="ID" /&gt;
+        &lt;PropertyColumn T="SupplierRow" TProperty="string" Property="x =&gt; x.Name" Title="Supplier" /&gt;
+    &lt;/Columns&gt;
+&lt;/AgentDataGrid&gt;</pre>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Live Example</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Try prompts: <code>sort suppliers by risk descending</code>, <code>filter suppliers in EMEA</code>.
+        </MudText>
+
+        <AgentDataGrid TItem="SupplierRow"
+                       AgentId="compare-wrapper-grid"
+                       Items="@Rows"
+                       Dense="true"
+                       Hover="true"
+                       Bordered="true"
+                       Striped="true"
+                       RowKeyProperty="Id">
+            <Columns>
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                <PropertyColumn T="SupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                <PropertyColumn T="SupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+            </Columns>
+        </AgentDataGrid>
+    </section>
+</div>
+
+@code {
+    private IReadOnlyList<SupplierRow> Rows { get; } =
+    [
+        new("SUP-100", "Northwind Traders", "EMEA", 82),
+        new("SUP-101", "Alpine Components", "NA", 58),
+        new("SUP-102", "Delta Manufacturing", "APAC", 71),
+        new("SUP-103", "Vertex Industrial", "EMEA", 44)
+    ];
+
+    private sealed record SupplierRow(string Id, string Name, string Region, int RiskScore);
+}
+

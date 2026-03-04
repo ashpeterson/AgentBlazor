@@ -11,13 +11,17 @@ namespace AgentBlazor.Attributes;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class AgentActionAttribute : Attribute
 {
+    public AgentActionAttribute()
+    {
+    }
+
     public AgentActionAttribute(string description)
     {
         Description = description;
     }
 
     /// <summary>Human-readable description shown to the agent in the system prompt.</summary>
-    public string Description { get; }
+    public string? Description { get; }
 
     /// <summary>
     /// Override the action id sent to the agent. Defaults to the method name snake_cased.

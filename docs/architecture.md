@@ -1,6 +1,6 @@
 # AgentBlazor Architecture (Current State)
 
-Last updated: 2026-03-03
+Last updated: 2026-03-04
 
 ## Purpose
 
@@ -149,6 +149,14 @@ Runtime action discovery is hybrid:
 
 - First uses `[AgentAction]` discovery
 - Falls back to `GetCapability()` for dynamic components (notably `AgentFormPageBase<TModel>`)
+
+Convention-mode discovery now reduces annotation boilerplate for attribute-driven components:
+
+- `[AgentAction]`, `[AgentReadable]`, and `[AgentParam]` descriptions are optional
+- Action descriptions default to humanized method names when omitted
+- Non-nullable parameters are inferred as required (unless overridden by `[AgentParam]`)
+- Enum parameters infer allowed values automatically when not specified
+- `AgentControllableComponentBase` infers `ComponentType` and default `AgentId` (with optional `[AgentComponent(...)]` overrides)
 
 `AgentFormPageBase<TModel>` now exposes partial-update aliases for dynamic form control:
 

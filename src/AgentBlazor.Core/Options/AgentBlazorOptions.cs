@@ -19,4 +19,14 @@ public sealed class AgentBlazorOptions
     /// The licensed feature tier. Defaults to Free. Set via UseProLicense() in registration options.
     /// </summary>
     public AgentBlazorTier LicensedTier { get; set; } = AgentBlazorTier.Free;
+
+    /// <summary>
+    /// Enables built-in in-app developer inspector tools.
+    /// </summary>
+    public bool EnableDevTools { get; set; }
+
+    /// <summary>
+    /// Automatically opens the developer inspector when enabled.
+    /// </summary>
+    public bool AutoShowDevTools { get; set; }
 }

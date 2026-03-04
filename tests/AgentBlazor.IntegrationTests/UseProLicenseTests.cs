@@ -114,4 +114,35 @@ public class UseProLicenseTests
         // Free tier uses the no-op store
         Assert.IsNotType<InMemoryActionHistoryStore>(store);
     }
+
+    [Fact]
+    public void UseDevTools_EnablesDevToolsOptions()
+    {
+        var services = new ServiceCollection();
+        AgentBlazorUnifiedServiceCollectionExtensions.AddAgentBlazor(services, options =>
+        {
+            options.UseDevTools(autoShow: true);
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var opts = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+
+        Assert.True(opts.EnableDevTools);
+        Assert.True(opts.AutoShowDevTools);
+    }
+
+    [Fact]
+    public void UseDevTools_RegistersInMemoryInspectorStore()
+    {
+        var services = new ServiceCollection();
+        AgentBlazorUnifiedServiceCollectionExtensions.AddAgentBlazor(services, options =>
+        {
+            options.UseDevTools();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAgentInspectorStore>();
+
+        Assert.IsType<InMemoryAgentInspectorStore>(store);
+    }
 }

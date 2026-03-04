@@ -8,7 +8,7 @@ A natural-language agent framework for Blazor Server apps. Add an AI assistant t
 - **AgentTabs** - Switch tabs by name
 - **AgentDialog + AgentForm** - Open dialogs, fill and submit forms
 - **Generative UI** - Agent-generated charts, tables, and cards in chat
-- **Custom Components** - Add `[AgentAction]` to any Blazor component
+- **Custom Components** - Add `[AgentAction]` / `[AgentReadable]` to any Blazor component
 
 ## Quick Start
 
@@ -108,24 +108,33 @@ export AZURE_OPENAI_API_KEY=...
 
 ## Custom Agent Components
 
-Add `[AgentAction]` to any method to expose it to the agent:
+Add `AgentControllableComponentBase` + attributes to expose any component:
 
 ```csharp
+[AgentComponent(AgentIdPrefix = "risk-counter")]
 public partial class RiskCounter : AgentControllableComponentBase
 {
-    public override string AgentId => "risk-counter";
+    private int _highRiskCount = 12;
 
-    [AgentReadable("Current high-risk count")]
-    public int HighRiskCount { get; private set; }
+    [AgentReadable]
+    public int HighRiskCount => _highRiskCount;
 
-    [AgentAction("Clear all high-risk flags")]
-    public void ClearHighRisk()
+    [AgentAction]
+    public Task ClearHighRisk()
     {
-        HighRiskCount = 0;
-        StateHasChanged();
+        _highRiskCount = 0;
+        return RequestComponentRefreshAsync();
     }
 }
 ```
+
+Convention defaults:
+- `ComponentType` is inferred from class name (or `[AgentComponent(ComponentType = ...)]`).
+- `AgentId` is auto-generated (or fixed with `[AgentComponent(AgentId = ...)]`).
+- `[AgentAction]` id defaults to `snake_case` method name.
+- Non-nullable parameters are inferred as required.
+- Enum parameters automatically expose allowed values.
+- `[AgentParam]` is only needed for custom descriptions/constraints.
 
 ## Form Auto-Generation
 

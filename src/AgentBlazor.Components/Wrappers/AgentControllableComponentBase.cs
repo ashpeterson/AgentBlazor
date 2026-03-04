@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Text;
+using AgentBlazor.Attributes;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -33,16 +36,24 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     [Inject]
     private IAgentDeferredActionEvents? DeferredActionEvents { get; set; }
 
-    [Parameter, EditorRequired]
+    [Parameter]
     public string AgentId { get; set; } = string.Empty;
 
     private ILogger? _logger;
+    private AgentComponentAttribute? _componentAttribute;
+    private string? _resolvedComponentType;
 
-    public abstract string ComponentType { get; }
+    public virtual string ComponentType => _resolvedComponentType ??= ResolveDefaultComponentType();
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
+        _ = GetComponentAttribute();
+        if (string.IsNullOrWhiteSpace(AgentId))
+        {
+            AgentId = ResolveDefaultAgentId();
+        }
+
         _logger ??= LoggerFactory?.CreateLogger(GetType());
         ComponentRegistry.Register(this);
 
@@ -153,6 +164,87 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         {
             _ = ComponentRegistry.Unregister(AgentId);
         }
+    }
+
+    private string ResolveDefaultComponentType()
+    {
+        var componentAttribute = GetComponentAttribute();
+        if (!string.IsNullOrWhiteSpace(componentAttribute?.ComponentType))
+        {
+            return componentAttribute.ComponentType.Trim();
+        }
+
+        var typeName = GetType().Name;
+        var genericSeparator = typeName.IndexOf('`');
+        return genericSeparator > 0 ? typeName[..genericSeparator] : typeName;
+    }
+
+    private string ResolveDefaultAgentId()
+    {
+        var componentAttribute = GetComponentAttribute();
+        if (!string.IsNullOrWhiteSpace(componentAttribute?.AgentId))
+        {
+            return componentAttribute.AgentId.Trim();
+        }
+
+        var prefix = !string.IsNullOrWhiteSpace(componentAttribute?.AgentIdPrefix)
+            ? componentAttribute.AgentIdPrefix
+            : ComponentType;
+
+        var normalizedPrefix = ToKebabCase(prefix ?? string.Empty);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        return $"{normalizedPrefix}-{suffix}";
+    }
+
+    private AgentComponentAttribute? GetComponentAttribute()
+        => _componentAttribute ??= GetType().GetCustomAttribute<AgentComponentAttribute>(inherit: true);
+
+    private static string ToKebabCase(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "component";
+        }
+
+        var builder = new StringBuilder(value.Length + 8);
+        var previousWasSeparator = false;
+
+        for (var i = 0; i < value.Length; i++)
+        {
+            var current = value[i];
+            if (!char.IsLetterOrDigit(current))
+            {
+                if (!previousWasSeparator && builder.Length > 0)
+                {
+                    builder.Append('-');
+                    previousWasSeparator = true;
+                }
+                continue;
+            }
+
+            if (char.IsUpper(current))
+            {
+                var hasPrevious = builder.Length > 0;
+                var previousIsLowerOrDigit =
+                    i > 0 &&
+                    (char.IsLower(value[i - 1]) || char.IsDigit(value[i - 1]));
+
+                if (hasPrevious && !previousWasSeparator && previousIsLowerOrDigit)
+                {
+                    builder.Append('-');
+                }
+
+                builder.Append(char.ToLowerInvariant(current));
+                previousWasSeparator = false;
+                continue;
+            }
+
+            builder.Append(char.ToLowerInvariant(current));
+            previousWasSeparator = false;
+        }
+
+        var kebab = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(kebab) ? "component" : kebab;
     }
 
     private static string? TryGetContextValue(

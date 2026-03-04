@@ -1,0 +1,130 @@
+@page "/demo/compare/attributes"
+@layout DemoLayout
+@using AgentBlazor
+@using AgentBlazor.Attributes
+@using MudBlazor
+@inherits AgentControllableComponentBase
+@attribute [AgentComponent(AgentIdPrefix = "compare-attribute-panel")]
+
+<PageTitle>Attribute-First Pattern</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Approach B</p>
+        <MudText Typo="Typo.h5">Convention-First (No Built-in Wrapper Required)</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Build any Blazor component on <code>AgentControllableComponentBase</code>, add action/readable attributes,
+            and let the runtime infer registration details automatically.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">New Flow (Minimal)</MudText>
+        <pre class="docs-code">public partial class MyComponent : AgentControllableComponentBase
+{
+    [AgentReadable]
+    public string CurrentSupplier =&gt; _supplier;
+
+    [AgentAction] // action id defaults to method name in snake_case
+    public Task SelectSupplier(string supplierId) { ... }
+}</pre>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            No manual <code>OnInitialized()</code>, no required <code>AgentId</code>, and no required <code>ComponentType</code>.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Non-nullable method parameters are treated as required automatically.
+        </MudText>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Optional Naming Control</MudText>
+        <pre class="docs-code">[AgentComponent(ComponentType = "SupplierStatusPanel", AgentIdPrefix = "supplier-panel")]
+public partial class MyComponent : AgentControllableComponentBase
+{
+    [AgentReadable("Current supplier")]
+    public string CurrentSupplier =&gt; _supplier;
+
+    [AgentAction("Select supplier")]
+    public Task SelectSupplier([AgentParam("Supplier id", Required = true)] string id) { ... }
+}</pre>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            You still need <code>AddAgentBlazor(...)</code>, <code>MapAgentBlazorEndpoints()</code>, and a chat surface/widget in the app.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Use <code>[AgentComponent]</code> only when you want custom names, a fixed id, or an id prefix.
+        </MudText>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Live Example Component State</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Try these one at a time:
+            <code>select supplier SUP-200</code>,
+            <code>set stage review</code>,
+            <code>mark this supplier blocked true</code>.
+            Then run <code>reset panel</code> to restore defaults.
+        </MudText>
+
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.subtitle2">ComponentType: <code>@ComponentType</code></MudText>
+                <MudText Typo="Typo.subtitle2">AgentId: <code>@AgentId</code></MudText>
+                <MudText Typo="Typo.body2">Selected Supplier: <strong>@SelectedSupplierId</strong></MudText>
+                <MudText Typo="Typo.body2">Current Stage: <strong>@CurrentStage</strong></MudText>
+                <MudText Typo="Typo.body2">Blocked: <strong>@IsBlocked</strong></MudText>
+            </MudStack>
+        </MudPaper>
+    </section>
+</div>
+
+@code {
+    private string _selectedSupplierId = "SUP-100";
+    private SupplierWorkflowStage _currentStage = SupplierWorkflowStage.Intake;
+    private bool _isBlocked;
+
+    [AgentReadable]
+    public string SelectedSupplierId => _selectedSupplierId;
+
+    [AgentReadable]
+    public string CurrentStage => _currentStage.ToString().ToLowerInvariant();
+
+    [AgentReadable]
+    public bool IsBlocked => _isBlocked;
+
+    [AgentAction]
+    public Task SelectSupplier(string supplierId)
+    {
+        _selectedSupplierId = supplierId;
+        return RequestComponentRefreshAsync();
+    }
+
+    [AgentAction]
+    public Task SetStage(SupplierWorkflowStage stage)
+    {
+        _currentStage = stage;
+        return RequestComponentRefreshAsync();
+    }
+
+    [AgentAction(RequiresApproval = true)]
+    public Task MarkBlocked(bool blocked)
+    {
+        _isBlocked = blocked;
+        return RequestComponentRefreshAsync();
+    }
+
+    [AgentAction]
+    public Task ResetPanel()
+    {
+        _selectedSupplierId = "SUP-100";
+        _currentStage = SupplierWorkflowStage.Intake;
+        _isBlocked = false;
+        return RequestComponentRefreshAsync();
+    }
+
+    public enum SupplierWorkflowStage
+    {
+        Intake,
+        Review,
+        Approved
+    }
+}

@@ -54,6 +54,11 @@ builder.Services.AddAgentBlazor(options =>
         options.UseOllama(ollamaModel, ollamaEndpoint, ollamaApiKey);
     }
 
+    if (builder.Environment.IsDevelopment())
+    {
+        options.UseDevTools();
+    }
+
     if (!string.IsNullOrWhiteSpace(proLicenseKey))
     {
         options.UseProLicense(proLicenseKey);

@@ -241,6 +241,28 @@ public sealed class AgentBlazorRegistrationOptions
     private AgentBlazorTier? _licensedTier;
 
     /// <summary>
+    /// Enables in-app developer tooling (inspector panel) without requiring a paid license.
+    /// </summary>
+    /// <param name="autoShow">Whether to auto-open the inspector panel.</param>
+    public AgentBlazorRegistrationOptions UseDevTools(bool autoShow = false)
+    {
+        _serviceRegistration += services =>
+        {
+            services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
+                AgentBlazor.Core.Paid.IAgentInspectorStore,
+                AgentBlazor.Core.Paid.InMemoryAgentInspectorStore>());
+        };
+
+        _optionsConfiguration += options =>
+        {
+            options.EnableDevTools = true;
+            options.AutoShowDevTools = autoShow;
+        };
+
+        return this;
+    }
+
+    /// <summary>
     /// Activates paid or enterprise features using a license key.
     /// Keys must start with "AB-PRO-" (Paid tier) or "AB-ENT-" (Premium tier)
     /// and be at least 24 characters long.

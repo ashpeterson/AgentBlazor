@@ -163,7 +163,56 @@ public class AgentActionDiscoveryTests
         var result = await AgentActionDiscovery.ExecuteActionAsync(component, action);
 
         Assert.True(result.Succeeded, result.Message);
+        Assert.NotNull(component.LastTags);
         Assert.Equal(["x", "y"], component.LastTags);
+    }
+
+    [Fact]
+    public void GetDiscoveredActions_WithoutAgentParam_InfersRequiredForNonNullableReference()
+    {
+        var component = new InferredMetadataComponent("inferred-1");
+
+        var actions = AgentActionDiscovery.GetDiscoveredActions(component);
+        var action = Assert.Single(actions, a => a.ActionId == "set_supplier");
+        var parameter = Assert.Single(action.Parameters, p => p.Name == "supplierId");
+
+        Assert.True(parameter.Required);
+    }
+
+    [Fact]
+    public void GetDiscoveredActions_WithoutAllowedValues_InfersEnumValues()
+    {
+        var component = new InferredMetadataComponent("inferred-2");
+
+        var actions = AgentActionDiscovery.GetDiscoveredActions(component);
+        var action = Assert.Single(actions, a => a.ActionId == "set_stage");
+        var parameter = Assert.Single(action.Parameters, p => p.Name == "stage");
+
+        Assert.NotNull(parameter.AllowedValues);
+        Assert.Equal(["Intake", "Review", "Approved"], parameter.AllowedValues);
+    }
+
+    [Fact]
+    public async Task ExecuteActionAsync_WhenInferredRequiredParameterMissing_ReturnsClarification()
+    {
+        var component = new InferredMetadataComponent("inferred-3");
+        var action = AgentAction.Create("set_supplier");
+
+        var result = await AgentActionDiscovery.ExecuteActionAsync(component, action);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Required parameter 'supplierId' is missing", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildCapability_WithoutActionDescription_UsesHumanizedMethodName()
+    {
+        var component = new InferredMetadataComponent("inferred-4");
+
+        var capability = AgentActionDiscovery.BuildCapability(component);
+        var action = Assert.Single(capability.Actions, a => a.ActionId == "set_supplier");
+
+        Assert.Equal("Set Supplier", action.Description);
     }
 
     // -------------------------------------------------------------------------
@@ -233,5 +282,43 @@ public class AgentActionDiscoveryTests
         public ComponentState GetCurrentState() => new();
         public Task<ActionResult> ExecuteActionAsync(AgentAction action, CancellationToken ct = default)
             => AgentActionDiscovery.ExecuteActionAsync(this, action, ct);
+    }
+
+    private sealed class InferredMetadataComponent(string agentId) : IAgentControllable
+    {
+        public string AgentId { get; } = agentId;
+        public string ComponentType => "InferredMetadataComponent";
+
+        [AgentReadable]
+        public string SupplierId { get; private set; } = "SUP-100";
+
+        [AgentReadable]
+        public SupplierStage Stage { get; private set; } = SupplierStage.Intake;
+
+        [AgentAction]
+        public Task SetSupplier(string supplierId)
+        {
+            SupplierId = supplierId;
+            return Task.CompletedTask;
+        }
+
+        [AgentAction]
+        public Task SetStage(SupplierStage stage)
+        {
+            Stage = stage;
+            return Task.CompletedTask;
+        }
+
+        public ComponentCapability GetCapability() => AgentActionDiscovery.BuildCapability(this);
+        public ComponentState GetCurrentState() => AgentActionDiscovery.BuildState(this);
+        public Task<ActionResult> ExecuteActionAsync(AgentAction action, CancellationToken ct = default)
+            => AgentActionDiscovery.ExecuteActionAsync(this, action, ct);
+
+        public enum SupplierStage
+        {
+            Intake,
+            Review,
+            Approved
+        }
     }
 }
