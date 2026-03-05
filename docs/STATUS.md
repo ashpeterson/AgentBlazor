@@ -14,8 +14,25 @@ Last updated: 2026-03-05
   - Pluggable conversation store APIs (`UseConversationStore<TStore>()`, `UseJsonFileConversationStore(...)`)
   - Restart-safe JSON conversation persistence
   - Compatibility + migration guidance documented for parity features (shared state, tool renders, multi-agent, remote adapter mode)
-- Route-aware docs-first demo structure is in place:
-  - `/demo/dojo`, `/demo/components`, `/demo/workflow`, `/demo/suppliers`, `/demo/onboarding`, `/demo/generative-ui`, `/demo/status`, `/demo/docs`
+- Demo shell has been simplified around the current product story:
+  - primary nav is now:
+    - `/demo/dojo`
+    - `/demo/components`
+    - `/demo/components/attribute-based`
+  - component explorer exposes:
+    - `AgentDataGrid`
+    - `AgentForm`
+    - `AgentDialog`
+    - `AgentTabs`
+    - `AgentSelect`
+    - `AgentAutocomplete`
+    - `AgentDatePicker`
+    - `AgentDateRangePicker`
+    - `AgentTreeView`
+    - `AgentStepper`
+    - `AgentCommandBar`
+    - `AgentFileUpload`
+  - legacy supplier/workflow/docs routes now redirect into the new demo structure instead of remaining first-class navigation targets
 - Provider-missing and chat resiliency UX landed:
   - startup warning + user-facing guidance
   - `ErrorBoundary` recovery
@@ -134,6 +151,27 @@ Last updated: 2026-03-05
   - persisted recipe/ingredients/steps/run-notes with auto-bootstrap defaults
   - run notes now ingest runtime-executed Dojo action outcomes via `IAgentRuntimeEventSubscriber`
   - schema bootstrap is automatic (no manual migration steps for local demo use)
+- Dojo experience state and route-level demo controls shipped:
+  - dojo-local state model tracks:
+    - selected integration
+    - selected demo example
+    - selected `Preview` / `Code` / `Docs` mode
+  - assistant-callable dojo route actions now exist for:
+    - changing dojo example
+    - switching dojo view mode
+    - switching integration label
+  - dojo examples are wired as concrete agent surfaces instead of static screenshots:
+    - `agentic-chat`
+    - `backend-tool-rendering`
+    - `human-loop`
+    - `agentic-generative-ui`
+    - `tool-based-generative-ui`
+    - `shared-state`
+    - `predictive-state`
+- Dojo parity restructuring is underway:
+  - dojo assistant is now embedded inside the dojo page instead of using the app-level global assistant pane
+  - dojo has a dedicated internal rail for examples plus `Preview` / `Code` / `Docs` toggles
+  - current implementation direction is explicitly aligned to CopilotKit-style dojo flows rather than the older supplier dashboard demo
 - Components page file workflow hardening shipped:
   - `/demo/components` `AgentFileUpload` flow is SQLite-backed per session
   - attached file list + upload mode (`Local`/`Remote`) persist across refresh/reconnect
@@ -183,8 +221,15 @@ Last updated: 2026-03-05
 
 ### Product/Platform Gaps
 
+- Dojo parity is not finished:
+  - example shells are functional, but the visual fidelity and interaction polish still fall short of the CopilotKit dojo reference
+  - several dojo examples still need tighter artifact/chat composition so they feel like a product showcase rather than internal demo panels
 - Multi-agent orchestration depth is still evolving:
   - pair-scoped policies and approval rules are shipped, but broader multi-step orchestration presets/workflow templates are not yet productized.
+- Demo breadth still exceeds demo polish in some areas:
+  - the core product story is now dojo + components explorer, but several older flows still exist as compatibility redirects and need continued cleanup/consistency work
+- Component-product depth is still uneven:
+  - wrapper breadth is strong, but some components need richer end-to-end scenarios so the demo proves production usage rather than isolated control calls
 
 ### Runtime/Policy Gaps
 
@@ -197,20 +242,26 @@ Last updated: 2026-03-05
 
 ## What Needs Doing Next (Product Priority)
 
-1. Embedded runtime inspector panel:
+1. Finish CopilotKit-style Dojo parity:
+   - tighten layout, spacing, and embedded chat/artifact fidelity for all dojo examples
+   - ensure every dojo example feels like a clean agent workflow showcase, not a dashboard fragment
+2. Expand deep end-to-end component scenarios:
+   - especially `AgentTreeView`, `AgentStepper`, `AgentCommandBar`, and `AgentFileUpload`
+   - keep the component explorer aligned to a MudBlazor-style docs experience
+3. Embedded runtime inspector panel:
    - continue iterative UX depth for cross-run and cross-agent correlation
-2. Expand deep end-to-end business scenarios for tree/stepper/command/file wrappers.
-3. Package broader production connector/auth examples for external adapter integrations.
+4. Package broader production connector/auth examples for external adapter integrations.
 
 ## Immediate Execution Plan
 
-1. Expand inspector correlation beyond current run-chain and pair filters into reusable troubleshooting presets.
-2. Build production-style scenario walkthroughs for tree/stepper/command wrappers with persisted state and approvals.
-3. Publish advanced connector/auth examples (beyond API key/bearer) on top of the HTTP adapter boundary.
+1. Finish the dojo refinement pass and lock the new demo shell structure before adding more scenarios.
+2. Build production-style walkthroughs for tree/stepper/command/file wrappers with persisted state and approvals.
+3. Expand inspector correlation beyond current run-chain and pair filters into reusable troubleshooting presets.
+4. Publish advanced connector/auth examples (beyond API key/bearer) on top of the HTTP adapter boundary.
 
 ## Verification Snapshot
 
-Latest local validation after the 2026-03-05 parity completion pass:
+Latest local validation after the 2026-03-05 dojo restructuring pass:
 
 - `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj` passed
 - `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj` passed

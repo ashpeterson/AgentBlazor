@@ -36,7 +36,11 @@ Non-negotiables:
 - Deterministic runtime pipeline (`Plan -> Validate -> Execute`) is operational.
 - Wrapper breadth for core UI controls is complete.
 - Runtime subscriber and conversation persistence hooks are shipped.
-- Demo route map is broad and docs-first.
+- Demo platform has been re-centered around the current product story:
+  - `/demo/dojo` as the primary agentic workflow showcase
+  - `/demo/components` as the component explorer
+  - `/demo/components/attribute-based` as the convention-first developer story
+  - older supplier/workflow pages now act as compatibility redirects, not the primary product narrative
 
 ### Completed Reliability Refinement (2026-03-03)
 
@@ -64,12 +68,36 @@ Non-negotiables:
   - emits `StateSnapshot` and `StateDelta` runtime stream events
 - Hosted AG-UI bridge now forwards shared-state payloads and records message->run correlation.
 
+### Completed Demo Repositioning (2026-03-05)
+
+- Main demo navigation now aligns to the intended public story:
+  - Dojo
+  - Components
+  - Attribute-based example
+- Dojo now has route-local experience state for:
+  - current example
+  - current integration label
+  - current `Preview` / `Code` / `Docs` mode
+- Dojo assistant interaction is now embedded inside the dojo page itself instead of relying on the app-level assistant pane.
+- Dojo examples are now wired as live agent workflows rather than seed-only cards:
+  - agentic chat
+  - backend tool rendering
+  - human in the loop
+  - agentic generative UI
+  - tool-based generative UI
+  - shared state
+  - predictive state updates
+
 ## Gap Analysis (What Is Missing)
 
 1. Shared state persistence and conflict semantics are not yet production-complete.
 2. Multi-agent advanced handoff/orchestration UX is not yet product-complete.
 3. Embedded runtime inspector needs deeper product-console depth beyond V1 timeline coverage.
 4. Demo production depth still needs broader non-Dojo persistence and workflow hardening.
+5. Dojo parity is still visually and experientially incomplete:
+   - structure is now pointed in the right direction
+   - fidelity against the CopilotKit dojo reference still needs another refinement pass
+6. Component explorer breadth is good, but scenario depth is still uneven for several wrappers.
 
 ## Roadmap Phases
 
@@ -324,6 +352,43 @@ Convert Dojo and scenario demos from seed-centric behavior to realistic workflow
   - expand provider-specific HTTP contract coverage further (timeouts/network interruption simulations and advanced auth schemes such as OAuth/mTLS)
   - expand persistence-backed flows beyond Dojo + file baseline to richer external adapter scenarios
 
+### Phase F: Dojo Product-Parity Pass (Priority 1 for demo UX)
+
+### Objective
+
+Make the dojo feel like a refined product showcase, not a collection of functional panels.
+
+### Scope
+
+- Match the CopilotKit dojo interaction model more closely:
+  - left example rail inside the dojo page
+  - `Preview` / `Code` / `Docs` mode switching in-page
+  - embedded chat/artifact layouts per example
+- Tighten visual fidelity:
+  - cleaner spacing
+  - lighter artifact canvases
+  - better chat/artifact composition
+  - less dashboard chrome
+- Ensure each dojo example demonstrates a distinct capability clearly and predictably.
+
+### Acceptance Criteria
+
+- Each dojo example has a stable, distinct layout and a believable prompt-to-artifact workflow.
+- The dojo can serve as the primary public product demo without relying on the old supplier-style narrative.
+- The dojo experience feels coherent across all examples rather than like separate prototype panels.
+
+### Phase F Status (2026-03-05)
+
+- Completed:
+  - dojo is now the primary demo entry point
+  - internal dojo rail and mode toggles are wired
+  - example selection and view changes are controllable from both UI and agent actions
+  - embedded assistant surfaces replaced the old global dojo-side assistant pattern
+- Outstanding:
+  - final layout refinement against the CopilotKit dojo reference
+  - tighter artifact sizing and chat composition in several examples
+  - final cleanup of stale visual chrome inherited from earlier dashboard-oriented demo shells
+
 ### Phase E: Tier and Policy Hardening (Priority 5)
 
 ### Objective
@@ -374,12 +439,13 @@ For every phase:
 
 ## Recommended Delivery Sequence
 
-1. Phase A (Shared State)
-2. Phase B (Multi-Agent V1) - completed
-3. Phase C (Inspector)
-4. Phase D (Production Demo Flows)
-5. Phase E (Tier Hardening) - completed
-6. Phase B (Multi-Agent V2 handoff depth)
+1. Phase F (Dojo Product-Parity Pass)
+2. Phase A (Shared State)
+3. Phase B (Multi-Agent V1) - completed
+4. Phase C (Inspector)
+5. Phase D (Production Demo Flows)
+6. Phase E (Tier Hardening) - completed
+7. Phase B (Multi-Agent V2 handoff depth)
 
 ## Risk Register
 

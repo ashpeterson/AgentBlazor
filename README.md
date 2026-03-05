@@ -161,10 +161,33 @@ cd demo/AgentBlazor.Demo
 dotnet run
 ```
 
-Open https://localhost:5001 and try prompts like:
-- "onboard Apex Components from Germany, high risk tier, priority 2"
-- "filter suppliers by EMEA region"
-- "show a bar chart of sales by region"
+Open the local demo and start with the current primary surfaces:
+- `/demo/dojo`
+- `/demo/components`
+- `/demo/components/attribute-based`
+
+Current demo focus:
+- `Dojo` shows the product narrative: agentic chat, backend tool rendering, human-in-the-loop, generated UI, shared state, and predictive state updates.
+- `Components` shows the shipped wrapper surface in a docs-style explorer.
+- `Attribute-Based Example` shows the convention-first custom component pattern.
+
+Example prompts:
+- dojo: "make me a sandwich"
+- dojo: "set dojo example to shared-state"
+- dojo: "set dojo view to code"
+- components: "switch to the AgentDataGrid example"
+- components: "open the dialog example"
+- attribute-based example: "compare the attribute-based approach with wrappers"
+
+Legacy supplier/workflow URLs still exist as redirects, but they are no longer the main product story.
+
+## Current Status
+
+As of 2026-03-05:
+- core wrapper breadth is in place
+- shared state, handoffs, and runtime inspection foundations are shipped
+- the demo has been repositioned around a CopilotKit-style dojo plus a MudBlazor-style components explorer
+- the main open demo task is finishing the visual and interaction parity pass for the dojo experience
 
 ## License
 
