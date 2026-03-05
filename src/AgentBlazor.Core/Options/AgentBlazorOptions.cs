@@ -29,4 +29,15 @@ public sealed class AgentBlazorOptions
     /// Automatically opens the developer inspector when enabled.
     /// </summary>
     public bool AutoShowDevTools { get; set; }
+
+    /// <summary>
+    /// When true, conversation history is scoped per agent for explicitly targeted runs.
+    /// This avoids cross-agent history leakage while preserving default single-agent behavior.
+    /// </summary>
+    public bool IsolateConversationsByAgent { get; set; } = true;
+
+    /// <summary>
+    /// Enables runtime agent auto-resolution from current route metadata and agent route metadata.
+    /// </summary>
+    public bool EnableRouteAgentResolution { get; set; } = true;
 }

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Paid;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -228,6 +229,7 @@ public class AgentRuntimeIntegrationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
         services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
@@ -273,6 +275,49 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.Contains("not available on the mounted component", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_WhenPlannerAsksClarificationForSingleFieldEdit_AutoRecoversSetField()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ClarificationOnlyChatClient(
+            "What are the details of the recipe you want to set (e.g., Title, Minutes, Difficulty)?"));
+        services.AddSingleton<CapturingPlannedActionExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
+        registry.Register(new StubRegisteredComponent(
+            "dojo-recipe-form",
+            "DojoRecipe",
+            new Dictionary<string, object?>
+            {
+                ["fields"] = new[] { "Title", "Minutes", "Difficulty" }
+            },
+            actions: ["set_field"]));
+
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var executor = provider.GetRequiredService<CapturingPlannedActionExecutor>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "set recipe title to test",
+            SessionId: registry.SessionId));
+
+        Assert.False(response.RequiresClarification);
+        Assert.NotNull(executor.LastAction);
+        Assert.Equal("set_field", executor.LastAction!.ActionId, ignoreCase: true);
+        var fieldValue = executor.LastAction.Arguments?.TryGetValue("field", out var resolvedFieldValue) == true
+            ? resolvedFieldValue
+            : null;
+        var newValue = executor.LastAction.Arguments?.TryGetValue("value", out var resolvedNewValue) == true
+            ? resolvedNewValue
+            : null;
+        Assert.NotNull(fieldValue);
+        Assert.NotNull(newValue);
+        Assert.Equal("Title", fieldValue?.ToString());
+        Assert.Equal("test", newValue?.ToString());
     }
 
     [Fact]
@@ -609,7 +654,131 @@ public class AgentRuntimeIntegrationTests
         Assert.Contains("not available", riskRouteResponse.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact(Skip = "DeterministicAgentRuntime doesn't implement early-exit for empty policy. LLM is called even when no actions are allowed.")]
+    [Fact]
+    public async Task RunTurnAsync_RouteLockContext_ResolvesRouteScopedAgent()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services
+            .AddAgentBlazorServices()
+            .AddAgent("Dojo Workspace Agent", agent =>
+            {
+                agent.WithAllowedComponents("AgentDialog");
+                agent.WithMetadata("route_prefixes", "/demo/dojo");
+            })
+            .AddAgent("Supplier Analyst Agent", agent =>
+            {
+                agent.WithAllowedComponents("AgentDialog");
+                agent.WithMetadata("route_prefixes", "/demo/suppliers");
+            });
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "open dialog",
+            SessionId: "route-lock-session",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.CurrentRoute] = "/demo/suppliers",
+                [AgentRuntimeContextKeys.AgentLock] = bool.TrueString
+            }));
+
+        Assert.Equal("Supplier Analyst Agent", response.AgentName);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_AgentLockWithUnknownAgent_ReturnsHelpfulError()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services
+            .AddAgentBlazorServices()
+            .AddAgent("Dojo Workspace Agent", agent =>
+            {
+                agent.WithAllowedComponents("AgentDialog");
+                agent.WithMetadata("route_prefixes", "/demo/dojo");
+            });
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "open dialog",
+            SessionId: "agent-lock-unknown",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.AgentName] = "Missing Agent",
+                [AgentRuntimeContextKeys.AgentLock] = bool.TrueString
+            }));
+
+        Assert.Equal("none", response.AgentName);
+        Assert.Contains("not registered", response.ResponseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_ExplicitAgentTarget_UsesAgentScopedConversationSession()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
+        services
+            .AddAgentBlazorServices()
+            .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
+            .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var conversationStore = provider.GetRequiredService<IConversationStore>();
+
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "hello",
+            AgentName: "Agent A",
+            SessionId: "scoped-session"));
+
+        var activeSessions = await conversationStore.GetActiveSessionsAsync();
+        var scopedSession = AgentConversationScope.BuildSessionKey("scoped-session", "Agent A", isolateByAgent: true);
+
+        Assert.Contains(scopedSession, activeSessions);
+        Assert.DoesNotContain("scoped-session", activeSessions);
+    }
+
+    [Fact]
+    public async Task RunTurnAsync_HandoffContext_RecordsInspectorHandoffEvent()
+    {
+        var services = new ServiceCollection();
+        var inspectorStore = new InMemoryAgentInspectorStore();
+
+        services.AddSingleton<IAgentInspectorStore>(inspectorStore);
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
+        services
+            .AddAgentBlazorServices()
+            .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
+            .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
+
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntime>();
+
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "hello from handoff",
+            AgentName: "Agent B",
+            SessionId: "handoff-session",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.AgentHandoffFrom] = "Agent A",
+                [AgentRuntimeContextKeys.AgentHandoffTo] = "Agent B",
+                [AgentRuntimeContextKeys.AgentHandoffAt] = DateTimeOffset.UtcNow.ToString("O")
+            }));
+
+        var recentRuns = inspectorStore.GetRecentRuns("handoff-session");
+        var run = Assert.Single(recentRuns);
+        var handoffEvent = Assert.Single(run.Events, ev =>
+            string.Equals(ev.Kind, "AgentHandoff", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains("Agent A", handoffEvent.Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Agent B", handoffEvent.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunTurnAsync_WhenPolicyRemovesAllMudActions_ReturnsPolicyMessage_AndSkipsProviderExecution()
     {
         var services = new ServiceCollection();
@@ -671,6 +840,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
         services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
@@ -718,6 +888,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
+        services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
         services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
@@ -740,7 +911,7 @@ public class AgentRuntimeIntegrationTests
             result.Succeeded);
     }
 
-    [Fact(Skip = "DeterministicAgentRuntime doesn't implement tier-based action filtering with early-exit.")]
+    [Fact]
     public async Task RunTurnAsync_MudPremiumAction_IsBlocked_WhenTierIsPaid()
     {
         var services = new ServiceCollection();
@@ -982,6 +1153,57 @@ public class AgentRuntimeIntegrationTests
             _ = options;
             _ = cancellationToken;
             yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
+            await Task.CompletedTask;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class ClarificationOnlyChatClient(string question) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                JsonSerializer.Serialize(new
+                {
+                    message = "Need more details.",
+                    actions = Array.Empty<object>(),
+                    needsClarification = true,
+                    clarificationQuestion = question
+                }))));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            yield return new ChatResponseUpdate(ChatRole.Assistant, JsonSerializer.Serialize(new
+            {
+                message = "Need more details.",
+                actions = Array.Empty<object>(),
+                needsClarification = true,
+                clarificationQuestion = question
+            }));
             await Task.CompletedTask;
         }
 

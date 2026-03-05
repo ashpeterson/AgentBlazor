@@ -6,6 +6,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Tracing;
+using AgentBlazor.Licensing;
 using AgentBlazor.Runtime;
 using AgentBlazor.Services;
 using Microsoft.Extensions.AI;
@@ -98,6 +99,7 @@ public class ComponentMockingTests
                 ["target"] = "supplier-grid"
             }));
         services.AddAgentBlazorServices();
+        services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();

@@ -2,6 +2,7 @@ using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.State;
 using AgentBlazor.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -124,5 +125,47 @@ public sealed class AgentBlazorBuilder
             filePath,
             sp.GetService<Microsoft.Extensions.Options.IOptions<ConversationOptions>>(),
             sp.GetService<Microsoft.Extensions.Logging.ILogger<JsonFileConversationStore>>()));
+    }
+
+    /// <summary>
+    /// Replaces the default shared-state store with a custom implementation.
+    /// </summary>
+    public AgentBlazorBuilder UseSharedStateStore<TStore>()
+        where TStore : class, IAgentSharedStateStore
+    {
+        Services.RemoveAll<IAgentSharedStateStore>();
+        Services.AddSingleton<IAgentSharedStateStore, TStore>();
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default shared-state store with a factory-backed implementation.
+    /// </summary>
+    public AgentBlazorBuilder UseSharedStateStore(Func<IServiceProvider, IAgentSharedStateStore> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        Services.RemoveAll<IAgentSharedStateStore>();
+        Services.AddSingleton(factory);
+        return this;
+    }
+
+    /// <summary>
+    /// Uses a JSON file-backed shared-state store for persistence across process restarts.
+    /// </summary>
+    public AgentBlazorBuilder UseJsonFileSharedStateStore(
+        string filePath,
+        Action<SharedStateOptions>? configure = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        Services.Configure<SharedStateOptions>(options =>
+        {
+            configure?.Invoke(options);
+        });
+
+        return UseSharedStateStore(sp => new JsonFileAgentSharedStateStore(
+            filePath,
+            sp.GetService<Microsoft.Extensions.Options.IOptions<SharedStateOptions>>(),
+            sp.GetService<Microsoft.Extensions.Logging.ILogger<JsonFileAgentSharedStateStore>>()));
     }
 }

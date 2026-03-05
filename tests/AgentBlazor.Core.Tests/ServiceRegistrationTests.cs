@@ -4,6 +4,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.State;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Runtime;
@@ -38,6 +39,8 @@ public class ServiceRegistrationTests
 
         var runtime = provider.GetRequiredService<IAgentRuntime>();
         Assert.NotNull(runtime);
+        var sharedStateStore = provider.GetRequiredService<IAgentSharedStateStore>();
+        Assert.NotNull(sharedStateStore);
         var componentRegistry = provider.GetRequiredService<IAgentComponentRegistry>();
         Assert.NotNull(componentRegistry);
 
@@ -425,6 +428,42 @@ public class ServiceRegistrationTests
             Assert.NotNull(history);
             Assert.Single(history.Turns);
             Assert.Equal("hello", history.Turns[0].UserMessage);
+        }
+        finally
+        {
+            var directory = Path.GetDirectoryName(tempPath);
+            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void UseJsonFileSharedStateStore_ReplacesDefaultInMemoryStore()
+    {
+        var tempPath = Path.Combine(
+            Path.GetTempPath(),
+            "agentblazor-tests",
+            $"{Guid.NewGuid():N}",
+            "shared-state.json");
+
+        try
+        {
+            var services = new ServiceCollection();
+            services
+                .AddAgentBlazorServices()
+                .UseJsonFileSharedStateStore(tempPath, options =>
+                {
+                    options.MergeMode = SharedStateMergeMode.RejectStaleWrites;
+                });
+
+            using var provider = services.BuildServiceProvider();
+            var store = provider.GetRequiredService<IAgentSharedStateStore>();
+            Assert.IsType<JsonFileAgentSharedStateStore>(store);
+
+            var options = provider.GetRequiredService<IOptions<SharedStateOptions>>().Value;
+            Assert.Equal(SharedStateMergeMode.RejectStaleWrites, options.MergeMode);
         }
         finally
         {

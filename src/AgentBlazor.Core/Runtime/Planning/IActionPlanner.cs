@@ -51,6 +51,12 @@ public sealed record ActionPlanRequest
     public IReadOnlyList<ConversationTurn> ConversationHistory { get; init; } = [];
 
     /// <summary>
+    /// Canonical shared state synchronized between runtime and UI for this session.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> SharedState { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Available app routes (path, description, aliases) for intent→route navigation.
     /// Planner uses this to output navigate_to with the correct uri when the user is not on the target page.
     /// </summary>

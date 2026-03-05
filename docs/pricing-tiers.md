@@ -1,6 +1,6 @@
 # Pricing Tiers (Current Wiring)
 
-Last updated: 2026-03-02
+Last updated: 2026-03-05
 
 This document describes the current tier model and what is wired in code today.
 
@@ -79,11 +79,14 @@ Defined in `src/AgentBlazor.Core/Components/AgentComponentTierBoundaries.cs`.
 
 ## Enforcement Status
 
-Action-to-tier boundaries are defined and test-covered at mapping level.
+Action-to-tier boundaries are now hard-enforced at runtime:
 
-Current behavior in runtime paths is not yet full hard-block filtering by tier for planned actions; tier-gating is partially wired and some blocking expectations remain marked/skipped in integration tests.
+- agent policy + tier filters are applied before planning when building allowed component actions
+- blocked outcomes return deterministic user-readable diagnostics with current tier context
+- validation also emits explicit tier-required diagnostics when a planned action is above current entitlement
+- AG-UI hosted and standard runtime paths both surface the same blocked-action behavior
 
-That means tiers are currently strongest for service feature activation (history/suggestions/inspector/insights) and metadata, with component action hard enforcement still maturing.
+Service activation differences by tier (history/suggestions/inspector/insights) still apply in addition to action gating.
 
 ## Packaging Summary
 

@@ -1,95 +1,852 @@
-.demo-dojo {
+.dojo-workspace {
+    max-width: 1500px;
+    margin: 0 auto;
+    min-height: calc(100dvh - 2rem);
     display: grid;
-    gap: 1.1rem;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: 1rem;
+    color: #1f2430;
 }
 
-.demo-dojo__hero {
-    position: relative;
-    overflow: hidden;
+.dojo-workspace__rail,
+.dojo-workspace__mode-panel,
+.dojo-canvas,
+.dojo-stage {
+    border-radius: 1rem;
+    border: 1px solid #e5ddd4;
+    box-shadow: 0 18px 40px rgba(18, 24, 38, 0.08);
 }
 
-.demo-dojo__hero::after {
-    content: "";
-    position: absolute;
-    right: -6rem;
-    top: -6rem;
-    width: 14rem;
-    height: 14rem;
-    border-radius: 999px;
-    background: radial-gradient(circle, rgba(110, 168, 254, 0.22), rgba(110, 168, 254, 0) 65%);
-    pointer-events: none;
-}
-
-.demo-dojo__hero-head {
-    margin-bottom: 0.45rem;
-}
-
-.demo-dojo__canvas {
+.dojo-workspace__rail {
+    position: sticky;
+    top: 1rem;
+    align-self: start;
+    padding: 1rem 0.9rem;
+    background: linear-gradient(180deg, rgba(248, 246, 242, 0.98), rgba(243, 240, 234, 0.98));
     display: grid;
     gap: 1rem;
 }
 
-.demo-dojo__canvas ::deep .mud-tabs-toolbar {
-    margin-bottom: 0.8rem;
+.dojo-workspace__rail-section {
+    display: grid;
+    gap: 0.45rem;
 }
 
-.demo-dojo__canvas ::deep .mud-tab {
-    font-size: 0.88rem;
+.dojo-workspace__rail-label {
+    margin: 0;
+    padding-bottom: 0.55rem;
+    font-size: 0.73rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #7d8596;
+    border-bottom: 1px solid #e8e0d7;
+}
+
+.dojo-workspace__rail ::deep .mud-input-control {
+    margin-top: 0;
+}
+
+.dojo-workspace__rail ::deep .mud-input-slot {
+    min-height: 2.4rem;
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.88);
+    font-size: 0.84rem;
+}
+
+.dojo-workspace__view-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.dojo-workspace__view-button {
+    min-height: 2.1rem;
+    border: 1px solid #e0d9cf;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #586071;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.dojo-workspace__view-button:hover,
+.dojo-workspace__demo-item:hover {
+    border-color: #d4cbbb;
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.dojo-workspace__view-button.is-active {
+    background: #ffffff;
+    color: #161c28;
+    border-color: #d7cfbf;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.dojo-workspace__demo-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.dojo-workspace__demo-item {
+    width: 100%;
+    text-align: left;
+    color: inherit;
+    border: 1px solid #e3dbd2;
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.72);
+    padding: 0.62rem;
+    display: grid;
+    gap: 0.16rem;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.dojo-workspace__demo-item.is-active {
+    background: #fcfbf8;
+    border-color: #d6ccbc;
+    transform: translateX(1px);
+}
+
+.dojo-workspace__demo-title {
+    font-size: 0.83rem;
+    font-weight: 700;
+    color: #171d29;
+}
+
+.dojo-workspace__demo-description {
+    font-size: 0.72rem;
+    color: #727b8d;
+    line-height: 1.35;
+}
+
+.dojo-workspace__demo-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem;
+    margin-top: 0.1rem;
+}
+
+.dojo-workspace__demo-tags > span {
+    padding: 0.16rem 0.42rem;
+    border-radius: 999px;
+    background: #22262f;
+    color: #ffffff;
+    font-size: 0.62rem;
     font-weight: 700;
 }
 
-.demo-dojo__flags {
+.dojo-workspace__main {
+    min-width: 0;
+    display: grid;
+    gap: 0.9rem;
+    align-content: start;
+}
+
+.dojo-workspace__mode-panel {
+    padding: 1.2rem 1.25rem;
+    background: linear-gradient(180deg, rgba(248, 246, 242, 0.98), rgba(243, 240, 234, 0.98));
+}
+
+.dojo-workspace__mode-eyebrow {
+    margin: 0 0 0.35rem;
+    font-size: 0.73rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #7d8596;
+}
+
+.docs-code {
+    margin: 0;
+    overflow: auto;
+    padding: 1rem;
+    border-radius: 0.9rem;
+    background: #fffdfa;
+    border: 1px solid #e7dfd6;
+    font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: #2d3543;
+}
+
+.dojo-canvas {
+    min-height: 44rem;
+    padding: 1.75rem 1.75rem 1rem;
+    background: linear-gradient(180deg, rgba(246, 244, 240, 0.98), rgba(242, 239, 233, 0.98));
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 1rem;
+    overflow: hidden;
+}
+
+.dojo-canvas--chat {
+    align-items: start;
+}
+
+.dojo-canvas__prompt-pill {
+    justify-self: end;
+    max-width: 20rem;
+    padding: 0.42rem 0.82rem;
+    border-radius: 999px;
+    border: 1px solid #e2dad0;
+    background: rgba(255, 255, 255, 0.86);
+    color: #667082;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.dojo-canvas__center-copy {
+    max-width: 34rem;
+    justify-self: center;
+    text-align: center;
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 4.5rem;
+}
+
+.dojo-canvas__center-copy--compact {
+    margin-top: 0.5rem;
+}
+
+.dojo-canvas__center-copy ::deep h4,
+.dojo-canvas__center-copy ::deep h5 {
+    margin: 0;
+    color: #232a36;
+    letter-spacing: -0.02em;
+}
+
+.dojo-canvas__center-copy ::deep .mud-typography-body2 {
+    color: #747c8c;
+}
+
+.dojo-canvas__suggestions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.65rem 1rem;
+    justify-content: center;
+    gap: 0.45rem;
 }
 
-.demo-dojo__steps {
-    margin: 0;
-    padding-left: 1.2rem;
+.dojo-canvas__suggestions > span,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__suggestion-chip {
+    padding: 0.36rem 0.72rem;
+    border-radius: 999px;
+    border: 1px solid #e3ddd4;
+    background: rgba(255, 255, 255, 0.86);
+    color: #394151;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.dojo-canvas__chat-shell {
+    width: 100%;
+    max-width: 31rem;
+    margin: 0 auto;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface,
+.dojo-stage--sidechat ::deep .ab-chat-surface {
+    height: 100%;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    gap: 0.65rem;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__header,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__body,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__label,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item-role,
+.dojo-stage--sidechat ::deep .ab-chat-surface__header,
+.dojo-stage--sidechat ::deep .ab-chat-surface__body,
+.dojo-stage--sidechat ::deep .ab-chat-surface__label,
+.dojo-stage--sidechat ::deep .ab-chat-surface__item-role,
+.dojo-stage--sidechat ::deep .ab-chat-surface__controls > .ab-chat-surface__select {
+    display: none;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__state,
+.dojo-stage--sidechat ::deep .ab-chat-surface__state {
+    align-self: center;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__timeline {
+    max-height: 18rem;
+    padding: 0 0.15rem 0.3rem;
+    gap: 0.8rem;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item {
+    max-width: 100%;
+    box-shadow: none;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--assistant,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--activity {
+    align-self: stretch;
+    padding: 0;
+    background: transparent;
+    border: 0;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--assistant.ab-chat-surface__item--generated,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--clarification,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--approval {
+    padding: 1rem;
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid #e6dfd6;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--user {
+    max-width: max-content;
+    margin-left: auto;
+    padding: 0.45rem 0.82rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #e4ddd3;
+    color: #515b6d;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item-text {
+    font-size: 0.94rem;
+    line-height: 1.6;
+    color: #303845;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--user .ab-chat-surface__item-text {
+    color: #515b6d;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__activity-list,
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__approval-list,
+.dojo-stage--sidechat ::deep .ab-chat-surface__activity-list,
+.dojo-stage--sidechat ::deep .ab-chat-surface__approval-list {
+    margin-top: 0.75rem;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__controls,
+.dojo-stage--sidechat ::deep .ab-chat-surface__controls {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.55rem;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__input-wrapper,
+.dojo-stage--sidechat ::deep .ab-chat-surface__input-wrapper {
+    position: relative;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__input-wrapper::before,
+.dojo-stage--sidechat ::deep .ab-chat-surface__input-wrapper::before {
+    content: "+";
+    position: absolute;
+    left: 0.95rem;
+    bottom: 0.86rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    color: #9098a8;
+    font-size: 1rem;
+    line-height: 1.35rem;
+    text-align: center;
+    pointer-events: none;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__input,
+.dojo-stage--sidechat ::deep .ab-chat-surface__input {
+    min-height: 3.15rem;
+    padding: 0.92rem 1rem 0.85rem 2.75rem;
+    border-radius: 1.05rem;
+    border: 1px solid #ddd6cc;
+    background: rgba(255, 255, 255, 0.96);
+    color: #202733;
+    resize: vertical;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__input {
+    border-radius: 999px;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
+.dojo-stage--sidechat ::deep .ab-chat-surface__submit {
+    align-self: end;
+    min-width: 2.25rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border-radius: 999px;
+    background: #eef0f4;
+    color: #6d7688;
+    box-shadow: none;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit::before,
+.dojo-stage--sidechat ::deep .ab-chat-surface__submit::before {
+    content: "↑";
+    font-size: 0.94rem;
+    font-weight: 700;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
+.dojo-stage--sidechat ::deep .ab-chat-surface__submit {
+    font-size: 0;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit:hover:not(:disabled),
+.dojo-stage--sidechat ::deep .ab-chat-surface__submit:hover:not(:disabled) {
+    background: #e4e8ef;
+    transform: none;
+}
+
+.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit:disabled,
+.dojo-stage--sidechat ::deep .ab-chat-surface__submit:disabled {
+    opacity: 0.55;
+}
+
+.dojo-backend-panel,
+.dojo-checklist,
+.dojo-progress-board {
+    max-width: 30rem;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid #e6dfd6;
+}
+
+.dojo-backend-panel {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.dojo-backend-panel__submit {
+    min-height: 3rem;
+}
+
+.dojo-backend-panel__events {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.dojo-backend-panel__event {
+    padding: 0.62rem 0.75rem;
+    border-radius: 0.85rem;
+    background: #f7f5f1;
+    border: 1px solid #e8e0d7;
+    font-size: 0.8rem;
+    color: #5d6575;
+}
+
+.dojo-checklist__head,
+.dojo-progress-board__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.7rem;
+}
+
+.dojo-checklist__meta {
+    display: inline-flex;
+    align-items: center;
     gap: 0.5rem;
-    color: var(--ab-ink-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #7a8090;
 }
 
-.demo-dojo__steps li {
-    line-height: 1.45;
+.dojo-checklist__status {
+    padding: 0.16rem 0.44rem;
+    border-radius: 999px;
+    background: #eef1ff;
+    color: #6b7bf6;
 }
 
-.demo-dojo__note {
-    padding: 0.75rem 0.82rem;
-    border-radius: 0.8rem;
-    border: 1px solid var(--ab-border);
-    background: rgba(16, 25, 40, 0.82);
+.dojo-checklist__progress,
+.dojo-progress-board__progress {
+    width: 100%;
+    height: 0.35rem;
+    margin-bottom: 0.85rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #e7e0d8;
+}
+
+.dojo-checklist__progress > span,
+.dojo-progress-board__progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #6c7ff8, #b059df);
+}
+
+.dojo-checklist__item,
+.dojo-progress-board__item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.45rem;
+    padding: 0.72rem 0.8rem;
+    border-radius: 0.85rem;
+    border: 1px solid #e5ded5;
+    background: #f8f6f2;
+    font-size: 0.84rem;
+    color: #3d4657;
+}
+
+.dojo-checklist__item {
+    cursor: pointer;
+}
+
+.dojo-checklist__item.is-selected {
+    background: #f0efff;
+}
+
+.dojo-checklist__checkbox,
+.dojo-progress-board__dot {
+    flex: 0 0 auto;
+}
+
+.dojo-checklist__checkbox {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.28rem;
+    background: #6d80f8;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+}
+
+.dojo-progress-board__item.is-complete {
+    background: #edf7ee;
+    color: #396d48;
+}
+
+.dojo-progress-board__dot {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 999px;
+    border: 2px solid #a3acb9;
+}
+
+.dojo-progress-board__item.is-complete .dojo-progress-board__dot {
+    background: #46a05e;
+    border-color: #46a05e;
+}
+
+.dojo-split-stage {
     display: grid;
-    gap: 0.25rem;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    gap: 1rem;
 }
 
-.demo-dojo__sidebar-card {
-    position: sticky;
-    top: 0.4rem;
+.dojo-split-stage--tool-ui {
+    grid-template-columns: minmax(0, 1fr) 23rem;
 }
 
-.demo-dojo__meta-list {
-    border-top: 1px solid var(--ab-border);
-    margin-top: 0.3rem;
-    padding-top: 0.3rem;
+.dojo-stage {
+    min-height: 44rem;
+    background: linear-gradient(180deg, rgba(246, 244, 240, 0.98), rgba(242, 239, 233, 0.98));
+    overflow: hidden;
 }
 
-.demo-dojo__meta-list ::deep .mud-list-item {
-    padding-inline: 0;
-    padding-block: 0.45rem;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+.dojo-stage--artifact {
+    padding: 1.25rem;
 }
 
-@media (max-width: 1400px) {
-    .demo-dojo__sidebar-card {
+.dojo-stage--sidechat {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    background: #fcfbf8;
+}
+
+.dojo-sidechat__head {
+    padding: 1rem 1rem 0.75rem;
+    border-bottom: 1px solid #ebe3da;
+}
+
+.dojo-sidechat__head p {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    font-weight: 700;
+    color: #232a36;
+}
+
+.dojo-sidechat__note {
+    margin: 0;
+    padding: 0.9rem 1rem 0;
+    color: #747c8c;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface {
+    padding: 1rem;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__timeline {
+    padding: 0 0 0.4rem;
+    gap: 0.75rem;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__item {
+    max-width: 90%;
+    box-shadow: none;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--assistant,
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--activity {
+    padding: 0.78rem 0.9rem;
+    border-radius: 1rem;
+    background: #f5f7fb;
+    border: 1px solid #e4e9f2;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--user {
+    margin-left: auto;
+    padding: 0.78rem 0.9rem;
+    border: 0;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #8fb2ff, #6f89ff);
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--user .ab-chat-surface__item-text {
+    color: #ffffff;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--approval,
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--clarification,
+.dojo-stage--sidechat ::deep .ab-chat-surface__item--assistant.ab-chat-surface__item--generated {
+    max-width: 100%;
+    background: #ffffff;
+    border: 1px solid #e4e9f2;
+}
+
+.dojo-stage--sidechat ::deep .ab-chat-surface__controls {
+    padding-top: 0.25rem;
+    border-top: 1px solid #ebe3da;
+}
+
+.dojo-generated-surface {
+    height: 100%;
+}
+
+.dojo-generated-surface ::deep .mud-paper,
+.dojo-stage--artifact ::deep .mud-paper {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.dojo-recipe__header,
+.dojo-recipe__actions {
+    margin-bottom: 0.85rem;
+}
+
+.dojo-recipe__meta {
+    margin-bottom: 0.75rem;
+}
+
+.dojo-recipe__section {
+    margin-top: 1rem;
+}
+
+.dojo-recipe__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
+}
+
+.dojo-recipe__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.6rem;
+}
+
+.dojo-recipe__card,
+.dojo-recipe__step-card {
+    border-radius: 0.9rem;
+    border: 1px solid #e6dfd6;
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.dojo-recipe__card {
+    padding: 0.78rem;
+}
+
+.dojo-recipe__steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.dojo-recipe__steps li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.55rem;
+    align-items: start;
+}
+
+.dojo-recipe__steps li::before {
+    content: counter(list-item);
+    width: 1.55rem;
+    height: 1.55rem;
+    margin-top: 0.25rem;
+    border-radius: 999px;
+    background: #f07f54;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.dojo-recipe__step-card {
+    padding: 0.82rem 0.88rem;
+}
+
+.dojo-document {
+    padding: 0.25rem 0.1rem;
+    font-size: 0.94rem;
+    line-height: 1.7;
+    color: #2e3644;
+}
+
+.dojo-document__label {
+    margin: 0 0 1rem;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #7d8596;
+}
+
+.dojo-document__line {
+    display: inline-block;
+    margin: 0 0 0.6rem;
+    padding: 0.15rem 0.28rem;
+    border-radius: 0.32rem;
+}
+
+.dojo-document__line--accepted {
+    background: rgba(124, 195, 132, 0.25);
+}
+
+.dojo-document__line--removed {
+    background: rgba(238, 153, 153, 0.2);
+    text-decoration: line-through;
+}
+
+.dojo-document__line--muted {
+    color: #697285;
+}
+
+.dojo-approval-card {
+    margin: 0.95rem 1rem 0;
+    padding: 1rem;
+    border-radius: 0.95rem;
+    border: 1px solid #e6dfd6;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.dojo-workspace ::deep .mud-input-slot {
+    border-radius: 0.85rem;
+}
+
+.dojo-workspace ::deep .mud-input-outlined-border {
+    border-color: #ddd6cc;
+}
+
+.dojo-workspace ::deep .mud-button {
+    border-radius: 0.8rem;
+    text-transform: none;
+    font-weight: 700;
+    box-shadow: none;
+}
+
+.dojo-workspace ::deep .mud-button-outlined {
+    border-color: #e1b097;
+    color: #e8774f;
+}
+
+.dojo-workspace ::deep .mud-button-filled {
+    background: linear-gradient(135deg, #f08b5b, #eb7448);
+}
+
+.dojo-workspace ::deep .mud-chip {
+    font-weight: 700;
+}
+
+@media (max-width: 1180px) {
+    .dojo-split-stage,
+    .dojo-split-stage--tool-ui {
+        grid-template-columns: 1fr;
+    }
+
+    .dojo-stage--sidechat {
+        min-height: 26rem;
+    }
+}
+
+@media (max-width: 1040px) {
+    .dojo-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .dojo-workspace__rail {
         position: static;
     }
 }
 
 @media (max-width: 760px) {
-    .demo-dojo__flags {
-        gap: 0.45rem 0.65rem;
+    .dojo-canvas,
+    .dojo-stage {
+        min-height: auto;
+    }
+
+    .dojo-canvas,
+    .dojo-stage--artifact {
+        padding: 1rem;
+    }
+
+    .dojo-canvas__center-copy {
+        margin-top: 1rem;
+    }
+
+    .dojo-canvas__chat-shell,
+    .dojo-backend-panel,
+    .dojo-checklist,
+    .dojo-progress-board {
+        max-width: 100%;
+    }
+
+    .dojo-canvas__chat-shell ::deep .ab-chat-surface__controls,
+    .dojo-stage--sidechat ::deep .ab-chat-surface__controls {
+        grid-template-columns: 1fr;
+    }
+
+    .dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
+    .dojo-stage--sidechat ::deep .ab-chat-surface__submit {
+        width: 100%;
+    }
+
+    .dojo-canvas__chat-shell ::deep .ab-chat-surface__submit::before,
+    .dojo-stage--sidechat ::deep .ab-chat-surface__submit::before {
+        content: "Send";
+        font-size: 0.86rem;
     }
 }

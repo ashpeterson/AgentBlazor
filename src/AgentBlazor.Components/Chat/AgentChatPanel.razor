@@ -11,6 +11,20 @@
                       Description="@Description"
                       FormName="@FormName"
                       DefaultAgentName="@DefaultAgentName"
+                      ShowAgentSelector="@ShowAgentSelector"
+                      LockedAgentName="@LockedAgentName"
+                      LockAgentToCurrentRoute="@LockAgentToCurrentRoute"
+                      EnableAgentHandoff="@EnableAgentHandoff"
+                      AutoNavigateOnRouteLockedHandoff="@AutoNavigateOnRouteLockedHandoff"
+                      RequireHandoffApproval="@RequireHandoffApproval"
+                      HandoffApprovalPolicy="@HandoffApprovalPolicy"
+                      HandoffPolicy="@HandoffPolicy"
+                      MaxHandoffsPerSession="@MaxHandoffsPerSession"
+                      MaxHandoffsPerPair="@MaxHandoffsPerPair"
+                      MaxHandoffsPerWindow="@MaxHandoffsPerWindow"
+                      HandoffWindowMinutes="@HandoffWindowMinutes"
+                      MaxPairHandoffsPerWindow="@MaxPairHandoffsPerWindow"
+                      BlockImmediateReturnHandoff="@BlockImmediateReturnHandoff"
                       SessionId="@SessionId"
                       Placeholder="@Placeholder"
                       EnableGeneratedUi="@EnableGeneratedUi"
@@ -43,6 +57,48 @@
 
     [Parameter]
     public string? DefaultAgentName { get; set; }
+
+    [Parameter]
+    public bool ShowAgentSelector { get; set; } = true;
+
+    [Parameter]
+    public string? LockedAgentName { get; set; }
+
+    [Parameter]
+    public bool LockAgentToCurrentRoute { get; set; }
+
+    [Parameter]
+    public bool EnableAgentHandoff { get; set; } = true;
+
+    [Parameter]
+    public bool AutoNavigateOnRouteLockedHandoff { get; set; } = true;
+
+    [Parameter]
+    public bool RequireHandoffApproval { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? HandoffApprovalPolicy { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? HandoffPolicy { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerSession { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerPair { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerWindow { get; set; }
+
+    [Parameter]
+    public int? HandoffWindowMinutes { get; set; }
+
+    [Parameter]
+    public int? MaxPairHandoffsPerWindow { get; set; }
+
+    [Parameter]
+    public bool BlockImmediateReturnHandoff { get; set; } = true;
 
     [Parameter]
     public string? SessionId { get; set; }

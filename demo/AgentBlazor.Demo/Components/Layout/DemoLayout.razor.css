@@ -11,6 +11,10 @@
         var(--ab-bg);
 }
 
+.demo-app--dojo {
+    grid-template-columns: 14.5rem minmax(0, 1fr);
+}
+
 .demo-app__sidebar,
 .demo-app__assistant-pane {
     position: sticky;
@@ -109,6 +113,10 @@
     gap: 0.85rem;
 }
 
+.demo-app__main--dojo {
+    grid-template-rows: 1fr;
+}
+
 .demo-app__topbar {
     display: flex;
     align-items: center;
@@ -190,6 +198,11 @@
     min-height: 0;
     overflow: auto;
     padding: 0.15rem 0.2rem 2.8rem;
+}
+
+.demo-app--dojo .demo-app__content {
+    overflow: visible;
+    padding: 0;
 }
 
 .demo-app__assistant-card {

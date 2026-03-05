@@ -1,5 +1,4 @@
 using AgentBlazor.Demo.Data;
-using AgentBlazor.Demo.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgentBlazor.Demo.Services;
@@ -10,117 +9,161 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureMitigationSchemaAsync(db, cancellationToken);
-
-        if (!await db.Suppliers.AnyAsync(cancellationToken))
-        {
-            var now = DateTime.UtcNow;
-            foreach (var seed in SupplierSeedData.Suppliers())
-            {
-                db.Suppliers.Add(new SupplierEntity
-                {
-                    SupplierId = seed.SupplierId,
-                    SupplierName = seed.SupplierName,
-                    Region = seed.Region,
-                    RiskScore = seed.RiskScore,
-                    LastAuditDate = seed.LastAuditDate,
-                    CreatedUtc = now.AddDays(-Random.Shared.Next(20, 180))
-                });
-            }
-        }
-
-        if (!await db.OnboardingRequests.AnyAsync(cancellationToken))
-        {
-            var samples = SupplierSeedData.Suppliers().Take(8).ToArray();
-            for (var i = 0; i < samples.Length; i++)
-            {
-                var sample = samples[i];
-                db.OnboardingRequests.Add(new OnboardingRequestEntity
-                {
-                    RequestId = $"REQ-{(i + 1).ToString("D4")}",
-                    SupplierId = sample.SupplierId,
-                    SupplierName = sample.SupplierName,
-                    ContactEmail = $"ops+{sample.SupplierId.ToLowerInvariant()}@example.com",
-                    RiskTier = sample.RiskScore >= 80 ? "High" : sample.RiskScore >= 60 ? "Medium" : "Low",
-                    Country = sample.Region switch
-                    {
-                        "EMEA" => "Germany",
-                        "APAC" => "Singapore",
-                        "LATAM" => "Brazil",
-                        _ => "United States"
-                    },
-                    Category = "Strategic Parts",
-                    PaymentTerms = "Net 45",
-                    PreferredCurrency = "USD",
-                    RequestedBudget = 120000 + (i * 5000),
-                    ExpectedMonthlySpend = 24000 + (i * 1200),
-                    Priority = (i % 5) + 1,
-                    SanctionsScreened = i % 3 != 0,
-                    NdaRequired = i % 2 == 0,
-                    Notes = "Seeded onboarding request for workflow demos.",
-                    Status = "Submitted",
-                    SubmittedUtc = DateTime.UtcNow.AddMonths(-7 + i).AddDays(Random.Shared.Next(0, 20))
-                });
-            }
-        }
-
-        if (!await db.MitigationTasks.AnyAsync(cancellationToken))
-        {
-            var seededSuppliers = await db.Suppliers
-                .OrderByDescending(x => x.RiskScore)
-                .Take(4)
-                .ToListAsync(cancellationToken);
-
-            for (var i = 0; i < seededSuppliers.Count; i++)
-            {
-                var supplier = seededSuppliers[i];
-                db.MitigationTasks.Add(new MitigationTaskEntity
-                {
-                    TaskId = $"MIT-{(i + 1).ToString("D4")}",
-                    SupplierId = supplier.SupplierId,
-                    SupplierName = supplier.SupplierName,
-                    ServiceName = "Supplier Risk Monitoring",
-                    Owner = i % 2 == 0 ? "Ops Lead" : "Risk Analyst",
-                    MitigationAction = "Increase audit cadence and validate contingency coverage.",
-                    Priority = Math.Clamp(1 + i, 1, 5),
-                    Status = i == 0 ? "InProgress" : "Open",
-                    DueDate = DateTime.UtcNow.Date.AddDays(7 + (i * 3)),
-                    CreatedUtc = DateTime.UtcNow.AddDays(-(i + 2))
-                });
-            }
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
+        await EnsureDojoWorkspaceSchemaAsync(db, cancellationToken);
+        await EnsureFileWorkflowSchemaAsync(db, cancellationToken);
     }
 
-    private static async Task EnsureMitigationSchemaAsync(
+    private static async Task EnsureDojoWorkspaceSchemaAsync(
         DemoWorkflowDbContext db,
         CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlRawAsync(
             """
-            CREATE TABLE IF NOT EXISTS mitigation_tasks (
+            CREATE TABLE IF NOT EXISTS dojo_workspaces (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                TaskId TEXT NOT NULL,
-                SupplierId TEXT NOT NULL,
-                SupplierName TEXT NOT NULL,
-                ServiceName TEXT NOT NULL,
-                Owner TEXT NOT NULL,
-                MitigationAction TEXT NOT NULL,
-                Priority INTEGER NOT NULL,
-                Status TEXT NOT NULL,
-                DueDate TEXT NOT NULL,
+                SessionKey TEXT NOT NULL,
+                Title TEXT NOT NULL,
+                Minutes INTEGER NOT NULL,
+                Difficulty TEXT NOT NULL,
+                HighProtein INTEGER NOT NULL,
+                LowCarb INTEGER NOT NULL,
+                Spicy INTEGER NOT NULL,
+                Vegetarian INTEGER NOT NULL,
+                LastSavedUtc TEXT NULL,
                 CreatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                UpdatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_dojo_workspaces_SessionKey ON dojo_workspaces (SessionKey);",
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS dojo_ingredients (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                IngredientId TEXT NOT NULL,
+                Name TEXT NOT NULL,
+                Amount TEXT NOT NULL,
+                Optional INTEGER NOT NULL,
+                Notes TEXT NOT NULL,
+                SortOrder INTEGER NOT NULL
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_dojo_ingredients_SessionKey ON dojo_ingredients (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_dojo_ingredients_SessionKey_IngredientId ON dojo_ingredients (SessionKey, IngredientId);",
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS dojo_steps (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                StepNumber INTEGER NOT NULL,
+                Text TEXT NOT NULL
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_dojo_steps_SessionKey ON dojo_steps (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_dojo_steps_SessionKey_StepNumber ON dojo_steps (SessionKey, StepNumber);",
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS dojo_run_notes (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                TimestampUtc TEXT NOT NULL,
+                Message TEXT NOT NULL
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_dojo_run_notes_SessionKey ON dojo_run_notes (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_dojo_run_notes_SessionKey_TimestampUtc ON dojo_run_notes (SessionKey, TimestampUtc);",
+            cancellationToken);
+    }
+
+    private static async Task EnsureFileWorkflowSchemaAsync(
+        DemoWorkflowDbContext db,
+        CancellationToken cancellationToken)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS demo_file_workflow_files (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                FileName TEXT NOT NULL,
+                UploadMode TEXT NOT NULL,
+                StorageToken TEXT NULL,
+                AddedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                UpdatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_files_SessionKey ON demo_file_workflow_files (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_demo_file_workflow_files_SessionKey_FileName ON demo_file_workflow_files (SessionKey, FileName);",
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS demo_file_workflow_events (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                TimestampUtc TEXT NOT NULL,
+                EventType TEXT NOT NULL,
+                FileName TEXT NOT NULL,
+                Message TEXT NOT NULL
+            );
+            """,
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_events_SessionKey ON demo_file_workflow_events (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_events_SessionKey_TimestampUtc ON demo_file_workflow_events (SessionKey, TimestampUtc);",
+            cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS demo_file_workflow_jobs (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionKey TEXT NOT NULL,
+                JobId TEXT NOT NULL,
+                Operation TEXT NOT NULL,
+                FileName TEXT NOT NULL,
+                UploadMode TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                StorageToken TEXT NULL,
+                Message TEXT NOT NULL,
+                CreatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                UpdatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
                 CompletedUtc TEXT NULL
             );
             """,
             cancellationToken);
-
         await db.Database.ExecuteSqlRawAsync(
-            "CREATE UNIQUE INDEX IF NOT EXISTS IX_mitigation_tasks_TaskId ON mitigation_tasks (TaskId);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_demo_file_workflow_jobs_JobId ON demo_file_workflow_jobs (JobId);",
             cancellationToken);
         await db.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS IX_mitigation_tasks_SupplierId ON mitigation_tasks (SupplierId);",
+            "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_jobs_SessionKey ON demo_file_workflow_jobs (SessionKey);",
+            cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_jobs_SessionKey_UpdatedUtc ON demo_file_workflow_jobs (SessionKey, UpdatedUtc);",
             cancellationToken);
     }
 }

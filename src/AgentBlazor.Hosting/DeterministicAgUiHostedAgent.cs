@@ -19,18 +19,20 @@ internal sealed class DeterministicAgUiHostedAgent(
     IAgentRegistry agentRegistry,
     IOptions<AgentBlazorOptions> options,
     IAgentBlazorTelemetrySink telemetrySink,
+    IAgentSharedStateStore sharedStateStore,
     AgentComponentRegistryHub? registryHub = null,
     IAgentBlazorEntitlementService? entitlementService = null) : AIAgent
 {
-    private const string SessionIdContextKey = "agentblazor.session_id";
-    private const string RunIdContextKey = "agentblazor.run_id";
-    private const string UserIdContextKey = "agentblazor.user_id";
-    private const string AgentNameContextKey = "agentblazor.agent_name";
+    private const string SessionIdContextKey = AgentRuntimeContextKeys.SessionId;
+    private const string RunIdContextKey = AgentRuntimeContextKeys.RunId;
+    private const string UserIdContextKey = AgentRuntimeContextKeys.UserId;
+    private const string AgentNameContextKey = AgentRuntimeContextKeys.AgentName;
 
     private readonly IAgentRuntime _runtime = runtime;
     private readonly IAgentRegistry _agentRegistry = agentRegistry;
     private readonly IOptions<AgentBlazorOptions> _options = options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink = telemetrySink;
+    private readonly IAgentSharedStateStore _sharedStateStore = sharedStateStore;
     private readonly AgentComponentRegistryHub? _registryHub = registryHub;
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
     private readonly IAgentRuntimeStreaming? _streamingRuntime = runtime as IAgentRuntimeStreaming;
@@ -277,6 +279,7 @@ internal sealed class DeterministicAgUiHostedAgent(
 
                 foreach (var update in MapStreamEvent(invocation, mappingState, streamEvent))
                 {
+                    TrackMessageRunAssociation(invocation, mappingState, update);
                     yield return update;
                 }
             }
@@ -291,6 +294,28 @@ internal sealed class DeterministicAgUiHostedAgent(
             invocation.HasContext,
             AgentBlazorRunEventKind.Finished,
             AgentBlazorRunOutcome.Succeeded));
+    }
+
+    private void TrackMessageRunAssociation(
+        TurnInvocation invocation,
+        MappingState mappingState,
+        AgentResponseUpdate update)
+    {
+        if (string.IsNullOrWhiteSpace(update.MessageId))
+        {
+            return;
+        }
+
+        var agentName = mappingState.LastAgentName
+            ?? invocation.Request.AgentName
+            ?? ResolveAgentRegistration(null).Name;
+        var sessionId = invocation.Request.GetEffectiveSessionId();
+
+        _sharedStateStore.AssociateMessageWithRun(
+            agentName,
+            sessionId,
+            update.MessageId,
+            invocation.RunId);
     }
 
     private AgentRegistration ResolveAgentRegistration(string? requestedName)
@@ -664,6 +689,24 @@ internal sealed class DeterministicAgUiHostedAgent(
         };
     }
 
+    private static Dictionary<string, object?> ToObjectPayload(
+        IReadOnlyDictionary<string, string> values)
+    {
+        return values.ToDictionary(
+            static pair => pair.Key,
+            static pair => (object?)pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, object?> ToNullableObjectPayload(
+        IReadOnlyDictionary<string, string?> values)
+    {
+        return values.ToDictionary(
+            static pair => pair.Key,
+            static pair => (object?)pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
     private static IEnumerable<AgentResponseUpdate> MapStreamEvent(
         TurnInvocation invocation,
         MappingState mappingState,
@@ -687,6 +730,48 @@ internal sealed class DeterministicAgUiHostedAgent(
                 {
                     payload["plannedAction"] = CreatePlannedActionPayload(streamEvent.PlannedAction);
                 }
+
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.StateSnapshot:
+            {
+                if (streamEvent.SharedStateSnapshot is null)
+                {
+                    yield break;
+                }
+
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "shared_state_snapshot",
+                    ["state"] = ToObjectPayload(streamEvent.SharedStateSnapshot)
+                };
+
+                yield return CreateStateSnapshotUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:state:{streamEvent.Sequence}",
+                    payload,
+                    streamEvent.Timestamp);
+                yield break;
+            }
+
+            case AgentTurnStreamEventKind.StateDelta:
+            {
+                if (streamEvent.SharedStateDelta is null || streamEvent.SharedStateDelta.Count == 0)
+                {
+                    yield break;
+                }
+
+                var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "shared_state_delta",
+                    ["delta"] = ToNullableObjectPayload(streamEvent.SharedStateDelta)
+                };
 
                 yield return CreateStateSnapshotUpdate(
                     invocation.RunId,

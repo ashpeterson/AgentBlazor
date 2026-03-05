@@ -17,7 +17,12 @@ builder.Logging.AddFilter("AgentBlazor", LogLevel.Information);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
-builder.Services.AddScoped<DojoWorkspaceService>();
+builder.Services.AddScoped<DojoExperienceState>();
+builder.Services.AddSingleton<DojoWorkspaceService>();
+builder.Services.AddScoped<DemoFileWorkflowService>();
+builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
+builder.Services.AddHttpClient("demo-remote-storage");
+builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
 
 var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_LICENSE_KEY");
@@ -37,8 +42,6 @@ var workflowConnectionString = builder.Configuration.GetConnectionString("DemoWo
 
 builder.Services.AddDbContextFactory<DemoWorkflowDbContext>(options =>
     options.UseSqlite(workflowConnectionString));
-builder.Services.AddSingleton<SupplierWorkflowService>();
-builder.Services.AddSingleton<DemoChartDataSources>();
 builder.Services.AddSingleton<DemoWorkflowDatabaseSeeder>();
 
 builder.Services.AddAgentBlazor(options =>
@@ -56,7 +59,7 @@ builder.Services.AddAgentBlazor(options =>
 
     if (builder.Environment.IsDevelopment())
     {
-        options.UseDevTools();
+       // options.UseDevTools();
     }
 
     if (!string.IsNullOrWhiteSpace(proLicenseKey))
@@ -64,7 +67,31 @@ builder.Services.AddAgentBlazor(options =>
         options.UseProLicense(proLicenseKey);
     }
 
-    options.UseChartDataResolver(sp => sp.GetRequiredService<DemoChartDataSources>().ResolveAsync);
+    options.ConfigureBuilder(agentBuilder =>
+    {
+        agentBuilder.AddRuntimeEventSubscriber<DojoRuntimeEventSubscriber>();
+
+        agentBuilder.AddAgent("Dojo Workspace Agent", agent =>
+        {
+            agent.WithDescription("Focused on the interactive dojo recipe workspace.");
+            agent.WithAllowedComponents("AgentForm", "AgentDataGrid", "AgentDialog", "AgentTabs", "AgentNavMenu", "DojoRecipe");
+            agent.WithMetadata("route_prefixes", "/demo/dojo");
+        });
+
+        agentBuilder.AddAgent("Supplier Analyst Agent", agent =>
+        {
+            agent.WithDescription("Focused on data-centric component exploration and selection-style controls.");
+            agent.WithAllowedComponents("AgentDataGrid", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentSelect", "AgentAutocomplete");
+            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/datagrid,/demo/components/select,/demo/components/autocomplete,/demo/components/date-picker,/demo/components/date-range-picker,/demo/components/tree-view");
+        });
+
+        agentBuilder.AddAgent("Workflow Orchestrator Agent", agent =>
+        {
+            agent.WithDescription("Focused on form/dialog/command orchestration across the component explorer.");
+            agent.WithAllowedComponents("AgentStepper", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentTreeView", "AgentCommandBar", "AgentFileUpload");
+            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/form,/demo/components/dialog,/demo/components/tabs,/demo/components/stepper,/demo/components/command-bar,/demo/components/file-upload,/demo/components/attribute-based");
+        });
+    });
 });
 
 var app = builder.Build();

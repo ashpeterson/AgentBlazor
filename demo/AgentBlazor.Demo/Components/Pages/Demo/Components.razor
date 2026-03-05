@@ -1,184 +1,396 @@
 @page "/demo/components"
+@page "/demo/components/{ComponentKey}"
 @layout DemoLayout
+@using System.ComponentModel.DataAnnotations
 @using AgentBlazor.Components
+@using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Demo.Services
 @using MudBlazor
 @inject ISnackbar Snackbar
+@inject IAgentComponentRegistry ComponentRegistry
+@inject DemoFileWorkflowService FileWorkflowService
 
-<PageTitle>Component Kit — AgentBlazor Demo</PageTitle>
+<PageTitle>Components — AgentBlazor Demo</PageTitle>
 
 <div class="demo-doc-page components-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Wrapper Catalog</p>
-        <MudText Typo="Typo.h5">Input + Utility Component Kit</MudText>
+        <p class="demo-doc-page__eyebrow">Components</p>
+        <MudText Typo="Typo.h5">AgentBlazor Component Explorer</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            One page for direct wrapper action testing:
-            <strong> AgentSelect</strong>, <strong>AgentAutocomplete</strong>, <strong>AgentDatePicker</strong>,
-            <strong>AgentDateRangePicker</strong>, <strong>AgentTreeView</strong>, <strong>AgentStepper</strong>,
-            <strong>AgentCommandBar</strong>, and <strong>AgentFileUpload</strong>.
+            MudBlazor-docs style explorer for every shipped wrapper. Use the left navigation to drill into a single component,
+            or stay on overview to validate the full stack in one pass.
         </MudText>
 
         <div class="demo-doc-page__toc">
-            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
-            <a class="demo-doc-page__toc-link" href="#input-controls">Select + Autocomplete</a>
-            <a class="demo-doc-page__toc-link" href="#date-controls">Date Controls</a>
-            <a class="demo-doc-page__toc-link" href="#workflow-controls">Tree + Stepper</a>
-            <a class="demo-doc-page__toc-link" href="#utility-controls">Command + Files</a>
+            @foreach (var entry in _componentEntries)
+            {
+                <a class="demo-doc-page__toc-link" href="@entry.Href">@entry.Title</a>
+            }
+            <a class="demo-doc-page__toc-link" href="/demo/components/attribute-based">Attribute-Based Example</a>
         </div>
     </MudPaper>
 
-    <section id="prompt-set" class="demo-doc-page__section">
-        <div class="demo-doc-page__section-head">
-            <MudText Typo="Typo.h6">Prompt Set</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Use these prompts to validate each mounted wrapper action.
+    @if (IsUnknownComponent)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+            Unknown component route: <code>@ComponentKey</code>. Showing overview instead.
+        </MudAlert>
+    }
+
+    @if (Show("overview"))
+    {
+        <section class="demo-doc-page__section">
+            <MudText Typo="Typo.h6">Coverage</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                Supported wrappers in this explorer: AgentDataGrid, AgentForm, AgentDialog, AgentTabs, AgentSelect,
+                AgentAutocomplete, AgentDatePicker, AgentDateRangePicker, AgentTreeView, AgentStepper,
+                AgentCommandBar, and AgentFileUpload.
             </MudText>
-        </div>
-        <div class="demo-doc-page__prompt-box">
-            <ul class="demo-doc-page__prompt-list">
-                <li><span class="demo-doc-page__prompt-code">set country select value to Germany</span></li>
-                <li><span class="demo-doc-page__prompt-code">set supplier search query to Apex and select option Apex Components</span></li>
-                <li><span class="demo-doc-page__prompt-code">set review date to March 18 2026</span></li>
-                <li><span class="demo-doc-page__prompt-code">set review range from 2026-03-01 to 2026-03-15</span></li>
-                <li><span class="demo-doc-page__prompt-code">expand node compliance and select node policy-documents</span></li>
-                <li><span class="demo-doc-page__prompt-code">go to step 2</span></li>
-                <li><span class="demo-doc-page__prompt-code">invoke command publish_report</span></li>
-                <li><span class="demo-doc-page__prompt-code">attach file risk-summary-q1.pdf then list files</span></li>
-                <li><span class="demo-doc-page__prompt-code">remove file vendor-evidence.csv</span></li>
-            </ul>
-        </div>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Final parity example: <MudLink Href="/demo/components/attribute-based">Attribute-based component automation</MudLink>.
+            </MudText>
+        </section>
+    }
+
+    @if (Show("datagrid"))
+    {
+        <section id="datagrid" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentDataGrid</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>sort suppliers by risk score descending</code>, <code>filter region EMEA</code>, <code>go to page 2</code>.
+                </MudText>
+            </div>
+            <AgentDataGrid TItem="GridSupplierRow"
+                           AgentId="components-datagrid"
+                           Items="@_gridRows"
+                           Dense="true"
+                           Hover="true"
+                           Bordered="true"
+                           Striped="true"
+                           RowKeyProperty="Id">
+                <Columns>
+                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                    <PropertyColumn T="GridSupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                </Columns>
+            </AgentDataGrid>
+        </section>
+    }
+
+    @if (Show("form"))
+    {
+        <section id="form" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentForm</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>set supplier name to Apex Labs</code>, <code>set risk tier to High</code>, <code>submit form</code>.
+                </MudText>
+            </div>
+
+            <AgentForm AgentId="components-form" Model="@_componentFormModel" Submitted="OnComponentFormSubmittedAsync">
+                <ChildContent Context="formContext">
+                    <DataAnnotationsValidator />
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="6">
+                            <MudTextField T="string"
+                                          Label="Supplier Name"
+                                          For="@(() => _componentFormModel.SupplierName)"
+                                          @bind-Value="_componentFormModel.SupplierName" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="string"
+                                       Label="Risk Tier"
+                                       For="@(() => _componentFormModel.RiskTier)"
+                                       @bind-Value="_componentFormModel.RiskTier">
+                                <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_componentFormModel.NeedsExpedite" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Submit</MudButton>
+                    </MudStack>
+                </ChildContent>
+            </AgentForm>
+        </section>
+    }
+
+    @if (Show("dialog"))
+    {
+        <section id="dialog" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentDialog</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>open dialog</code>, <code>confirm dialog</code>, <code>close dialog</code>.
+                </MudText>
+            </div>
+
+            <MudStack Row="true" Spacing="1" Class="mb-2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenComponentDialogAsync">Open Dialog</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Close Dialog</MudButton>
+            </MudStack>
+
+            <AgentDialog @ref="_componentDialog"
+                         AgentId="components-dialog"
+                         Visible="@_componentDialogVisible"
+                         VisibleChanged="OnComponentDialogVisibleChanged">
+                <TitleContent>
+                    <MudText Typo="Typo.h6">Supplier Policy Confirmation</MudText>
+                </TitleContent>
+                <DialogContent>
+                    <MudText Typo="Typo.body2">Confirm this supplier can move from review to approval.</MudText>
+                </DialogContent>
+                <DialogActions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmComponentDialogAsync">Confirm</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Cancel</MudButton>
+                </DialogActions>
+            </AgentDialog>
+        </section>
+    }
+
+    @if (Show("tabs"))
+    {
+        <section id="tabs" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentTabs</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>switch to policy tab</code>.</MudText>
+            </div>
+            <AgentTabs AgentId="components-tabs">
+                <MudTabPanel Text="Summary">
+                    <MudText Typo="Typo.body2">Supplier overview and risk summary.</MudText>
+                </MudTabPanel>
+                <MudTabPanel Text="Policy">
+                    <MudText Typo="Typo.body2">Policy controls and compliance checks.</MudText>
+                </MudTabPanel>
+                <MudTabPanel Text="Audit">
+                    <MudText Typo="Typo.body2">Audit logs and evidence bundle state.</MudText>
+                </MudTabPanel>
+            </AgentTabs>
+        </section>
+    }
+
+    @if (Show("select"))
+    {
+        <section id="select" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentSelect</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set country select value to Germany</code>.</MudText>
+            </div>
+            <AgentSelect AgentId="kit-country-select"
+                         Value="@_selectedCountry"
+                         ValueChanged="OnCountryChanged"
+                         Options="@_countryOptions" />
+            <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
+        </section>
+    }
+
+    @if (Show("autocomplete"))
+    {
+        <section id="autocomplete" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentAutocomplete</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>set supplier search query to Apex and select option Apex Components</code>.
+                </MudText>
+            </div>
+            <AgentAutocomplete AgentId="kit-supplier-autocomplete"
+                               Query="@_supplierQuery"
+                               QueryChanged="OnSupplierQueryChanged"
+                               Value="@_selectedSupplier"
+                               ValueChanged="OnSupplierValueChanged"
+                               Options="@_supplierOptions"
+                               Placeholder="Search suppliers..." />
+            <MudText Typo="Typo.caption" Class="mt-1">Query: @_supplierQuery | Selected: @_selectedSupplier</MudText>
+        </section>
+    }
+
+    @if (Show("date-picker"))
+    {
+        <section id="date-picker" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentDatePicker</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set review date to March 18 2026</code>.</MudText>
+            </div>
+            <AgentDatePicker AgentId="kit-review-date"
+                             Value="@_reviewDate"
+                             ValueChanged="OnReviewDateChanged"
+                             MinDate="@_minReviewDate"
+                             MaxDate="@_maxReviewDate" />
+            <MudText Typo="Typo.caption" Class="mt-1">Review date: @FormatDate(_reviewDate)</MudText>
+        </section>
+    }
+
+    @if (Show("date-range-picker"))
+    {
+        <section id="date-range-picker" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentDateRangePicker</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set review range from 2026-03-01 to 2026-03-15</code>.</MudText>
+            </div>
+            <AgentDateRangePicker AgentId="kit-review-range"
+                                  StartDate="@_rangeStart"
+                                  StartDateChanged="OnRangeStartChanged"
+                                  EndDate="@_rangeEnd"
+                                  EndDateChanged="OnRangeEndChanged"
+                                  MinDate="@_minReviewDate"
+                                  MaxDate="@_maxReviewDate" />
+            <MudText Typo="Typo.caption" Class="mt-1">Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)</MudText>
+        </section>
+    }
+
+    @if (Show("tree-view"))
+    {
+        <section id="tree-view" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentTreeView</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>expand node compliance and select node policy-documents</code>.
+                </MudText>
+            </div>
+            <AgentTreeView AgentId="kit-workflow-tree"
+                           NodeIds="@_treeNodeIds"
+                           SelectedNodeId="@_selectedTreeNodeId"
+                           SelectedNodeIdChanged="OnTreeNodeSelected"
+                           ExpandedNodeIds="@_expandedTreeNodeIds"
+                           ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
+            <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)</MudText>
+        </section>
+    }
+
+    @if (Show("stepper"))
+    {
+        <section id="stepper" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentStepper</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>go to step 2</code>, <code>next step</code>.</MudText>
+            </div>
+            <AgentStepper AgentId="kit-onboarding-stepper"
+                          CurrentStepIndex="@_currentStepIndex"
+                          CurrentStepIndexChanged="OnCurrentStepChanged"
+                          StepIds="@_stepIds" />
+            <MudText Typo="Typo.caption" Class="mt-1">Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])</MudText>
+        </section>
+    }
+
+    @if (Show("command-bar"))
+    {
+        <section id="command-bar" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentCommandBar</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>invoke command publish_report</code>.</MudText>
+            </div>
+            <AgentCommandBar AgentId="kit-command-bar"
+                             Commands="@_commands"
+                             CommandInvoked="OnCommandInvoked" />
+            <MudText Typo="Typo.caption" Class="mt-1">Last command: @_lastCommand</MudText>
+        </section>
+    }
+
+    @if (Show("file-upload"))
+    {
+        <section id="file-upload" class="demo-doc-page__section components-page__card">
+            <div class="demo-doc-page__section-head">
+                <MudText Typo="Typo.h6">AgentFileUpload</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Try: <code>attach file risk-summary-q1.pdf</code>, <code>list files</code>, <code>remove file vendor-evidence.csv</code>.
+                </MudText>
+            </div>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                Local mode treats names as trusted references. Remote mode treats names as handoff tokens.
+            </MudAlert>
+
+            <AgentFileUpload AgentId="kit-file-upload"
+                             Files="@_attachedFiles"
+                             FilesChanged="OnFilesChanged" />
+            <MudText Typo="Typo.caption" Class="mt-1">Attached files: @(string.Join(", ", _attachedFiles))</MudText>
+            <MudText Typo="Typo.caption" Class="mt-1">Upload mode: @_uploadPolicyMode</MudText>
+
+            <MudStack Row="true" Spacing="1" Class="mt-2">
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="RunRemoteHandoffAsync">
+                    Sync Remote Handoff
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ValidateRemoteTokensAsync">
+                    Validate Tokens
+                </MudButton>
+            </MudStack>
+
+            @if (_fileWorkflowEvents.Count > 0)
+            {
+                <ul class="components-page__file-events">
+                    @foreach (var fileEvent in _fileWorkflowEvents)
+                    {
+                        <li>
+                            <span>@fileEvent.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                            <span>@fileEvent.EventType</span>
+                            <span>@fileEvent.Message</span>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (_fileWorkflowJobs.Count > 0)
+            {
+                <div class="components-page__job-block">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Recent workflow jobs</MudText>
+                    <ul class="components-page__file-jobs">
+                        @foreach (var job in _fileWorkflowJobs)
+                        {
+                            <li>
+                                <div class="components-page__job-head">
+                                    <span>@job.UpdatedUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span>@job.Operation</span>
+                                    <MudChip T="string" Size="Size.Small" Color="@MapJobStatusColor(job.Status)">
+                                        @job.Status
+                                    </MudChip>
+                                </div>
+                                <div class="components-page__job-detail">
+                                    <span>@job.FileName</span>
+                                    @if (!string.IsNullOrWhiteSpace(job.StorageToken))
+                                    {
+                                        <span>@job.StorageToken</span>
+                                    }
+                                    <span>@job.Message</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </section>
+    }
+
+    <section class="demo-doc-page__section components-page__card">
+        <MudText Typo="Typo.h6">Attribute-Based Example</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            Use the final parity example to compare wrapper-driven control vs convention-first component actions.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/components/attribute-based">
+            Open Attribute-Based Example
+        </MudButton>
     </section>
-
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-        <strong>File upload policy examples</strong>:
-        local mode uses file names as trusted references only (no direct file-system operations),
-        and remote mode uses file names as handoff tokens for downstream storage services.
-    </MudAlert>
-
-    <MudGrid Class="components-page__grid">
-        <MudItem xs="12" md="6" id="input-controls">
-            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
-                <MudText Typo="Typo.subtitle1" Class="mb-2">Select + Autocomplete</MudText>
-                <MudStack Spacing="2">
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Country Select</MudText>
-                        <AgentSelect AgentId="kit-country-select"
-                                     Value="@_selectedCountry"
-                                     ValueChanged="OnCountryChanged"
-                                     Options="@_countryOptions" />
-                        <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
-                    </div>
-
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Supplier Autocomplete</MudText>
-                        <AgentAutocomplete AgentId="kit-supplier-autocomplete"
-                                           Query="@_supplierQuery"
-                                           QueryChanged="OnSupplierQueryChanged"
-                                           Value="@_selectedSupplier"
-                                           ValueChanged="OnSupplierValueChanged"
-                                           Options="@_supplierOptions"
-                                           Placeholder="Search suppliers..." />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Query: @_supplierQuery | Selected: @_selectedSupplier
-                        </MudText>
-                    </div>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6" id="date-controls">
-            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
-                <MudText Typo="Typo.subtitle1" Class="mb-2">Date Pickers</MudText>
-                <MudStack Spacing="2">
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Single Date</MudText>
-                        <AgentDatePicker AgentId="kit-review-date"
-                                         Value="@_reviewDate"
-                                         ValueChanged="OnReviewDateChanged"
-                                         MinDate="@_minReviewDate"
-                                         MaxDate="@_maxReviewDate" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Review date: @FormatDate(_reviewDate)
-                        </MudText>
-                    </div>
-
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Date Range</MudText>
-                        <AgentDateRangePicker AgentId="kit-review-range"
-                                              StartDate="@_rangeStart"
-                                              StartDateChanged="OnRangeStartChanged"
-                                              EndDate="@_rangeEnd"
-                                              EndDateChanged="OnRangeEndChanged"
-                                              MinDate="@_minReviewDate"
-                                              MaxDate="@_maxReviewDate" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)
-                        </MudText>
-                    </div>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6" id="workflow-controls">
-            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
-                <MudText Typo="Typo.subtitle1" Class="mb-2">Tree + Stepper</MudText>
-                <MudStack Spacing="2">
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Workflow Tree</MudText>
-                        <AgentTreeView AgentId="kit-workflow-tree"
-                                       NodeIds="@_treeNodeIds"
-                                       SelectedNodeId="@_selectedTreeNodeId"
-                                       SelectedNodeIdChanged="OnTreeNodeSelected"
-                                       ExpandedNodeIds="@_expandedTreeNodeIds"
-                                       ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)
-                        </MudText>
-                    </div>
-
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Onboarding Stepper</MudText>
-                        <AgentStepper AgentId="kit-onboarding-stepper"
-                                      CurrentStepIndex="@_currentStepIndex"
-                                      CurrentStepIndexChanged="OnCurrentStepChanged"
-                                      StepIds="@_stepIds" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])
-                        </MudText>
-                    </div>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="6" id="utility-controls">
-            <MudPaper Elevation="0" Class="demo-doc-page__section components-page__card">
-                <MudText Typo="Typo.subtitle1" Class="mb-2">Command + Files</MudText>
-                <MudStack Spacing="2">
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Command Bar</MudText>
-                        <AgentCommandBar AgentId="kit-command-bar"
-                                         Commands="@_commands"
-                                         CommandInvoked="OnCommandInvoked" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Last command: @_lastCommand
-                        </MudText>
-                    </div>
-
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">File Upload (names only)</MudText>
-                        <AgentFileUpload AgentId="kit-file-upload"
-                                         Files="@_attachedFiles"
-                                         FilesChanged="OnFilesChanged" />
-                        <MudText Typo="Typo.caption" Class="mt-1">
-                            Attached files: @(string.Join(", ", _attachedFiles))
-                        </MudText>
-                    </div>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
 </div>
 
 @code {
+    [Parameter]
+    public string? ComponentKey { get; set; }
+
+    private AgentDialog? _componentDialog;
+    private bool _componentDialogVisible;
+
+    private readonly ComponentFormModel _componentFormModel = new()
+    {
+        SupplierName = "Northwind Traders",
+        RiskTier = "Medium",
+        NeedsExpedite = false
+    };
+
     private string? _selectedCountry = "United States";
     private string? _supplierQuery = "Apex";
     private string? _selectedSupplier = "Apex Components";
@@ -191,10 +403,19 @@
     private IReadOnlyList<string> _expandedTreeNodeIds = ["compliance"];
     private int _currentStepIndex = 1;
     private string _lastCommand = "none";
-    private IReadOnlyList<string> _attachedFiles =
+    private IReadOnlyList<string> _attachedFiles = [];
+    private string _uploadPolicyMode = "Local";
+    private IReadOnlyList<DemoFileWorkflowEvent> _fileWorkflowEvents = [];
+    private IReadOnlyList<DemoFileWorkflowJob> _fileWorkflowJobs = [];
+
+    private static readonly IReadOnlyList<GridSupplierRow> _gridRows =
     [
-        "vendor-evidence.csv",
-        "risk-summary-q1.pdf"
+        new("SUP-100", "Northwind Traders", "EMEA", 82),
+        new("SUP-101", "Alpine Components", "NA", 58),
+        new("SUP-102", "Delta Manufacturing", "APAC", 71),
+        new("SUP-103", "Vertex Industrial", "EMEA", 44),
+        new("SUP-104", "Apex Labs", "NA", 66),
+        new("SUP-105", "Summit Fabrication", "APAC", 75)
     ];
 
     private static readonly IReadOnlyList<string> _countryOptions =
@@ -237,8 +458,80 @@
         "publish_report",
         "show_local_upload_policy",
         "show_remote_upload_policy",
+        "sync_remote_handoff",
+        "validate_remote_tokens",
         "create_audit_bundle"
     ];
+
+    private static readonly IReadOnlyList<ComponentEntry> _componentEntries =
+    [
+        new("Overview", "/demo/components"),
+        new("AgentDataGrid", "/demo/components/datagrid"),
+        new("AgentForm", "/demo/components/form"),
+        new("AgentDialog", "/demo/components/dialog"),
+        new("AgentTabs", "/demo/components/tabs"),
+        new("AgentSelect", "/demo/components/select"),
+        new("AgentAutocomplete", "/demo/components/autocomplete"),
+        new("AgentDatePicker", "/demo/components/date-picker"),
+        new("AgentDateRangePicker", "/demo/components/date-range-picker"),
+        new("AgentTreeView", "/demo/components/tree-view"),
+        new("AgentStepper", "/demo/components/stepper"),
+        new("AgentCommandBar", "/demo/components/command-bar"),
+        new("AgentFileUpload", "/demo/components/file-upload")
+    ];
+
+    private string NormalizedComponentKey => NormalizeComponentKey(ComponentKey);
+
+    private bool IsUnknownComponent =>
+        !string.Equals(NormalizedComponentKey, "overview", StringComparison.OrdinalIgnoreCase)
+        && !_componentEntries.Any(x => string.Equals(NormalizedComponentKey, ExtractKeyFromHref(x.Href), StringComparison.OrdinalIgnoreCase));
+
+    private bool Show(string key)
+    {
+        if (IsUnknownComponent)
+        {
+            return true;
+        }
+
+        return string.Equals(NormalizedComponentKey, "overview", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(NormalizedComponentKey, key, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OnComponentFormSubmittedAsync()
+    {
+        Snackbar.Add("Component form submitted.", Severity.Success);
+        await Task.CompletedTask;
+    }
+
+    private async Task OpenComponentDialogAsync()
+    {
+        _componentDialogVisible = true;
+        if (_componentDialog is not null)
+        {
+            await _componentDialog.Open();
+        }
+    }
+
+    private async Task CloseComponentDialogAsync()
+    {
+        _componentDialogVisible = false;
+        if (_componentDialog is not null)
+        {
+            await _componentDialog.Close();
+        }
+    }
+
+    private async Task ConfirmComponentDialogAsync()
+    {
+        Snackbar.Add("Dialog confirmed.", Severity.Success);
+        await CloseComponentDialogAsync();
+    }
+
+    private Task OnComponentDialogVisibleChanged(bool visible)
+    {
+        _componentDialogVisible = visible;
+        return Task.CompletedTask;
+    }
 
     private Task OnCountryChanged(string? value)
     {
@@ -294,15 +587,17 @@
         return Task.CompletedTask;
     }
 
-    private Task OnFilesChanged(IReadOnlyList<string> files)
+    private async Task OnFilesChanged(IReadOnlyList<string> files)
     {
         _attachedFiles = files;
-        return Task.CompletedTask;
+        var snapshot = await FileWorkflowService.SyncFilesAsync(ComponentRegistry.SessionId, _attachedFiles, _uploadPolicyMode);
+        ApplyFileWorkflowSnapshot(snapshot);
     }
 
-    private Task OnCommandInvoked(string command)
+    private async Task OnCommandInvoked(string command)
     {
         _lastCommand = command;
+        DemoFileWorkflowSnapshot snapshot;
 
         var message = command switch
         {
@@ -310,13 +605,140 @@
                 "Local policy: keep file names as references only; do not read/write local files directly.",
             "show_remote_upload_policy" =>
                 "Remote policy: treat file names as tokens and hand off uploads to approved external storage services.",
+            "sync_remote_handoff" =>
+                "Started remote handoff pipeline for files in Remote mode.",
+            "validate_remote_tokens" =>
+                "Validated remote storage tokens for files in Remote mode.",
+            "create_audit_bundle" =>
+                "Executed remote handoff and token validation to generate an audit-ready workflow trace.",
             _ => $"Invoked '{command}'."
         };
 
+        if (string.Equals(command, "show_local_upload_policy", StringComparison.OrdinalIgnoreCase))
+        {
+            _uploadPolicyMode = "Local";
+            snapshot = await FileWorkflowService.SyncFilesAsync(ComponentRegistry.SessionId, _attachedFiles, _uploadPolicyMode);
+        }
+        else if (string.Equals(command, "show_remote_upload_policy", StringComparison.OrdinalIgnoreCase))
+        {
+            _uploadPolicyMode = "Remote";
+            snapshot = await FileWorkflowService.SyncFilesAsync(ComponentRegistry.SessionId, _attachedFiles, _uploadPolicyMode);
+        }
+        else if (string.Equals(command, "sync_remote_handoff", StringComparison.OrdinalIgnoreCase))
+        {
+            snapshot = await FileWorkflowService.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+        }
+        else if (string.Equals(command, "validate_remote_tokens", StringComparison.OrdinalIgnoreCase))
+        {
+            snapshot = await FileWorkflowService.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+        }
+        else if (string.Equals(command, "create_audit_bundle", StringComparison.OrdinalIgnoreCase))
+        {
+            snapshot = await FileWorkflowService.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+            snapshot = await FileWorkflowService.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+        }
+        else
+        {
+            snapshot = await FileWorkflowService.GetOrCreateAsync(ComponentRegistry.SessionId, _uploadPolicyMode);
+        }
+
+        snapshot = await FileWorkflowService.RecordWorkflowEventAsync(
+            ComponentRegistry.SessionId,
+            "CommandInvoked",
+            command,
+            message);
+
+        ApplyFileWorkflowSnapshot(snapshot);
+
         Snackbar.Add(message, Severity.Info);
-        return Task.CompletedTask;
     }
+
+    private async Task RunRemoteHandoffAsync()
+    {
+        var snapshot = await FileWorkflowService.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+        snapshot = await FileWorkflowService.RecordWorkflowEventAsync(
+            ComponentRegistry.SessionId,
+            "CommandInvoked",
+            "sync_remote_handoff",
+            "Started remote handoff pipeline for files in Remote mode.");
+        ApplyFileWorkflowSnapshot(snapshot);
+        _lastCommand = "sync_remote_handoff";
+        Snackbar.Add("Remote handoff pipeline executed.", Severity.Info);
+    }
+
+    private async Task ValidateRemoteTokensAsync()
+    {
+        var snapshot = await FileWorkflowService.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+        snapshot = await FileWorkflowService.RecordWorkflowEventAsync(
+            ComponentRegistry.SessionId,
+            "CommandInvoked",
+            "validate_remote_tokens",
+            "Validated remote storage tokens for files in Remote mode.");
+        ApplyFileWorkflowSnapshot(snapshot);
+        _lastCommand = "validate_remote_tokens";
+        Snackbar.Add("Remote token validation completed.", Severity.Info);
+    }
+
+    private void ApplyFileWorkflowSnapshot(DemoFileWorkflowSnapshot snapshot)
+    {
+        _attachedFiles = snapshot.Files;
+        _uploadPolicyMode = snapshot.UploadMode;
+        _fileWorkflowEvents = snapshot.Events;
+        _fileWorkflowJobs = snapshot.Jobs;
+    }
+
+    private static Color MapJobStatusColor(string status) =>
+        status switch
+        {
+            "Completed" => Color.Success,
+            "Verified" => Color.Success,
+            "Failed" => Color.Error,
+            "InProgress" => Color.Warning,
+            _ => Color.Default
+        };
 
     private static string FormatDate(DateTime? value) =>
         value?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "(none)";
+
+    private static string NormalizeComponentKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return "overview";
+        }
+
+        return key.Trim().ToLowerInvariant();
+    }
+
+    private static string ExtractKeyFromHref(string href)
+    {
+        const string prefix = "/demo/components/";
+        if (!href.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return "overview";
+        }
+
+        var key = href[prefix.Length..];
+        return string.IsNullOrWhiteSpace(key) ? "overview" : key;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var snapshot = await FileWorkflowService.GetOrCreateAsync(ComponentRegistry.SessionId, _uploadPolicyMode);
+        ApplyFileWorkflowSnapshot(snapshot);
+    }
+
+    private sealed class ComponentFormModel
+    {
+        [Required]
+        public string SupplierName { get; set; } = string.Empty;
+
+        [Required]
+        public string RiskTier { get; set; } = "Medium";
+
+        public bool NeedsExpedite { get; set; }
+    }
+
+    private sealed record GridSupplierRow(string Id, string Name, string Region, int RiskScore);
+    private sealed record ComponentEntry(string Title, string Href);
 }

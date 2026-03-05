@@ -1,14 +1,18 @@
 @inherits LayoutComponentBase
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Demo.Services
 @using MudBlazor
+@implements IDisposable
+@inject DojoExperienceState DojoExperience
+@inject NavigationManager NavigationManager
 
 <MudThemeProvider Theme="_activeTheme" IsDarkMode="true" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<div class="demo-app @CurrentThemeCssClass">
+<div class="demo-app @CurrentThemeCssClass @(IsDojoRoute ? "demo-app--dojo" : null)">
     <aside class="demo-app__sidebar">
         <MudPaper Elevation="0" Class="demo-app__sidebar-card">
             <a href="/demo" class="demo-app__sidebar-brand">
@@ -20,78 +24,109 @@
             </a>
 
             <p class="demo-app__sidebar-copy">
-                Navigate focused demos and run assistant-driven actions against mounted wrappers.
+                Navigate the dojo workspace and component explorer with assistant-driven control.
             </p>
 
             <DemoNavMenu />
         </MudPaper>
     </aside>
 
-    <main class="demo-app__main">
-        <header class="demo-app__topbar">
-            <div class="demo-app__topbar-intro">
-                <a href="/" class="demo-app__back">
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                    <span>Back to Home</span>
-                </a>
+    <main class="demo-app__main @(IsDojoRoute ? "demo-app__main--dojo" : null)">
+        @if (!IsDojoRoute)
+        {
+            <header class="demo-app__topbar">
+                <div class="demo-app__topbar-intro">
+                    <a href="/" class="demo-app__back">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                        <span>Back to Home</span>
+                    </a>
 
-                <div class="demo-app__title-block">
-                    <p class="demo-app__title-eyebrow">Component-aware UI automation</p>
-                    <h1 class="demo-app__title">AgentBlazor Demo Workspace</h1>
+                    <div class="demo-app__title-block">
+                        <p class="demo-app__title-eyebrow">Interactive Agent UI</p>
+                        <h1 class="demo-app__title">AgentBlazor Dojo</h1>
+                    </div>
                 </div>
-            </div>
 
-            <div class="demo-app__controls">
-                <MudSelect T="string"
-                           Value="_selectedThemeKey"
-                           ValueChanged="OnThemeChanged"
-                           Label="Theme"
-                           Dense="true"
-                           Variant="Variant.Outlined"
-                           Class="demo-app__theme-select">
-                    @foreach (var option in ThemeOptions)
-                    {
-                        <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-        </header>
+                <div class="demo-app__controls">
+                    <MudSelect T="string"
+                               Value="_selectedThemeKey"
+                               ValueChanged="OnThemeChanged"
+                               Label="Theme"
+                               Dense="true"
+                               Variant="Variant.Outlined"
+                               Class="demo-app__theme-select">
+                        @foreach (var option in ThemeOptions)
+                        {
+                            <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </header>
+        }
 
         <article class="demo-app__content">
             @Body
         </article>
     </main>
 
-    <aside class="demo-app__assistant-pane">
-        <MudPaper Elevation="0" Class="demo-app__assistant-card">
-            <div class="demo-app__assistant-head">
-                <p class="demo-app__assistant-eyebrow">AI Assistant</p>
-                <h2 class="demo-app__assistant-title">Control This Workspace</h2>
-                <p class="demo-app__assistant-copy">
-                    Edit forms, navigate routes, and generate UI from live data sources without leaving this page.
-                </p>
-            </div>
+    @if (!IsDojoRoute)
+    {
+        <aside class="demo-app__assistant-pane">
+            <MudPaper Elevation="0" Class="demo-app__assistant-card">
+                <div class="demo-app__assistant-head">
+                    <p class="demo-app__assistant-eyebrow">AI Assistant</p>
+                    <h2 class="demo-app__assistant-title">Control This Workspace</h2>
+                    <p class="demo-app__assistant-copy">
+                        @AssistantDescription
+                    </p>
+                </div>
 
-            <AgentChatSurface Title="Assistant"
-                              Description="Everything in this workspace is agent-controllable on the current route."
-                              EnableGeneratedUi="true"
-                              Placeholder="Try: set recipe title to test, add optional ingredient chives, switch to run notes."
-                              Theme="_assistantTheme"
-                              CssClass="demo-app__assistant-surface" />
-        </MudPaper>
-    </aside>
+                <AgentChatSurface Title="@AssistantTitle"
+                                  Description="@AssistantDescription"
+                                  DefaultAgentName="@DefaultAssistantAgent"
+                                  LockAgentToCurrentRoute="true"
+                                  ShowAgentSelector="false"
+                                  RequireHandoffApproval="@AssistantRequireHandoffApproval"
+                                  HandoffApprovalPolicy="@_assistantHandoffApprovalPolicy"
+                                  HandoffPolicy="@_assistantHandoffPolicy"
+                                  MaxHandoffsPerSession="6"
+                                  MaxHandoffsPerPair="2"
+                                  MaxHandoffsPerWindow="3"
+                                  HandoffWindowMinutes="10"
+                                  MaxPairHandoffsPerWindow="2"
+                                  BlockImmediateReturnHandoff="true"
+                                  EnableGeneratedUi="@AssistantEnableGeneratedUi"
+                                  Placeholder="@AssistantPlaceholder"
+                                  Theme="_assistantTheme"
+                                  CssClass="demo-app__assistant-surface" />
+            </MudPaper>
+        </aside>
+    }
 </div>
 
-<AgentChatWidget Title="Assistant"
-                 Description="Generated UI mode is enabled for this chat."
-                 EnableGeneratedUi="true"
-                 Placeholder="Ask me to navigate, analyze data, draft UI, and run workflow actions across this app..."
-                 Theme="_assistantTheme"
-                 Width="26rem"
-                 Height="68vh"
-                 Right="0.85rem"
-                 Bottom="0.85rem"
-                 CssClass="demo-app__assistant-widget" />
+@if (!IsDojoRoute)
+{
+    <AgentChatWidget Title="@AssistantTitle"
+                     Description="@AssistantDescription"
+                     DefaultAgentName="@DefaultAssistantAgent"
+                     RequireHandoffApproval="@AssistantRequireHandoffApproval"
+                     HandoffApprovalPolicy="@_assistantHandoffApprovalPolicy"
+                     HandoffPolicy="@_assistantHandoffPolicy"
+                     MaxHandoffsPerSession="6"
+                     MaxHandoffsPerPair="2"
+                     MaxHandoffsPerWindow="3"
+                     HandoffWindowMinutes="10"
+                     MaxPairHandoffsPerWindow="2"
+                     BlockImmediateReturnHandoff="true"
+                     EnableGeneratedUi="@AssistantEnableGeneratedUi"
+                     Placeholder="@AssistantPlaceholder"
+                     Theme="_assistantTheme"
+                     Width="26rem"
+                     Height="68vh"
+                     Right="0.85rem"
+                     Bottom="0.85rem"
+                     CssClass="demo-app__assistant-widget" />
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -114,6 +149,21 @@
         FontFamily = "\"Public Sans\", \"Segoe UI\", sans-serif",
         FontSize = "0.92rem"
     };
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _assistantHandoffPolicy =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Dojo Workspace Agent"] = ["Workflow Orchestrator Agent"],
+            ["Workflow Orchestrator Agent"] = ["Dojo Workspace Agent", "Supplier Analyst Agent"],
+            ["Supplier Analyst Agent"] = ["Workflow Orchestrator Agent"]
+        };
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _assistantHandoffApprovalPolicy =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Workflow Orchestrator Agent"] = ["Supplier Analyst Agent"],
+            ["*"] = ["!Dojo Workspace Agent"]
+        };
 
     private static readonly MudTheme AuroraTheme = new()
     {
@@ -187,6 +237,36 @@
             ? "demo-theme--coastline"
             : "demo-theme--aurora";
 
+    private string CurrentRoutePath => new Uri(NavigationManager.Uri).AbsolutePath;
+
+    private bool IsDojoRoute => CurrentRoutePath.StartsWith("/demo/dojo", StringComparison.OrdinalIgnoreCase);
+
+    private DojoAssistantProfile ActiveDojoProfile => DojoExperience.CurrentAssistantProfile;
+
+    private string AssistantTitle => IsDojoRoute ? "AI Recipe Assistant" : "Assistant";
+
+    private string AssistantDescription => IsDojoRoute
+        ? ActiveDojoProfile.AssistantDescription
+        : "Edit forms, navigate components, and run cross-wrapper actions from the current route.";
+
+    private string AssistantPlaceholder => IsDojoRoute
+        ? ActiveDojoProfile.Placeholder
+        : "Try: /agents, /agent Workflow Orchestrator Agent, /approve-handoff, set form fields, submit workflows.";
+
+    private bool AssistantRequireHandoffApproval => IsDojoRoute && ActiveDojoProfile.RequireHandoffApproval;
+
+    private bool AssistantEnableGeneratedUi => IsDojoRoute
+        ? ActiveDojoProfile.EnableGeneratedUi
+        : true;
+
+    private string? DefaultAssistantAgent => IsDojoRoute ? "Dojo Workspace Agent" : null;
+
+    protected override void OnInitialized()
+    {
+        DojoExperience.Changed += OnDojoExperienceChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
     private Task OnThemeChanged(string key)
     {
         _selectedThemeKey = key;
@@ -194,6 +274,21 @@
             ? CoastlineTheme
             : AuroraTheme;
         return Task.CompletedTask;
+    }
+
+    private void OnDojoExperienceChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = args;
+        _ = sender;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        DojoExperience.Changed -= OnDojoExperienceChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 
     private sealed record ThemeOption(string Key, string Label);

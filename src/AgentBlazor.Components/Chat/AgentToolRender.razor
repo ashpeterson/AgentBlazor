@@ -1,0 +1,90 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Models
+
+<AgentActionRender AgentId="@ResolvedComponentId"
+                   ActionId="@ResolvedActionId"
+                   InProgress="@InProgress"
+                   Executing="@Executing"
+                   Complete="@Complete"
+                   Failed="@Failed" />
+
+@code {
+    /// <summary>
+    /// Full tool id in <c>ComponentId.ActionId</c> format (for example <c>AgentForm.submit</c>).
+    /// </summary>
+    [Parameter]
+    public string? ToolId { get; set; }
+
+    /// <summary>
+    /// Runtime component id (for example <c>AgentForm</c> or <c>AgentDataGrid</c>).
+    /// </summary>
+    [Parameter]
+    public string? ComponentId { get; set; }
+
+    /// <summary>
+    /// Action id for the target component (for example <c>submit</c>).
+    /// </summary>
+    [Parameter]
+    public string? ActionId { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? InProgress { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Executing { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Complete { get; set; }
+
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Failed { get; set; }
+
+    private string ResolvedComponentId { get; set; } = string.Empty;
+    private string ResolvedActionId { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(ComponentId) && !string.IsNullOrWhiteSpace(ActionId))
+        {
+            ResolvedComponentId = ComponentId.Trim();
+            ResolvedActionId = ActionId.Trim();
+            return;
+        }
+
+        if (TryParseToolId(ToolId, out var componentId, out var actionId))
+        {
+            ResolvedComponentId = componentId;
+            ResolvedActionId = actionId;
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "AgentToolRender requires either ToolId in 'ComponentId.ActionId' format " +
+            "or both ComponentId and ActionId.");
+    }
+
+    private static bool TryParseToolId(
+        string? toolId,
+        out string componentId,
+        out string actionId)
+    {
+        componentId = string.Empty;
+        actionId = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(toolId))
+        {
+            return false;
+        }
+
+        var trimmed = toolId.Trim();
+        var separator = trimmed.IndexOf('.');
+        if (separator <= 0 || separator >= trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        componentId = trimmed[..separator].Trim();
+        actionId = trimmed[(separator + 1)..].Trim();
+        return !string.IsNullOrWhiteSpace(componentId) && !string.IsNullOrWhiteSpace(actionId);
+    }
+}

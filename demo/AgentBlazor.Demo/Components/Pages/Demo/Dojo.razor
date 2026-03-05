@@ -1,81 +1,336 @@
 @page "/demo/dojo"
 @layout DemoLayout
 @using AgentBlazor
+@using AgentBlazor.Attributes
 @using AgentBlazor.Components
+@using AgentBlazor.Components.Chat
+@using AgentBlazor.Core.Components
+@using AgentBlazor.Core.Runtime.Agents
+@using AgentBlazor.Runtime
 @using AgentBlazor.Demo.Services
 @using MudBlazor
 @inherits AgentFormPageBase<DojoRecipeModel>
 @inject ISnackbar Snackbar
 @inject DojoWorkspaceService WorkspaceService
+@inject DojoExperienceState DojoExperience
 
 <PageTitle>Dojo Workspace — AgentBlazor Demo</PageTitle>
 
-<div class="demo-dojo">
-    <MudPaper Elevation="1" Class="demo-doc-page__hero demo-dojo__hero">
-        <p class="demo-doc-page__eyebrow">Interactive Dojo</p>
+<AgentToolRender ToolId="AgentForm.submit">
+    <InProgress Context="_">
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+            Gathering submit parameters...
+        </MudAlert>
+    </InProgress>
+    <Executing Context="_">
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+            Running tool invocation...
+        </MudAlert>
+    </Executing>
+    <Complete Context="ctx">
+        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-2">
+            Tool completed: @ctx.Result
+        </MudAlert>
+    </Complete>
+    <Failed Context="ctx">
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">
+            Tool failed: @ctx.Result
+        </MudAlert>
+    </Failed>
+</AgentToolRender>
 
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="demo-dojo__hero-head">
-            <MudText Typo="Typo.h5">AI Recipe Workspace</MudText>
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Live Workspace</MudChip>
-        </MudStack>
+<div class="dojo-workspace">
+    <MudPaper Elevation="0" Class="dojo-workspace__rail">
+        <MudText Typo="Typo.subtitle1">AG-UI Interactive Dojo</MudText>
 
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            A calm, structured canvas inspired by CopilotKit-style workflows. Edit the recipe, manage ingredients,
-            and run assistant prompts without jumping between pages.
-        </MudText>
+        <section class="dojo-workspace__rail-section">
+            <p class="dojo-workspace__rail-label">Integrations</p>
+            <MudSelect T="string" Value="@_selectedIntegration" ValueChanged="OnIntegrationChanged" Dense="true" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@("Microsoft Agent Framework (.NET)")">Microsoft Agent Framework (.NET)</MudSelectItem>
+            </MudSelect>
+        </section>
 
-        <div class="demo-doc-page__toc">
-            <a class="demo-doc-page__toc-link" href="#prompt-set">Prompt Set</a>
-            <a class="demo-doc-page__toc-link" href="#canvas">Recipe Canvas</a>
-            <a class="demo-doc-page__toc-link" href="#run-notes">Run Notes</a>
-            <a class="demo-doc-page__toc-link" href="#data-sources">Data Sources</a>
-        </div>
+        <section class="dojo-workspace__rail-section">
+            <p class="dojo-workspace__rail-label">View</p>
+            <div class="dojo-workspace__view-toggle">
+                <button type="button"
+                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Preview) ? "is-active" : null)"
+                        @onclick="() => SetViewMode(DojoViewMode.Preview)">
+                    Preview
+                </button>
+                <button type="button"
+                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Code) ? "is-active" : null)"
+                        @onclick="() => SetViewMode(DojoViewMode.Code)">
+                    Code
+                </button>
+                <button type="button"
+                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Docs) ? "is-active" : null)"
+                        @onclick="() => SetViewMode(DojoViewMode.Docs)">
+                    Docs
+                </button>
+            </div>
+        </section>
+
+        <section class="dojo-workspace__rail-section">
+            <p class="dojo-workspace__rail-label">Demos</p>
+            <div class="dojo-workspace__demo-list">
+                @foreach (var example in _examples)
+                {
+                    <button type="button"
+                            class="dojo-workspace__demo-item @(IsSelectedExample(example.Key) ? "is-active" : null)"
+                            @onclick="() => SelectExample(example.Key)">
+                        <span class="dojo-workspace__demo-title">@example.Title</span>
+                        <span class="dojo-workspace__demo-description">@example.Description</span>
+                        <span class="dojo-workspace__demo-tags">
+                            @foreach (var tag in example.Tags)
+                            {
+                                <span>@tag</span>
+                            }
+                        </span>
+                    </button>
+                }
+            </div>
+        </section>
     </MudPaper>
 
-    <section id="prompt-set" class="demo-doc-page__section">
-        <div class="demo-doc-page__section-head">
-            <MudText Typo="Typo.h6">Prompt Set</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Use these prompts to validate smooth, multi-component control.
-            </MudText>
-        </div>
+    <div class="dojo-workspace__main">
+        @if (_viewMode == DojoViewMode.Preview)
+        {
+            @if (IsExample("agentic-chat"))
+            {
+                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat" Style="@BackgroundCanvasStyle">
+                    <div class="dojo-canvas__prompt-pill">@_backgroundStudioUserPrompt</div>
 
-        <div class="demo-doc-page__prompt-box">
-            <ul class="demo-doc-page__prompt-list">
-                <li><span class="demo-doc-page__prompt-code">set recipe title to test</span></li>
-                <li><span class="demo-doc-page__prompt-code">set duration to 45</span></li>
-                <li><span class="demo-doc-page__prompt-code">show only ingredients where optional is false</span></li>
-                <li><span class="demo-doc-page__prompt-code">open ingredient dialog and add chives optional amount 1 tbsp</span></li>
-                <li><span class="demo-doc-page__prompt-code">switch to run notes tab</span></li>
-            </ul>
-        </div>
-    </section>
+                    <div class="dojo-canvas__center-copy">
+                        <MudText Typo="Typo.h4">@_backgroundStudioHeadline</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_backgroundStudioBody</MudText>
+                    </div>
 
-    <MudGrid Spacing="2">
-        <MudItem xs="12" xl="8" id="canvas">
-            <MudPaper Elevation="0" Class="demo-doc-page__section demo-dojo__canvas">
-                <AgentTabs AgentId="dojo-tabs">
-                    <MudTabPanel Text="Recipe Canvas">
+                    <div class="dojo-canvas__suggestions">
+                        @foreach (var suggestion in _backgroundStudioSuggestions)
+                        {
+                            <span>@suggestion</span>
+                        }
+                    </div>
+
+                    <div class="dojo-canvas__chat-shell">
+                        <AgentChatSurface FormName="dojo-chat-agentic"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          Placeholder="Change the background color, update the title, or ask what components are mounted."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat" />
+                    </div>
+                </MudPaper>
+            }
+            else if (IsExample("backend-tool-rendering"))
+            {
+                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
+                    <div class="dojo-canvas__center-copy dojo-canvas__center-copy--compact">
+                        <MudText Typo="Typo.h5">Backend Tool Rendering</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Submit the backend action below or ask the assistant to do it for you. Tool lifecycle events stream into the chat and run notes.
+                        </MudText>
+                    </div>
+
+                    <MudPaper Elevation="0" Class="dojo-backend-panel">
+                        <AgentForm AgentId="dojo-backend-tool-form"
+                                   Model="@_backendToolModel"
+                                   Submitted="OnBackendToolSubmittedAsync">
+                            <ChildContent Context="_">
+                                <DataAnnotationsValidator />
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="5">
+                                        <MudTextField T="string"
+                                                      Label="Action Label"
+                                                      For="@(() => _backendToolModel.ActionLabel)"
+                                                      @bind-Value="_backendToolModel.ActionLabel" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="4">
+                                        <MudTextField T="string"
+                                                      Label="Operator"
+                                                      For="@(() => _backendToolModel.Operator)"
+                                                      @bind-Value="_backendToolModel.Operator" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="3">
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   ButtonType="ButtonType.Submit"
+                                                   FullWidth="true"
+                                                   Class="dojo-backend-panel__submit">
+                                            Submit Tool
+                                        </MudButton>
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Notes"
+                                                      Lines="2"
+                                                      For="@(() => _backendToolModel.Notes)"
+                                                      @bind-Value="_backendToolModel.Notes" />
+                                    </MudItem>
+                                </MudGrid>
+                            </ChildContent>
+                        </AgentForm>
+
+                        <div class="dojo-backend-panel__events">
+                            @foreach (var note in ToolExecutionNotes)
+                            {
+                                <div class="dojo-backend-panel__event">@note.Message</div>
+                            }
+                        </div>
+                    </MudPaper>
+
+                    <div class="dojo-canvas__chat-shell">
+                        <AgentChatSurface FormName="dojo-chat-backend"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          Placeholder="Set action label to policy review and submit the backend demo form."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat" />
+                    </div>
+                </MudPaper>
+            }
+            else if (IsExample("human-loop"))
+            {
+                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
+                    <MudPaper Elevation="0" Class="dojo-checklist">
+                        <div class="dojo-checklist__head">
+                            <MudText Typo="Typo.h6">Select Steps</MudText>
+                            <div class="dojo-checklist__meta">
+                                <span>@SelectedSandwichStepCount/@_humanLoopSteps.Count Selected</span>
+                                <span class="dojo-checklist__status">@_humanLoopStatus</span>
+                            </div>
+                        </div>
+
+                        <div class="dojo-checklist__progress">
+                            <span style="width:@SandwichSelectionProgress%;"></span>
+                        </div>
+
+                        @foreach (var step in _humanLoopSteps)
+                        {
+                            <button type="button"
+                                    class="dojo-checklist__item @(step.Selected ? "is-selected" : null)"
+                                    @onclick="() => ToggleSandwichStep(step.Number)">
+                                <span class="dojo-checklist__checkbox">@(step.Selected ? "\u2713" : "")</span>
+                                <span>@step.Text</span>
+                            </button>
+                        }
+                    </MudPaper>
+
+                    <div class="dojo-canvas__chat-shell">
+                        <AgentChatSurface FormName="dojo-chat-human-loop"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          RequireHandoffApproval="true"
+                                          Placeholder="Make me a sandwich and then finalize the selected steps."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat" />
+                    </div>
+                </MudPaper>
+            }
+            else if (IsExample("agentic-generative-ui"))
+            {
+                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
+                    <MudPaper Elevation="0" Class="dojo-progress-board">
+                        <div class="dojo-progress-board__head">
+                            <MudText Typo="Typo.h6">Task Progress</MudText>
+                            <span>@CompletedTaskCount/@_taskProgressSteps.Count Complete</span>
+                        </div>
+
+                        <div class="dojo-progress-board__progress">
+                            <span style="width:@TaskCompletionProgress%;"></span>
+                        </div>
+
+                        @foreach (var step in _taskProgressSteps)
+                        {
+                            <div class="dojo-progress-board__item @(step.Completed ? "is-complete" : null)">
+                                <span class="dojo-progress-board__dot"></span>
+                                <span>@step.Text</span>
+                            </div>
+                        }
+                    </MudPaper>
+
+                    <div class="dojo-canvas__chat-shell">
+                        <AgentChatSurface FormName="dojo-chat-agentic-ui"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          EnableGeneratedUi="true"
+                                          Placeholder="Plan a vacation to Japan and keep the progress board updated."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat" />
+                    </div>
+                </MudPaper>
+            }
+            else if (IsExample("tool-based-generative-ui"))
+            {
+                <div class="dojo-split-stage dojo-split-stage--tool-ui">
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
+                        <AgentGenerativeSurface Document="@_toolBasedGeneratedUiDocument"
+                                                AgentName="Dojo Workspace Agent"
+                                                SessionId="@WorkspaceSessionId"
+                                                ForwardActionsToRuntime="true"
+                                                ShowRuntimeResponses="false"
+                                                OnActionInvoked="OnGeneratedUiActionInvokedAsync"
+                                                OnRuntimeResponseReceived="OnGeneratedUiRuntimeResponseAsync"
+                                                OnError="OnGeneratedUiErrorAsync"
+                                                CssClass="dojo-generated-surface" />
+                    </MudPaper>
+
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
+                        <div class="dojo-sidechat__head">
+                            <p>Haiku Generator</p>
+                        </div>
+
+                        <AgentChatSurface FormName="dojo-chat-tool-ui"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          EnableGeneratedUi="true"
+                                          Placeholder="Write me a haiku about nature."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
+                    </MudPaper>
+                </div>
+            }
+            else if (IsExample("shared-state"))
+            {
+                <div class="dojo-split-stage">
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
                         <AgentForm AgentId="dojo-recipe-form"
                                    Model="@Model"
                                    Submitted="OnRecipeSubmittedAsync">
-                            <ChildContent Context="formContext">
+                            <ChildContent Context="_">
                                 <DataAnnotationsValidator />
 
-                                <MudGrid Spacing="2">
-                                    <MudItem xs="12" md="7">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="dojo-recipe__header">
+                                    <MudText Typo="Typo.h4">@Model.Title</MudText>
+                                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">Live Recipe</MudChip>
+                                </MudStack>
+
+                                <MudGrid Spacing="2" Class="dojo-recipe__meta">
+                                    <MudItem xs="12" md="6">
                                         <MudTextField T="string"
                                                       Label="Recipe Title"
+                                                      Placeholder="Classic Omelette"
                                                       For="@(() => Model.Title)"
                                                       @bind-Value="Model.Title" />
                                     </MudItem>
-                                    <MudItem xs="12" sm="6" md="3">
+                                    <MudItem xs="6" md="3">
                                         <MudNumericField T="int"
                                                          Label="Minutes"
                                                          For="@(() => Model.Minutes)"
                                                          @bind-Value="Model.Minutes" />
                                     </MudItem>
-                                    <MudItem xs="12" sm="6" md="2">
+                                    <MudItem xs="6" md="3">
                                         <MudSelect T="string"
                                                    Label="Difficulty"
                                                    For="@(() => Model.Difficulty)"
@@ -87,216 +342,262 @@
                                     </MudItem>
                                 </MudGrid>
 
-                                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Dietary Preferences</MudText>
-                                <div class="demo-dojo__flags">
-                                    <MudCheckBox T="bool" @bind-Value="Model.HighProtein" Label="High Protein" />
-                                    <MudCheckBox T="bool" @bind-Value="Model.LowCarb" Label="Low Carb" />
-                                    <MudCheckBox T="bool" @bind-Value="Model.Spicy" Label="Spicy" />
-                                    <MudCheckBox T="bool" @bind-Value="Model.Vegetarian" Label="Vegetarian" />
-                                </div>
+                                <section class="dojo-recipe__section">
+                                    <MudText Typo="Typo.h6">Dietary Preferences</MudText>
+                                    <div class="dojo-recipe__flags">
+                                        <MudCheckBox T="bool" @bind-Value="Model.HighProtein" Label="High Protein" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.LowCarb" Label="Low Carb" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.Spicy" Label="Spicy" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.Vegetarian" Label="Vegetarian" />
+                                    </div>
+                                </section>
 
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-3">
-                                    <MudText Typo="Typo.subtitle2">Ingredients</MudText>
-                                    <MudStack Row="true" Spacing="1">
+                                <section class="dojo-recipe__section">
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                                        <MudText Typo="Typo.h6">Ingredients</MudText>
                                         <MudButton Variant="Variant.Outlined"
                                                    Size="Size.Small"
                                                    Color="Color.Primary"
                                                    OnClick="OpenIngredientDialogAsync">
-                                            Add Ingredient
+                                            + Add Ingredient
                                         </MudButton>
-                                        <MudButton ButtonType="ButtonType.Submit"
-                                                   Variant="Variant.Filled"
+                                    </MudStack>
+
+                                    <div class="dojo-recipe__grid">
+                                        @foreach (var ingredient in _ingredients)
+                                        {
+                                            <MudPaper Elevation="0" Class="dojo-recipe__card">
+                                                <MudText Typo="Typo.subtitle2">@ingredient.Name</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@ingredient.Amount</MudText>
+                                                @if (!string.IsNullOrWhiteSpace(ingredient.Notes))
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@ingredient.Notes</MudText>
+                                                }
+                                            </MudPaper>
+                                        }
+                                    </div>
+                                </section>
+
+                                <section class="dojo-recipe__section">
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                                        <MudText Typo="Typo.h6">Instructions</MudText>
+                                        <MudButton Variant="Variant.Outlined"
                                                    Size="Size.Small"
-                                                   Color="Color.Primary">
+                                                   Color="Color.Primary"
+                                                   OnClick="OpenStepDialogAsync">
+                                            + Add Step
+                                        </MudButton>
+                                    </MudStack>
+
+                                    <ol class="dojo-recipe__steps">
+                                        @foreach (var step in _steps)
+                                        {
+                                            <li>
+                                                <MudPaper Elevation="0" Class="dojo-recipe__step-card">
+                                                    @step
+                                                </MudPaper>
+                                            </li>
+                                        }
+                                    </ol>
+                                </section>
+
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="dojo-recipe__actions">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Last save: @LastSavedLabel</MudText>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
                                             Save Draft
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowAssistantTip">
+                                            Improve with AI
                                         </MudButton>
                                     </MudStack>
                                 </MudStack>
                             </ChildContent>
                         </AgentForm>
+                    </MudPaper>
 
-                        <AgentDataGrid TItem="DojoIngredientRow"
-                                       AgentId="dojo-ingredients-grid"
-                                       Items="@_ingredients"
-                                       Dense="false"
-                                       Hover="true"
-                                       Bordered="true"
-                                       Striped="true"
-                                       RowKeyProperty="IngredientId"
-                                       ColumnAliases="@_ingredientAliases"
-                                       Class="mt-2">
-                            <Columns>
-                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Name" Title="Ingredient" />
-                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Amount" Title="Amount" />
-                                <PropertyColumn T="DojoIngredientRow" TProperty="bool" Property="x => x.Optional" Title="Optional" />
-                                <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Notes" Title="Notes" />
-                            </Columns>
-                        </AgentDataGrid>
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
+                        <div class="dojo-sidechat__head">
+                            <p>AI Recipe Assistant</p>
+                        </div>
 
-                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-3 mb-1">
-                            <MudText Typo="Typo.subtitle2">Instructions</MudText>
-                            <MudButton Variant="Variant.Outlined"
-                                       Size="Size.Small"
-                                       Color="Color.Primary"
-                                       OnClick="OpenStepDialogAsync">
-                                Add Step
-                            </MudButton>
-                        </MudStack>
-                        <ol class="demo-dojo__steps">
-                            @for (var i = 0; i < _steps.Count; i++)
+                        <AgentChatSurface FormName="dojo-chat-shared-state"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          Placeholder="Add eggs, add onion, create Italian recipe, or make it healthier."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
+                    </MudPaper>
+                </div>
+            }
+            else if (IsExample("predictive-state"))
+            {
+                <div class="dojo-split-stage">
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
+                        <div class="dojo-document">
+                            <p class="dojo-document__label">Predictive State Updates Document Editor</p>
+                            @foreach (var line in _predictiveDocumentLines)
                             {
-                                <li>@_steps[i]</li>
+                                <p class="dojo-document__line dojo-document__line--@line.Kind.ToString().ToLowerInvariant()">@line.Text</p>
                             }
-                        </ol>
-                    </MudTabPanel>
+                        </div>
+                    </MudPaper>
 
-                    <MudTabPanel Text="Run Notes">
-                        <div id="run-notes"></div>
-                        <MudStack Spacing="1">
-                            @foreach (var note in _runNotes)
-                            {
-                                <MudPaper Elevation="0" Class="demo-dojo__note">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@note.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudText>
-                                    <MudText Typo="Typo.body2">@note.Message</MudText>
-                                </MudPaper>
-                            }
-                        </MudStack>
-                    </MudTabPanel>
+                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
+                        <div class="dojo-sidechat__head">
+                            <p>AI Document Editor</p>
+                        </div>
 
-                    <MudTabPanel Text="Data Sources">
-                        <div id="data-sources"></div>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                            These are recommended chart/card sources for generated UI from the assistant.
+                        @if (_predictiveHasPendingChanges)
+                        {
+                            <MudPaper Elevation="0" Class="dojo-approval-card">
+                                <MudText Typo="Typo.subtitle1">Confirm Changes</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@_predictiveApprovalPrompt</MudText>
+                                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1" Class="mt-2">
+                                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="RejectPredictiveChanges">
+                                        Reject
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmPredictiveChangesFromUi">
+                                        Confirm
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        }
+
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="dojo-sidechat__note">
+                            @_predictiveAssistantMessage
                         </MudText>
-                        <pre class="docs-code">demo.suppliers.risk.by-region
-demo.suppliers.risk.tier-distribution
-demo.onboarding.volume.monthly
-demo.mitigation.volume.monthly</pre>
-                    </MudTabPanel>
-                </AgentTabs>
+
+                        <AgentChatSurface FormName="dojo-chat-predictive"
+                                          DefaultAgentName="Dojo Workspace Agent"
+                                          ShowAgentSelector="false"
+                                          LockAgentToCurrentRoute="true"
+                                          SessionId="@WorkspaceSessionId"
+                                          EnableGeneratedUi="true"
+                                          Placeholder="Make all bold, rewrite the story, or summarize the content."
+                                          Theme="_dojoChatTheme"
+                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
+                    </MudPaper>
+                </div>
+            }
+
+        }
+        else if (_viewMode == DojoViewMode.Code)
+        {
+            <MudPaper Elevation="0" Class="dojo-workspace__mode-panel">
+                <p class="dojo-workspace__mode-eyebrow">Code</p>
+                <MudText Typo="Typo.h6" Class="mb-2">@CurrentExample.Title</MudText>
+                <pre class="docs-code">@CurrentExample.Code</pre>
             </MudPaper>
-
-            <AgentDialog @ref="_ingredientDialog"
-                         AgentId="dojo-ingredient-dialog"
-                         Visible="@_ingredientDialogVisible"
-                         VisibleChanged="OnIngredientDialogVisibleChanged">
-                <TitleContent>
-                    <MudText Typo="Typo.h6">Add Ingredient</MudText>
-                </TitleContent>
-                <DialogContent>
-                    <AgentForm AgentId="dojo-ingredient-form"
-                               Model="@_ingredientDraft"
-                               Submitted="OnIngredientSubmittedAsync">
-                        <ChildContent Context="formContext">
-                            <DataAnnotationsValidator />
-                            <MudTextField T="string"
-                                          Label="Ingredient name"
-                                          For="@(() => _ingredientDraft.Name)"
-                                          @bind-Value="_ingredientDraft.Name" />
-                            <MudTextField T="string"
-                                          Label="Amount"
-                                          For="@(() => _ingredientDraft.Amount)"
-                                          @bind-Value="_ingredientDraft.Amount" />
-                            <MudCheckBox T="bool"
-                                         Label="Optional"
-                                         @bind-Value="_ingredientDraft.Optional" />
-                            <MudTextField T="string"
-                                          Label="Notes"
-                                          For="@(() => _ingredientDraft.Notes)"
-                                          @bind-Value="_ingredientDraft.Notes" />
-                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                                <MudButton ButtonType="ButtonType.Submit"
-                                           Variant="Variant.Filled"
-                                           Color="Color.Primary">
-                                    Save Ingredient
-                                </MudButton>
-                            </MudStack>
-                        </ChildContent>
-                    </AgentForm>
-                </DialogContent>
-                <DialogActions>
-                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseIngredientDialogAsync">
-                        Close
-                    </MudButton>
-                </DialogActions>
-            </AgentDialog>
-
-            <AgentDialog @ref="_stepDialog"
-                         AgentId="dojo-step-dialog"
-                         Visible="@_stepDialogVisible"
-                         VisibleChanged="OnStepDialogVisibleChanged">
-                <TitleContent>
-                    <MudText Typo="Typo.h6">Add Instruction Step</MudText>
-                </TitleContent>
-                <DialogContent>
-                    <AgentForm AgentId="dojo-step-form"
-                               Model="@_stepDraft"
-                               Submitted="OnStepSubmittedAsync">
-                        <ChildContent Context="formContext">
-                            <DataAnnotationsValidator />
-                            <MudTextField T="string"
-                                          Label="Step text"
-                                          Lines="3"
-                                          For="@(() => _stepDraft.Text)"
-                                          @bind-Value="_stepDraft.Text" />
-                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                                <MudButton ButtonType="ButtonType.Submit"
-                                           Variant="Variant.Filled"
-                                           Color="Color.Primary">
-                                    Save Step
-                                </MudButton>
-                            </MudStack>
-                        </ChildContent>
-                    </AgentForm>
-                </DialogContent>
-                <DialogActions>
-                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseStepDialogAsync">
-                        Close
-                    </MudButton>
-                </DialogActions>
-            </AgentDialog>
-        </MudItem>
-
-        <MudItem xs="12" xl="4">
-            <MudPaper Elevation="0" Class="demo-doc-page__section demo-dojo__sidebar-card">
-                <MudText Typo="Typo.subtitle1">Current Session</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                    Keep this panel open while testing natural-language edits and cross-wrapper actions.
-                </MudText>
-                <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small" Class="mb-2">
-                    Service-backed session state
-                </MudChip>
-
-                <MudList T="string" Dense="false" Class="demo-dojo__meta-list">
-                    <MudListItem>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Recipe</MudText>
-                        <MudText Typo="Typo.body2">@Model.Title</MudText>
-                    </MudListItem>
-                    <MudListItem>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Duration</MudText>
-                        <MudText Typo="Typo.body2">@Model.Minutes min</MudText>
-                    </MudListItem>
-                    <MudListItem>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Ingredients</MudText>
-                        <MudText Typo="Typo.body2">@_ingredients.Count tracked</MudText>
-                    </MudListItem>
-                    <MudListItem>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Steps</MudText>
-                        <MudText Typo="Typo.body2">@_steps.Count instructions</MudText>
-                    </MudListItem>
-                    <MudListItem>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Last save</MudText>
-                        <MudText Typo="Typo.body2">@LastSavedLabel</MudText>
-                    </MudListItem>
-                </MudList>
+        }
+        else
+        {
+            <MudPaper Elevation="0" Class="dojo-workspace__mode-panel">
+                <p class="dojo-workspace__mode-eyebrow">Docs</p>
+                <MudText Typo="Typo.h6" Class="mb-2">@CurrentExample.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@CurrentExample.Docs</MudText>
             </MudPaper>
-        </MudItem>
-    </MudGrid>
+        }
+    </div>
+
+    <AgentDialog @ref="_ingredientDialog"
+                 AgentId="dojo-ingredient-dialog"
+                 Visible="@_ingredientDialogVisible"
+                 VisibleChanged="OnIngredientDialogVisibleChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Add Ingredient</MudText>
+        </TitleContent>
+        <DialogContent>
+            <AgentForm AgentId="dojo-ingredient-form"
+                       Model="@_ingredientDraft"
+                       Submitted="OnIngredientSubmittedAsync">
+                <ChildContent Context="_">
+                    <DataAnnotationsValidator />
+                    <MudTextField T="string"
+                                  Label="Ingredient name"
+                                  For="@(() => _ingredientDraft.Name)"
+                                  @bind-Value="_ingredientDraft.Name" />
+                    <MudTextField T="string"
+                                  Label="Amount"
+                                  For="@(() => _ingredientDraft.Amount)"
+                                  @bind-Value="_ingredientDraft.Amount" />
+                    <MudCheckBox T="bool"
+                                 Label="Optional"
+                                 @bind-Value="_ingredientDraft.Optional" />
+                    <MudTextField T="string"
+                                  Label="Notes"
+                                  For="@(() => _ingredientDraft.Notes)"
+                                  @bind-Value="_ingredientDraft.Notes" />
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary">
+                            Save Ingredient
+                        </MudButton>
+                    </MudStack>
+                </ChildContent>
+            </AgentForm>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseIngredientDialogAsync">
+                Close
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
+
+    <AgentDialog @ref="_stepDialog"
+                 AgentId="dojo-step-dialog"
+                 Visible="@_stepDialogVisible"
+                 VisibleChanged="OnStepDialogVisibleChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Add Instruction Step</MudText>
+        </TitleContent>
+        <DialogContent>
+            <AgentForm AgentId="dojo-step-form"
+                       Model="@_stepDraft"
+                       Submitted="OnStepSubmittedAsync">
+                <ChildContent Context="_">
+                    <DataAnnotationsValidator />
+                    <MudTextField T="string"
+                                  Label="Step text"
+                                  Lines="3"
+                                  For="@(() => _stepDraft.Text)"
+                                  @bind-Value="_stepDraft.Text" />
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary">
+                            Save Step
+                        </MudButton>
+                    </MudStack>
+                </ChildContent>
+            </AgentForm>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseStepDialogAsync">
+                Close
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
 </div>
 
 @code {
     protected override string AgentIdValue => "dojo-recipe-workflow";
     protected override string FormDisplayName => "Recipe";
+
+    private static readonly ChatTheme _dojoChatTheme = new()
+    {
+        Variant = ChatThemeVariant.Light,
+        Style = ChatVisualStyle.Minimal,
+        Spacing = ChatSpacing.Compact,
+        BorderRadius = ChatBorderRadius.Large,
+        EnableGlassEffect = false,
+        AccentColor = "#ff8a57",
+        FontFamily = "\"Public Sans\", \"Segoe UI\", sans-serif",
+        FontSize = "0.93rem"
+    };
 
     private List<DojoIngredientRow> _ingredients = [];
     private List<string> _steps = [];
@@ -308,33 +609,486 @@ demo.mitigation.volume.monthly</pre>
     private AgentDialog? _stepDialog;
     private bool _stepDialogVisible;
     private DojoStepDraft _stepDraft = new();
+    private BackendToolFormModel _backendToolModel = new();
     private DateTime? _lastSavedUtc;
 
-    private static readonly IReadOnlyDictionary<string, string> _ingredientAliases =
+    private string _selectedIntegration = "Microsoft Agent Framework (.NET)";
+    private DojoViewMode _viewMode = DojoViewMode.Preview;
+    private string _selectedExampleKey = "shared-state";
+
+    private string _backgroundStudioTheme = "neutral";
+    private string _backgroundStudioUserPrompt = "\"Can you change the background color to something more vibrant?\"";
+    private string _backgroundStudioHeadline = "How can I help you today?";
+    private string _backgroundStudioBody = "Describe a UI change and the mounted Dojo component can respond instantly.";
+    private readonly IReadOnlyList<string> _backgroundStudioSuggestions = ["Change background", "Generate sonnet"];
+
+    private List<DojoChecklistStep> _humanLoopSteps = CreateHumanLoopSteps();
+    private string _humanLoopStatus = "Ready";
+
+    private List<DojoProgressStep> _taskProgressSteps = CreateTaskProgressSteps();
+
+    private List<DojoDocumentLine> _predictiveDocumentLines = CreatePredictiveDocumentLines();
+    private bool _predictiveHasPendingChanges = true;
+    private string _predictiveApprovalPrompt = "Do you want to accept the changes?";
+    private string _predictiveAssistantMessage =
+        "I have updated the document to make all text bold. Let me know if you need any further adjustments.";
+
+    private static readonly IReadOnlyDictionary<string, string> _exampleAliases =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["ingredient"] = nameof(DojoIngredientRow.Name),
-            ["name"] = nameof(DojoIngredientRow.Name),
-            ["amount"] = nameof(DojoIngredientRow.Amount),
-            ["optional"] = nameof(DojoIngredientRow.Optional),
-            ["notes"] = nameof(DojoIngredientRow.Notes)
+            ["chat"] = "agentic-chat",
+            ["agentic"] = "agentic-chat",
+            ["backend"] = "backend-tool-rendering",
+            ["tools"] = "backend-tool-rendering",
+            ["hitl"] = "human-loop",
+            ["humanloop"] = "human-loop",
+            ["human"] = "human-loop",
+            ["generative"] = "agentic-generative-ui",
+            ["agenticui"] = "agentic-generative-ui",
+            ["toolui"] = "tool-based-generative-ui",
+            ["toolbased"] = "tool-based-generative-ui",
+            ["shared"] = "shared-state",
+            ["state"] = "shared-state",
+            ["predictive"] = "predictive-state"
         };
+
+    private static readonly AgentUiDocument _toolBasedGeneratedUiDocument = new()
+    {
+        Blocks =
+        [
+            new AgentUiBlock
+            {
+                Id = "haiku-card",
+                Kind = AgentUiBlockKind.Card,
+                Title = "Blue sky above",
+                Description = "Tool-based generated card output.",
+                Actions =
+                [
+                    new AgentUiAction
+                    {
+                        Id = "add_chives",
+                        Label = "Add Chives",
+                        Prompt = "add ingredient chives amount 1 tbsp optional true"
+                    }
+                ]
+            },
+            new AgentUiBlock
+            {
+                Id = "haiku-table",
+                Kind = AgentUiBlockKind.Table,
+                Title = "Haiku Segments",
+                Columns =
+                [
+                    new AgentUiTableColumn { Key = "line", Header = "Line" },
+                    new AgentUiTableColumn { Key = "translation", Header = "Translation" }
+                ],
+                Rows =
+                [
+                    new Dictionary<string, object?> { ["line"] = "Blue sky above", ["translation"] = "Calm opening line" },
+                    new Dictionary<string, object?> { ["line"] = "Stream's gentle murmuring", ["translation"] = "Quiet motion" },
+                    new Dictionary<string, object?> { ["line"] = "Trees dance in rhythm", ["translation"] = "Closing image" }
+                ]
+            }
+        ]
+    };
+
+    private static readonly IReadOnlyList<DojoExampleDefinition> _examples =
+    [
+        new(
+            "agentic-chat",
+            "Agentic Chat",
+            "Chat with your Copilot and call front-end tools.",
+            ["Chat", "Tools", "Streaming"],
+            ["change the background color to coral", "set dojo view to code", "what components are mounted on this route"],
+            "<AgentChatSurface LockAgentToCurrentRoute=\"true\" />",
+            "Agentic chat keeps the canvas minimal and lets the assistant manipulate mounted UI in place."),
+        new(
+            "backend-tool-rendering",
+            "Backend Tool Rendering",
+            "Render and stream your backend tools to the frontend.",
+            ["Agent State", "Collaborating"],
+            ["set action label to policy review", "submit the backend demo form", "show latest tool execution"],
+            "<AgentToolRender ToolId=\"AgentForm.submit\">...</AgentToolRender>",
+            "Backend tool rendering shows tool lifecycle updates in the chat and the canvas itself."),
+        new(
+            "human-loop",
+            "Human in the loop",
+            "Plan a task together and direct the Copilot to take the right steps.",
+            ["HITL", "Interactivity"],
+            ["make me a sandwich", "finalize the selected sandwich steps", "toggle sandwich step 3 false"],
+            "<AgentChatSurface RequireHandoffApproval=\"true\" />",
+            "Human-in-the-loop mode keeps approval-sensitive actions visible in a single checklist flow."),
+        new(
+            "agentic-generative-ui",
+            "Agentic Generative UI",
+            "Assign a long running task to your Copilot and see how it performs.",
+            ["Generative ui (agent)", "Long running task"],
+            ["plan a vacation to Japan", "mark travel task 6 complete", "complete the next task"],
+            "<AgentChatSurface EnableGeneratedUi=\"true\" />",
+            "Agentic generative UI pairs a persistent progress artifact with generated assistant output."),
+        new(
+            "tool-based-generative-ui",
+            "Tool Based Generative UI",
+            "Tool-based generated interfaces rendered from tool output.",
+            ["Generative ui (action)", "Tools"],
+            ["write me a haiku about nature", "click generated action to add chives", "render the generated table"],
+            "<AgentGenerativeSurface Document=\"generatedUi\" />",
+            "Tool-based generative UI renders deterministic blocks and forwards actions back into the runtime."),
+        new(
+            "shared-state",
+            "Shared State between agent and UI",
+            "A recipe Copilot which reads and updates collaboratively.",
+            ["Agent State", "Collaborating"],
+            ["set recipe title to classic omelette", "add ingredient onion amount 1 small", "submit recipe form"],
+            "<AgentForm AgentId=\"dojo-recipe-form\" />",
+            "Shared state keeps form fields, ingredient cards, and assistant actions synchronized."),
+        new(
+            "predictive-state",
+            "Predictive State Updates",
+            "Use collaboration to edit a document in real time with your Copilot.",
+            ["State", "Streaming", "Tools"],
+            ["make all bold", "rewrite the story in a more professional tone", "confirm document changes"],
+            "<AgentChatSurface EnableGeneratedUi=\"true\" />",
+            "Predictive state updates surface pending edits and approval in the same workspace.")
+    ];
+
+    private DojoExampleDefinition CurrentExample =>
+        _examples.FirstOrDefault(x => string.Equals(x.Key, _selectedExampleKey, StringComparison.OrdinalIgnoreCase))
+        ?? _examples[0];
+
+    private string WorkspaceSessionId => ComponentRegistry.SessionId;
+
+    private string BackgroundCanvasStyle => _backgroundStudioTheme switch
+    {
+        "coral" => "background: linear-gradient(180deg, #ea8b68, #f2b68c);",
+        "ocean" => "background: linear-gradient(180deg, #67a8cf, #98dfd0);",
+        "forest" => "background: linear-gradient(180deg, #4d8865, #93c08a);",
+        _ => "background: linear-gradient(180deg, #f5f2ef, #efebe6);"
+    };
 
     private string LastSavedLabel =>
         _lastSavedUtc is null
             ? "Not saved yet"
             : _lastSavedUtc.Value.ToLocalTime().ToString("HH:mm:ss");
 
+    private int SelectedSandwichStepCount => _humanLoopSteps.Count(x => x.Selected);
+
+    private int SandwichSelectionProgress =>
+        _humanLoopSteps.Count == 0 ? 0 : (int)Math.Round(SelectedSandwichStepCount * 100d / _humanLoopSteps.Count);
+
+    private int CompletedTaskCount => _taskProgressSteps.Count(x => x.Completed);
+
+    private int TaskCompletionProgress =>
+        _taskProgressSteps.Count == 0 ? 0 : (int)Math.Round(CompletedTaskCount * 100d / _taskProgressSteps.Count);
+
+    private IReadOnlyList<DojoRunNote> ToolExecutionNotes =>
+        _runNotes
+            .Where(note => note.Message.Contains("submit", StringComparison.OrdinalIgnoreCase) ||
+                           note.Message.Contains("tool", StringComparison.OrdinalIgnoreCase) ||
+                           note.Message.Contains("Applied:", StringComparison.OrdinalIgnoreCase))
+            .TakeLast(3)
+            .ToArray();
+
+    private bool CanUseAgenticChatActions => IsExample("agentic-chat");
+    private bool CanUseHumanLoopActions => IsExample("human-loop");
+    private bool CanUseTaskProgressActions => IsExample("agentic-generative-ui");
+    private bool CanUsePredictiveDocumentActions => IsExample("predictive-state");
+
+    [AgentReadable("Current dojo example key.")]
+    public string SelectedDojoExampleKey => _selectedExampleKey;
+
+    [AgentReadable("Current dojo view mode.")]
+    public string SelectedDojoViewMode => ToViewModeKey(_viewMode);
+
+    [AgentReadable("Current dojo integration selector value.")]
+    public string SelectedDojoIntegration => _selectedIntegration;
+
+    [AgentReadable("Current background canvas theme.")]
+    public string BackgroundCanvasTheme => _backgroundStudioTheme;
+
+    [AgentReadable("Current sandwich checklist status.")]
+    public string HumanLoopStatus => _humanLoopStatus;
+
+    [AgentReadable("Current predictive document approval state.")]
+    public string PredictiveApprovalState => _predictiveHasPendingChanges ? "pending" : "resolved";
+
     protected override async Task OnInitializedAsync()
     {
+        _selectedIntegration = DojoExperience.SelectedIntegration;
+        _selectedExampleKey = ResolveExampleKey(DojoExperience.SelectedExampleKey) ?? "shared-state";
+        _viewMode = ParseViewMode(DojoExperience.SelectedViewMode);
+        SyncDojoExperienceState();
         await LoadSnapshotAsync();
     }
 
+    [AgentAction("Select dojo example by key or title without route navigation.")]
+    public async Task<ActionResult> SetDojoExample(
+        [AgentParam("Example key/title.", Required = true)]
+        string example)
+    {
+        var resolved = ResolveExampleKey(example);
+        if (resolved is null)
+        {
+            return ActionResult.NeedsClarification(
+                $"Unknown dojo example '{example}'. Use one of: {string.Join(", ", _examples.Select(x => x.Key))}.");
+        }
+
+        _selectedExampleKey = resolved;
+        _viewMode = DojoViewMode.Preview;
+        SyncDojoExperienceState();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Selected dojo example '{resolved}'.");
+    }
+
+    [AgentAction("Switch dojo view mode between preview, code, and docs.")]
+    public async Task<ActionResult> SetDojoView(
+        [AgentParam("View mode value.", Required = true, AllowedValues = "preview,code,docs")]
+        string viewMode)
+    {
+        if (!TryParseViewMode(viewMode, out var resolvedMode))
+        {
+            return ActionResult.NeedsClarification("Unknown view mode. Use preview, code, or docs.");
+        }
+
+        _viewMode = resolvedMode;
+        SyncDojoExperienceState();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Switched dojo view to {ToViewModeKey(resolvedMode)}.");
+    }
+
+    [AgentAction("Set dojo integration selector value.")]
+    public async Task<ActionResult> SetDojoIntegration(
+        [AgentParam("Integration name.", Required = true)]
+        string integration)
+    {
+        if (string.IsNullOrWhiteSpace(integration))
+        {
+            return ActionResult.NeedsClarification("Provide an integration name.");
+        }
+
+        _selectedIntegration = integration.Trim();
+        SyncDojoExperienceState();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Integration set to {_selectedIntegration}.");
+    }
+
+    [AgentAction("Change the background theme for the agentic chat canvas.", AvailableWhen = nameof(CanUseAgenticChatActions))]
+    public async Task<ActionResult> ChangeCanvasBackground(
+        [AgentParam("Theme name.", Required = true, AllowedValues = "neutral,coral,ocean,forest")]
+        string theme)
+    {
+        var normalized = theme.Trim().ToLowerInvariant();
+        if (normalized is not ("neutral" or "coral" or "ocean" or "forest"))
+        {
+            return ActionResult.NeedsClarification("Use neutral, coral, ocean, or forest.");
+        }
+
+        _backgroundStudioTheme = normalized;
+        _backgroundStudioUserPrompt = $"\"Change the background to {normalized}.\"";
+        _backgroundStudioBody = normalized switch
+        {
+            "coral" => "The background has been updated to a coral-to-peach gradient.",
+            "ocean" => "The background now uses an ocean blue to seafoam gradient.",
+            "forest" => "The background now uses a forest green gradient with softer contrast.",
+            _ => "The background has been reset to a neutral editorial canvas."
+        };
+
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Updated the chat canvas background to {normalized}.");
+    }
+
+    [AgentAction("Set the headline text for the agentic chat canvas.", AvailableWhen = nameof(CanUseAgenticChatActions))]
+    public async Task<ActionResult> SetCanvasHeadline(
+        [AgentParam("Headline text.", Required = true)]
+        string headline)
+    {
+        if (string.IsNullOrWhiteSpace(headline))
+        {
+            return ActionResult.NeedsClarification("Provide headline text.");
+        }
+
+        _backgroundStudioHeadline = headline.Trim();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Set the canvas headline to '{_backgroundStudioHeadline}'.");
+    }
+
+    [AgentAction("Prepare a sandwich plan with the standard steps selected.", AvailableWhen = nameof(CanUseHumanLoopActions))]
+    public async Task<ActionResult> PrepareSandwichPlan()
+    {
+        _humanLoopSteps = CreateHumanLoopSteps();
+        _humanLoopStatus = "Ready";
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Prepared the sandwich checklist with the default steps.");
+    }
+
+    [AgentAction("Toggle a sandwich checklist step by number.", AvailableWhen = nameof(CanUseHumanLoopActions))]
+    public async Task<ActionResult> ToggleSandwichStepSelection(
+        [AgentParam("Step number.", Required = true)]
+        int stepNumber,
+        [AgentParam("Whether the step should be selected.")]
+        bool selected = true)
+    {
+        var step = _humanLoopSteps.FirstOrDefault(x => x.Number == stepNumber);
+        if (step is null)
+        {
+            return ActionResult.NeedsClarification("Unknown sandwich step number.");
+        }
+
+        step.Selected = selected;
+        _humanLoopStatus = SelectedSandwichStepCount == _humanLoopSteps.Count ? "Ready" : "Review";
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Updated sandwich step {stepNumber} selection to {selected}.");
+    }
+
+    [AgentAction("Finalize the selected sandwich steps after approval.", RequiresApproval = true, AvailableWhen = nameof(CanUseHumanLoopActions))]
+    public async Task<ActionResult> FinalizeSandwichPlan()
+    {
+        _humanLoopStatus = "Confirmed";
+        await WorkspaceService.AppendRunNoteAsync(
+            WorkspaceSessionId,
+            $"Confirmed {SelectedSandwichStepCount} sandwich steps.",
+            DateTime.UtcNow,
+            CancellationToken.None);
+        await LoadSnapshotAsync();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Finalized the sandwich plan.");
+    }
+
+    [AgentAction("Plan a travel workflow and populate the long-running task board.", AvailableWhen = nameof(CanUseTaskProgressActions))]
+    public async Task<ActionResult> PlanTravelWorkflow(
+        [AgentParam("Destination name.")]
+        string? destination = null)
+    {
+        var place = string.IsNullOrWhiteSpace(destination) ? "Japan" : destination.Trim();
+        _taskProgressSteps = CreateTaskProgressSteps(place);
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Prepared the task progress board for travel to {place}.");
+    }
+
+    [AgentAction("Mark a travel task complete by number.", AvailableWhen = nameof(CanUseTaskProgressActions))]
+    public async Task<ActionResult> MarkTravelTaskComplete(
+        [AgentParam("Task number.", Required = true)]
+        int taskNumber,
+        [AgentParam("Whether the task is complete.")]
+        bool completed = true)
+    {
+        var step = _taskProgressSteps.FirstOrDefault(x => x.Number == taskNumber);
+        if (step is null)
+        {
+            return ActionResult.NeedsClarification("Unknown task number.");
+        }
+
+        step.Completed = completed;
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Marked travel task {taskNumber} as {(completed ? "complete" : "incomplete")}.");
+    }
+
+    [AgentAction("Complete the next unfinished travel task.", AvailableWhen = nameof(CanUseTaskProgressActions))]
+    public async Task<ActionResult> CompleteNextTask()
+    {
+        var next = _taskProgressSteps.FirstOrDefault(x => !x.Completed);
+        if (next is null)
+        {
+            return ActionResult.Applied("All travel tasks are already complete.");
+        }
+
+        next.Completed = true;
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Completed task {next.Number}: {next.Text}");
+    }
+
+    [AgentAction("Apply an editorial instruction to the predictive document.", AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
+    public async Task<ActionResult> ApplyPredictiveDocumentInstruction(
+        [AgentParam("Editing instruction.", Required = true)]
+        string instruction)
+    {
+        if (string.IsNullOrWhiteSpace(instruction))
+        {
+            return ActionResult.NeedsClarification("Provide an editing instruction.");
+        }
+
+        var normalized = instruction.Trim();
+        _predictiveHasPendingChanges = true;
+        _predictiveApprovalPrompt = "Do you want to accept the changes?";
+        _predictiveAssistantMessage = $"I have updated the document to '{normalized}'. Let me know if you need any further adjustments.";
+
+        if (normalized.Contains("bold", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var line in _predictiveDocumentLines)
+            {
+                if (line.Kind == DojoDocumentLineKind.Accepted)
+                {
+                    line.Text = $"**{line.Text.Trim('*')}**";
+                }
+            }
+        }
+
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Applied the predictive document instruction '{normalized}'.");
+    }
+
+    [AgentAction("Confirm the pending predictive document changes.", RequiresApproval = true, AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
+    public async Task<ActionResult> ConfirmPredictiveDocumentChanges()
+    {
+        _predictiveHasPendingChanges = false;
+        _predictiveAssistantMessage = "The predictive changes have been confirmed and the document state is now stable.";
+        await WorkspaceService.AppendRunNoteAsync(
+            WorkspaceSessionId,
+            "Confirmed predictive document changes.",
+            DateTime.UtcNow,
+            CancellationToken.None);
+        await LoadSnapshotAsync();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Confirmed predictive document changes.");
+    }
+
+    [AgentAction("Reject the pending predictive document changes.", AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
+    public async Task<ActionResult> RejectPredictiveDocumentChanges()
+    {
+        _predictiveHasPendingChanges = false;
+        _predictiveAssistantMessage = "The pending predictive changes were rejected.";
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Rejected predictive document changes.");
+    }
+
+    private Task OnIntegrationChanged(string value)
+    {
+        _selectedIntegration = value;
+        DojoExperience.SetIntegration(value);
+        return Task.CompletedTask;
+    }
+
+    private void SelectExample(string key)
+    {
+        _selectedExampleKey = ResolveExampleKey(key) ?? "shared-state";
+        _viewMode = DojoViewMode.Preview;
+        SyncDojoExperienceState();
+    }
+
+    private void SetViewMode(DojoViewMode mode)
+    {
+        _viewMode = mode;
+        DojoExperience.SetViewMode(ToViewModeKey(mode));
+    }
+
+    private bool IsSelectedExample(string key) =>
+        string.Equals(_selectedExampleKey, key, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsViewMode(DojoViewMode mode) => _viewMode == mode;
+
+    private bool IsExample(string key) =>
+        string.Equals(_selectedExampleKey, key, StringComparison.OrdinalIgnoreCase);
+
     private async Task OnRecipeSubmittedAsync()
     {
-        var snapshot = await WorkspaceService.SaveRecipeAsync(Model, CancellationToken.None);
+        var snapshot = await WorkspaceService.SaveRecipeAsync(WorkspaceSessionId, Model, CancellationToken.None);
         ApplySnapshot(snapshot);
         Snackbar.Add("Recipe draft saved.", Severity.Success);
+    }
+
+    private void ShowAssistantTip()
+    {
+        Snackbar.Add("Use the embedded assistant to improve the recipe from the current Dojo mode.", Severity.Normal);
     }
 
     private async Task OpenIngredientDialogAsync()
@@ -364,9 +1118,8 @@ demo.mitigation.volume.monthly</pre>
 
     private async Task OnIngredientSubmittedAsync()
     {
-        var snapshot = await WorkspaceService.AddIngredientAsync(_ingredientDraft, CancellationToken.None);
+        var snapshot = await WorkspaceService.AddIngredientAsync(WorkspaceSessionId, _ingredientDraft, CancellationToken.None);
         ApplySnapshot(snapshot);
-
         Snackbar.Add($"Added ingredient: {_ingredientDraft.Name.Trim()}", Severity.Success);
         await CloseIngredientDialogAsync();
     }
@@ -398,15 +1151,88 @@ demo.mitigation.volume.monthly</pre>
 
     private async Task OnStepSubmittedAsync()
     {
-        var snapshot = await WorkspaceService.AddStepAsync(_stepDraft, CancellationToken.None);
+        var snapshot = await WorkspaceService.AddStepAsync(WorkspaceSessionId, _stepDraft, CancellationToken.None);
         ApplySnapshot(snapshot);
         Snackbar.Add($"Added step {_steps.Count}.", Severity.Success);
         await CloseStepDialogAsync();
     }
 
+    private async Task OnBackendToolSubmittedAsync()
+    {
+        var actionLabel = string.IsNullOrWhiteSpace(_backendToolModel.ActionLabel)
+            ? "unnamed action"
+            : _backendToolModel.ActionLabel.Trim();
+        var operatorName = string.IsNullOrWhiteSpace(_backendToolModel.Operator)
+            ? "unknown operator"
+            : _backendToolModel.Operator.Trim();
+
+        await WorkspaceService.AppendRunNoteAsync(
+            WorkspaceSessionId,
+            $"Backend tool submit '{actionLabel}' by {operatorName}.",
+            DateTime.UtcNow,
+            CancellationToken.None);
+
+        await LoadSnapshotAsync();
+        Snackbar.Add("Backend demo action submitted.", Severity.Success);
+    }
+
+    private async Task OnGeneratedUiActionInvokedAsync(AgentUiActionInvocation invocation)
+    {
+        await WorkspaceService.AppendRunNoteAsync(
+            WorkspaceSessionId,
+            $"Generated UI action invoked: {invocation.BlockId}.{invocation.Action.Id}.",
+            DateTime.UtcNow,
+            CancellationToken.None);
+
+        await LoadSnapshotAsync();
+    }
+
+    private async Task OnGeneratedUiRuntimeResponseAsync(AgentTurnResponse response)
+    {
+        if (!string.IsNullOrWhiteSpace(response.ResponseText))
+        {
+            await WorkspaceService.AppendRunNoteAsync(
+                WorkspaceSessionId,
+                $"Generated UI runtime response: {response.ResponseText}",
+                DateTime.UtcNow,
+                CancellationToken.None);
+            await LoadSnapshotAsync();
+        }
+    }
+
+    private Task OnGeneratedUiErrorAsync(Exception exception)
+    {
+        Snackbar.Add($"Generated UI action failed: {exception.Message}", Severity.Error);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleSandwichStep(int stepNumber)
+    {
+        var step = _humanLoopSteps.FirstOrDefault(x => x.Number == stepNumber);
+        if (step is null)
+        {
+            return;
+        }
+
+        step.Selected = !step.Selected;
+        _humanLoopStatus = SelectedSandwichStepCount == _humanLoopSteps.Count ? "Ready" : "Review";
+    }
+
+    private void ConfirmPredictiveChangesFromUi()
+    {
+        _predictiveHasPendingChanges = false;
+        _predictiveAssistantMessage = "The predictive changes have been confirmed and applied to the document.";
+    }
+
+    private void RejectPredictiveChanges()
+    {
+        _predictiveHasPendingChanges = false;
+        _predictiveAssistantMessage = "The predictive changes were rejected from the Dojo approval card.";
+    }
+
     private async Task LoadSnapshotAsync()
     {
-        var snapshot = await WorkspaceService.GetSnapshotAsync(CancellationToken.None);
+        var snapshot = await WorkspaceService.GetSnapshotAsync(WorkspaceSessionId, CancellationToken.None);
         ApplySnapshot(snapshot);
     }
 
@@ -417,5 +1243,191 @@ demo.mitigation.volume.monthly</pre>
         _steps = snapshot.Steps.ToList();
         _runNotes = snapshot.RunNotes.ToList();
         _lastSavedUtc = snapshot.LastSavedUtc;
+    }
+
+    private void SyncDojoExperienceState()
+    {
+        DojoExperience.SetIntegration(_selectedIntegration);
+        DojoExperience.SetExample(_selectedExampleKey);
+        DojoExperience.SetViewMode(ToViewModeKey(_viewMode));
+    }
+
+    private static string ToViewModeKey(DojoViewMode viewMode) => viewMode switch
+    {
+        DojoViewMode.Code => "code",
+        DojoViewMode.Docs => "docs",
+        _ => "preview"
+    };
+
+    private static DojoViewMode ParseViewMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "code" => DojoViewMode.Code,
+            "docs" => DojoViewMode.Docs,
+            _ => DojoViewMode.Preview
+        };
+    }
+
+    private static bool TryParseViewMode(string? value, out DojoViewMode mode)
+    {
+        if (string.Equals(value, "code", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = DojoViewMode.Code;
+            return true;
+        }
+
+        if (string.Equals(value, "docs", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = DojoViewMode.Docs;
+            return true;
+        }
+
+        if (string.Equals(value, "preview", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = DojoViewMode.Preview;
+            return true;
+        }
+
+        mode = DojoViewMode.Preview;
+        return false;
+    }
+
+    private static string? ResolveExampleKey(string? hint)
+    {
+        if (string.IsNullOrWhiteSpace(hint))
+        {
+            return null;
+        }
+
+        var trimmed = hint.Trim();
+        var direct = _examples.FirstOrDefault(x => string.Equals(x.Key, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (direct is not null)
+        {
+            return direct.Key;
+        }
+
+        var normalized = NormalizeToken(trimmed);
+        if (normalized.Length == 0)
+        {
+            return null;
+        }
+
+        if (_exampleAliases.TryGetValue(normalized, out var aliasTarget))
+        {
+            return aliasTarget;
+        }
+
+        foreach (var example in _examples)
+        {
+            var keyToken = NormalizeToken(example.Key);
+            var titleToken = NormalizeToken(example.Title);
+            if (string.Equals(keyToken, normalized, StringComparison.Ordinal) ||
+                string.Equals(titleToken, normalized, StringComparison.Ordinal) ||
+                keyToken.Contains(normalized, StringComparison.Ordinal) ||
+                titleToken.Contains(normalized, StringComparison.Ordinal))
+            {
+                return example.Key;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeToken(string value) =>
+        new(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+    private static List<DojoChecklistStep> CreateHumanLoopSteps() =>
+    [
+        new(1, "Gather ingredients for the sandwich (bread, fillings, condiments).", true),
+        new(2, "Lay out two slices of bread on a clean surface.", true),
+        new(3, "Spread condiments on the bread slices.", true),
+        new(4, "Add the desired fillings to one slice of bread.", true),
+        new(5, "Place the second slice of bread on top.", true),
+        new(6, "Cut the sandwich in halves or quarters if desired.", true),
+        new(7, "Serve and enjoy the sandwich.", true)
+    ];
+
+    private static List<DojoProgressStep> CreateTaskProgressSteps(string destination = "Japan") =>
+    [
+        new(1, $"Research and decide on travel dates to {destination}.", true),
+        new(2, $"Book flights and accommodations for the trip to {destination}.", true),
+        new(3, $"Create a travel itinerary with destinations and activities in {destination}.", true),
+        new(4, "Check visa requirements and complete necessary documentation.", true),
+        new(5, $"Prepare and pack for the trip to {destination}.", true),
+        new(6, "Arrange travel insurance.", false),
+        new(7, "Exchange currency or arrange payment options.", false),
+        new(8, "Learn a few useful local phrases.", false),
+        new(9, "Plan transportation within the destination.", false),
+        new(10, "Prepare emergency contacts and backups.", false)
+    ];
+
+    private static List<DojoDocumentLine> CreatePredictiveDocumentLines() =>
+    [
+        new("Predictive State Updates Document Editor", DojoDocumentLineKind.Muted),
+        new("This demo showcases predictive state updates for real-time document collaboration.", DojoDocumentLineKind.Removed),
+        new("Live document editing updates as the Copilot works.", DojoDocumentLineKind.Removed),
+        new("Candy Beard was a pirate who loved to interact with sugar-coated treasure.", DojoDocumentLineKind.Accepted),
+        new("One day, Candy Beard set sail on his ship, the Sugar Wave, in search of the rarest candy of all.", DojoDocumentLineKind.Accepted),
+        new("Add magical candy that never melted or lost its flavor.", DojoDocumentLineKind.Removed),
+        new("After weeks at sea, they finally came across Infamous Sour Goblins near the woods.", DojoDocumentLineKind.Accepted),
+        new("Change the mysterious island to a more casual tone.", DojoDocumentLineKind.Removed)
+    ];
+
+    private enum DojoViewMode
+    {
+        Preview,
+        Code,
+        Docs
+    }
+
+    private sealed record DojoExampleDefinition(
+        string Key,
+        string Title,
+        string Description,
+        IReadOnlyList<string> Tags,
+        IReadOnlyList<string> Prompts,
+        string Code,
+        string Docs);
+
+    private sealed class BackendToolFormModel
+    {
+        public string ActionLabel { get; set; } = "policy review";
+
+        public string Operator { get; set; } = "dojo-operator";
+
+        public string? Notes { get; set; }
+    }
+
+    private sealed class DojoChecklistStep(int number, string text, bool selected)
+    {
+        public int Number { get; } = number;
+
+        public string Text { get; } = text;
+
+        public bool Selected { get; set; } = selected;
+    }
+
+    private sealed class DojoProgressStep(int number, string text, bool completed)
+    {
+        public int Number { get; } = number;
+
+        public string Text { get; } = text;
+
+        public bool Completed { get; set; } = completed;
+    }
+
+    private sealed class DojoDocumentLine(string text, DojoDocumentLineKind kind)
+    {
+        public string Text { get; set; } = text;
+
+        public DojoDocumentLineKind Kind { get; } = kind;
+    }
+
+    private enum DojoDocumentLineKind
+    {
+        Accepted,
+        Removed,
+        Muted
     }
 }

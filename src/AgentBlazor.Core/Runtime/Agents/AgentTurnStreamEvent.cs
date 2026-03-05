@@ -16,6 +16,8 @@ public enum AgentTurnStreamEventKind
     TextMessageEnd,
     ClarificationRequired,
     ApprovalRequired,
+    StateSnapshot,
+    StateDelta,
     RunFinished,
     RunError,
     ReasoningStart,
@@ -39,6 +41,8 @@ public sealed record AgentTurnStreamEvent
     public IReadOnlyDictionary<string, object?>? ToolArguments { get; init; }
     public string? ClarificationQuestion { get; init; }
     public IReadOnlyList<PendingApproval>? PendingApprovals { get; init; }
+    public IReadOnlyDictionary<string, string>? SharedStateSnapshot { get; init; }
+    public IReadOnlyDictionary<string, string?>? SharedStateDelta { get; init; }
     public AgentTurnResponse? Response { get; init; }
     public string? ErrorMessage { get; init; }
     public string? ErrorCode { get; init; }

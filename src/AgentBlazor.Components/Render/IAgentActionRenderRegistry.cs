@@ -13,4 +13,16 @@ public interface IAgentActionRenderRegistry
 public record ActionRenderFragments(
     RenderFragment<ActionRenderContext>? InProgress,
     RenderFragment<ActionRenderContext>? Executing,
-    RenderFragment<ActionRenderContext>? Complete);
+    RenderFragment<ActionRenderContext>? Complete,
+    RenderFragment<ActionRenderContext>? Failed)
+{
+    public RenderFragment<ActionRenderContext>? Resolve(ActionStatus status) =>
+        status switch
+        {
+            ActionStatus.InProgress => InProgress,
+            ActionStatus.Executing => Executing,
+            ActionStatus.Complete => Complete,
+            ActionStatus.Failed => Failed ?? Complete,
+            _ => null
+        };
+}

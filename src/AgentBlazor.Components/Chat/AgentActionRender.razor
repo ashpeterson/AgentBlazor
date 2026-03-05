@@ -7,6 +7,10 @@
 @* No visible output — registers render fragments as a pure side-effect. *@
 
 @code {
+    /// <summary>
+    /// Component identifier emitted by runtime tool calls (for built-in wrappers this is typically
+    /// the wrapper component type, e.g. "AgentForm" or "AgentDataGrid").
+    /// </summary>
     [Parameter, EditorRequired]
     public string AgentId { get; set; } = "";
 
@@ -22,11 +26,14 @@
     [Parameter]
     public RenderFragment<ActionRenderContext>? Complete { get; set; }
 
+    [Parameter]
+    public RenderFragment<ActionRenderContext>? Failed { get; set; }
+
     protected override void OnInitialized()
-        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete));
+        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete, Failed));
 
     protected override void OnParametersSet()
-        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete));
+        => Registry.Register(AgentId, ActionId, new ActionRenderFragments(InProgress, Executing, Complete, Failed));
 
     public void Dispose() => Registry.Unregister(AgentId, ActionId);
 }

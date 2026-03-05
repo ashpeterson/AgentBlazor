@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\demo\AgentBlazor.Demo\AgentBlazor.Demo.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.Core\AgentBlazor.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.DefaultAgent\AgentBlazor.DefaultAgent.csproj" />

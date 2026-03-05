@@ -21,6 +21,7 @@
 @inject IAgentComponentRegistry ComponentRegistry
 @inject IAgentChatSessionEvents SessionEvents
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 @inject IAgentActionRenderRegistry ActionRenderRegistry
 @inject IAdaptiveSuggestionService SuggestionService
 @inject IProactiveInsightService ProactiveInsightService
@@ -111,10 +112,19 @@
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in item.ActivityMessages)
                             {
-                                <li class="ab-chat-surface__activity-item @(activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")">
-                                    <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
-                                    <span class="ab-chat-surface__activity-text">@activity.Text</span>
-                                </li>
+                                if (TryBuildRenderedActivity(activity, out var renderedActivity))
+                                {
+                                    <li class="ab-chat-surface__activity-item ab-chat-surface__activity-item--custom">
+                                        @renderedActivity
+                                    </li>
+                                }
+                                else
+                                {
+                                    <li class="ab-chat-surface__activity-item @(activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")">
+                                        <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
+                                        <span class="ab-chat-surface__activity-text">@activity.Text</span>
+                                    </li>
+                                }
                             }
                         </ul>
                     }
@@ -134,15 +144,12 @@
                         <ul class="ab-chat-surface__results" aria-label="Results">
                             @foreach (var result in item.ExecutionResults)
                             {
+                                var ctx = BuildResultRenderContext(item, result);
                                 var fragments = ActionRenderRegistry.TryGet(result.ComponentId, result.ActionId);
-                                if (fragments?.Complete is not null)
+                                var fragment = fragments?.Resolve(ctx.Status);
+                                if (fragment is not null)
                                 {
-                                    var ctx = new ActionRenderContext(
-                                        result.ComponentId, result.ActionId,
-                                        result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed,
-                                        new Dictionary<string, object?>(),
-                                        result.Message);
-                                    <li>@fragments.Complete(ctx)</li>
+                                    <li>@fragment(ctx)</li>
                                 }
                                 else
                                 {
@@ -178,21 +185,30 @@
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in _streamingActivityMessages)
                             {
-                                var isDone = _completedActivityKeys.Contains(activity.Key);
-                                var statusClass = isDone
-                                    ? (activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")
-                                    : string.Empty;
-                                <li class="ab-chat-surface__activity-item @statusClass">
-                                    @if (isDone)
-                                    {
-                                        <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="ab-chat-surface__activity-spinner" aria-hidden="true"></span>
-                                    }
-                                    <span class="ab-chat-surface__activity-text">@activity.Text</span>
-                                </li>
+                                if (TryBuildRenderedActivity(activity, out var renderedActivity))
+                                {
+                                    <li class="ab-chat-surface__activity-item ab-chat-surface__activity-item--custom">
+                                        @renderedActivity
+                                    </li>
+                                }
+                                else
+                                {
+                                    var isDone = _completedActivityKeys.Contains(activity.Key);
+                                    var statusClass = isDone
+                                        ? (activity.Succeeded ? "ab-chat-surface__activity-item--done" : "ab-chat-surface__activity-item--failed")
+                                        : string.Empty;
+                                    <li class="ab-chat-surface__activity-item @statusClass">
+                                        @if (isDone)
+                                        {
+                                            <span class="ab-chat-surface__activity-icon @(activity.Succeeded ? "" : "ab-chat-surface__activity-icon--failed")">@(activity.Succeeded ? "✓" : "✗")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="ab-chat-surface__activity-spinner" aria-hidden="true"></span>
+                                        }
+                                        <span class="ab-chat-surface__activity-text">@activity.Text</span>
+                                    </li>
+                                }
                             }
                         </ul>
                     }
@@ -271,6 +287,34 @@
                     </div>
                 </article>
             }
+
+            @if (_pendingHandoffRequest is { } pendingHandoff)
+            {
+                <article class="ab-chat-surface__item ab-chat-surface__item--approval" aria-label="Handoff approval required">
+                    <div class="ab-chat-surface__item-role">Handoff Pending</div>
+                    <div class="ab-chat-surface__item-text">
+                        Transfer control from <strong>@pendingHandoff.FromAgent</strong> to <strong>@pendingHandoff.ToAgent</strong>?
+                        @if (!string.IsNullOrWhiteSpace(pendingHandoff.TargetRoute))
+                        {
+                            <span> Route: <code>@pendingHandoff.TargetRoute</code>.</span>
+                        }
+                    </div>
+                    <div class="ab-chat-surface__approval-buttons">
+                        <button type="button"
+                                class="ab-chat-surface__submit ab-chat-surface__submit--approve"
+                                disabled="@_isBusy"
+                                @onclick="ApprovePendingHandoffAsync">
+                            @(_isBusy ? "Approving…" : "Approve Handoff")
+                        </button>
+                        <button type="button"
+                                class="ab-chat-surface__submit ab-chat-surface__submit--deny"
+                                disabled="@_isBusy"
+                                @onclick="CancelPendingHandoffAsync">
+                            @(_isBusy ? "Cancelling…" : "Cancel")
+                        </button>
+                    </div>
+                </article>
+            }
         </div>
     }
 
@@ -290,21 +334,29 @@
     }
 
     <EditForm class="ab-chat-surface__controls" Model="@this" FormName="@EffectiveFormName" OnValidSubmit="SendAsync">
-        <label class="ab-chat-surface__label" for="@AgentSelectId">Agent</label>
-        <select id="@AgentSelectId"
-                class="ab-chat-surface__select"
-                @bind="_selectedAgent"
-                aria-describedby="@DescriptionId"
-                disabled="@_isBusy">
-            @if (_agentNames.Count == 0)
-            {
-                <option value="">No agents registered</option>
-            }
-            @foreach (var agent in _agentNames)
-            {
-                <option value="@agent">@agent</option>
-            }
-        </select>
+        @if (ShowAgentSelector && !IsAgentSelectionLocked)
+        {
+            <label class="ab-chat-surface__label" for="@AgentSelectId">Agent</label>
+            <select id="@AgentSelectId"
+                    class="ab-chat-surface__select"
+                    @bind="_selectedAgent"
+                    aria-describedby="@DescriptionId"
+                    disabled="@_isBusy">
+                @if (_agentNames.Count == 0)
+                {
+                    <option value="">No agents registered</option>
+                }
+                @foreach (var agent in _agentNames)
+                {
+                    <option value="@agent">@agent</option>
+                }
+            </select>
+        }
+        else if (IsAgentSelectionLocked && !string.IsNullOrWhiteSpace(_selectedAgent))
+        {
+            <label class="ab-chat-surface__label">Agent</label>
+            <div class="ab-chat-surface__select">@_selectedAgent</div>
+        }
 
         <label class="ab-chat-surface__label" for="@PromptId">Message</label>
         <div class="ab-chat-surface__input-wrapper">
@@ -383,6 +435,9 @@
 @code {
     private static readonly MarkdownPipeline _mdPipeline =
         new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+    private static readonly IReadOnlyDictionary<string, object?> EmptyActionArgs =
+        new Dictionary<string, object?>();
+    private static readonly string[] AgentRouteMetadataKeys = ["route", "routes", "route_prefix", "route_prefixes"];
 
     private static MarkupString RenderMarkdown(string? text) =>
         new(string.IsNullOrWhiteSpace(text) ? string.Empty :
@@ -414,6 +469,11 @@
     private bool _showSlashMenu;
     private List<SlashItem> _slashItems = [];
     private List<SlashItem>? _allSlashItems; // cached full list
+    private string? _pendingHandoffFromAgent;
+    private string? _pendingHandoffToAgent;
+    private DateTimeOffset? _pendingHandoffAtUtc;
+    private PendingHandoffRequest? _pendingHandoffRequest;
+    private readonly List<HandoffTransition> _handoffHistory = [];
 
     // Timeout warning
     private bool _showTimeoutWarning;
@@ -444,6 +504,48 @@
     public string? DefaultAgentName { get; set; }
 
     [Parameter]
+    public bool ShowAgentSelector { get; set; } = true;
+
+    [Parameter]
+    public string? LockedAgentName { get; set; }
+
+    [Parameter]
+    public bool LockAgentToCurrentRoute { get; set; }
+
+    [Parameter]
+    public bool EnableAgentHandoff { get; set; } = true;
+
+    [Parameter]
+    public bool AutoNavigateOnRouteLockedHandoff { get; set; } = true;
+
+    [Parameter]
+    public bool RequireHandoffApproval { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? HandoffApprovalPolicy { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? HandoffPolicy { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerSession { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerPair { get; set; }
+
+    [Parameter]
+    public int? MaxHandoffsPerWindow { get; set; }
+
+    [Parameter]
+    public int? HandoffWindowMinutes { get; set; }
+
+    [Parameter]
+    public int? MaxPairHandoffsPerWindow { get; set; }
+
+    [Parameter]
+    public bool BlockImmediateReturnHandoff { get; set; } = true;
+
+    [Parameter]
     public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
 
     [Parameter]
@@ -469,6 +571,12 @@
             ? CircuitSessionId
             : SessionId.Trim();
 
+    private string EffectiveConversationSessionId =>
+        AgentConversationScope.BuildSessionKey(
+            EffectiveSessionId,
+            _selectedAgent,
+            ShouldIsolateConversationSession);
+
     private bool ResolvedShowDevTools =>
         ShowDevTools ?? AgentBlazorOptionsAccessor.Value.EnableDevTools;
 
@@ -489,6 +597,12 @@
     private string ClarificationInputId => $"ab-clarification-input-{_instanceId}";
     private string ClarificationSubmitButtonId => $"ab-clarification-submit-{_instanceId}";
 
+    private bool IsAgentSelectionLocked =>
+        !string.IsNullOrWhiteSpace(LockedAgentName) || LockAgentToCurrentRoute;
+
+    private bool ShouldIsolateConversationSession =>
+        AgentBlazorOptionsAccessor.Value.IsolateConversationsByAgent && _agentNames.Count > 1;
+
     private bool _canSubmit => !string.IsNullOrWhiteSpace(_prompt.Trim()) && _pendingClarification is null;
 
     private string? _themeStyle => Theme?.GetStyleString();
@@ -503,18 +617,12 @@
             AgentRegistry.GetAll()
                 .Select(static agent => agent.Name)
                 .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrWhiteSpace(DefaultAgentName))
-        {
-            _selectedAgent = _agentNames.FirstOrDefault(name =>
-                string.Equals(name, DefaultAgentName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        _selectedAgent ??= _agentNames.FirstOrDefault();
+        ApplyAgentSelectionPolicy();
     }
 
     protected override async Task OnParametersSetAsync()
     {
+        ApplyAgentSelectionPolicy();
         await HydrateTimelineFromHistoryAsync();
     }
 
@@ -627,6 +735,7 @@
         _streamingAgentName = null;
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
+        _pendingHandoffRequest = null;
         StateHasChanged();
     }
 
@@ -641,6 +750,56 @@
 
         if (_agentNames.Count == 0)
             return;
+
+        if (TryHandleAgentListCommand(message))
+        {
+            _prompt = string.Empty;
+            _showSlashMenu = false;
+            _suggestions = [];
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
+
+        if (TryHandleHandoffHistoryCommand(message))
+        {
+            _prompt = string.Empty;
+            _showSlashMenu = false;
+            _suggestions = [];
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
+
+        if (TryHandleHandoffPolicyCommand(message))
+        {
+            _prompt = string.Empty;
+            _showSlashMenu = false;
+            _suggestions = [];
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
+
+        if (await TryHandleHandoffDecisionCommandAsync(message))
+        {
+            _prompt = string.Empty;
+            _showSlashMenu = false;
+            _suggestions = [];
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
+
+        if (await TryHandleAgentHandoffCommandAsync(message))
+        {
+            _prompt = string.Empty;
+            _showSlashMenu = false;
+            _suggestions = [];
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
 
         _timeline.Add(ChatTimelineItem.User(message));
         _suggestions = [];
@@ -670,6 +829,7 @@
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
             ApplyTurnOutcome(message, turnOutcome);
+            ClearPendingHandoffMetadata();
             _ = FireProactiveInsightAsync(message, turnOutcome);
             _scrollRequested = true;
         }
@@ -855,9 +1015,57 @@
             if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
                 streamEvent.PlannedAction is not null)
             {
+                var plannedAction = streamEvent.PlannedAction;
                 AddStreamingActivityMessage(
-                    BuildActivityKey(streamEvent.PlannedAction.ComponentId, streamEvent.PlannedAction.ActionId),
-                    FormatToolCallStartMessage(streamEvent.PlannedAction));
+                    new ActivityMessage(
+                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.InProgress,
+                        Args: plannedAction.Arguments,
+                        Result: null));
+                _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallArgs &&
+                streamEvent.PlannedAction is not null)
+            {
+                var plannedAction = streamEvent.PlannedAction;
+                var args = streamEvent.ToolArguments ?? plannedAction.Arguments;
+                AddStreamingActivityMessage(
+                    new ActivityMessage(
+                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.InProgress,
+                        Args: args,
+                        Result: null));
+                _scrollRequested = true;
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallEnd &&
+                streamEvent.PlannedAction is not null)
+            {
+                var plannedAction = streamEvent.PlannedAction;
+                var key = BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId);
+                AddStreamingActivityMessage(
+                    new ActivityMessage(
+                        key,
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.Executing,
+                        Args: streamEvent.ToolArguments ?? plannedAction.Arguments ?? GetActivityArgsByKey(key),
+                        Result: null));
                 _scrollRequested = true;
                 await InvokeAsync(StateHasChanged);
                 continue;
@@ -867,7 +1075,17 @@
                 streamEvent.ExecutionResult is not null)
             {
                 var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
-                AddStreamingActivityMessage(resultKey, FormatToolCallResultMessage(streamEvent.ExecutionResult), streamEvent.ExecutionResult.Succeeded);
+                var resultStatus = streamEvent.ExecutionResult.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+                AddStreamingActivityMessage(
+                    new ActivityMessage(
+                        resultKey,
+                        FormatToolCallResultMessage(streamEvent.ExecutionResult),
+                        streamEvent.ExecutionResult.Succeeded,
+                        streamEvent.ExecutionResult.ComponentId,
+                        streamEvent.ExecutionResult.ActionId,
+                        resultStatus,
+                        GetActivityArgsByKey(resultKey),
+                        streamEvent.ExecutionResult.Message));
                 _completedActivityKeys.Add(resultKey);
                 _scrollRequested = true;
                 await InvokeAsync(StateHasChanged);
@@ -956,7 +1174,7 @@
         {
             _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
         }
-        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+        SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
 
         if (!string.IsNullOrWhiteSpace(turnOutcome.ClarificationQuestion))
         {
@@ -1018,8 +1236,19 @@
         _ = InvokeAsync(() =>
         {
             var message = FormatDeferredActionMessage(actionEvent);
-            var key = BuildActivityKey(actionEvent.ComponentType, actionEvent.ActionId);
-            if (!TryAttachActivityToAssociatedTurn(key, message, actionEvent.RunId))
+            var componentId = actionEvent.ComponentType;
+            var key = BuildActivityKey(componentId, actionEvent.ActionId);
+            var status = actionEvent.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            var activity = new ActivityMessage(
+                key,
+                message,
+                actionEvent.Succeeded,
+                componentId,
+                actionEvent.ActionId,
+                status,
+                Args: null,
+                Result: actionEvent.Message);
+            if (!TryAttachActivityToAssociatedTurn(activity, actionEvent.RunId))
             {
                 _timeline.Add(ChatTimelineItem.Activity(message, actionEvent.RunId));
             }
@@ -1045,19 +1274,19 @@
         return false;
     }
 
-    private void AddStreamingActivityMessage(string key, string message, bool succeeded = true)
+    private void AddStreamingActivityMessage(ActivityMessage activity)
     {
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(activity.Key) || string.IsNullOrWhiteSpace(activity.Text))
         {
             return;
         }
 
-        UpsertActivityMessage(_streamingActivityMessages, key, message, succeeded);
+        UpsertActivityMessage(_streamingActivityMessages, activity);
     }
 
-    private bool TryAttachActivityToAssociatedTurn(string key, string message, string? runId)
+    private bool TryAttachActivityToAssociatedTurn(ActivityMessage activity, string? runId)
     {
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(activity.Key) || string.IsNullOrWhiteSpace(activity.Text))
         {
             return true;
         }
@@ -1068,19 +1297,19 @@
                 !string.IsNullOrWhiteSpace(_activeRunId) &&
                 string.Equals(runId, _activeRunId, StringComparison.OrdinalIgnoreCase))
             {
-                AddStreamingActivityMessage(key, message);
+                AddStreamingActivityMessage(activity);
                 return true;
             }
 
             if (_assistantTimelineIndexByRunId.TryGetValue(runId, out var assistantIndex))
             {
-                return TryAppendActivityToAssistantItem(assistantIndex, key, message);
+                return TryAppendActivityToAssistantItem(assistantIndex, activity);
             }
         }
 
         if (_isBusy)
         {
-            AddStreamingActivityMessage(key, message);
+            AddStreamingActivityMessage(activity);
             return true;
         }
 
@@ -1091,13 +1320,13 @@
                 continue;
             }
 
-            return TryAppendActivityToAssistantItem(index, key, message);
+            return TryAppendActivityToAssistantItem(index, activity);
         }
 
         return false;
     }
 
-    private bool TryAppendActivityToAssistantItem(int index, string key, string message)
+    private bool TryAppendActivityToAssistantItem(int index, ActivityMessage activity)
     {
         if (index < 0 || index >= _timeline.Count)
         {
@@ -1110,7 +1339,7 @@
             return false;
         }
 
-        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, key, message);
+        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, activity);
         _timeline[index] = item with { ActivityMessages = updatedActivities };
         return true;
     }
@@ -1122,29 +1351,101 @@
         return $"{normalizedComponent}.{normalizedAction}".ToLowerInvariant();
     }
 
-    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message, bool succeeded = true)
+    private static void UpsertActivityMessage(List<ActivityMessage> target, ActivityMessage activity)
     {
-        var index = target.FindIndex(activity =>
-            string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase));
-        var entry = new ActivityMessage(key, message, succeeded);
+        var index = target.FindIndex(existing =>
+            string.Equals(existing.Key, activity.Key, StringComparison.OrdinalIgnoreCase));
         if (index >= 0)
         {
-            target[index] = entry;
+            target[index] = activity;
             return;
         }
 
-        target.Add(entry);
+        target.Add(activity);
     }
 
     private static IReadOnlyList<ActivityMessage> UpsertActivityMessage(
         IReadOnlyList<ActivityMessage> source,
-        string key,
-        string message,
-        bool succeeded = true)
+        ActivityMessage activity)
     {
         var copy = source.ToList();
-        UpsertActivityMessage(copy, key, message, succeeded);
+        UpsertActivityMessage(copy, activity);
         return copy;
+    }
+
+    private bool TryBuildRenderedActivity(ActivityMessage activity, out RenderFragment? rendered)
+    {
+        rendered = null;
+        if (string.IsNullOrWhiteSpace(activity.ComponentId) || string.IsNullOrWhiteSpace(activity.ActionId))
+        {
+            return false;
+        }
+
+        var fragments = ActionRenderRegistry.TryGet(activity.ComponentId, activity.ActionId);
+        var fragment = fragments?.Resolve(activity.Status);
+        if (fragment is null)
+        {
+            return false;
+        }
+
+        var context = new ActionRenderContext(
+            activity.ComponentId,
+            activity.ActionId,
+            activity.Status,
+            activity.Args ?? EmptyActionArgs,
+            activity.Result ?? activity.Text);
+        rendered = fragment(context);
+        return true;
+    }
+
+    private ActionRenderContext BuildResultRenderContext(
+        ChatTimelineItem item,
+        ComponentActionExecutionResult result)
+    {
+        var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+        var args = FindActionArguments(item.PlannedActions, result.ComponentId, result.ActionId);
+        return new ActionRenderContext(
+            result.ComponentId,
+            result.ActionId,
+            status,
+            args,
+            result.Message);
+    }
+
+    private IReadOnlyDictionary<string, object?>? GetActivityArgsByKey(string key)
+    {
+        for (var i = _streamingActivityMessages.Count - 1; i >= 0; i--)
+        {
+            var activity = _streamingActivityMessages[i];
+            if (!string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return activity.Args;
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, object?> FindActionArguments(
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        string componentId,
+        string actionId)
+    {
+        for (var i = plannedActions.Count - 1; i >= 0; i--)
+        {
+            var action = plannedActions[i];
+            if (!string.Equals(action.ComponentId, componentId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return action.Arguments ?? EmptyActionArgs;
+        }
+
+        return EmptyActionArgs;
     }
 
     private static string FormatDeferredActionMessage(DeferredComponentActionEvent actionEvent)
@@ -1175,26 +1476,183 @@
 
     private IDictionary<string, string>? CreateRequestContext(IReadOnlyDictionary<string, string>? additional = null)
     {
-        Dictionary<string, string>? context = null;
+        Dictionary<string, string>? context = new(StringComparer.OrdinalIgnoreCase);
 
         if (EnableGeneratedUi)
         {
-            context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            context[AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString;
+        }
+
+        var currentRoute = GetCurrentRoute();
+        if (!string.IsNullOrWhiteSpace(currentRoute))
+        {
+            context[AgentRuntimeContextKeys.CurrentRoute] = currentRoute;
+        }
+
+        if (IsAgentSelectionLocked && !string.IsNullOrWhiteSpace(_selectedAgent))
+        {
+            context[AgentRuntimeContextKeys.AgentName] = _selectedAgent;
+            context[AgentRuntimeContextKeys.AgentLock] = bool.TrueString;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_pendingHandoffFromAgent) &&
+            !string.IsNullOrWhiteSpace(_pendingHandoffToAgent))
+        {
+            context[AgentRuntimeContextKeys.AgentHandoffFrom] = _pendingHandoffFromAgent;
+            context[AgentRuntimeContextKeys.AgentHandoffTo] = _pendingHandoffToAgent;
+            if (_pendingHandoffAtUtc.HasValue)
             {
-                [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
-            };
+                context[AgentRuntimeContextKeys.AgentHandoffAt] = _pendingHandoffAtUtc.Value.ToString("O");
+            }
         }
 
         if (additional is not null)
         {
-            context ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var pair in additional)
             {
                 context[pair.Key] = pair.Value;
             }
         }
 
-        return context;
+        return context.Count > 0 ? context : null;
+    }
+
+    private void ApplyAgentSelectionPolicy()
+    {
+        if (_agentNames.Count == 0)
+        {
+            _selectedAgent = null;
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(LockedAgentName))
+        {
+            _selectedAgent = _agentNames.FirstOrDefault(name =>
+                string.Equals(name, LockedAgentName, StringComparison.OrdinalIgnoreCase))
+                ?? _agentNames.FirstOrDefault();
+            return;
+        }
+
+        if (LockAgentToCurrentRoute)
+        {
+            var resolved = ResolveRouteLockedAgentName();
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                _selectedAgent = resolved;
+                return;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedAgent) &&
+            !string.IsNullOrWhiteSpace(DefaultAgentName))
+        {
+            _selectedAgent = _agentNames.FirstOrDefault(name =>
+                string.Equals(name, DefaultAgentName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedAgent) ||
+            !_agentNames.Contains(_selectedAgent, StringComparer.OrdinalIgnoreCase))
+        {
+            _selectedAgent = _agentNames.FirstOrDefault();
+        }
+    }
+
+    private string? ResolveRouteLockedAgentName()
+    {
+        var currentRoute = GetCurrentRoute();
+        if (string.IsNullOrWhiteSpace(currentRoute))
+        {
+            return null;
+        }
+
+        AgentRegistration? bestMatch = null;
+        var bestScore = -1;
+
+        foreach (var registration in AgentRegistry.GetAll())
+        {
+            foreach (var routePattern in EnumerateRoutePatterns(registration))
+            {
+                var normalizedPattern = NormalizeRoute(routePattern);
+                if (string.IsNullOrWhiteSpace(normalizedPattern))
+                {
+                    continue;
+                }
+
+                if (!currentRoute.StartsWith(normalizedPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var score = normalizedPattern.Length;
+                if (score <= bestScore)
+                {
+                    continue;
+                }
+
+                bestScore = score;
+                bestMatch = registration;
+            }
+        }
+
+        return bestMatch?.Name;
+    }
+
+    private string? GetCurrentRoute()
+    {
+        var uri = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var routePart = uri;
+        var queryOrFragmentIndex = routePart.IndexOfAny(['?', '#']);
+        if (queryOrFragmentIndex >= 0)
+        {
+            routePart = routePart[..queryOrFragmentIndex];
+        }
+
+        var route = string.IsNullOrWhiteSpace(routePart) ? "/" : "/" + routePart;
+        return NormalizeRoute(route);
+    }
+
+    private static string? NormalizeRoute(string? route)
+    {
+        if (string.IsNullOrWhiteSpace(route))
+        {
+            return null;
+        }
+
+        var normalized = route.Trim();
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absolute))
+        {
+            normalized = absolute.AbsolutePath;
+        }
+
+        if (!normalized.StartsWith('/'))
+        {
+            normalized = "/" + normalized;
+        }
+
+        normalized = normalized.TrimEnd('/');
+        return normalized.Length == 0
+            ? "/"
+            : normalized.ToLowerInvariant();
+    }
+
+    private static IEnumerable<string> EnumerateRoutePatterns(AgentRegistration registration)
+    {
+        foreach (var key in AgentRouteMetadataKeys)
+        {
+            if (!registration.Metadata.TryGetValue(key, out var rawValue) ||
+                string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            foreach (var token in rawValue.Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    yield return token;
+                }
+            }
+        }
     }
 
     private Task HandleGeneratedActionInvokedAsync(AgentUiActionInvocation invocation)
@@ -1208,7 +1666,7 @@
     private Task HandleGeneratedRuntimeResponseAsync(AgentTurnResponse response)
     {
         _timeline.Add(ChatTimelineItem.Agent(response));
-        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+        SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
 
         if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
         {
@@ -1236,7 +1694,7 @@
     private void HandleSessionUpdated(AgentChatSessionUpdate update)
     {
         if (_isBusy ||
-            !string.Equals(update.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(update.SessionId, EffectiveConversationSessionId, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(update.SourceId, _instanceId, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -1258,7 +1716,7 @@
 
     private async Task HydrateTimelineFromHistoryAsync(bool force = false)
     {
-        var sessionId = EffectiveSessionId;
+        var sessionId = EffectiveConversationSessionId;
         if (!force &&
             string.Equals(_historyHydratedForSession, sessionId, StringComparison.OrdinalIgnoreCase))
         {
@@ -1276,6 +1734,7 @@
         _activeRunId = null;
         _pendingClarification = null;
         _pendingApprovals.Clear();
+        _pendingHandoffRequest = null;
         _clarificationResponse = string.Empty;
         _agentState = AgentState.Idle;
 
@@ -1320,7 +1779,16 @@
         {
             var key = BuildActivityKey(result.ComponentId, result.ActionId);
             var text = FormatToolCallResultMessage(result);
-            messages.Add(new ActivityMessage(key, text, result.Succeeded));
+            var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            messages.Add(new ActivityMessage(
+                key,
+                text,
+                result.Succeeded,
+                result.ComponentId,
+                result.ActionId,
+                status,
+                Args: null,
+                Result: result.Message));
         }
 
         return messages;
@@ -1369,6 +1837,47 @@
     private List<SlashItem> BuildAllSlashItems()
     {
         var items = new List<SlashItem>();
+        if (EnableAgentHandoff && _agentNames.Count > 0)
+        {
+            items.Add(new SlashItem(
+                "AgentRuntime",
+                "agents",
+                "List available agents",
+                "/agents"));
+            items.Add(new SlashItem(
+                "AgentRuntime",
+                "handoff-history",
+                "Show recent handoff transitions",
+                "/handoff-history"));
+            items.Add(new SlashItem(
+                "AgentRuntime",
+                "handoff-policy",
+                "Show active handoff policy and limits",
+                "/handoff-policy"));
+            foreach (var agentName in _agentNames)
+            {
+                items.Add(new SlashItem(
+                    "AgentRuntime",
+                    "handoff",
+                    $"Switch control to {agentName}",
+                    $"/agent {agentName}"));
+            }
+
+            if (RequireHandoffApproval)
+            {
+                items.Add(new SlashItem(
+                    "AgentRuntime",
+                    "approve-handoff",
+                    "Approve pending handoff request",
+                    "/approve-handoff"));
+                items.Add(new SlashItem(
+                    "AgentRuntime",
+                    "cancel-handoff",
+                    "Cancel pending handoff request",
+                    "/cancel-handoff"));
+            }
+        }
+
         foreach (var component in ComponentRegistry.GetAll())
         {
             if (!AgentActionDiscovery.IsAttributeDriven(component))
@@ -1386,6 +1895,410 @@
         }
 
         return items;
+    }
+
+    private async Task<bool> TryHandleAgentHandoffCommandAsync(string message)
+    {
+        if (!EnableAgentHandoff || !TryExtractHandoffTarget(message, out var targetHint))
+        {
+            return false;
+        }
+
+        if (_agentNames.Count == 0)
+        {
+            _timeline.Add(ChatTimelineItem.Activity("No agents are registered to hand off to."));
+            return true;
+        }
+
+        if (!TryResolveAgentByHint(targetHint, out var targetAgent))
+        {
+            _timeline.Add(ChatTimelineItem.Activity(
+                $"Unknown agent '{targetHint}'. Available: {string.Join(", ", _agentNames)}."));
+            return true;
+        }
+
+        var previousAgent = _selectedAgent ?? _agentNames.FirstOrDefault() ?? "Agent";
+        if (string.Equals(previousAgent, targetAgent, StringComparison.OrdinalIgnoreCase))
+        {
+            _timeline.Add(ChatTimelineItem.Activity($"Already assigned to {targetAgent}."));
+            return true;
+        }
+
+        if (!IsHandoffAllowed(previousAgent, targetAgent, out var policyViolation))
+        {
+            _timeline.Add(ChatTimelineItem.Activity(policyViolation ?? $"Handoff from {previousAgent} to {targetAgent} is blocked by policy."));
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(LockedAgentName))
+        {
+            _timeline.Add(ChatTimelineItem.Activity(
+                $"Agent is locked to '{LockedAgentName}'. Handoff command was ignored."));
+            return true;
+        }
+
+        string? targetRoute = null;
+        if (LockAgentToCurrentRoute)
+        {
+            if (!AutoNavigateOnRouteLockedHandoff)
+            {
+                _timeline.Add(ChatTimelineItem.Activity(
+                    $"Agent is route-locked on '{GetCurrentRoute()}'. Navigate to the target route to complete handoff."));
+                return true;
+            }
+
+            targetRoute = ResolvePrimaryRouteForAgent(targetAgent);
+            if (string.IsNullOrWhiteSpace(targetRoute))
+            {
+                _timeline.Add(ChatTimelineItem.Activity(
+                    $"Could not resolve a route prefix for '{targetAgent}'."));
+                return true;
+            }
+        }
+
+        if (ShouldRequireHandoffApproval(previousAgent, targetAgent))
+        {
+            _pendingHandoffRequest = new PendingHandoffRequest(previousAgent, targetAgent, targetRoute);
+            var routeInfo = string.IsNullOrWhiteSpace(targetRoute)
+                ? string.Empty
+                : $" Route: {targetRoute}.";
+            _timeline.Add(ChatTimelineItem.Activity(
+                $"Handoff requested: {previousAgent} -> {targetAgent}.{routeInfo} Type /approve-handoff or /cancel-handoff."));
+            return true;
+        }
+
+        await CompleteHandoffAsync(previousAgent, targetAgent, targetRoute);
+        return true;
+    }
+
+    private async Task ApprovePendingHandoffAsync()
+    {
+        if (_isBusy || _pendingHandoffRequest is null)
+        {
+            return;
+        }
+
+        var request = _pendingHandoffRequest;
+        if (!IsHandoffAllowed(request.FromAgent, request.ToAgent, out var policyViolation))
+        {
+            _timeline.Add(ChatTimelineItem.Activity(policyViolation ?? $"Handoff from {request.FromAgent} to {request.ToAgent} is blocked by policy."));
+            _pendingHandoffRequest = null;
+            _scrollRequested = true;
+            StateHasChanged();
+            return;
+        }
+
+        _pendingHandoffRequest = null;
+        await CompleteHandoffAsync(request.FromAgent, request.ToAgent, request.TargetRoute);
+        _scrollRequested = true;
+        StateHasChanged();
+    }
+
+    private Task CancelPendingHandoffAsync()
+    {
+        if (_isBusy || _pendingHandoffRequest is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _timeline.Add(ChatTimelineItem.Activity(
+            $"Canceled handoff: {_pendingHandoffRequest.FromAgent} -> {_pendingHandoffRequest.ToAgent}."));
+        _pendingHandoffRequest = null;
+        _scrollRequested = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private bool TryHandleAgentListCommand(string message)
+    {
+        if (!EnableAgentHandoff || !IsAgentListCommand(message))
+        {
+            return false;
+        }
+
+        if (_agentNames.Count == 0)
+        {
+            _timeline.Add(ChatTimelineItem.Activity("No agents are currently registered."));
+            return true;
+        }
+
+        _timeline.Add(ChatTimelineItem.Activity($"Available agents: {string.Join(", ", _agentNames)}."));
+        return true;
+    }
+
+    private bool TryHandleHandoffHistoryCommand(string message)
+    {
+        if (!EnableAgentHandoff || !HandoffHistoryFormatter.TryParseHistoryCommand(message, out var limit))
+        {
+            return false;
+        }
+
+        var summary = HandoffHistoryFormatter.BuildSummary(_handoffHistory, limit);
+        _timeline.Add(ChatTimelineItem.Activity(summary));
+        return true;
+    }
+
+    private bool TryHandleHandoffPolicyCommand(string message)
+    {
+        if (!EnableAgentHandoff || !HandoffPolicyFormatter.TryParsePolicyCommand(message))
+        {
+            return false;
+        }
+
+        var summary = HandoffPolicyFormatter.BuildSummary(
+            HandoffPolicy,
+            HandoffApprovalPolicy,
+            RequireHandoffApproval,
+            _handoffHistory,
+            MaxHandoffsPerSession,
+            MaxHandoffsPerPair,
+            BlockImmediateReturnHandoff,
+            MaxHandoffsPerWindow,
+            HandoffWindowMinutes,
+            MaxPairHandoffsPerWindow);
+        _timeline.Add(ChatTimelineItem.Activity(summary));
+        return true;
+    }
+
+    private async Task<bool> TryHandleHandoffDecisionCommandAsync(string message)
+    {
+        if (!EnableAgentHandoff || !TryExtractHandoffDecision(message, out var approve))
+        {
+            return false;
+        }
+
+        if (_pendingHandoffRequest is null)
+        {
+            _timeline.Add(ChatTimelineItem.Activity("No pending handoff request."));
+            return true;
+        }
+
+        if (!approve)
+        {
+            await CancelPendingHandoffAsync();
+            return true;
+        }
+
+        await ApprovePendingHandoffAsync();
+        return true;
+    }
+
+    private async Task CompleteHandoffAsync(string fromAgent, string toAgent, string? targetRoute)
+    {
+        _selectedAgent = toAgent;
+        SetPendingHandoffMetadata(fromAgent, toAgent);
+        RecordHandoffTransition(fromAgent, toAgent);
+
+        if (LockAgentToCurrentRoute)
+        {
+            if (!string.IsNullOrWhiteSpace(targetRoute))
+            {
+                _timeline.Add(ChatTimelineItem.Activity(
+                    $"Handed off from {fromAgent} to {toAgent}. Navigating to {targetRoute}."));
+                NavigationManager.NavigateTo(targetRoute);
+                return;
+            }
+
+            _timeline.Add(ChatTimelineItem.Activity(
+                $"Handed off from {fromAgent} to {toAgent}."));
+            return;
+        }
+
+        await HydrateTimelineFromHistoryAsync(force: true);
+        _timeline.Add(ChatTimelineItem.Activity($"Handed off from {fromAgent} to {toAgent}."));
+    }
+
+    private string? ResolvePrimaryRouteForAgent(string agentName)
+    {
+        var registration = AgentRegistry.GetAll().FirstOrDefault(a =>
+            string.Equals(a.Name, agentName, StringComparison.OrdinalIgnoreCase));
+        if (registration is null)
+        {
+            return null;
+        }
+
+        foreach (var routePattern in EnumerateRoutePatterns(registration))
+        {
+            var normalized = NormalizeRoute(routePattern);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryResolveAgentByHint(string hint, out string resolvedAgent)
+    {
+        resolvedAgent = string.Empty;
+        var normalizedHint = NormalizeAgentHint(hint);
+        if (string.IsNullOrWhiteSpace(normalizedHint))
+        {
+            return false;
+        }
+
+        var exact = _agentNames.FirstOrDefault(name =>
+            string.Equals(NormalizeAgentHint(name), normalizedHint, StringComparison.Ordinal));
+        if (!string.IsNullOrWhiteSpace(exact))
+        {
+            resolvedAgent = exact;
+            return true;
+        }
+
+        var containsMatches = _agentNames
+            .Where(name =>
+            {
+                var normalizedName = NormalizeAgentHint(name);
+                return normalizedName.Contains(normalizedHint, StringComparison.Ordinal) ||
+                       normalizedHint.Contains(normalizedName, StringComparison.Ordinal);
+            })
+            .ToArray();
+
+        if (containsMatches.Length == 1)
+        {
+            resolvedAgent = containsMatches[0];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryExtractHandoffTarget(string message, out string targetHint)
+    {
+        targetHint = string.Empty;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var trimmed = message.Trim();
+        var prefixes = new[]
+        {
+            "/agent ",
+            "/handoff ",
+            "handoff to ",
+            "switch agent to ",
+            "transfer agent to "
+        };
+
+        foreach (var prefix in prefixes)
+        {
+            if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            targetHint = trimmed[prefix.Length..].Trim();
+            return !string.IsNullOrWhiteSpace(targetHint);
+        }
+
+        return false;
+    }
+
+    private static bool IsAgentListCommand(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var trimmed = message.Trim();
+        return string.Equals(trimmed, "/agents", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(trimmed, "list agents", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryExtractHandoffDecision(string message, out bool approve)
+    {
+        approve = false;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        var trimmed = message.Trim();
+        if (string.Equals(trimmed, "/approve-handoff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "approve handoff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "approve transfer", StringComparison.OrdinalIgnoreCase))
+        {
+            approve = true;
+            return true;
+        }
+
+        if (string.Equals(trimmed, "/cancel-handoff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "cancel handoff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "deny handoff", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeAgentHint(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.EndsWith(" agent", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed[..^6];
+        }
+
+        return new string(trimmed
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+    }
+
+    private bool ShouldRequireHandoffApproval(string fromAgent, string toAgent)
+        => HandoffApprovalPolicyEvaluator.ShouldRequireApproval(
+            RequireHandoffApproval,
+            fromAgent,
+            toAgent,
+            HandoffApprovalPolicy);
+
+    private bool IsHandoffAllowed(string fromAgent, string toAgent, out string? violationMessage)
+    {
+        var decision = HandoffPolicyEvaluator.Evaluate(
+            fromAgent,
+            toAgent,
+            HandoffPolicy,
+            _handoffHistory,
+            MaxHandoffsPerSession,
+            MaxHandoffsPerPair,
+            BlockImmediateReturnHandoff,
+            MaxHandoffsPerWindow,
+            HandoffWindowMinutes,
+            MaxPairHandoffsPerWindow);
+        violationMessage = decision.ViolationMessage;
+        return decision.Allowed;
+    }
+
+    private void RecordHandoffTransition(string fromAgent, string toAgent)
+    {
+        _handoffHistory.Add(new HandoffTransition(fromAgent, toAgent, DateTimeOffset.UtcNow));
+        if (_handoffHistory.Count > 100)
+        {
+            _handoffHistory.RemoveAt(0);
+        }
+    }
+
+    private void SetPendingHandoffMetadata(string fromAgent, string toAgent)
+    {
+        _pendingHandoffFromAgent = fromAgent;
+        _pendingHandoffToAgent = toAgent;
+        _pendingHandoffAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    private void ClearPendingHandoffMetadata()
+    {
+        _pendingHandoffFromAgent = null;
+        _pendingHandoffToAgent = null;
+        _pendingHandoffAtUtc = null;
     }
 
     // ── Proactive Insights ──────────────────────────────────────────────────
@@ -1461,7 +2374,15 @@
             new("activity", "Activity", text, [], [], [], null, runId);
     }
 
-    private sealed record ActivityMessage(string Key, string Text, bool Succeeded = true);
+    private sealed record ActivityMessage(
+        string Key,
+        string Text,
+        bool Succeeded = true,
+        string? ComponentId = null,
+        string? ActionId = null,
+        ActionStatus Status = ActionStatus.Complete,
+        IReadOnlyDictionary<string, object?>? Args = null,
+        object? Result = null);
 
     private sealed record StreamTurnOutcome(
         AgentTurnResponse Response,
@@ -1469,6 +2390,7 @@
         IReadOnlyList<PendingApproval> PendingApprovals,
         string? RunId);
 
+    private sealed record PendingHandoffRequest(string FromAgent, string ToAgent, string? TargetRoute);
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);
     private sealed record PendingApprovalInfo(string ComponentId, string ActionId, string Description, IReadOnlyDictionary<string, object?> Parameters);
 }

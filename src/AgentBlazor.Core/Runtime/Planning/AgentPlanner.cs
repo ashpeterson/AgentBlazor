@@ -120,6 +120,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         sb.AppendLine("- If the user provides ANY data values, use them — do not ask for clarification.");
         sb.AppendLine("- Do not invent agentIds, action names, or routes not listed below.");
         sb.AppendLine("- Include all required parameters for each action.");
+        sb.AppendLine("- Treat SHARED STATE as the canonical app/session context.");
         sb.AppendLine();
         sb.AppendLine("# ACTION TARGETING RULES");
         sb.AppendLine("- CRITICAL: Use ONLY the action names listed in ACTIVE COMPONENTS below.");
@@ -143,6 +144,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         }
 
         BuildActiveComponentsSection(sb, request);
+        BuildSharedStateSection(sb, request);
         BuildServiceToolsSection(sb, request);
 
         if (request.AvailableRoutes.Count > 0)
@@ -180,6 +182,22 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
 
         sb.AppendLine("Return JSON now.");
         return sb.ToString();
+    }
+
+    private static void BuildSharedStateSection(StringBuilder sb, ActionPlanRequest request)
+    {
+        if (request.SharedState.Count == 0)
+            return;
+
+        sb.AppendLine("# SHARED STATE");
+        sb.AppendLine("Use this synchronized state when deciding what to do next.");
+        foreach (var (key, value) in request.SharedState
+                     .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            sb.Append("  ").Append(key).Append(": ").AppendLine(value);
+        }
+
+        sb.AppendLine();
     }
 
     private static void BuildActiveComponentsSection(StringBuilder sb, ActionPlanRequest request)

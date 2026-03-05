@@ -1,9 +1,13 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Components.Render
 @using AgentBlazor.Core.Components
+@using AgentBlazor.Core.Models
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Options
+@using Microsoft.Extensions.Options
 @implements IDisposable
 @using MudBlazor
 @inject IAgentRuntime AgentRuntime
@@ -11,6 +15,9 @@
 @inject IConversationStore ConversationStore
 @inject IAgentChatSessionState ChatSessionState
 @inject IAgentChatSessionEvents SessionEvents
+@inject IAgentActionRenderRegistry ActionRenderRegistry
+@inject NavigationManager NavigationManager
+@inject IOptions<AgentBlazorOptions> AgentBlazorOptionsAccessor
 
 <div class="ab-chat-bar @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
      data-theme="@(Theme?.DataTheme)"
@@ -82,7 +89,14 @@
                         <ul class="ab-chat-bar__activity-list">
                             @foreach (var activity in item.ActivityMessages)
                             {
-                                <li>@activity.Text</li>
+                                if (TryBuildRenderedActivity(activity, out var renderedActivity))
+                                {
+                                    <li>@renderedActivity</li>
+                                }
+                                else
+                                {
+                                    <li>@activity.Text</li>
+                                }
                             }
                         </ul>
                     }
@@ -99,7 +113,14 @@
                         <ul class="ab-chat-bar__activity-list">
                             @foreach (var activity in _streamingActivityMessages)
                             {
-                                <li>@activity.Text</li>
+                                if (TryBuildRenderedActivity(activity, out var renderedActivity))
+                                {
+                                    <li>@renderedActivity</li>
+                                }
+                                else
+                                {
+                                    <li>@activity.Text</li>
+                                }
                             }
                         </ul>
                     }
@@ -118,6 +139,9 @@
 </div>
 
 @code {
+    private static readonly IReadOnlyDictionary<string, object?> EmptyActionArgs =
+        new Dictionary<string, object?>();
+
     private string _prompt = string.Empty;
     private bool _isBusy;
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
@@ -225,6 +249,13 @@
             ? ChatSessionState.SessionId
             : SessionId.Trim();
 
+    private string EffectiveConversationSessionId =>
+        AgentConversationScope.BuildSessionKey(
+            EffectiveSessionId,
+            AgentName,
+            AgentBlazorOptionsAccessor.Value.IsolateConversationsByAgent &&
+            !string.IsNullOrWhiteSpace(AgentName));
+
     private string? _themeStyle => Theme?.GetStyleString();
 
     protected override void OnInitialized()
@@ -285,13 +316,17 @@
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
 
+            var activityMessages = _streamingActivityMessages.Count > 0
+                ? _streamingActivityMessages.ToArray()
+                : BuildActivityMessages(response.ExecutionResults, response.PlannedActions);
+
             // Add agent response to timeline
             var runId = string.IsNullOrWhiteSpace(_activeRunId) ? null : _activeRunId;
             _timeline.Add(new ChatBarTimelineItem(
                 "assistant",
                 response.ResponseText,
                 response.PlannedActions,
-                _streamingActivityMessages.ToArray(),
+                activityMessages,
                 runId));
             if (!string.IsNullOrWhiteSpace(runId))
             {
@@ -300,7 +335,7 @@
             _streamingActivityMessages.Clear();
 
             await OnResponseReceived.InvokeAsync(response);
-            SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+            SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
         }
         catch (Exception ex)
         {
@@ -322,8 +357,8 @@
         _assistantTimelineIndexByRunId.Clear();
         _streamingActivityMessages.Clear();
         _activeRunId = null;
-        await ConversationStore.ClearSessionAsync(EffectiveSessionId);
-        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+        await ConversationStore.ClearSessionAsync(EffectiveConversationSessionId);
+        SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
     }
 
     /// <summary>
@@ -344,8 +379,8 @@
         _assistantTimelineIndexByRunId.Clear();
         _streamingActivityMessages.Clear();
         _activeRunId = null;
-        _ = ConversationStore.ClearSessionAsync(EffectiveSessionId);
-        SessionEvents.NotifySessionUpdated(EffectiveSessionId, _instanceId);
+        _ = ConversationStore.ClearSessionAsync(EffectiveConversationSessionId);
+        SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
     }
 
     private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
@@ -372,9 +407,55 @@
             if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
                 streamEvent.PlannedAction is not null)
             {
+                var plannedAction = streamEvent.PlannedAction;
                 AddStreamingActivityMessage(
-                    BuildActivityKey(streamEvent.PlannedAction.ComponentId, streamEvent.PlannedAction.ActionId),
-                    FormatToolCallStartMessage(streamEvent.PlannedAction));
+                    new ActivityMessage(
+                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.InProgress,
+                        Args: plannedAction.Arguments,
+                        Result: null));
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallArgs &&
+                streamEvent.PlannedAction is not null)
+            {
+                var plannedAction = streamEvent.PlannedAction;
+                var args = streamEvent.ToolArguments ?? plannedAction.Arguments;
+                AddStreamingActivityMessage(
+                    new ActivityMessage(
+                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.InProgress,
+                        Args: args,
+                        Result: null));
+                await InvokeAsync(StateHasChanged);
+                continue;
+            }
+
+            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallEnd &&
+                streamEvent.PlannedAction is not null)
+            {
+                var plannedAction = streamEvent.PlannedAction;
+                var key = BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId);
+                AddStreamingActivityMessage(
+                    new ActivityMessage(
+                        key,
+                        FormatToolCallStartMessage(plannedAction),
+                        Succeeded: true,
+                        ComponentId: plannedAction.ComponentId,
+                        ActionId: plannedAction.ActionId,
+                        Status: ActionStatus.Executing,
+                        Args: streamEvent.ToolArguments ?? plannedAction.Arguments ?? GetActivityArgsByKey(key),
+                        Result: null));
                 await InvokeAsync(StateHasChanged);
                 continue;
             }
@@ -382,9 +463,19 @@
             if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
                 streamEvent.ExecutionResult is not null)
             {
+                var result = streamEvent.ExecutionResult;
+                var key = BuildActivityKey(result.ComponentId, result.ActionId);
+                var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
                 AddStreamingActivityMessage(
-                    BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId),
-                    FormatToolCallResultMessage(streamEvent.ExecutionResult));
+                    new ActivityMessage(
+                        key,
+                        FormatToolCallResultMessage(result),
+                        result.Succeeded,
+                        result.ComponentId,
+                        result.ActionId,
+                        status,
+                        GetActivityArgsByKey(key),
+                        result.Message));
                 await InvokeAsync(StateHasChanged);
                 continue;
             }
@@ -429,7 +520,17 @@
         {
             var message = FormatDeferredActionMessage(actionEvent);
             var key = BuildActivityKey(actionEvent.ComponentType, actionEvent.ActionId);
-            if (!TryAttachActivityToAssociatedTurn(key, message, actionEvent.RunId))
+            var status = actionEvent.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            var activity = new ActivityMessage(
+                key,
+                message,
+                actionEvent.Succeeded,
+                actionEvent.ComponentType,
+                actionEvent.ActionId,
+                status,
+                Args: null,
+                Result: actionEvent.Message);
+            if (!TryAttachActivityToAssociatedTurn(activity, actionEvent.RunId))
             {
                 _timeline.Add(new ChatBarTimelineItem("activity", message, [], [], actionEvent.RunId));
             }
@@ -441,7 +542,7 @@
     private void HandleSessionUpdated(AgentChatSessionUpdate update)
     {
         if (_isBusy ||
-            !string.Equals(update.SessionId, EffectiveSessionId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(update.SessionId, EffectiveConversationSessionId, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(update.SourceId, _instanceId, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -470,19 +571,19 @@
         return false;
     }
 
-    private void AddStreamingActivityMessage(string key, string message)
+    private void AddStreamingActivityMessage(ActivityMessage activity)
     {
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(activity.Key) || string.IsNullOrWhiteSpace(activity.Text))
         {
             return;
         }
 
-        UpsertActivityMessage(_streamingActivityMessages, key, message);
+        UpsertActivityMessage(_streamingActivityMessages, activity);
     }
 
-    private bool TryAttachActivityToAssociatedTurn(string key, string message, string? runId)
+    private bool TryAttachActivityToAssociatedTurn(ActivityMessage activity, string? runId)
     {
-        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(message))
+        if (string.IsNullOrWhiteSpace(activity.Key) || string.IsNullOrWhiteSpace(activity.Text))
         {
             return true;
         }
@@ -493,19 +594,19 @@
                 !string.IsNullOrWhiteSpace(_activeRunId) &&
                 string.Equals(runId, _activeRunId, StringComparison.OrdinalIgnoreCase))
             {
-                AddStreamingActivityMessage(key, message);
+                AddStreamingActivityMessage(activity);
                 return true;
             }
 
             if (_assistantTimelineIndexByRunId.TryGetValue(runId, out var assistantIndex))
             {
-                return TryAppendActivityToAssistantItem(assistantIndex, key, message);
+                return TryAppendActivityToAssistantItem(assistantIndex, activity);
             }
         }
 
         if (_isBusy)
         {
-            AddStreamingActivityMessage(key, message);
+            AddStreamingActivityMessage(activity);
             return true;
         }
 
@@ -516,13 +617,13 @@
                 continue;
             }
 
-            return TryAppendActivityToAssistantItem(index, key, message);
+            return TryAppendActivityToAssistantItem(index, activity);
         }
 
         return false;
     }
 
-    private bool TryAppendActivityToAssistantItem(int index, string key, string message)
+    private bool TryAppendActivityToAssistantItem(int index, ActivityMessage activity)
     {
         if (index < 0 || index >= _timeline.Count)
         {
@@ -535,7 +636,7 @@
             return false;
         }
 
-        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, key, message);
+        var updatedActivities = UpsertActivityMessage(item.ActivityMessages, activity);
         _timeline[index] = item with { ActivityMessages = updatedActivities };
         return true;
     }
@@ -547,28 +648,87 @@
         return $"{normalizedComponent}.{normalizedAction}".ToLowerInvariant();
     }
 
-    private static void UpsertActivityMessage(List<ActivityMessage> target, string key, string message)
+    private static void UpsertActivityMessage(List<ActivityMessage> target, ActivityMessage activity)
     {
-        var index = target.FindIndex(activity =>
-            string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase));
-        var entry = new ActivityMessage(key, message);
+        var index = target.FindIndex(existing =>
+            string.Equals(existing.Key, activity.Key, StringComparison.OrdinalIgnoreCase));
         if (index >= 0)
         {
-            target[index] = entry;
+            target[index] = activity;
             return;
         }
 
-        target.Add(entry);
+        target.Add(activity);
     }
 
     private static IReadOnlyList<ActivityMessage> UpsertActivityMessage(
         IReadOnlyList<ActivityMessage> source,
-        string key,
-        string message)
+        ActivityMessage activity)
     {
         var copy = source.ToList();
-        UpsertActivityMessage(copy, key, message);
+        UpsertActivityMessage(copy, activity);
         return copy;
+    }
+
+    private bool TryBuildRenderedActivity(ActivityMessage activity, out RenderFragment? rendered)
+    {
+        rendered = null;
+        if (string.IsNullOrWhiteSpace(activity.ComponentId) || string.IsNullOrWhiteSpace(activity.ActionId))
+        {
+            return false;
+        }
+
+        var fragments = ActionRenderRegistry.TryGet(activity.ComponentId, activity.ActionId);
+        var fragment = fragments?.Resolve(activity.Status);
+        if (fragment is null)
+        {
+            return false;
+        }
+
+        var context = new ActionRenderContext(
+            activity.ComponentId,
+            activity.ActionId,
+            activity.Status,
+            activity.Args ?? EmptyActionArgs,
+            activity.Result ?? activity.Text);
+        rendered = fragment(context);
+        return true;
+    }
+
+    private IReadOnlyDictionary<string, object?>? GetActivityArgsByKey(string key)
+    {
+        for (var i = _streamingActivityMessages.Count - 1; i >= 0; i--)
+        {
+            var activity = _streamingActivityMessages[i];
+            if (!string.Equals(activity.Key, key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return activity.Args;
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, object?> FindActionArguments(
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        string componentId,
+        string actionId)
+    {
+        for (var i = plannedActions.Count - 1; i >= 0; i--)
+        {
+            var action = plannedActions[i];
+            if (!string.Equals(action.ComponentId, componentId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return action.Arguments ?? EmptyActionArgs;
+        }
+
+        return EmptyActionArgs;
     }
 
     private static string FormatDeferredActionMessage(DeferredComponentActionEvent actionEvent)
@@ -599,20 +759,36 @@
 
     private IDictionary<string, string>? CreateRequestContext()
     {
-        if (!EnableGeneratedUi)
+        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (EnableGeneratedUi)
         {
-            return null;
+            context[AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString;
         }
 
-        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var routePart = relativePath;
+        var queryOrFragmentIndex = routePart.IndexOfAny(['?', '#']);
+        if (queryOrFragmentIndex >= 0)
         {
-            [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
-        };
+            routePart = routePart[..queryOrFragmentIndex];
+        }
+
+        var currentRoute = string.IsNullOrWhiteSpace(routePart) ? "/" : "/" + routePart;
+        context[AgentRuntimeContextKeys.CurrentRoute] = currentRoute;
+
+        if (!string.IsNullOrWhiteSpace(AgentName))
+        {
+            context[AgentRuntimeContextKeys.AgentName] = AgentName;
+            context[AgentRuntimeContextKeys.AgentLock] = bool.TrueString;
+        }
+
+        return context.Count > 0 ? context : null;
     }
 
     private async Task HydrateTimelineFromHistoryAsync(bool force = false)
     {
-        var sessionId = EffectiveSessionId;
+        var sessionId = EffectiveConversationSessionId;
         if (!force &&
             string.Equals(_historyHydratedForSession, sessionId, StringComparison.OrdinalIgnoreCase))
         {
@@ -646,14 +822,15 @@
                     "assistant",
                     turn.AgentResponse,
                     turn.PlannedActions,
-                    BuildActivityMessages(turn.ExecutionResults),
+                    BuildActivityMessages(turn.ExecutionResults, turn.PlannedActions),
                     null));
             }
         }
     }
 
     private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
-        IReadOnlyList<ComponentActionExecutionResult> executionResults)
+        IReadOnlyList<ComponentActionExecutionResult> executionResults,
+        IReadOnlyList<PlannedComponentAction> plannedActions)
     {
         if (executionResults.Count == 0)
         {
@@ -665,7 +842,16 @@
         {
             var key = BuildActivityKey(result.ComponentId, result.ActionId);
             var text = FormatToolCallResultMessage(result);
-            messages.Add(new ActivityMessage(key, text));
+            var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            messages.Add(new ActivityMessage(
+                key,
+                text,
+                result.Succeeded,
+                result.ComponentId,
+                result.ActionId,
+                status,
+                FindActionArguments(plannedActions, result.ComponentId, result.ActionId),
+                result.Message));
         }
 
         return messages;
@@ -686,5 +872,13 @@
         IReadOnlyList<ActivityMessage> ActivityMessages,
         string? RunId);
 
-    private sealed record ActivityMessage(string Key, string Text);
+    private sealed record ActivityMessage(
+        string Key,
+        string Text,
+        bool Succeeded = true,
+        string? ComponentId = null,
+        string? ActionId = null,
+        ActionStatus Status = ActionStatus.Complete,
+        IReadOnlyDictionary<string, object?>? Args = null,
+        object? Result = null);
 }

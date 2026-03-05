@@ -24,7 +24,9 @@ public class AgUiHostingIntegrationTests
     [Fact]
     public async Task AgUiRun_ApprovalRequiredAction_SkipsExecution_WhenApprovalMissing()
     {
-        var app = await CreateAppAsync(BuildPlanJson("AgentForm", "submit"));
+        var app = await CreateAppAsync(
+            BuildPlanJson("AgentForm", "submit"),
+            tier: AgentBlazorTier.Premium);
         try
         {
             using var client = CreateClient(app);
@@ -53,7 +55,9 @@ public class AgUiHostingIntegrationTests
     [Fact]
     public async Task AgUiRun_ApprovalRequiredAction_Executes_WhenApprovalProvided()
     {
-        var app = await CreateAppAsync(BuildPlanJson("AgentForm", "submit"));
+        var app = await CreateAppAsync(
+            BuildPlanJson("AgentForm", "submit"),
+            tier: AgentBlazorTier.Premium);
         try
         {
             using var client = CreateClient(app);
@@ -116,7 +120,7 @@ public class AgUiHostingIntegrationTests
     }
 
     [Fact]
-    public async Task AgUiRun_PaidTier_StillExecutesDeterministicSubmitAction()
+    public async Task AgUiRun_PaidTier_BlocksPremiumSubmitAction()
     {
         var app = await CreateAppAsync(
             BuildPlanJson("AgentForm", "submit"),
@@ -142,7 +146,14 @@ public class AgUiHostingIntegrationTests
             Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
             Assert.Contains("RUN_STARTED", body, StringComparison.Ordinal);
             Assert.Contains("RUN_FINISHED", body, StringComparison.Ordinal);
-            Assert.Equal(1, executor.CallCount);
+            Assert.Contains("Current tier: Paid", body, StringComparison.Ordinal);
+            var hasPolicyFilteredSummary = body.Contains("Filtered actions:", StringComparison.Ordinal);
+            var hasTierValidationMessage = body.Contains("requires", StringComparison.Ordinal)
+                && body.Contains("Current tier: Paid.", StringComparison.Ordinal);
+            Assert.True(
+                hasPolicyFilteredSummary || hasTierValidationMessage,
+                $"Expected blocked-tier diagnostics in stream body. Actual body: {body}");
+            Assert.Equal(0, executor.CallCount);
         }
         finally
         {
@@ -206,6 +217,8 @@ public class AgUiHostingIntegrationTests
             Assert.Contains("step_started", body, StringComparison.Ordinal);
             Assert.Contains("tool_call_end", body, StringComparison.Ordinal);
             Assert.Contains("step_finished", body, StringComparison.Ordinal);
+            Assert.Contains("shared_state_snapshot", body, StringComparison.Ordinal);
+            Assert.Contains("shared_state_delta", body, StringComparison.Ordinal);
         }
         finally
         {
@@ -553,6 +566,23 @@ public class AgUiHostingIntegrationTests
 
             var sequence = 0L;
             yield return CreateEvent(AgentTurnStreamEventKind.RunStarted, runId, ++sequence);
+            yield return CreateEvent(
+                AgentTurnStreamEventKind.StateSnapshot,
+                runId,
+                ++sequence,
+                sharedStateSnapshot: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["component.recipe.state.title"] = "Classic Scrambled Eggs",
+                    ["route.current"] = "/demo/dojo"
+                });
+            yield return CreateEvent(
+                AgentTurnStreamEventKind.StateDelta,
+                runId,
+                ++sequence,
+                sharedStateDelta: new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["component.recipe.state.title"] = "Test"
+                });
             yield return CreateEvent(AgentTurnStreamEventKind.ReasoningStart, runId, ++sequence);
             yield return CreateEvent(AgentTurnStreamEventKind.ReasoningContent, runId, ++sequence, reasoningDelta: "Model is planning next action.");
             yield return CreateEvent(AgentTurnStreamEventKind.ReasoningEnd, runId, ++sequence);
@@ -597,7 +627,9 @@ public class AgUiHostingIntegrationTests
             IReadOnlyDictionary<string, object?>? toolArgs = null,
             bool? stepSucceeded = null,
             string? textDelta = null,
-            string? reasoningDelta = null)
+            string? reasoningDelta = null,
+            IReadOnlyDictionary<string, string>? sharedStateSnapshot = null,
+            IReadOnlyDictionary<string, string?>? sharedStateDelta = null)
         {
             return new AgentTurnStreamEvent
             {
@@ -612,7 +644,9 @@ public class AgUiHostingIntegrationTests
                 ToolArguments = toolArgs,
                 StepSucceeded = stepSucceeded,
                 TextDelta = textDelta,
-                ReasoningDelta = reasoningDelta
+                ReasoningDelta = reasoningDelta,
+                SharedStateSnapshot = sharedStateSnapshot,
+                SharedStateDelta = sharedStateDelta
             };
         }
     }

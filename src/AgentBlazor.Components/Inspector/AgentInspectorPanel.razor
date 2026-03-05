@@ -3,6 +3,8 @@
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Discovery
 @using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Components.Inspector
+@using System.Text.Json
 @using Microsoft.JSInterop
 @inject IAgentInspectorStore InspectorStore
 @inject IAgentComponentRegistry ComponentRegistry
@@ -24,13 +26,66 @@
             <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 2 ? "ab-inspector__tab--active" : null)"
                     @onclick="() => _activeTab = 2">Prompt</button>
             <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 3 ? "ab-inspector__tab--active" : null)"
-                    @onclick="() => _activeTab = 3">Components</button>
+                    @onclick="() => _activeTab = 3">State</button>
+            <button type="button" role="tab" class="ab-inspector__tab @(_activeTab == 4 ? "ab-inspector__tab--active" : null)"
+                    @onclick="() => _activeTab = 4">Components</button>
         </div>
 
         <div class="ab-inspector__body">
             @if (_activeTab == 0)
             {
-                var runs = InspectorStore.GetRecentRuns(SessionId);
+                var allRuns = InspectorStore.GetRecentRuns(SessionId);
+                var chainMap = InspectorRunCorrelationLens.BuildHandoffChainMap(allRuns);
+                var availableAgents = allRuns
+                    .Select(static run => run.AgentName)
+                    .Where(static agent => !string.IsNullOrWhiteSpace(agent))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(static agent => agent, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var availableChains = chainMap.Values
+                    .Distinct()
+                    .OrderBy(static chain => chain)
+                    .ToList();
+                var availableHandoffPairs = allRuns
+                    .SelectMany(GetRunHandoffPairs)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(static pair => pair, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var runs = GetFilteredRuns(allRuns, chainMap);
+                <div class="ab-inspector__run-toolbar">
+                    <select class="ab-inspector__event-kind-filter" @bind="_runAgentFilter">
+                        <option value="">All agents</option>
+                        @foreach (var agent in availableAgents)
+                        {
+                            <option value="@agent">@agent</option>
+                        }
+                    </select>
+                    <select class="ab-inspector__event-kind-filter" @bind="_runChainFilter">
+                        <option value="">All chains</option>
+                        @foreach (var chainId in availableChains)
+                        {
+                            <option value="@chainId.ToString(System.Globalization.CultureInfo.InvariantCulture)">Chain @chainId</option>
+                        }
+                    </select>
+                    <select class="ab-inspector__event-kind-filter" @bind="_runHandoffPairFilter">
+                        <option value="">All handoff pairs</option>
+                        @foreach (var pair in availableHandoffPairs)
+                        {
+                            <option value="@pair">@pair</option>
+                        }
+                    </select>
+                    <label class="ab-inspector__event-toggle">
+                        <input type="checkbox" @bind="_handoffRunsOnly" />
+                        Handoff runs
+                    </label>
+                    <button type="button"
+                            class="ab-inspector__copy-btn"
+                            @onclick="ClearRunFilters"
+                            disabled="@(!HasActiveRunFilters)">
+                        Clear
+                    </button>
+                    <span class="ab-inspector__event-count">@runs.Count / @allRuns.Count</span>
+                </div>
                 if (runs.Count == 0)
                 {
                     <p class="ab-inspector__empty">No runs recorded yet.</p>
@@ -42,16 +97,35 @@
                         {
                             <li class="ab-inspector__run-item @(_selectedRunId == run.RunId ? "ab-inspector__run-item--selected" : null)"
                                 @onclick="() => SelectRun(run)">
+                                @{
+                                    var handoffCount = CountRunEvents(run, "AgentHandoff");
+                                }
                                 <span class="ab-inspector__run-time">@run.StartedAt.ToLocalTime().ToString("HH:mm:ss")</span>
                                 <span class="ab-inspector__run-agent">@run.AgentName</span>
                                 <span class="ab-inspector__badge @(run.Succeeded ? "ab-inspector__badge--success" : "ab-inspector__badge--error")">
                                     @(run.Succeeded ? "OK" : "ERR")
                                 </span>
                                 <span class="ab-inspector__run-actions">@run.Events.Count events</span>
+                                @if (chainMap.TryGetValue(run.RunId, out var chainId))
+                                {
+                                    <span class="ab-inspector__summary-chip">chain @chainId</span>
+                                }
+                                @if (handoffCount > 0)
+                                {
+                                    <span class="ab-inspector__summary-chip">handoffs @handoffCount</span>
+                                }
                                 @if (run.FinishedAt.HasValue)
                                 {
                                     var ms = (run.FinishedAt.Value - run.StartedAt).TotalMilliseconds;
                                     <span class="ab-inspector__run-duration">@ms.ToString("F0")ms</span>
+                                }
+                                @if (handoffCount > 0)
+                                {
+                                    var handoffSummary = GetRunHandoffSummary(run);
+                                    if (!string.IsNullOrWhiteSpace(handoffSummary))
+                                    {
+                                        <span class="ab-inspector__run-handoff">@handoffSummary</span>
+                                    }
                                 }
                             </li>
                         }
@@ -67,24 +141,249 @@
                 else
                 {
                     var startTs = _selectedRun.StartedAt;
-                    <ul class="ab-inspector__event-list">
-                        @foreach (var ev in _selectedRun.Events)
-                        {
-                            var deltaMs = (ev.Timestamp - startTs).TotalMilliseconds;
-                            <li class="ab-inspector__event-item ab-inspector__event-item--@ev.Kind.ToLowerInvariant()">
-                                <span class="ab-inspector__event-time">+@deltaMs.ToString("F0")ms</span>
-                                <span class="ab-inspector__event-kind">@ev.Kind</span>
-                                @if (!string.IsNullOrWhiteSpace(ev.ComponentId))
-                                {
-                                    <span class="ab-inspector__event-target">@ev.ComponentId@(ev.ActionId != null ? "." + ev.ActionId : null)</span>
-                                }
-                                @if (!string.IsNullOrWhiteSpace(ev.Detail))
-                                {
-                                    <span class="ab-inspector__event-detail">@ev.Detail</span>
-                                }
-                            </li>
+                    var durationMs = _selectedRun.FinishedAt.HasValue
+                        ? (_selectedRun.FinishedAt.Value - _selectedRun.StartedAt).TotalMilliseconds
+                        : (double?)null;
+                    var eventKinds = GetAvailableEventKinds();
+                    var eventPhases = GetAvailableEventPhases();
+                    var filteredEvents = GetFilteredEvents();
+                    <div class="ab-inspector__run-summary">
+                        <span class="ab-inspector__summary-chip">Agent: @_selectedRun.AgentName</span>
+                        @{
+                            var selectedChainId = GetSelectedRunChainId();
                         }
-                    </ul>
+                        @if (selectedChainId.HasValue)
+                        {
+                            <span class="ab-inspector__summary-chip">Chain: @selectedChainId.Value</span>
+                        }
+                        <span class="ab-inspector__summary-chip">Events: @_selectedRun.Events.Count</span>
+                        <span class="ab-inspector__summary-chip">Planned: @CountEvents("PlannedAction")</span>
+                        <span class="ab-inspector__summary-chip">Approvals: @CountEvents("ApprovalRequired")</span>
+                        <span class="ab-inspector__summary-chip">State Deltas: @CountEvents("StateDelta")</span>
+                        <span class="ab-inspector__summary-chip">Handoffs: @CountEvents("AgentHandoff")</span>
+                        <span class="ab-inspector__summary-chip">Stream: @CountStreamEvents()</span>
+                        <span class="ab-inspector__summary-chip">Planning: @CountEventsByPhase("planning")</span>
+                        <span class="ab-inspector__summary-chip">Validation: @CountEventsByPhase("validation")</span>
+                        <span class="ab-inspector__summary-chip">Execution: @CountEventsByPhase("execution")</span>
+                        <span class="ab-inspector__summary-chip">Result: @(_selectedRun.Succeeded ? "Success" : "Error")</span>
+                        @if (durationMs.HasValue)
+                        {
+                            <span class="ab-inspector__summary-chip">Duration: @durationMs.Value.ToString("F0")ms</span>
+                        }
+                    </div>
+                    <div class="ab-inspector__event-toolbar">
+                        <input class="ab-inspector__event-search"
+                               type="text"
+                               placeholder="Search events"
+                               @bind="_eventSearch"
+                               @bind:event="oninput" />
+                        <select class="ab-inspector__event-kind-filter" @bind="_eventKindFilter">
+                            <option value="">All kinds</option>
+                            @foreach (var kind in eventKinds)
+                            {
+                                <option value="@kind">@kind</option>
+                            }
+                        </select>
+                        <select class="ab-inspector__event-kind-filter" @bind="_eventPhaseFilter">
+                            <option value="">All phases</option>
+                            @foreach (var phase in eventPhases)
+                            {
+                                <option value="@phase">@InspectorEventLens.GetPhaseLabel(phase)</option>
+                            }
+                        </select>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_handoffOnly" />
+                            Handoff only
+                        </label>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_streamOnly" />
+                            Stream only
+                        </label>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_groupEventsByPhase" />
+                            Group by phase
+                        </label>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_showPayloadKeyLens" />
+                            Show payload keys
+                        </label>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_showPayloadValueLens" />
+                            Show payload values
+                        </label>
+                        <label class="ab-inspector__event-toggle">
+                            <input type="checkbox" @bind="_showPayloadPathLens" />
+                            Nested payload
+                        </label>
+                        <button type="button"
+                                class="ab-inspector__copy-btn"
+                                @onclick="ClearEventFilters"
+                                disabled="@(!HasActiveEventFilters)">
+                            Clear
+                        </button>
+                        <span class="ab-inspector__event-count">@filteredEvents.Count / @_selectedRun.Events.Count</span>
+                    </div>
+                    if (filteredEvents.Count == 0)
+                    {
+                        <p class="ab-inspector__empty">No events match the current filters.</p>
+                    }
+                    else
+                    {
+                        @if (_groupEventsByPhase)
+                        {
+                            var groupedEvents = InspectorEventLens.GroupByPhase(filteredEvents);
+                            <div class="ab-inspector__phase-groups">
+                                @foreach (var group in groupedEvents)
+                                {
+                                    <div class="ab-inspector__phase-group">
+                                        <div class="ab-inspector__phase-header">
+                                            <span class="ab-inspector__phase-title">@group.Label</span>
+                                            <span class="ab-inspector__phase-count">@group.Events.Count</span>
+                                        </div>
+                                        <ul class="ab-inspector__event-list">
+                                            @foreach (var ev in group.Events)
+                                            {
+                                                var deltaMs = (ev.Timestamp - startTs).TotalMilliseconds;
+                                                var normalizedKind = GetEventKindClass(ev.Kind);
+                                                var formattedDetail = FormatEventDetail(ev.Detail);
+                                                var isJsonDetail = LooksLikeJson(ev.Detail);
+                                                var payloadKeys = _showPayloadKeyLens && isJsonDetail
+                                                    ? InspectorEventLens.ExtractJsonTopLevelKeys(ev.Detail)
+                                                    : [];
+                                                var payloadEntries = _showPayloadValueLens && isJsonDetail
+                                                    ? InspectorEventLens.ExtractJsonTopLevelEntries(ev.Detail)
+                                                    : [];
+                                                var payloadPaths = _showPayloadPathLens && isJsonDetail
+                                                    ? InspectorEventLens.ExtractJsonLeafPaths(ev.Detail)
+                                                    : [];
+                                                <li class="ab-inspector__event-item ab-inspector__event-item--@normalizedKind">
+                                                    <span class="ab-inspector__event-time">+@deltaMs.ToString("F0")ms</span>
+                                                    <span class="ab-inspector__event-kind">@ev.Kind</span>
+                                                    @if (!string.IsNullOrWhiteSpace(ev.ComponentId))
+                                                    {
+                                                        <span class="ab-inspector__event-target">@ev.ComponentId@(ev.ActionId != null ? "." + ev.ActionId : null)</span>
+                                                    }
+                                                    @if (payloadPaths.Count > 0)
+                                                    {
+                                                        <span class="ab-inspector__event-payload-keys">
+                                                            @foreach (var entry in payloadPaths)
+                                                            {
+                                                                <span class="ab-inspector__event-payload-chip">
+                                                                    @entry.Key=<span class="ab-inspector__event-payload-value">@entry.ValuePreview</span>
+                                                                </span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                    else if (payloadEntries.Count > 0)
+                                                    {
+                                                        <span class="ab-inspector__event-payload-keys">
+                                                            @foreach (var entry in payloadEntries)
+                                                            {
+                                                                <span class="ab-inspector__event-payload-chip">
+                                                                    @entry.Key=<span class="ab-inspector__event-payload-value">@entry.ValuePreview</span>
+                                                                </span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                    else if (payloadKeys.Count > 0)
+                                                    {
+                                                        <span class="ab-inspector__event-payload-keys">
+                                                            @foreach (var key in payloadKeys)
+                                                            {
+                                                                <span class="ab-inspector__event-payload-chip">@key</span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(formattedDetail))
+                                                    {
+                                                        @if (isJsonDetail)
+                                                        {
+                                                            <pre class="ab-inspector__event-detail ab-inspector__event-detail--json">@formattedDetail</pre>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="ab-inspector__event-detail">@formattedDetail</span>
+                                                        }
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <ul class="ab-inspector__event-list">
+                                @foreach (var ev in filteredEvents)
+                                {
+                                    var deltaMs = (ev.Timestamp - startTs).TotalMilliseconds;
+                                    var normalizedKind = GetEventKindClass(ev.Kind);
+                                    var formattedDetail = FormatEventDetail(ev.Detail);
+                                    var isJsonDetail = LooksLikeJson(ev.Detail);
+                                    var payloadKeys = _showPayloadKeyLens && isJsonDetail
+                                        ? InspectorEventLens.ExtractJsonTopLevelKeys(ev.Detail)
+                                        : [];
+                                    var payloadEntries = _showPayloadValueLens && isJsonDetail
+                                        ? InspectorEventLens.ExtractJsonTopLevelEntries(ev.Detail)
+                                        : [];
+                                    var payloadPaths = _showPayloadPathLens && isJsonDetail
+                                        ? InspectorEventLens.ExtractJsonLeafPaths(ev.Detail)
+                                        : [];
+                                    <li class="ab-inspector__event-item ab-inspector__event-item--@normalizedKind">
+                                        <span class="ab-inspector__event-time">+@deltaMs.ToString("F0")ms</span>
+                                        <span class="ab-inspector__event-kind">@ev.Kind</span>
+                                        @if (!string.IsNullOrWhiteSpace(ev.ComponentId))
+                                        {
+                                            <span class="ab-inspector__event-target">@ev.ComponentId@(ev.ActionId != null ? "." + ev.ActionId : null)</span>
+                                        }
+                                        @if (payloadPaths.Count > 0)
+                                        {
+                                            <span class="ab-inspector__event-payload-keys">
+                                                @foreach (var entry in payloadPaths)
+                                                {
+                                                    <span class="ab-inspector__event-payload-chip">
+                                                        @entry.Key=<span class="ab-inspector__event-payload-value">@entry.ValuePreview</span>
+                                                    </span>
+                                                }
+                                            </span>
+                                        }
+                                        else if (payloadEntries.Count > 0)
+                                        {
+                                            <span class="ab-inspector__event-payload-keys">
+                                                @foreach (var entry in payloadEntries)
+                                                {
+                                                    <span class="ab-inspector__event-payload-chip">
+                                                        @entry.Key=<span class="ab-inspector__event-payload-value">@entry.ValuePreview</span>
+                                                    </span>
+                                                }
+                                            </span>
+                                        }
+                                        else if (payloadKeys.Count > 0)
+                                        {
+                                            <span class="ab-inspector__event-payload-keys">
+                                                @foreach (var key in payloadKeys)
+                                                {
+                                                    <span class="ab-inspector__event-payload-chip">@key</span>
+                                                }
+                                            </span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(formattedDetail))
+                                        {
+                                            @if (isJsonDetail)
+                                            {
+                                                <pre class="ab-inspector__event-detail ab-inspector__event-detail--json">@formattedDetail</pre>
+                                            }
+                                            else
+                                            {
+                                                <span class="ab-inspector__event-detail">@formattedDetail</span>
+                                            }
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
                 }
             }
             else if (_activeTab == 2)
@@ -102,6 +401,74 @@
                 }
             }
             else if (_activeTab == 3)
+            {
+                @if (_selectedRun is null)
+                {
+                    <p class="ab-inspector__empty">Select a run to inspect shared-state changes.</p>
+                }
+                else
+                {
+                    var allStateChanges = GetStateChanges();
+                    var filteredStateChanges = GetFilteredStateChanges();
+                    <div class="ab-inspector__run-summary">
+                        <span class="ab-inspector__summary-chip">Changes: @allStateChanges.Count</span>
+                        <span class="ab-inspector__summary-chip">Added: @allStateChanges.Count(static change => string.Equals(change.ChangeKind, "added", StringComparison.OrdinalIgnoreCase))</span>
+                        <span class="ab-inspector__summary-chip">Updated: @allStateChanges.Count(static change => string.Equals(change.ChangeKind, "updated", StringComparison.OrdinalIgnoreCase))</span>
+                        <span class="ab-inspector__summary-chip">Removed: @allStateChanges.Count(static change => string.Equals(change.ChangeKind, "removed", StringComparison.OrdinalIgnoreCase))</span>
+                    </div>
+                    <div class="ab-inspector__event-toolbar">
+                        <input class="ab-inspector__event-search"
+                               type="text"
+                               placeholder="Filter state keys/values"
+                               @bind="_stateKeyFilter"
+                               @bind:event="oninput" />
+                        <select class="ab-inspector__event-kind-filter" @bind="_stateChangeFilter">
+                            <option value="">All changes</option>
+                            <option value="added">Added</option>
+                            <option value="updated">Updated</option>
+                            <option value="removed">Removed</option>
+                        </select>
+                        <button type="button"
+                                class="ab-inspector__copy-btn"
+                                @onclick="ClearStateFilters"
+                                disabled="@(!HasActiveStateFilters)">
+                            Clear
+                        </button>
+                        <span class="ab-inspector__event-count">@filteredStateChanges.Count / @allStateChanges.Count</span>
+                    </div>
+                    if (filteredStateChanges.Count == 0)
+                    {
+                        <p class="ab-inspector__empty">No state changes match the current filters.</p>
+                    }
+                    else
+                    {
+                        <ul class="ab-inspector__state-diff-list">
+                            @foreach (var change in filteredStateChanges)
+                            {
+                                var deltaMs = (change.Timestamp - _selectedRun.StartedAt).TotalMilliseconds;
+                                <li class="ab-inspector__state-diff-item ab-inspector__state-diff-item--@change.ChangeKind">
+                                    <span class="ab-inspector__event-time">+@deltaMs.ToString("F0")ms</span>
+                                    <span class="ab-inspector__state-diff-kind">@change.ChangeKind.ToUpperInvariant()</span>
+                                    <span class="ab-inspector__state-diff-key">@change.Key</span>
+                                    @if (string.Equals(change.ChangeKind, "removed", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="ab-inspector__state-diff-values">@FormatStateValue(change.PreviousValue) -> <span class="ab-inspector__state-diff-null">(null)</span></span>
+                                    }
+                                    else if (string.Equals(change.ChangeKind, "added", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="ab-inspector__state-diff-values"><span class="ab-inspector__state-diff-null">(null)</span> -> @FormatStateValue(change.CurrentValue)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ab-inspector__state-diff-values">@FormatStateValue(change.PreviousValue) -> @FormatStateValue(change.CurrentValue)</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                }
+            }
+            else if (_activeTab == 4)
             {
                 var components = ComponentRegistry.GetAll().ToList();
                 if (components.Count == 0)
@@ -152,6 +519,21 @@ else if (!Inline)
     private int _activeTab;
     private string? _selectedRunId;
     private InspectorRunRecord? _selectedRun;
+    private string _eventSearch = string.Empty;
+    private string _eventKindFilter = string.Empty;
+    private string _eventPhaseFilter = string.Empty;
+    private bool _handoffOnly;
+    private bool _streamOnly;
+    private bool _groupEventsByPhase = true;
+    private bool _showPayloadKeyLens = true;
+    private bool _showPayloadValueLens;
+    private bool _showPayloadPathLens;
+    private string _runAgentFilter = string.Empty;
+    private string _runChainFilter = string.Empty;
+    private string _runHandoffPairFilter = string.Empty;
+    private bool _handoffRunsOnly;
+    private string _stateKeyFilter = string.Empty;
+    private string _stateChangeFilter = string.Empty;
 
     [Parameter]
     public bool Inline { get; set; }
@@ -172,6 +554,7 @@ else if (!Inline)
     {
         _selectedRunId = run.RunId;
         _selectedRun = run;
+        ClearEventFilters();
         _activeTab = 1;
     }
 
@@ -186,4 +569,488 @@ else if (!Inline)
         }
         catch { }
     }
+
+    private int CountEvents(string kind)
+    {
+        if (_selectedRun is null)
+        {
+            return 0;
+        }
+
+        return _selectedRun.Events.Count(ev => string.Equals(ev.Kind, kind, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static int CountRunEvents(InspectorRunRecord run, string kind)
+    {
+        return run.Events.Count(ev => string.Equals(ev.Kind, kind, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? GetRunHandoffSummary(InspectorRunRecord run)
+    {
+        var handoff = run.Events
+            .LastOrDefault(static ev => string.Equals(ev.Kind, "AgentHandoff", StringComparison.OrdinalIgnoreCase));
+        return handoff?.Detail;
+    }
+
+    private bool HasActiveRunFilters =>
+        !string.IsNullOrWhiteSpace(_runAgentFilter) ||
+        !string.IsNullOrWhiteSpace(_runChainFilter) ||
+        !string.IsNullOrWhiteSpace(_runHandoffPairFilter) ||
+        _handoffRunsOnly;
+
+    private void ClearRunFilters()
+    {
+        _runAgentFilter = string.Empty;
+        _runChainFilter = string.Empty;
+        _runHandoffPairFilter = string.Empty;
+        _handoffRunsOnly = false;
+    }
+
+    private IReadOnlyList<InspectorRunRecord> GetFilteredRuns(
+        IReadOnlyList<InspectorRunRecord> runs,
+        IReadOnlyDictionary<string, int> chainMap)
+    {
+        IEnumerable<InspectorRunRecord> filtered = runs;
+
+        if (!string.IsNullOrWhiteSpace(_runAgentFilter))
+        {
+            filtered = filtered.Where(run =>
+                string.Equals(run.AgentName, _runAgentFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_runChainFilter) &&
+            int.TryParse(_runChainFilter, out var chainFilter))
+        {
+            filtered = filtered.Where(run =>
+                chainMap.TryGetValue(run.RunId, out var chainId) && chainId == chainFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_runHandoffPairFilter))
+        {
+            filtered = filtered.Where(run => RunContainsHandoffPair(run, _runHandoffPairFilter));
+        }
+
+        if (_handoffRunsOnly)
+        {
+            filtered = filtered.Where(run => CountRunEvents(run, "AgentHandoff") > 0);
+        }
+
+        return filtered.ToList();
+    }
+
+    private static IReadOnlyList<string> GetRunHandoffPairs(InspectorRunRecord run)
+    {
+        var pairs = new List<string>();
+        foreach (var ev in run.Events)
+        {
+            if (!string.Equals(ev.Kind, "AgentHandoff", StringComparison.OrdinalIgnoreCase) ||
+                !InspectorRunCorrelationLens.TryParseHandoffDetail(ev.Detail, out var fromAgent, out var toAgent))
+            {
+                continue;
+            }
+
+            pairs.Add($"{fromAgent} -> {toAgent}");
+        }
+
+        return pairs;
+    }
+
+    private static bool RunContainsHandoffPair(InspectorRunRecord run, string pair)
+    {
+        if (string.IsNullOrWhiteSpace(pair))
+        {
+            return true;
+        }
+
+        foreach (var candidate in GetRunHandoffPairs(run))
+        {
+            if (string.Equals(candidate, pair, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int? GetSelectedRunChainId()
+    {
+        if (_selectedRun is null)
+        {
+            return null;
+        }
+
+        var runs = InspectorStore.GetRecentRuns(SessionId);
+        var chainMap = InspectorRunCorrelationLens.BuildHandoffChainMap(runs);
+        return chainMap.TryGetValue(_selectedRun.RunId, out var chainId)
+            ? chainId
+            : null;
+    }
+
+    private bool HasActiveEventFilters =>
+        !string.IsNullOrWhiteSpace(_eventSearch) ||
+        !string.IsNullOrWhiteSpace(_eventKindFilter) ||
+        !string.IsNullOrWhiteSpace(_eventPhaseFilter) ||
+        _handoffOnly ||
+        _streamOnly;
+
+    private void ClearEventFilters()
+    {
+        _eventSearch = string.Empty;
+        _eventKindFilter = string.Empty;
+        _eventPhaseFilter = string.Empty;
+        _handoffOnly = false;
+        _streamOnly = false;
+    }
+
+    private bool HasActiveStateFilters =>
+        !string.IsNullOrWhiteSpace(_stateKeyFilter) ||
+        !string.IsNullOrWhiteSpace(_stateChangeFilter);
+
+    private void ClearStateFilters()
+    {
+        _stateKeyFilter = string.Empty;
+        _stateChangeFilter = string.Empty;
+    }
+
+    private IReadOnlyList<string> GetAvailableEventKinds()
+    {
+        if (_selectedRun is null)
+        {
+            return [];
+        }
+
+        return _selectedRun.Events
+            .Select(static ev => ev.Kind)
+            .Where(static kind => !string.IsNullOrWhiteSpace(kind))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static kind => kind, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private IReadOnlyList<string> GetAvailableEventPhases()
+    {
+        if (_selectedRun is null)
+        {
+            return [];
+        }
+
+        return InspectorEventLens.GroupByPhase(_selectedRun.Events)
+            .Select(static group => group.Phase)
+            .ToList();
+    }
+
+    private IReadOnlyList<InspectorEvent> GetFilteredEvents()
+    {
+        if (_selectedRun is null)
+        {
+            return [];
+        }
+
+        var search = _eventSearch.Trim();
+        IEnumerable<InspectorEvent> filtered = _selectedRun.Events;
+
+        if (!string.IsNullOrWhiteSpace(_eventKindFilter))
+        {
+            filtered = filtered.Where(ev => string.Equals(ev.Kind, _eventKindFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(_eventPhaseFilter))
+        {
+            filtered = filtered.Where(ev =>
+                string.Equals(
+                    InspectorEventLens.ClassifyPhase(ev.Kind),
+                    _eventPhaseFilter,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (_handoffOnly)
+        {
+            filtered = filtered.Where(static ev => string.Equals(ev.Kind, "AgentHandoff", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (_streamOnly)
+        {
+            filtered = filtered.Where(ev => IsStreamEventKind(ev.Kind));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filtered = filtered.Where(ev => MatchesEventSearch(ev, search));
+        }
+
+        return filtered.ToList();
+    }
+
+    private static bool MatchesEventSearch(InspectorEvent ev, string search)
+    {
+        return ContainsSearch(ev.Kind, search)
+            || ContainsSearch(ev.ComponentId, search)
+            || ContainsSearch(ev.ActionId, search)
+            || ContainsSearch(ev.Detail, search);
+    }
+
+    private static bool ContainsSearch(string? candidate, string search)
+    {
+        return !string.IsNullOrWhiteSpace(candidate)
+            && candidate.Contains(search, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private int CountStreamEvents()
+    {
+        if (_selectedRun is null)
+        {
+            return 0;
+        }
+
+        return _selectedRun.Events.Count(ev => IsStreamEventKind(ev.Kind));
+    }
+
+    private int CountEventsByPhase(string phase)
+    {
+        if (_selectedRun is null)
+        {
+            return 0;
+        }
+
+        return _selectedRun.Events.Count(ev =>
+            string.Equals(InspectorEventLens.ClassifyPhase(ev.Kind), phase, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsStreamEventKind(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            return false;
+        }
+
+        return InspectorEventLens.IsStreamKind(kind);
+    }
+
+    private static string GetEventKindClass(string kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            return "unknown";
+        }
+
+        return new string(kind
+            .ToLowerInvariant()
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+    }
+
+    private static bool LooksLikeJson(string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return false;
+        }
+
+        var trimmed = detail.Trim();
+        return (trimmed.StartsWith("{", StringComparison.Ordinal) && trimmed.EndsWith("}", StringComparison.Ordinal)) ||
+               (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal));
+    }
+
+    private static string? FormatEventDetail(string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return detail;
+        }
+
+        if (!LooksLikeJson(detail))
+        {
+            return detail;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(detail!);
+            return JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return detail;
+        }
+    }
+
+    private IReadOnlyList<InspectorStateChange> GetFilteredStateChanges()
+    {
+        var search = _stateKeyFilter.Trim();
+        IEnumerable<InspectorStateChange> filtered = GetStateChanges();
+
+        if (!string.IsNullOrWhiteSpace(_stateChangeFilter))
+        {
+            filtered = filtered.Where(change =>
+                string.Equals(change.ChangeKind, _stateChangeFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filtered = filtered.Where(change =>
+                ContainsSearch(change.Key, search) ||
+                ContainsSearch(change.PreviousValue, search) ||
+                ContainsSearch(change.CurrentValue, search));
+        }
+
+        return filtered.ToList();
+    }
+
+    private IReadOnlyList<InspectorStateChange> GetStateChanges()
+    {
+        if (_selectedRun is null)
+        {
+            return [];
+        }
+
+        var latest = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var changes = new List<InspectorStateChange>();
+        foreach (var ev in _selectedRun.Events)
+        {
+            if (string.Equals(ev.Kind, "StateSnapshot", StringComparison.OrdinalIgnoreCase))
+            {
+                latest.Clear();
+                foreach (var kv in ParseStateSnapshot(ev.Detail))
+                {
+                    latest[kv.Key] = kv.Value;
+                }
+                continue;
+            }
+
+            if (!string.Equals(ev.Kind, "StateDelta", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var delta = ParseStateDelta(ev.Detail);
+            foreach (var kv in delta)
+            {
+                var hadPrevious = latest.TryGetValue(kv.Key, out var previous);
+                var current = kv.Value;
+                var changeKind = current is null
+                    ? "removed"
+                    : hadPrevious
+                        ? "updated"
+                        : "added";
+
+                if (string.Equals(changeKind, "updated", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(previous, current, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                changes.Add(new InspectorStateChange(
+                    Timestamp: ev.Timestamp,
+                    Key: kv.Key,
+                    PreviousValue: previous,
+                    CurrentValue: current,
+                    ChangeKind: changeKind));
+
+                if (current is null)
+                {
+                    latest.Remove(kv.Key);
+                }
+                else
+                {
+                    latest[kv.Key] = current;
+                }
+            }
+        }
+
+        return changes
+            .OrderByDescending(static change => change.Timestamp)
+            .ToList();
+    }
+
+    private static Dictionary<string, string> ParseStateSnapshot(string? detail)
+    {
+        if (!LooksLikeJson(detail))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(detail!);
+            if (doc.RootElement.ValueKind is not JsonValueKind.Object)
+            {
+                return [];
+            }
+
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                var value = ExtractStateValue(property.Value);
+                if (value is null)
+                {
+                    continue;
+                }
+
+                values[property.Name] = value;
+            }
+
+            return values;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static Dictionary<string, string?> ParseStateDelta(string? detail)
+    {
+        if (!LooksLikeJson(detail))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(detail!);
+            if (doc.RootElement.ValueKind is not JsonValueKind.Object)
+            {
+                return [];
+            }
+
+            var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                values[property.Name] = ExtractStateValue(property.Value);
+            }
+
+            return values;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static string? ExtractStateValue(JsonElement element)
+    {
+        if (element.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            _ => element.ToString()
+        };
+    }
+
+    private static string FormatStateValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "(empty)" : value;
+
+    private sealed record InspectorStateChange(
+        DateTimeOffset Timestamp,
+        string Key,
+        string? PreviousValue,
+        string? CurrentValue,
+        string ChangeKind);
 }

@@ -12,6 +12,7 @@ using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Planning;
 using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Core.Runtime.Routing;
+using AgentBlazor.Core.Runtime.State;
 using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Components;
@@ -77,7 +78,9 @@ public static class AgentBlazorServiceCollectionExtensions
 
         // Conversation store — default InMemory (can be replaced via builder.UseConversationStore*)
         services.AddOptions<ConversationOptions>();
+        services.AddOptions<SharedStateOptions>();
         services.TryAddSingleton<IConversationStore, InMemoryConversationStore>();
+        services.TryAddSingleton<IAgentSharedStateStore, InMemoryAgentSharedStateStore>();
 
         // Route registry for navigation planning
         services.TryAddSingleton<IRouteRegistry, InMemoryRouteRegistry>();

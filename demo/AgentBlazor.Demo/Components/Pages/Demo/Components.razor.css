@@ -1,7 +1,62 @@
-.components-page__grid {
-    margin-top: 0.1rem;
+.components-page {
+    max-width: 1020px;
+    margin: 0 auto;
 }
 
 .components-page__card {
-    height: 100%;
+    display: grid;
+    gap: 0.7rem;
+}
+
+.components-page__file-events {
+    margin: 0.7rem 0 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.components-page__file-events li {
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+}
+
+.components-page__job-block {
+    margin-top: 0.75rem;
+}
+
+.components-page__file-jobs {
+    margin: 0.4rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+    font-size: 0.75rem;
+}
+
+.components-page__file-jobs li {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    padding: 0.4rem 0.5rem;
+    background: var(--mud-palette-surface);
+    display: grid;
+    gap: 0.25rem;
+}
+
+.components-page__job-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.components-page__job-head :deep(.mud-chip) {
+    margin-left: auto;
+}
+
+.components-page__job-detail {
+    display: grid;
+    gap: 0.2rem;
+    color: var(--mud-palette-text-secondary);
 }

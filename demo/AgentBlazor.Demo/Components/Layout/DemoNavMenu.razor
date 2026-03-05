@@ -2,17 +2,26 @@
 @using MudBlazor
 
 <AgentNavMenu AgentId="demo-nav" Dense="true">
-    <MudNavLink Href="/demo" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Explore">Overview</MudNavLink>
-    <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Dojo Workspace</MudNavLink>
-    <MudNavLink Href="/demo/components" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Widgets">Component Kit</MudNavLink>
-    <MudNavLink Href="/demo/workflow" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">Workflow Orchestration</MudNavLink>
-    <MudNavLink Href="/demo/examples/supplier-dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">Supplier Dashboard</MudNavLink>
-    <MudNavLink Href="/demo/suppliers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.TableChart">Data Grid Focus</MudNavLink>
-    <MudNavLink Href="/demo/onboarding" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.DynamicForm">Form Automation</MudNavLink>
-    <MudNavLink Href="/demo/compare/wrappers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewModule">Compare: Wrapper-First</MudNavLink>
-    <MudNavLink Href="/demo/compare/attributes" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Code">Compare: Attribute-First</MudNavLink>
-    <MudNavLink Href="/demo/generative-ui" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoAwesome">Generative UI</MudNavLink>
-    <MudNavLink Href="/demo/status" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MonitorHeart">Runtime Status</MudNavLink>
-    <MudDivider Class="my-1" />
-    <MudNavLink Href="/demo/docs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MenuBook">Integration Guide</MudNavLink>
+    <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Dojo</MudNavLink>
+
+    <MudNavGroup Title="Components" Icon="@Icons.Material.Filled.Widgets" @bind-Expanded="_componentsExpanded">
+        <MudNavLink Href="/demo/components" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewAgenda">Overview</MudNavLink>
+        <MudNavLink Href="/demo/components/datagrid" Match="NavLinkMatch.Prefix">AgentDataGrid</MudNavLink>
+        <MudNavLink Href="/demo/components/form" Match="NavLinkMatch.Prefix">AgentForm</MudNavLink>
+        <MudNavLink Href="/demo/components/dialog" Match="NavLinkMatch.Prefix">AgentDialog</MudNavLink>
+        <MudNavLink Href="/demo/components/tabs" Match="NavLinkMatch.Prefix">AgentTabs</MudNavLink>
+        <MudNavLink Href="/demo/components/select" Match="NavLinkMatch.Prefix">AgentSelect</MudNavLink>
+        <MudNavLink Href="/demo/components/autocomplete" Match="NavLinkMatch.Prefix">AgentAutocomplete</MudNavLink>
+        <MudNavLink Href="/demo/components/date-picker" Match="NavLinkMatch.Prefix">AgentDatePicker</MudNavLink>
+        <MudNavLink Href="/demo/components/date-range-picker" Match="NavLinkMatch.Prefix">AgentDateRangePicker</MudNavLink>
+        <MudNavLink Href="/demo/components/tree-view" Match="NavLinkMatch.Prefix">AgentTreeView</MudNavLink>
+        <MudNavLink Href="/demo/components/stepper" Match="NavLinkMatch.Prefix">AgentStepper</MudNavLink>
+        <MudNavLink Href="/demo/components/command-bar" Match="NavLinkMatch.Prefix">AgentCommandBar</MudNavLink>
+        <MudNavLink Href="/demo/components/file-upload" Match="NavLinkMatch.Prefix">AgentFileUpload</MudNavLink>
+        <MudNavLink Href="/demo/components/attribute-based" Match="NavLinkMatch.Prefix">Attribute-Based Example</MudNavLink>
+    </MudNavGroup>
 </AgentNavMenu>
+
+@code {
+    private bool _componentsExpanded = true;
+}

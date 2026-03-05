@@ -18,6 +18,7 @@ using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Options;
 using AgentBlazor.Telemetry;
+using AgentBlazor.Licensing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -31,6 +32,8 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 {
     private const string RunIdContextKey = AgentRuntimeContextKeys.RunId;
     private const int MaxRetainedRuns = 200;
+    private static readonly string[] RouteAgentMetadataKeys = ["agent", "agent_name", "agentName", "agent_lock"];
+    private static readonly string[] AgentRouteMetadataKeys = ["route", "routes", "route_prefix", "route_prefixes"];
 
     private readonly ConcurrentDictionary<string, StreamingRunState> _activeStreamingRuns =
         new(StringComparer.OrdinalIgnoreCase);
@@ -47,6 +50,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private readonly IConversationStore? _conversationStore;
     private readonly AgentComponentRegistryHub? _registryHub;
     private readonly IRouteRegistry _routeRegistry;
+    private readonly IAgentSharedStateStore _sharedStateStore;
     private readonly IOptions<AgentBlazorOptions> _options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink;
     private readonly IReadOnlyList<IAgentRuntimeEventSubscriber> _runtimeEventSubscribers;
@@ -56,6 +60,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private readonly IAgentServiceToolRegistry? _serviceToolRegistry;
     private readonly IEnumerable<IMcpToolProvider>? _mcpToolProviders;
     private readonly IServiceProvider? _serviceProvider;
+    private readonly IAgentBlazorEntitlementService? _entitlementService;
     private readonly AgentBlazor.Core.Paid.IAgentInspectorStore? _inspectorStore;
     private readonly AgentMiddlewarePipeline? _middlewarePipeline;
     private readonly ILogger<AgentRuntime>? _logger;
@@ -76,6 +81,11 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IReadOnlyList<AgentTurnStreamEvent> Events,
         DateTimeOffset CompletedAt);
 
+    private sealed record AllowedComponentPolicyResult(
+        IReadOnlyList<AvailableComponent> AllowedComponents,
+        IReadOnlyList<string> BlockedByAgentPolicy,
+        IReadOnlyList<string> BlockedByTier);
+
     public AgentRuntime(
         IStructuredActionPlanner planner,
         IPlanValidator validator,
@@ -86,6 +96,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IConversationStore? conversationStore,
         AgentComponentRegistryHub? registryHub,
         IRouteRegistry routeRegistry,
+        IAgentSharedStateStore sharedStateStore,
         IOptions<AgentBlazorOptions> options,
         IAgentBlazorTelemetrySink telemetrySink,
         IEnumerable<IAgentRuntimeEventSubscriber>? runtimeEventSubscribers = null,
@@ -95,6 +106,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IAgentServiceToolRegistry? serviceToolRegistry = null,
         IEnumerable<IMcpToolProvider>? mcpToolProviders = null,
         IServiceProvider? serviceProvider = null,
+        IAgentBlazorEntitlementService? entitlementService = null,
         AgentBlazor.Core.Paid.IAgentInspectorStore? inspectorStore = null,
         AgentMiddlewarePipeline? middlewarePipeline = null,
         ILogger<AgentRuntime>? logger = null)
@@ -108,6 +120,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         _conversationStore = conversationStore;
         _registryHub = registryHub;
         _routeRegistry = routeRegistry;
+        _sharedStateStore = sharedStateStore;
         _options = options;
         _telemetrySink = telemetrySink;
         _runtimeEventSubscribers = runtimeEventSubscribers?.ToArray() ?? [];
@@ -117,6 +130,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         _serviceToolRegistry = serviceToolRegistry;
         _mcpToolProviders = mcpToolProviders;
         _serviceProvider = serviceProvider;
+        _entitlementService = entitlementService;
         _inspectorStore = inspectorStore;
         _middlewarePipeline = middlewarePipeline;
         _logger = logger;
@@ -238,16 +252,64 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         var traceBuilder = new PromptTraceBuilder(_tracingOptions);
         var sessionId = request.GetEffectiveSessionId();
         var runId = GetContextRunId(request.Context);
-        var conversationHistory = await BuildConversationHistoryAsync(sessionId, cancellationToken);
+        var sharedStateRunId = string.IsNullOrWhiteSpace(runId)
+            ? Guid.NewGuid().ToString("N")
+            : runId!;
         var inspectorRunId = Guid.NewGuid().ToString("N");
         var inspectorStartedAt = DateTimeOffset.UtcNow;
         var inspectorEvents = new List<AgentBlazor.Core.Paid.InspectorEvent>();
+        ActionPlan? inspectorPlan = null;
+        var conversationSessionId = sessionId;
+        void AppendInspectorEvent(
+            string kind,
+            string? detail = null,
+            string? componentId = null,
+            string? actionId = null)
+        {
+            inspectorEvents.Add(new AgentBlazor.Core.Paid.InspectorEvent(
+                Timestamp: DateTimeOffset.UtcNow,
+                Kind: kind,
+                ComponentId: componentId,
+                ActionId: actionId,
+                Detail: detail));
+        }
 
         // Resolve the per-circuit registry for this session
         IAgentComponentRegistry? registry = null;
         _registryHub?.TryGet(sessionId, out registry);
+        var mountedComponents = GetMountedComponents(registry);
+        var currentRoute = ResolveCurrentRoute(request.Context, mountedComponents);
+        AppendInspectorEvent("RunStarted", $"User message: {request.UserMessage}");
+        if (!string.IsNullOrWhiteSpace(currentRoute))
+        {
+            AppendInspectorEvent("CurrentRoute", currentRoute);
+        }
 
-        var registration = ResolveAgent(request.AgentName);
+        var registration = ResolveAgent(request.AgentName, request.Context, currentRoute);
+        if (registration is not null)
+        {
+            AppendInspectorEvent("AgentResolved", registration.Name);
+        }
+        else
+        {
+            AppendInspectorEvent("AgentResolutionFailed", BuildNoAgentReasonDetail(request.AgentName, request.Context, currentRoute));
+        }
+
+        if (request.Context is not null &&
+            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffFrom, out var handoffFrom) &&
+            !string.IsNullOrWhiteSpace(handoffFrom) &&
+            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffTo, out var handoffTo) &&
+            !string.IsNullOrWhiteSpace(handoffTo))
+        {
+            var handoffAt = request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffAt, out var rawHandoffAt)
+                ? rawHandoffAt
+                : null;
+            var handoffDetail = string.IsNullOrWhiteSpace(handoffAt)
+                ? $"{handoffFrom} -> {handoffTo}"
+                : $"{handoffFrom} -> {handoffTo} @ {handoffAt}";
+            AppendInspectorEvent("AgentHandoff", handoffDetail);
+        }
+
         traceBuilder.RecordEntry(request, registration?.Name);
 
         await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
@@ -264,10 +326,25 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         if (registration is null)
         {
-            var noAgentResponse = await HandleNoAgentAsync(traceBuilder, cancellationToken);
-            await StoreConversationTurnAsync(sessionId, request.UserMessage, noAgentResponse, cancellationToken);
+            var noAgentResponse = await HandleNoAgentAsync(
+                traceBuilder,
+                request.AgentName,
+                request.Context,
+                cancellationToken);
+            AppendInspectorEvent("RunFinished", noAgentResponse.ResponseText);
+            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, noAgentResponse, cancellationToken);
             await EmitTextDeltasAsync(noAgentResponse.AgentName, noAgentResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(noAgentResponse, emitEvent);
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                noAgentResponse.AgentName,
+                inspectorStartedAt,
+                plan: null,
+                executionResults: [],
+                events: inspectorEvents,
+                succeeded: false,
+                errorMessage: noAgentResponse.ResponseText);
             await NotifyTurnFinishedAsync(
                 sessionId,
                 runId,
@@ -278,25 +355,101 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             return noAgentResponse;
         }
 
-        var allowedComponents = GetAllowedComponents(registration);
-        var mountedComponents = GetMountedComponents(registry);
+        conversationSessionId = ResolveConversationSessionId(sessionId, registration.Name, request);
+        var conversationHistory = await BuildConversationHistoryAsync(conversationSessionId, cancellationToken);
+        AppendInspectorEvent("ConversationHydrated", $"Turns loaded: {conversationHistory.Count}");
+        var allowedPolicy = GetAllowedComponents(registration);
+        var allowedComponents = allowedPolicy.AllowedComponents;
         // Augment with any custom [AgentAction] components not already in the catalog
         allowedComponents = AugmentAllowedWithMounted(allowedComponents, mountedComponents);
-        var currentRoute = ExtractCurrentRoute(mountedComponents);
+        AppendInspectorEvent(
+            "CapabilitiesReady",
+            $"Allowed components: {allowedComponents.Count}, blocked-by-policy: {allowedPolicy.BlockedByAgentPolicy.Count}, blocked-by-tier: {allowedPolicy.BlockedByTier.Count}");
+        var sharedStateBase = new Dictionary<string, string>(
+            _sharedStateStore.GetSnapshot(registration.Name, sessionId).Values,
+            StringComparer.OrdinalIgnoreCase);
+        ApplyContextSharedStateSnapshot(sharedStateBase, request.Context);
+        ApplyContextSharedStateDelta(sharedStateBase, request.Context);
+        var latestSharedState = BuildSharedStateSnapshot(
+            sharedStateBase,
+            mountedComponents,
+            currentRoute);
+        AppendInspectorEvent("StateSnapshot", SerializeInspectorPayload(latestSharedState));
+        _sharedStateStore.SaveSnapshot(registration.Name, sessionId, sharedStateRunId, latestSharedState);
+        await EmitSharedStateSnapshotAsync(registration.Name, latestSharedState, emitEvent);
         var providerConfigured = _planner.IsProviderConfigured;
 
         await TrackStartedAsync(registration.Name, request, providerConfigured);
+
+        if (allowedComponents.Count == 0)
+        {
+            var policyBlockedMessage = BuildNoAllowedActionsResponseText(
+                allowedPolicy.BlockedByAgentPolicy,
+                allowedPolicy.BlockedByTier);
+            AppendInspectorEvent("PolicyBlocked", policyBlockedMessage);
+
+            if (traceBuilder.IsEnabled)
+            {
+                traceBuilder.RecordFailure(policyBlockedMessage);
+                await StoreTraceAsync(traceBuilder, cancellationToken);
+            }
+
+            var policyBlockedResponse = new AgentTurnResponse(
+                AgentName: registration.Name,
+                ResponseText: policyBlockedMessage,
+                PlannedActions: [],
+                ExecutionResults: []);
+            await TrackFinishedAsync(
+                registration.Name,
+                request,
+                AgentBlazorRunOutcome.Failed,
+                plannedCount: 0,
+                executedCount: 0,
+                providerConfigured: providerConfigured);
+            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, policyBlockedResponse, cancellationToken);
+            await EmitTextDeltasAsync(registration.Name, policyBlockedResponse.ResponseText, emitEvent);
+            await EmitRunFinishedAsync(policyBlockedResponse, emitEvent);
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                registration.Name,
+                inspectorStartedAt,
+                plan: null,
+                executionResults: [],
+                events: inspectorEvents,
+                succeeded: false,
+                errorMessage: policyBlockedResponse.ResponseText);
+            await NotifyTurnFinishedAsync(
+                sessionId,
+                runId,
+                registration.Name,
+                request.UserMessage,
+                policyBlockedResponse,
+                CancellationToken.None);
+            return policyBlockedResponse;
+        }
 
         if (!providerConfigured)
         {
             var providerMissingResponse = await BuildProviderMissingResponseAsync(
                 registration.Name, traceBuilder, cancellationToken);
+            AppendInspectorEvent("ProviderMissing", providerMissingResponse.ResponseText);
 
             await TrackFinishedAsync(registration.Name, request, AgentBlazorRunOutcome.ProviderMissing,
                 plannedCount: 0, executedCount: 0, providerConfigured: false);
-            await StoreConversationTurnAsync(sessionId, request.UserMessage, providerMissingResponse, cancellationToken);
+            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, providerMissingResponse, cancellationToken);
             await EmitTextDeltasAsync(providerMissingResponse.AgentName, providerMissingResponse.ResponseText, emitEvent);
             await EmitRunFinishedAsync(providerMissingResponse, emitEvent);
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                registration.Name,
+                inspectorStartedAt,
+                plan: null,
+                executionResults: [],
+                events: inspectorEvents,
+                succeeded: false,
+                errorMessage: providerMissingResponse.ResponseText);
             await NotifyTurnFinishedAsync(
                 sessionId,
                 runId,
@@ -311,6 +464,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         {
             // PHASE 1: PLAN
             _logger?.LogInformation("Planning: {Request}", request.UserMessage);
+            AppendInspectorEvent("PlanningStarted");
 
             var availableRoutes = _routeRegistry.GetAll()
                 .Select(r => new AvailableRoute { Path = r.Path, Description = r.Description, Aliases = r.Aliases })
@@ -329,6 +483,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 AvailableComponents = allowedComponents,
                 MountedComponents = mountedComponents,
                 ConversationHistory = conversationHistory,
+                SharedState = latestSharedState,
                 AvailableRoutes = availableRoutes,
                 AgentInstructions = registration.Instructions,
                 CurrentRoute = currentRoute,
@@ -336,24 +491,61 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             };
 
             var plan = await _planner.PlanAsync(planRequest, cancellationToken);
+            inspectorPlan = plan;
 
             // Resolve agentId-based steps to canonical component types for validation
             plan = ResolveComponentTypes(plan, mountedComponents, allowedComponents);
             plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
+            inspectorPlan = plan;
+            AppendInspectorEvent("PlanningFinished", $"Steps: {plan.Steps.Count}, Clarification: {plan.RequiresClarification}");
+            foreach (var step in plan.Steps)
+            {
+                AppendInspectorEvent(
+                    "PlannedAction",
+                    SerializeInspectorPayload(step.Arguments),
+                    step.ComponentId,
+                    step.ActionId);
+            }
 
             // Determine response text from the plan's message or build one
             var planMessage = plan.Message;
+
+            if (plan.RequiresClarification &&
+                TryRecoverSingleFieldFormEditPlan(
+                    request.UserMessage,
+                    mountedComponents,
+                    allowedComponents,
+                    plan,
+                    out var recoveredPlan))
+            {
+                plan = recoveredPlan;
+                inspectorPlan = recoveredPlan;
+                planMessage = recoveredPlan.Message;
+
+                var recoveredStep = recoveredPlan.Steps[0];
+                AppendInspectorEvent(
+                    "ClarificationAutoRecovered",
+                    $"Recovered as {recoveredStep.ComponentId}.{recoveredStep.ActionId}",
+                    recoveredStep.ComponentId,
+                    recoveredStep.ActionId);
+                AppendInspectorEvent(
+                    "PlannedAction",
+                    SerializeInspectorPayload(recoveredStep.Arguments),
+                    recoveredStep.ComponentId,
+                    recoveredStep.ActionId);
+            }
 
             if (plan.RequiresClarification)
             {
                 _logger?.LogInformation("Clarification needed: {Question}", plan.ClarificationNeeded);
                 var clarificationText = plan.ClarificationNeeded!;
+                AppendInspectorEvent("ClarificationRequired", clarificationText);
                 var clarificationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
                     AgentName: registration.Name,
                     ResponseText: clarificationText,
                     PlannedActions: [],
                     ExecutionResults: []), plan);
-                await StoreConversationTurnAsync(sessionId, request.UserMessage, clarificationResponse, cancellationToken);
+                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, clarificationResponse, cancellationToken);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
                 {
                     Kind = AgentTurnStreamEventKind.ClarificationRequired,
@@ -362,6 +554,16 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 });
                 await EmitTextDeltasAsync(registration.Name, planMessage ?? clarificationText, emitEvent);
                 await EmitRunFinishedAsync(clarificationResponse, emitEvent);
+                RecordInspectorRun(
+                    inspectorRunId,
+                    sessionId,
+                    registration.Name,
+                    inspectorStartedAt,
+                    inspectorPlan,
+                    executionResults: [],
+                    events: inspectorEvents,
+                    succeeded: false,
+                    errorMessage: clarificationText);
                 await NotifyTurnFinishedAsync(
                     sessionId,
                     runId,
@@ -376,14 +578,25 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             {
                 _logger?.LogInformation("Plan is empty — no actions");
                 var emptyText = planMessage ?? "I understood your request but no actions are needed.";
+                AppendInspectorEvent("PlanEmpty", emptyText);
                 var emptyResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
                     AgentName: registration.Name,
                     ResponseText: emptyText,
                     PlannedActions: [],
                     ExecutionResults: []), plan);
-                await StoreConversationTurnAsync(sessionId, request.UserMessage, emptyResponse, cancellationToken);
+                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, emptyResponse, cancellationToken);
                 await EmitTextDeltasAsync(registration.Name, emptyText, emitEvent);
                 await EmitRunFinishedAsync(emptyResponse, emitEvent);
+                RecordInspectorRun(
+                    inspectorRunId,
+                    sessionId,
+                    registration.Name,
+                    inspectorStartedAt,
+                    inspectorPlan,
+                    executionResults: [],
+                    events: inspectorEvents,
+                    succeeded: true,
+                    errorMessage: null);
                 await NotifyTurnFinishedAsync(
                     sessionId,
                     runId,
@@ -410,6 +623,10 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase);
             var approvedActions = GetApprovedActions(plan, allowedComponents, runtimeContext);
             var pendingApprovals = GetPendingApprovals(plan, allowedComponents, approvedActions);
+            if (pendingApprovals.Count > 0)
+            {
+                AppendInspectorEvent("ApprovalRequired", SerializeInspectorPayload(pendingApprovals));
+            }
 
             if (pendingApprovals.Count > 0)
             {
@@ -438,7 +655,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     RequiresApproval = true,
                     PendingApprovals = pendingApprovals
                 }, plan);
-                await StoreConversationTurnAsync(sessionId, request.UserMessage, approvalResponse, cancellationToken);
+                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, approvalResponse, cancellationToken);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
                 {
                     Kind = AgentTurnStreamEventKind.ApprovalRequired,
@@ -448,6 +665,16 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 await EmitExecutionResultsAsync(blockedResults, emitEvent);
                 await EmitTextDeltasAsync(registration.Name, approvalText, emitEvent);
                 await EmitRunFinishedAsync(approvalResponse, emitEvent);
+                RecordInspectorRun(
+                    inspectorRunId,
+                    sessionId,
+                    registration.Name,
+                    inspectorStartedAt,
+                    inspectorPlan,
+                    blockedResults,
+                    inspectorEvents,
+                    succeeded: false,
+                    errorMessage: approvalText);
                 await NotifyTurnFinishedAsync(
                     sessionId,
                     runId,
@@ -460,6 +687,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
             // PHASE 2: VALIDATE
             _logger?.LogInformation("Validating plan");
+            AppendInspectorEvent("ValidationStarted");
 
             var validationContext = new PlanValidationContext
             {
@@ -472,8 +700,14 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
             if (!validationResult.IsValid)
             {
-                var clarification = validationResult.BuildClarificationQuestion() ?? "The plan could not be validated.";
                 var validationFailures = BuildValidationFailureResults(validationResult);
+                var clarification = validationFailures
+                    .Select(static f => f.Message)
+                    .FirstOrDefault(static message =>
+                        message.Contains("Current tier:", StringComparison.OrdinalIgnoreCase))
+                    ?? validationResult.BuildClarificationQuestion()
+                    ?? "The plan could not be validated.";
+                AppendInspectorEvent("ValidationFailed", SerializeInspectorPayload(validationFailures));
 
                 if (traceBuilder.IsEnabled)
                 {
@@ -488,7 +722,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     ResponseText: clarification,
                     PlannedActions: [],
                     ExecutionResults: validationFailures), plan);
-                await StoreConversationTurnAsync(sessionId, request.UserMessage, validationResponse, cancellationToken);
+                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, validationResponse, cancellationToken);
                 await EmitExecutionResultsAsync(validationFailures, emitEvent);
                 await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
                 {
@@ -498,6 +732,16 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 });
                 await EmitTextDeltasAsync(registration.Name, clarification, emitEvent);
                 await EmitRunFinishedAsync(validationResponse, emitEvent);
+                RecordInspectorRun(
+                    inspectorRunId,
+                    sessionId,
+                    registration.Name,
+                    inspectorStartedAt,
+                    inspectorPlan,
+                    validationFailures,
+                    inspectorEvents,
+                    succeeded: false,
+                    errorMessage: clarification);
                 await NotifyTurnFinishedAsync(
                     sessionId,
                     runId,
@@ -507,9 +751,11 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     CancellationToken.None);
                 return validationResponse;
             }
+            AppendInspectorEvent("ValidationPassed");
 
             // PHASE 3: EXECUTE
             _logger?.LogInformation("Executing plan");
+            AppendInspectorEvent("ExecutionStarted");
 
             var executionOptions = new PlanExecutionOptions
             {
@@ -551,6 +797,23 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 executionResults,
                 CancellationToken.None);
 
+            var mountedComponentsAfterExecution = GetMountedComponents(registry);
+            var currentRouteAfterExecution = NormalizeRoutePath(ExtractCurrentRoute(mountedComponentsAfterExecution)) ?? currentRoute;
+            var sharedStateAfterExecution = BuildSharedStateSnapshot(
+                latestSharedState,
+                mountedComponentsAfterExecution,
+                currentRouteAfterExecution);
+            var sharedStateDelta = BuildSharedStateDelta(latestSharedState, sharedStateAfterExecution);
+            if (sharedStateDelta.Count > 0)
+            {
+                _sharedStateStore.ApplyDelta(registration.Name, sessionId, sharedStateRunId, sharedStateDelta);
+                await EmitSharedStateDeltaAsync(registration.Name, sharedStateDelta, emitEvent);
+                latestSharedState = sharedStateAfterExecution;
+                await EmitSharedStateSnapshotAsync(registration.Name, latestSharedState, emitEvent);
+                AppendInspectorEvent("StateDelta", SerializeInspectorPayload(sharedStateDelta));
+                AppendInspectorEvent("StateSnapshot", SerializeInspectorPayload(latestSharedState));
+            }
+
             // When execution fully succeeded, use the LLM's plan message if available.
             // When any step failed (NeedsClarification, Failed, etc.), surface the execution message instead.
             var allToolsSucceeded = toolResults.All(r => r.Succeeded);
@@ -581,11 +844,21 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 ResponseText: responseText,
                 PlannedActions: plannedActions,
                 ExecutionResults: executionResults), plan);
-            await StoreConversationTurnAsync(sessionId, request.UserMessage, successResponse, cancellationToken);
+            AppendInspectorEvent("ExecutionFinished", $"Succeeded: {overallSucceeded}");
+            AppendInspectorEvent("RunFinished", responseText);
+            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, successResponse, cancellationToken);
 
             // Record inspector data
-            RecordInspectorRun(inspectorRunId, sessionId, registration.Name,
-                inspectorStartedAt, plan, executionResults, inspectorEvents, succeeded: overallSucceeded, errorMessage: null);
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                registration.Name,
+                inspectorStartedAt,
+                inspectorPlan,
+                executionResults,
+                inspectorEvents,
+                succeeded: overallSucceeded,
+                errorMessage: overallSucceeded ? null : responseText);
             await RecordActionHistoryAsync(
                 sessionId,
                 request.GetEffectiveUserId(),
@@ -609,6 +882,17 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         {
             traceBuilder.RecordCanceled();
             await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            AppendInspectorEvent("RunCanceled", "Turn canceled.");
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                registration?.Name ?? "none",
+                inspectorStartedAt,
+                inspectorPlan,
+                executionResults: [],
+                events: inspectorEvents,
+                succeeded: false,
+                errorMessage: "Run canceled.");
             throw;
         }
         catch (Exception ex)
@@ -616,6 +900,17 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             _logger?.LogError(ex, "Turn failed");
             traceBuilder.RecordFailure(ex.Message);
             await StoreTraceAsync(traceBuilder, CancellationToken.None);
+            AppendInspectorEvent("RunError", ex.Message);
+            RecordInspectorRun(
+                inspectorRunId,
+                sessionId,
+                registration?.Name ?? "none",
+                inspectorStartedAt,
+                inspectorPlan,
+                executionResults: [],
+                events: inspectorEvents,
+                succeeded: false,
+                errorMessage: ex.Message);
             await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
             {
                 Kind = AgentTurnStreamEventKind.RunError,
@@ -637,12 +932,33 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     // Registry / component helpers
     // -------------------------------------------------------------------------
 
-    private AgentRegistration? ResolveAgent(string? requestedAgentName)
+    private AgentRegistration? ResolveAgent(
+        string? requestedAgentName,
+        IDictionary<string, string>? context,
+        string? currentRoute)
     {
-        if (!string.IsNullOrWhiteSpace(requestedAgentName) &&
-            _agentRegistry.TryGet(requestedAgentName, out var requested))
+        var lockRequested = IsAgentLockRequested(context);
+
+        if (TryResolveNamedAgent(requestedAgentName, out var requested))
         {
             return requested;
+        }
+
+        if (TryGetContextAgentName(context, out var contextAgentName) &&
+            TryResolveNamedAgent(contextAgentName, out var contextAgent))
+        {
+            return contextAgent;
+        }
+
+        if (_options.Value.EnableRouteAgentResolution &&
+            TryResolveRouteScopedAgent(currentRoute, out var routeAgent))
+        {
+            return routeAgent;
+        }
+
+        if (lockRequested)
+        {
+            return null;
         }
 
         if (_agentRegistry.TryGet(_options.Value.DefaultAgent.Name, out var configuredDefault))
@@ -653,15 +969,274 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             .FirstOrDefault();
     }
 
-    private IReadOnlyList<AvailableComponent> GetAllowedComponents(AgentRegistration registration)
+    private bool TryResolveNamedAgent(string? candidateName, out AgentRegistration registration)
+    {
+        registration = null!;
+        return !string.IsNullOrWhiteSpace(candidateName) &&
+               _agentRegistry.TryGet(candidateName, out registration!);
+    }
+
+    private static bool TryGetContextAgentName(
+        IDictionary<string, string>? context,
+        out string? agentName)
+    {
+        agentName = null;
+        return context is not null &&
+               context.TryGetValue(AgentRuntimeContextKeys.AgentName, out agentName) &&
+               !string.IsNullOrWhiteSpace(agentName);
+    }
+
+    private static bool IsAgentLockRequested(IDictionary<string, string>? context)
+    {
+        if (context is null ||
+            !context.TryGetValue(AgentRuntimeContextKeys.AgentLock, out var rawValue) ||
+            string.IsNullOrWhiteSpace(rawValue))
+        {
+            return false;
+        }
+
+        if (bool.TryParse(rawValue, out var parsed))
+        {
+            return parsed;
+        }
+
+        return rawValue.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+               rawValue.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+               rawValue.Equals("y", StringComparison.OrdinalIgnoreCase) ||
+               rawValue.Equals("on", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryResolveRouteScopedAgent(string? currentRoute, out AgentRegistration registration)
+    {
+        registration = null!;
+        var normalizedRoute = NormalizeRoutePath(currentRoute);
+        if (string.IsNullOrWhiteSpace(normalizedRoute))
+        {
+            return false;
+        }
+
+        if (TryResolveAgentFromRouteMetadata(normalizedRoute, out registration))
+        {
+            return true;
+        }
+
+        return TryResolveAgentFromAgentMetadata(normalizedRoute, out registration);
+    }
+
+    private bool TryResolveAgentFromRouteMetadata(string currentRoute, out AgentRegistration registration)
+    {
+        registration = null!;
+
+        var route = _routeRegistry.GetAll()
+            .FirstOrDefault(r => string.Equals(
+                NormalizeRoutePath(r.Path),
+                currentRoute,
+                StringComparison.OrdinalIgnoreCase));
+        if (route?.Metadata is null || route.Metadata.Count == 0)
+        {
+            return false;
+        }
+
+        if (!TryReadRouteAgentMetadata(route.Metadata, out var routeAgentName))
+        {
+            return false;
+        }
+
+        return TryResolveNamedAgent(routeAgentName, out registration);
+    }
+
+    private bool TryResolveAgentFromAgentMetadata(string currentRoute, out AgentRegistration registration)
+    {
+        registration = null!;
+        AgentRegistration? bestMatch = null;
+        var bestScore = -1;
+
+        foreach (var candidate in _agentRegistry.GetAll())
+        {
+            foreach (var routePattern in EnumerateAgentRoutePatterns(candidate))
+            {
+                if (string.IsNullOrWhiteSpace(routePattern))
+                {
+                    continue;
+                }
+
+                var normalizedPattern = NormalizeRoutePath(routePattern);
+                if (string.IsNullOrWhiteSpace(normalizedPattern))
+                {
+                    continue;
+                }
+
+                if (!currentRoute.StartsWith(normalizedPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var score = normalizedPattern.Length;
+                if (score <= bestScore)
+                {
+                    continue;
+                }
+
+                bestScore = score;
+                bestMatch = candidate;
+            }
+        }
+
+        if (bestMatch is null)
+        {
+            return false;
+        }
+
+        registration = bestMatch;
+        return true;
+    }
+
+    private static bool TryReadRouteAgentMetadata(
+        IReadOnlyDictionary<string, string> metadata,
+        out string? agentName)
+    {
+        agentName = null;
+        foreach (var key in RouteAgentMetadataKeys)
+        {
+            if (metadata.TryGetValue(key, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                agentName = value.Trim();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> EnumerateAgentRoutePatterns(AgentRegistration registration)
+    {
+        foreach (var key in AgentRouteMetadataKeys)
+        {
+            if (!registration.Metadata.TryGetValue(key, out var rawValue) ||
+                string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            foreach (var token in rawValue.Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    yield return token;
+                }
+            }
+        }
+    }
+
+    private string ResolveConversationSessionId(
+        string sessionId,
+        string agentName,
+        AgentTurnRequest request)
+    {
+        if (!_options.Value.IsolateConversationsByAgent)
+        {
+            return sessionId;
+        }
+
+        var hasMultipleAgents = _agentRegistry.GetAll().Count > 1;
+        if (!hasMultipleAgents)
+        {
+            return sessionId;
+        }
+
+        var explicitAgentTargeted =
+            !string.IsNullOrWhiteSpace(request.AgentName) ||
+            (request.Context is not null &&
+             request.Context.ContainsKey(AgentRuntimeContextKeys.AgentName)) ||
+            IsAgentLockRequested(request.Context);
+        if (!explicitAgentTargeted)
+        {
+            return sessionId;
+        }
+
+        return AgentConversationScope.BuildSessionKey(sessionId, agentName, isolateByAgent: true);
+    }
+
+    private static string? ResolveCurrentRoute(
+        IDictionary<string, string>? context,
+        IReadOnlyList<MountedComponentState> mountedComponents)
+    {
+        if (context is not null &&
+            context.TryGetValue(AgentRuntimeContextKeys.CurrentRoute, out var contextRoute) &&
+            !string.IsNullOrWhiteSpace(contextRoute))
+        {
+            return NormalizeRoutePath(contextRoute);
+        }
+
+        return NormalizeRoutePath(ExtractCurrentRoute(mountedComponents));
+    }
+
+    private static string? NormalizeRoutePath(string? route)
+    {
+        if (string.IsNullOrWhiteSpace(route))
+        {
+            return null;
+        }
+
+        var normalized = route.Trim();
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absolute))
+        {
+            normalized = absolute.AbsolutePath;
+        }
+        else
+        {
+            var queryOrFragmentIndex = normalized.IndexOfAny(['?', '#']);
+            if (queryOrFragmentIndex >= 0)
+            {
+                normalized = normalized[..queryOrFragmentIndex];
+            }
+        }
+
+        if (!normalized.StartsWith('/'))
+        {
+            normalized = "/" + normalized;
+        }
+
+        normalized = normalized.TrimEnd('/');
+        return normalized.Length == 0
+            ? "/"
+            : normalized.ToLowerInvariant();
+    }
+
+    private AllowedComponentPolicyResult GetAllowedComponents(AgentRegistration registration)
     {
         var components = _componentCatalog.GetComponents();
-        var evaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
+        var agentPolicyEvaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
             components, registration.AllowedComponents, registration.AllowedActions);
+        var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
+        var tierFiltered = new List<ComponentCapability>();
+        var blockedByTier = new List<string>();
+
+        foreach (var component in agentPolicyEvaluation.AllowedComponents)
+        {
+            var componentCopy = new ComponentCapability(component.ComponentId, component.Description);
+            foreach (var action in component.Actions)
+            {
+                var requiredTier = AgentComponentTierBoundaries.GetRequiredTier(component.ComponentId, action.ActionId);
+                if (effectiveTier < requiredTier)
+                {
+                    blockedByTier.Add(ComponentActionPolicy.ToActionKey(component.ComponentId, action.ActionId));
+                    continue;
+                }
+
+                componentCopy.UpsertAction(action);
+            }
+
+            if (componentCopy.Actions.Count > 0)
+            {
+                tierFiltered.Add(componentCopy);
+            }
+        }
 
         // Catalog-sourced components drive validation and approval-gating.
         // Parameters here are for the validator only; the prompt uses mounted.Actions from discovery.
-        return evaluation.AllowedComponents
+        var allowedComponents = tierFiltered
             .Select(c => new AvailableComponent
             {
                 ComponentId = c.ComponentId,
@@ -675,6 +1250,14 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 }).ToList()
             })
             .ToList();
+
+        return new AllowedComponentPolicyResult(
+            AllowedComponents: allowedComponents,
+            BlockedByAgentPolicy: agentPolicyEvaluation.BlockedActionKeys,
+            BlockedByTier: blockedByTier
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static x => x, StringComparer.OrdinalIgnoreCase)
+                .ToArray());
     }
 
     /// <summary>
@@ -836,6 +1419,151 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     .ToDictionary(kv => kv.Key, kv => FormatMountedStateValue(kv.Value))
             })
             .ToList();
+    }
+
+    private static Dictionary<string, string> BuildSharedStateSnapshot(
+        IReadOnlyDictionary<string, string> baseState,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        string? currentRoute)
+    {
+        var snapshot = new Dictionary<string, string>(baseState, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mounted in mountedComponents)
+        {
+            if (string.IsNullOrWhiteSpace(mounted.AgentId))
+            {
+                continue;
+            }
+
+            var prefix = $"component.{mounted.AgentId}.";
+            foreach (var staleKey in snapshot.Keys
+                         .Where(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                         .ToArray())
+            {
+                snapshot.Remove(staleKey);
+            }
+
+            snapshot[$"{prefix}type"] = mounted.ComponentType;
+            foreach (var (stateKey, stateValue) in mounted.State)
+            {
+                snapshot[$"{prefix}state.{stateKey}"] = stateValue;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(currentRoute))
+        {
+            snapshot.Remove("route.current");
+        }
+        else
+        {
+            snapshot["route.current"] = currentRoute;
+        }
+
+        return snapshot;
+    }
+
+    private void ApplyContextSharedStateSnapshot(
+        IDictionary<string, string> sharedState,
+        IDictionary<string, string>? context)
+    {
+        if (context is null ||
+            !context.TryGetValue(AgentRuntimeContextKeys.SharedStateSnapshot, out var serialized) ||
+            string.IsNullOrWhiteSpace(serialized))
+        {
+            return;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(serialized);
+            if (parsed is null)
+            {
+                return;
+            }
+
+            sharedState.Clear();
+            foreach (var (key, value) in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                sharedState[key] = value ?? string.Empty;
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger?.LogWarning(ex, "Invalid shared-state snapshot context payload.");
+        }
+    }
+
+    private void ApplyContextSharedStateDelta(
+        IDictionary<string, string> sharedState,
+        IDictionary<string, string>? context)
+    {
+        if (context is null ||
+            !context.TryGetValue(AgentRuntimeContextKeys.SharedStateDelta, out var serialized) ||
+            string.IsNullOrWhiteSpace(serialized))
+        {
+            return;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, string?>>(serialized);
+            if (parsed is null)
+            {
+                return;
+            }
+
+            foreach (var (key, value) in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (value is null)
+                {
+                    sharedState.Remove(key);
+                }
+                else
+                {
+                    sharedState[key] = value;
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger?.LogWarning(ex, "Invalid shared-state delta context payload.");
+        }
+    }
+
+    private static Dictionary<string, string?> BuildSharedStateDelta(
+        IReadOnlyDictionary<string, string> previous,
+        IReadOnlyDictionary<string, string> current)
+    {
+        var delta = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (key, value) in current)
+        {
+            if (!previous.TryGetValue(key, out var oldValue) ||
+                !string.Equals(oldValue, value, StringComparison.Ordinal))
+            {
+                delta[key] = value;
+            }
+        }
+
+        foreach (var key in previous.Keys)
+        {
+            if (!current.ContainsKey(key))
+            {
+                delta[key] = null;
+            }
+        }
+
+        return delta;
     }
 
     private static List<AvailableAction> GetActionsForComponent(IAgentControllable component)
@@ -1049,6 +1777,230 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             text.Contains("finalize", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("send", StringComparison.OrdinalIgnoreCase));
 
+    private static bool TryRecoverSingleFieldFormEditPlan(
+        string userMessage,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        IReadOnlyList<AvailableComponent> allowedComponents,
+        ActionPlan sourcePlan,
+        out ActionPlan recoveredPlan)
+    {
+        recoveredPlan = sourcePlan;
+        if (!sourcePlan.RequiresClarification ||
+            sourcePlan.Steps.Count > 0 ||
+            !TryParseSingleFieldEdit(userMessage, out var fieldHint, out var value))
+        {
+            return false;
+        }
+
+        foreach (var mounted in mountedComponents)
+        {
+            var setFieldAction = mounted.Actions.FirstOrDefault(static action =>
+                ActionIdMatches(action.ActionId, AgentComponentCapabilityProfile.FormSetFieldActionId));
+            if (setFieldAction is null)
+            {
+                continue;
+            }
+
+            var resolvedField = ResolveMountedFormField(fieldHint, mounted.State);
+            if (string.IsNullOrWhiteSpace(resolvedField))
+            {
+                continue;
+            }
+
+            var resolvedComponentId = ResolveAllowedComponentId(mounted.ComponentType, allowedComponents)
+                                      ?? mounted.ComponentType;
+            recoveredPlan = sourcePlan with
+            {
+                ClarificationNeeded = null,
+                Steps =
+                [
+                    new PlannedStep
+                    {
+                        ComponentId = resolvedComponentId,
+                        ActionId = setFieldAction.ActionId,
+                        Arguments = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["field"] = resolvedField,
+                            ["value"] = value
+                        },
+                        TargetAgentId = mounted.AgentId
+                    }
+                ],
+                Message = string.IsNullOrWhiteSpace(sourcePlan.Message)
+                    ? $"Updated '{resolvedField}'."
+                    : sourcePlan.Message
+            };
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryParseSingleFieldEdit(
+        string userMessage,
+        out string fieldHint,
+        out string value)
+    {
+        fieldHint = string.Empty;
+        value = string.Empty;
+        if (string.IsNullOrWhiteSpace(userMessage))
+        {
+            return false;
+        }
+
+        var normalized = userMessage.ReplaceLineEndings(" ").Trim();
+        var toIndex = normalized.LastIndexOf(" to ", StringComparison.OrdinalIgnoreCase);
+        if (toIndex <= 0 || toIndex + 4 >= normalized.Length)
+        {
+            return false;
+        }
+
+        var left = normalized[..toIndex].Trim();
+        var right = normalized[(toIndex + 4)..].Trim();
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        var padded = $" {left} ";
+        var verbs = new[] { " set ", " update ", " change " };
+        var verbIndex = -1;
+        string? verbToken = null;
+        foreach (var verb in verbs)
+        {
+            var index = padded.LastIndexOf(verb, StringComparison.OrdinalIgnoreCase);
+            if (index > verbIndex)
+            {
+                verbIndex = index;
+                verbToken = verb;
+            }
+        }
+
+        if (verbIndex < 0 || verbToken is null)
+        {
+            return false;
+        }
+
+        fieldHint = padded[(verbIndex + verbToken.Length)..].Trim();
+        value = TrimEditValue(right);
+        return !string.IsNullOrWhiteSpace(fieldHint) && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static string TrimEditValue(string rawValue)
+    {
+        var trimmed = rawValue.Trim().TrimEnd('.', ';');
+        if ((trimmed.StartsWith('"') && trimmed.EndsWith('"')) ||
+            (trimmed.StartsWith('\'') && trimmed.EndsWith('\'')))
+        {
+            trimmed = trimmed[1..^1].Trim();
+        }
+
+        return trimmed;
+    }
+
+    private static string? ResolveMountedFormField(
+        string fieldHint,
+        IReadOnlyDictionary<string, string> mountedState)
+    {
+        var fields = ExtractMountedFormFields(mountedState);
+        if (fields.Count == 0)
+        {
+            return null;
+        }
+
+        var reducedHint = ReduceFieldHint(fieldHint);
+        var resolved = fields.FirstOrDefault(field =>
+            FieldHintMatches(fieldHint, field) || FieldHintMatches(reducedHint, field));
+        if (!string.IsNullOrWhiteSpace(resolved))
+        {
+            return resolved;
+        }
+
+        if (NormalizeFieldText(reducedHint) is "recipe" or "therecipe")
+        {
+            return fields.FirstOrDefault(static field =>
+                string.Equals(field, "Title", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (reducedHint.Contains("duration", StringComparison.OrdinalIgnoreCase) ||
+            reducedHint.Contains("time", StringComparison.OrdinalIgnoreCase))
+        {
+            return fields.FirstOrDefault(field =>
+                string.Equals(field, "Minutes", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(field, "Duration", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private static bool FieldHintMatches(string hint, string fieldName)
+    {
+        var normalizedHint = NormalizeFieldText(hint);
+        var normalizedField = NormalizeFieldText(fieldName);
+        if (string.IsNullOrWhiteSpace(normalizedHint) || string.IsNullOrWhiteSpace(normalizedField))
+        {
+            return false;
+        }
+
+        return string.Equals(normalizedHint, normalizedField, StringComparison.Ordinal) ||
+               normalizedHint.EndsWith(normalizedField, StringComparison.Ordinal) ||
+               normalizedHint.Contains(normalizedField, StringComparison.Ordinal) ||
+               normalizedField.Contains(normalizedHint, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeFieldText(string value)
+        => string.Concat(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant));
+
+    private static string ReduceFieldHint(string hint)
+    {
+        if (string.IsNullOrWhiteSpace(hint))
+        {
+            return string.Empty;
+        }
+
+        var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "a", "an", "field", "form", "value"
+        };
+        var tokens = hint
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(token => !stopWords.Contains(token))
+            .ToArray();
+        return tokens.Length == 0 ? hint : string.Join(' ', tokens);
+    }
+
+    private static IReadOnlyList<string> ExtractMountedFormFields(IReadOnlyDictionary<string, string> mountedState)
+    {
+        if (!mountedState.TryGetValue("fields", out var serialized) || string.IsNullOrWhiteSpace(serialized))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<string[]>(serialized);
+            if (parsed is { Length: > 0 })
+            {
+                return parsed
+                    .Where(static value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+        }
+        catch
+        {
+            // Ignore parse failures and fall back below.
+        }
+
+        return serialized
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static value => value.Trim('"', '\''))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     // -------------------------------------------------------------------------
     // Approval / Validation helpers
     // -------------------------------------------------------------------------
@@ -1101,14 +2053,19 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         return pending;
     }
 
-    private static ComponentActionExecutionResult[] BuildValidationFailureResults(PlanValidationResult validationResult)
+    private ComponentActionExecutionResult[] BuildValidationFailureResults(PlanValidationResult validationResult)
         => validationResult.StepResults
             .Where(static s => !s.IsValid)
-            .Select(static s =>
+            .Select(s =>
             {
-                var message = s.MissingParameters.Count > 0
-                    ? $"Action '{s.Step.ActionId}' requires '{s.MissingParameters[0]}' parameter."
-                    : s.Errors.FirstOrDefault() ?? "Plan validation failed.";
+                var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
+                var requiredTier = AgentComponentTierBoundaries.GetRequiredTier(s.Step.ComponentId, s.Step.ActionId);
+
+                var message = effectiveTier < requiredTier
+                    ? $"Action '{s.Step.ComponentId}.{s.Step.ActionId}' requires '{requiredTier}' tier. Current tier: {effectiveTier}."
+                    : s.MissingParameters.Count > 0
+                        ? $"Action '{s.Step.ActionId}' requires '{s.MissingParameters[0]}' parameter."
+                        : s.Errors.FirstOrDefault() ?? "Plan validation failed.";
                 return new ComponentActionExecutionResult(s.Step.ComponentId, s.Step.ActionId,
                     Outcome: ActionOutcome.NeedsClarification, Message: message);
             })
@@ -1227,7 +2184,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         string sessionId,
         string agentName,
         DateTimeOffset startedAt,
-        ActionPlan plan,
+        ActionPlan? plan,
         IReadOnlyList<AgentBlazor.Core.Runtime.Components.ComponentActionExecutionResult> executionResults,
         IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> events,
         bool succeeded,
@@ -1254,8 +2211,8 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 AgentName: agentName,
                 StartedAt: startedAt,
                 FinishedAt: DateTimeOffset.UtcNow,
-                SystemPrompt: plan.SystemPrompt,
-                RawPlanResponse: plan.RawResponse,
+                SystemPrompt: plan?.SystemPrompt,
+                RawPlanResponse: plan?.RawResponse,
                 Events: allEvents,
                 Succeeded: succeeded,
                 ErrorMessage: errorMessage));
@@ -1263,6 +2220,23 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to record inspector run");
+        }
+    }
+
+    private static string SerializeInspectorPayload(object? payload)
+    {
+        if (payload is null)
+        {
+            return "{}";
+        }
+
+        try
+        {
+            return JsonSerializer.Serialize(payload);
+        }
+        catch
+        {
+            return payload.ToString() ?? string.Empty;
         }
     }
 
@@ -1515,6 +2489,42 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private static async ValueTask EmitEventAsync(Func<AgentTurnStreamEvent, ValueTask>? emitEvent, AgentTurnStreamEvent streamEvent)
     {
         if (emitEvent is not null) await emitEvent(streamEvent);
+    }
+
+    private static async ValueTask EmitSharedStateSnapshotAsync(
+        string? agentName,
+        IReadOnlyDictionary<string, string> state,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        if (emitEvent is null)
+        {
+            return;
+        }
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.StateSnapshot,
+            AgentName = agentName,
+            SharedStateSnapshot = state
+        });
+    }
+
+    private static async ValueTask EmitSharedStateDeltaAsync(
+        string? agentName,
+        IReadOnlyDictionary<string, string?> delta,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        if (emitEvent is null || delta.Count == 0)
+        {
+            return;
+        }
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.StateDelta,
+            AgentName = agentName,
+            SharedStateDelta = delta
+        });
     }
 
     private static async ValueTask EmitRunFinishedAsync(AgentTurnResponse response, Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
@@ -1884,15 +2894,22 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     // Response builders
     // -------------------------------------------------------------------------
 
-    private async Task<AgentTurnResponse> HandleNoAgentAsync(PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
+    private async Task<AgentTurnResponse> HandleNoAgentAsync(
+        PromptTraceBuilder traceBuilder,
+        string? requestedAgentName,
+        IDictionary<string, string>? context,
+        CancellationToken cancellationToken)
     {
+        var registeredCount = _agentRegistry.GetAll().Count;
+        var responseText = BuildNoAgentResponseText(registeredCount, requestedAgentName, context);
+
         if (traceBuilder.IsEnabled)
         {
-            traceBuilder.RecordFailure("No agents registered");
+            traceBuilder.RecordFailure(responseText);
             await StoreTraceAsync(traceBuilder, cancellationToken);
         }
 
-        return new AgentTurnResponse("none", "No agents are registered.", [], []);
+        return new AgentTurnResponse("none", responseText, [], []);
     }
 
     private async Task<AgentTurnResponse> BuildProviderMissingResponseAsync(string agentName, PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
@@ -1919,6 +2936,29 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         return new AgentTurnResponse(agentName, message, [], []);
     }
 
+    private string BuildNoAllowedActionsResponseText(
+        IReadOnlyList<string> blockedByAgentPolicy,
+        IReadOnlyList<string> blockedByTier)
+    {
+        var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
+        var allBlocked = blockedByAgentPolicy
+            .Concat(blockedByTier)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var summary = ComponentActionPolicy.SummarizeBlockedActions(allBlocked);
+
+        if (allBlocked.Length == 0)
+        {
+            return $"No allowed component actions are available for this agent policy.\n\nCurrent tier: {effectiveTier}";
+        }
+
+        return
+            "No allowed component actions are available for this agent policy.\n\n" +
+            $"Current tier: {effectiveTier}\n" +
+            $"Filtered actions: {summary}";
+    }
+
     // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
@@ -1927,4 +2967,71 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         => context is not null &&
            context.TryGetValue(AgentGenerativeUiSpec.GenerateUiContextKey, out var raw) &&
            bool.TryParse(raw, out var val) && val;
+
+    private static string BuildNoAgentResponseText(
+        int registeredCount,
+        string? requestedAgentName,
+        IDictionary<string, string>? context)
+    {
+        if (registeredCount == 0)
+        {
+            return "No agents are registered.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedAgentName))
+        {
+            return $"Requested agent '{requestedAgentName}' is not registered.";
+        }
+
+        if (context is not null &&
+            context.TryGetValue(AgentRuntimeContextKeys.AgentName, out var contextAgentName) &&
+            !string.IsNullOrWhiteSpace(contextAgentName))
+        {
+            return $"Requested agent '{contextAgentName}' is not registered.";
+        }
+
+        if (IsAgentLockRequested(context))
+        {
+            if (context is not null &&
+                context.TryGetValue(AgentRuntimeContextKeys.CurrentRoute, out var currentRoute) &&
+                !string.IsNullOrWhiteSpace(currentRoute))
+            {
+                return $"No route-locked agent is configured for '{currentRoute}'.";
+            }
+
+            return "Agent lock is enabled, but no matching registered agent could be resolved.";
+        }
+
+        return "No matching agent could be resolved for this request.";
+    }
+
+    private static string BuildNoAgentReasonDetail(
+        string? requestedAgentName,
+        IDictionary<string, string>? context,
+        string? currentRoute)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedAgentName))
+        {
+            return $"Requested agent '{requestedAgentName}' was not found.";
+        }
+
+        if (context is not null &&
+            context.TryGetValue(AgentRuntimeContextKeys.AgentName, out var contextAgentName) &&
+            !string.IsNullOrWhiteSpace(contextAgentName))
+        {
+            return $"Context agent '{contextAgentName}' was not found.";
+        }
+
+        if (IsAgentLockRequested(context))
+        {
+            if (!string.IsNullOrWhiteSpace(currentRoute))
+            {
+                return $"Agent lock enabled; no route agent for '{currentRoute}'.";
+            }
+
+            return "Agent lock enabled with no matching registered agent.";
+        }
+
+        return "Agent could not be resolved from request context.";
+    }
 }

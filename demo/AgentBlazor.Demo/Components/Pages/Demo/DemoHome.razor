@@ -2,98 +2,46 @@
 @layout DemoLayout
 @using MudBlazor
 
-<PageTitle>Demo Overview - AgentBlazor</PageTitle>
+<PageTitle>Demo — AgentBlazor</PageTitle>
 
 <div class="demo-overview">
     <MudPaper Elevation="1" Class="demo-overview__hero">
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Workspace-First Demo</MudChip>
-        <MudText Typo="Typo.h4" Class="mt-3 mb-1">AgentBlazor Playground</MudText>
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Focused Demo Surface</MudChip>
+        <MudText Typo="Typo.h4" Class="mt-3 mb-1">AgentBlazor Dojo + Component Explorer</MudText>
         <MudText Typo="Typo.body1" Color="Color.Secondary">
-            Start with a refined dojo workspace, then explore wrapper coverage, orchestration flows, and generated UI.
-            The supplier dashboard remains available as a scenario example.
+            The demo is now intentionally reduced to a CopilotKit-style dojo workspace and a MudBlazor-style component explorer,
+            with a dedicated attribute-based parity example.
         </MudText>
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/dojo">
-                Open Dojo Workspace
+                Open Dojo
             </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/components">
-                Open Component Kit
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/components">
+                Open Components
             </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflow">
-                Open Workflow Orchestration
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="/demo/examples/supplier-dashboard">
-                Open Supplier Dashboard Example
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/status">
-                Runtime Status
+            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/components/attribute-based">
+                Attribute-Based Example
             </MudButton>
         </MudStack>
     </MudPaper>
 
     <MudGrid Spacing="2" Class="mt-2">
-        <MudItem xs="12" md="4">
+        <MudItem xs="12" md="6">
             <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">1. Start in Dojo</MudText>
+                <MudText Typo="Typo.subtitle1">Dojo</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Use <MudLink Href="/demo/dojo">/demo/dojo</MudLink> for an integrated, low-friction
-                    workspace with tabs, forms, grids, and dialog actions.
+                    Single-canvas workspace intended for assistant-led edits and approvals.
                 </MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="12" md="4">
+        <MudItem xs="12" md="6">
             <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">2. Validate wrappers</MudText>
+                <MudText Typo="Typo.subtitle1">Components</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Use <MudLink Href="/demo/components">/demo/components</MudLink> to test select,
-                    autocomplete, date controls, tree, stepper, command bar, and file upload actions.
-                </MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="4">
-            <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">3. Validate orchestration + generated UI</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Use <MudLink Href="/demo/workflow">/demo/workflow</MudLink> and
-                    <MudLink Href="/demo/generative-ui">/demo/generative-ui</MudLink> to verify
-                    multi-component workflows and chart/card generation.
+                    Expandable component catalog covering all currently shipped wrappers.
                 </MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
-
-    <MudPaper Elevation="0" Class="demo-overview__panel mt-3">
-        <MudText Typo="Typo.h6" Class="mb-2">Route Map</MudText>
-        <MudTable T="RouteRow" Items="@RouteRows" Dense="false" Hover="true" Bordered="true" Striped="true">
-            <HeaderContent>
-                <MudTh>Route</MudTh>
-                <MudTh>Role</MudTh>
-                <MudTh>What to test</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Route"><MudLink Href="@context.Route">@context.Route</MudLink></MudTd>
-                <MudTd DataLabel="Role">@context.Role</MudTd>
-                <MudTd DataLabel="What to test">@context.Scope</MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
 </div>
-
-@code {
-    private static readonly IReadOnlyList<RouteRow> RouteRows =
-    [
-        new("/demo", "Primary", "Overview and test flow entrypoint"),
-        new("/demo/dojo", "Primary", "Refined integrated workspace (tabs + form + grid + dialog)"),
-        new("/demo/components", "Primary", "Single-component action testing"),
-        new("/demo/workflow", "Primary", "Cross-component orchestration testing"),
-        new("/demo/suppliers", "Reference", "Focused AgentDataGrid behaviors"),
-        new("/demo/onboarding", "Reference", "Form automation and validation"),
-        new("/demo/generative-ui", "Primary", "Generated chart/card responses"),
-        new("/demo/docs", "Primary", "Integration guide and action coverage"),
-        new("/demo/status", "Primary", "Provider, catalog, and runtime diagnostics"),
-        new("/demo/examples/supplier-dashboard", "Scenario", "Full-page business-themed showcase")
-    ];
-
-    private sealed record RouteRow(string Route, string Role, string Scope);
-}
