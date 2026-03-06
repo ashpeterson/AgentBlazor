@@ -18,7 +18,7 @@ module.exports = defineConfig({
   },
   webServer: {
     command: "dotnet run --project ../../demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj --urls http://127.0.0.1:5188",
-    url: "http://127.0.0.1:5188/demo/generative-ui",
+    url: "http://127.0.0.1:5188/demo/dojo",
     timeout: 180000,
     reuseExistingServer: false
   }

@@ -41,7 +41,7 @@
 
 <div class="dojo-workspace">
     <MudPaper Elevation="0" Class="dojo-workspace__rail">
-        <MudText Typo="Typo.subtitle1">AG-UI Interactive Dojo</MudText>
+        <MudText Typo="Typo.subtitle1" Class="dojo-workspace__rail-title">AG-UI Interactive Dojo</MudText>
 
         <section class="dojo-workspace__rail-section">
             <p class="dojo-workspace__rail-label">Integrations</p>
@@ -94,26 +94,52 @@
     </MudPaper>
 
     <div class="dojo-workspace__main">
+        @if (ShowExampleHero)
+        {
+            <MudPaper Elevation="0" Class="dojo-workspace__hero">
+                <div class="dojo-workspace__hero-copy">
+                    <p class="dojo-workspace__hero-eyebrow">Dojo Example</p>
+                    <div class="dojo-workspace__hero-head">
+                        <MudText Typo="Typo.h4">@CurrentExample.Title</MudText>
+                        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">@CurrentViewLabel</MudChip>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="dojo-workspace__hero-description">
+                        @CurrentExample.Description
+                    </MudText>
+                </div>
+
+                <div class="dojo-workspace__hero-meta">
+                    <div class="dojo-workspace__hero-prompts">
+                        <p>Try asking</p>
+                        <div class="dojo-workspace__hero-prompt-list">
+                            @foreach (var prompt in CurrentExample.Prompts)
+                            {
+                                <span>@prompt</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="dojo-workspace__hero-tags">
+                        @foreach (var tag in CurrentExample.Tags)
+                        {
+                            <span>@tag</span>
+                        }
+                    </div>
+                </div>
+            </MudPaper>
+        }
+
         @if (_viewMode == DojoViewMode.Preview)
         {
             @if (IsExample("agentic-chat"))
             {
-                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat" Style="@BackgroundCanvasStyle">
-                    <div class="dojo-canvas__prompt-pill">@_backgroundStudioUserPrompt</div>
-
-                    <div class="dojo-canvas__center-copy">
+                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat dojo-canvas--agentic" Style="@BackgroundCanvasStyle">
+                    <div class="dojo-canvas__center-copy dojo-canvas__center-copy--agentic">
                         <MudText Typo="Typo.h4">@_backgroundStudioHeadline</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@_backgroundStudioBody</MudText>
                     </div>
 
-                    <div class="dojo-canvas__suggestions">
-                        @foreach (var suggestion in _backgroundStudioSuggestions)
-                        {
-                            <span>@suggestion</span>
-                        }
-                    </div>
-
-                    <div class="dojo-canvas__chat-shell">
+                    <div class="dojo-canvas__chat-shell dojo-canvas__chat-shell--agentic">
                         <AgentChatSurface FormName="dojo-chat-agentic"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
@@ -122,6 +148,15 @@
                                           Placeholder="Change the background color, update the title, or ask what components are mounted."
                                           Theme="_dojoChatTheme"
                                           CssClass="dojo-embedded-chat" />
+                    </div>
+
+                    <p class="dojo-canvas__agentic-note">AI can make mistakes. Please verify important information.</p>
+
+                    <div class="dojo-canvas__suggestions dojo-canvas__suggestions--agentic">
+                        @foreach (var suggestion in _backgroundStudioSuggestions)
+                        {
+                            <span>@suggestion</span>
+                        }
                     </div>
                 </MudPaper>
             }
@@ -614,10 +649,9 @@
 
     private string _selectedIntegration = "Microsoft Agent Framework (.NET)";
     private DojoViewMode _viewMode = DojoViewMode.Preview;
-    private string _selectedExampleKey = "shared-state";
+    private string _selectedExampleKey = "agentic-chat";
 
     private string _backgroundStudioTheme = "neutral";
-    private string _backgroundStudioUserPrompt = "\"Can you change the background color to something more vibrant?\"";
     private string _backgroundStudioHeadline = "How can I help you today?";
     private string _backgroundStudioBody = "Describe a UI change and the mounted Dojo component can respond instantly.";
     private readonly IReadOnlyList<string> _backgroundStudioSuggestions = ["Change background", "Generate sonnet"];
@@ -756,6 +790,15 @@
         _examples.FirstOrDefault(x => string.Equals(x.Key, _selectedExampleKey, StringComparison.OrdinalIgnoreCase))
         ?? _examples[0];
 
+    private string CurrentViewLabel => _viewMode switch
+    {
+        DojoViewMode.Code => "Code",
+        DojoViewMode.Docs => "Docs",
+        _ => "Preview"
+    };
+
+    private bool ShowExampleHero => !(_viewMode == DojoViewMode.Preview && IsExample("agentic-chat"));
+
     private string WorkspaceSessionId => ComponentRegistry.SessionId;
 
     private string BackgroundCanvasStyle => _backgroundStudioTheme switch
@@ -815,7 +858,7 @@
     protected override async Task OnInitializedAsync()
     {
         _selectedIntegration = DojoExperience.SelectedIntegration;
-        _selectedExampleKey = ResolveExampleKey(DojoExperience.SelectedExampleKey) ?? "shared-state";
+        _selectedExampleKey = ResolveExampleKey(DojoExperience.SelectedExampleKey) ?? "agentic-chat";
         _viewMode = ParseViewMode(DojoExperience.SelectedViewMode);
         SyncDojoExperienceState();
         await LoadSnapshotAsync();
@@ -884,7 +927,6 @@
         }
 
         _backgroundStudioTheme = normalized;
-        _backgroundStudioUserPrompt = $"\"Change the background to {normalized}.\"";
         _backgroundStudioBody = normalized switch
         {
             "coral" => "The background has been updated to a coral-to-peach gradient.",
@@ -1060,7 +1102,7 @@
 
     private void SelectExample(string key)
     {
-        _selectedExampleKey = ResolveExampleKey(key) ?? "shared-state";
+        _selectedExampleKey = ResolveExampleKey(key) ?? "agentic-chat";
         _viewMode = DojoViewMode.Preview;
         SyncDojoExperienceState();
     }

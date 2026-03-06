@@ -183,11 +183,13 @@ Legacy supplier/workflow URLs still exist as redirects, but they are no longer t
 
 ## Current Status
 
-As of 2026-03-05:
+As of 2026-03-06:
 - core wrapper breadth is in place
 - shared state, handoffs, and runtime inspection foundations are shipped
 - the demo has been repositioned around a CopilotKit-style dojo plus a MudBlazor-style components explorer
-- the main open demo task is finishing the visual and interaction parity pass for the dojo experience
+- the dojo now uses a lighter dedicated shell with `agentic-chat` as the default first-run experience
+- end-to-end regression coverage now targets the active dojo/components routes instead of the retired workflow demo pages
+- the main open demo task is finishing per-example dojo fidelity beyond the new default shell
 
 ## License
 

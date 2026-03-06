@@ -7,29 +7,32 @@
 @inject DojoExperienceState DojoExperience
 @inject NavigationManager NavigationManager
 
-<MudThemeProvider Theme="_activeTheme" IsDarkMode="true" />
+<MudThemeProvider Theme="_activeTheme" IsDarkMode="@(!IsDojoRoute)" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <div class="demo-app @CurrentThemeCssClass @(IsDojoRoute ? "demo-app--dojo" : null)">
-    <aside class="demo-app__sidebar">
-        <MudPaper Elevation="0" Class="demo-app__sidebar-card">
-            <a href="/demo" class="demo-app__sidebar-brand">
-                <img src="logo.png" class="demo-app__sidebar-logo" alt="AgentBlazor" />
-                <span class="demo-app__sidebar-brand-text">
-                    <strong>AgentBlazor</strong>
-                    <small>Interactive Dojo</small>
-                </span>
-            </a>
+    @if (!IsDojoRoute)
+    {
+        <aside class="demo-app__sidebar">
+            <MudPaper Elevation="0" Class="demo-app__sidebar-card">
+                <a href="/demo" class="demo-app__sidebar-brand">
+                    <img src="logo.png" class="demo-app__sidebar-logo" alt="AgentBlazor" />
+                    <span class="demo-app__sidebar-brand-text">
+                        <strong>AgentBlazor</strong>
+                        <small>Interactive Dojo</small>
+                    </span>
+                </a>
 
-            <p class="demo-app__sidebar-copy">
-                Navigate the dojo workspace and component explorer with assistant-driven control.
-            </p>
+                <p class="demo-app__sidebar-copy">
+                    Navigate the dojo workspace and component explorer with assistant-driven control.
+                </p>
 
-            <DemoNavMenu />
-        </MudPaper>
-    </aside>
+                <DemoNavMenu />
+            </MudPaper>
+        </aside>
+    }
 
     <main class="demo-app__main @(IsDojoRoute ? "demo-app__main--dojo" : null)">
         @if (!IsDojoRoute)

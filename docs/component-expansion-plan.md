@@ -377,17 +377,22 @@ Make the dojo feel like a refined product showcase, not a collection of function
 - The dojo can serve as the primary public product demo without relying on the old supplier-style narrative.
 - The dojo experience feels coherent across all examples rather than like separate prototype panels.
 
-### Phase F Status (2026-03-05)
+### Phase F Status (2026-03-06)
 
 - Completed:
   - dojo is now the primary demo entry point
   - internal dojo rail and mode toggles are wired
   - example selection and view changes are controllable from both UI and agent actions
   - embedded assistant surfaces replaced the old global dojo-side assistant pattern
+  - dojo now renders in a lighter route-local shell rather than the older dark app-shell framing
+  - `agentic-chat` is now the default first-run state with a centered composer-first presentation closer to the CopilotKit reference
+  - rail chrome and first-run canvas density were reduced to move the dojo from dashboard styling toward product styling
+  - browser regression coverage now targets dojo/components surfaces instead of the retired workflow/generative-ui routes
+  - the real-usability runner now exercises dojo/current persistence flows instead of the retired supplier/onboarding workflow model
 - Outstanding:
-  - final layout refinement against the CopilotKit dojo reference
-  - tighter artifact sizing and chat composition in several examples
-  - final cleanup of stale visual chrome inherited from earlier dashboard-oriented demo shells
+  - tighter artifact sizing and chat composition in `shared-state`, `predictive-state`, and tool-render/generative-ui examples
+  - final cross-example consistency pass so all dojo scenarios match the quality of the new default landing state
+  - optional final rail/composer polish if screenshot-level parity is required
 
 ### Phase E: Tier and Policy Hardening (Priority 5)
 

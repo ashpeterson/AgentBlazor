@@ -9,7 +9,7 @@ npm run test:e2e
 npm run test:real-usability
 ```
 
-This suite starts the demo app via Playwright `webServer` and validates the Generative UI chat flow.
+This suite starts the demo app via Playwright `webServer` and validates the current dojo and component explorer surfaces.
 
 The suite uses the real runtime path (no deterministic e2e mock client). Configure one provider before running:
 
@@ -25,7 +25,7 @@ set OLLAMA_MODEL=...
 set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1
 ```
 
-`test:real-usability` runs the nightly-style workflow suite on `/demo/workflow` using:
+`test:real-usability` runs the nightly-style dojo suite on `/demo/dojo` using:
 - `tests/e2e/real-usability.prompts.json`
 - `tests/e2e/real-usability-baseline.json`
 

@@ -168,10 +168,17 @@ Last updated: 2026-03-05
     - `tool-based-generative-ui`
     - `shared-state`
     - `predictive-state`
-- Dojo parity restructuring is underway:
-  - dojo assistant is now embedded inside the dojo page instead of using the app-level global assistant pane
+- Dojo parity pass advanced materially:
+  - dojo assistant is embedded inside the dojo page instead of using the app-level global assistant pane
   - dojo has a dedicated internal rail for examples plus `Preview` / `Code` / `Docs` toggles
+  - the dojo route now renders in its own lighter full-canvas shell instead of the older dark dashboard wrapper
+  - `agentic-chat` is the default landing state with a centered composer-first layout closer to the CopilotKit reference
+  - rail chrome, card density, and first-run canvas styling have been reduced so the page reads as a product surface instead of a demo dashboard
   - current implementation direction is explicitly aligned to CopilotKit-style dojo flows rather than the older supplier dashboard demo
+- Demo verification was retargeted to the current product story:
+  - Playwright now validates `/demo/dojo`, `/demo/components`, and `/demo/components/attribute-based`
+  - stale `/demo/workflow` and `/demo/generative-ui` browser specs were removed
+  - the real-usability runner now executes against dojo routes and current persistence-backed artifacts instead of the retired supplier/onboarding workflow model
 - Components page file workflow hardening shipped:
   - `/demo/components` `AgentFileUpload` flow is SQLite-backed per session
   - attached file list + upload mode (`Local`/`Remote`) persist across refresh/reconnect
@@ -222,8 +229,8 @@ Last updated: 2026-03-05
 ### Product/Platform Gaps
 
 - Dojo parity is not finished:
-  - example shells are functional, but the visual fidelity and interaction polish still fall short of the CopilotKit dojo reference
-  - several dojo examples still need tighter artifact/chat composition so they feel like a product showcase rather than internal demo panels
+  - the default shell and `agentic-chat` landing state are substantially closer to the CopilotKit dojo reference, but the parity pass is not complete
+  - several non-default dojo examples still need tighter artifact sizing and chat composition so they feel like a product showcase rather than internal demo panels
 - Multi-agent orchestration depth is still evolving:
   - pair-scoped policies and approval rules are shipped, but broader multi-step orchestration presets/workflow templates are not yet productized.
 - Demo breadth still exceeds demo polish in some areas:
@@ -243,7 +250,7 @@ Last updated: 2026-03-05
 ## What Needs Doing Next (Product Priority)
 
 1. Finish CopilotKit-style Dojo parity:
-   - tighten layout, spacing, and embedded chat/artifact fidelity for all dojo examples
+   - carry the new default-shell quality into `shared-state`, `predictive-state`, and tool-render/generative-ui examples
    - ensure every dojo example feels like a clean agent workflow showcase, not a dashboard fragment
 2. Expand deep end-to-end component scenarios:
    - especially `AgentTreeView`, `AgentStepper`, `AgentCommandBar`, and `AgentFileUpload`
@@ -254,19 +261,20 @@ Last updated: 2026-03-05
 
 ## Immediate Execution Plan
 
-1. Finish the dojo refinement pass and lock the new demo shell structure before adding more scenarios.
+1. Finish the dojo refinement pass across the remaining non-default examples now that the new shell structure is in place.
 2. Build production-style walkthroughs for tree/stepper/command/file wrappers with persisted state and approvals.
 3. Expand inspector correlation beyond current run-chain and pair filters into reusable troubleshooting presets.
 4. Publish advanced connector/auth examples (beyond API key/bearer) on top of the HTTP adapter boundary.
 
 ## Verification Snapshot
 
-Latest local validation after the 2026-03-05 dojo restructuring pass:
+Latest local validation after the 2026-03-06 dojo parity + coverage pass:
 
-- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj` passed
-- `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj` passed
-- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj` passed
+- `npx playwright test` passed
 - `dotnet build demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj` passed
+- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj` passed on 2026-03-05
+- `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj` passed on 2026-03-05
+- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj` passed on 2026-03-05
 
 ## Reference Docs
 

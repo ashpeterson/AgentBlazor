@@ -1,15 +1,17 @@
 {
-  "minPassRate": 0.8,
+  "minPassRate": 0.67,
   "maxFailures": 1,
   "requiredScenarioPasses": [
-    "incident-triage-mitigation",
-    "forecast-driven-planning"
+    "dojo-shared-state-save",
+    "dojo-backend-tool-submit"
   ],
   "maxRootCauseCounts": {
     "missing_generated_ui": 0,
-    "missing_required_block_types": 1,
+    "missing_required_block_types": 0,
     "excessive_clarifications": 1,
     "repeated_deferred_loop": 0,
-    "no_component_actions": 1
+    "no_component_actions": 1,
+    "missing_db_effect": 1,
+    "approval_loop": 0
   }
 }

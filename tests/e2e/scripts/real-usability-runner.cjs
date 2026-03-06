@@ -14,6 +14,7 @@ const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.join(repoRoot, "tests", "e2e", "artifacts", "real-usability", stamp);
 const serverLogPath = path.join(outputDir, "demo-server.log");
 const baseUrl = process.env.REAL_USABILITY_BASE_URL || "http://127.0.0.1:5190";
+const defaultScenarioRoute = process.env.REAL_USABILITY_DEFAULT_ROUTE || "/demo/dojo";
 const scenarioTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SCENARIO_TIMEOUT_MS || "90000", 10);
 const serverReadyTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SERVER_TIMEOUT_MS || "180000", 10);
 
@@ -158,7 +159,7 @@ function waitForExit(child, timeoutMs) {
 
 async function waitForServerReady(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
-  const endpoint = `${url}/demo/workflow`;
+  const endpoint = `${url}${defaultScenarioRoute}`;
 
   while (Date.now() < deadline) {
     try {
@@ -179,6 +180,7 @@ async function waitForServerReady(url, timeoutMs) {
 async function runScenario(browser, scenario) {
   const scenarioDir = path.join(outputDir, scenario.id);
   fs.mkdirSync(scenarioDir, { recursive: true });
+  const route = scenario.route || defaultScenarioRoute;
 
   const beforeDb = await snapshotDatabase();
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -195,7 +197,7 @@ async function runScenario(browser, scenario) {
   let afterDb;
 
   try {
-    await page.goto(`${baseUrl}/demo/workflow`, { waitUntil: "networkidle", timeout: scenarioTimeoutMs });
+    await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle", timeout: scenarioTimeoutMs });
 
     const chatSurface = await openAssistantChatSurface(page, 30000);
     const promptInput = chatSurface.getByLabel("Message input");
@@ -233,6 +235,7 @@ async function runScenario(browser, scenario) {
     return {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
+      route,
       prompt: scenario.prompt,
       pass: evaluation.pass,
       failures: evaluation.failures,
@@ -257,6 +260,7 @@ async function runScenario(browser, scenario) {
     const failure = {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
+      route,
       prompt: scenario.prompt,
       pass: false,
       failures: [{ code: "scenario_runtime_failure", message: error.message }],
@@ -647,11 +651,11 @@ function buildMarkdownReport(report) {
 
   lines.push("## Scenario Results");
   lines.push("");
-  lines.push("| Scenario | Pass | Generated Blocks | Block Types | Clarifications | Deferred Repeat | Root Causes |");
-  lines.push("|---|---:|---:|---|---:|---:|---|");
+  lines.push("| Scenario | Route | Pass | Generated Blocks | Block Types | Clarifications | Deferred Repeat | Root Causes |");
+  lines.push("|---|---|---:|---:|---|---:|---:|---|");
   for (const result of report.results) {
     lines.push(
-      `| ${result.scenarioName} | ${result.pass ? "yes" : "no"} | ${result.metrics.generatedBlockCount} | ${result.metrics.generatedBlockTypes.join(", ") || "-" } | ${result.metrics.clarificationCount} | ${result.metrics.maxDeferredRepeat} | ${result.rootCauses.join(", ") || "-"} |`
+      `| ${result.scenarioName} | ${result.route} | ${result.pass ? "yes" : "no"} | ${result.metrics.generatedBlockCount} | ${result.metrics.generatedBlockTypes.join(", ") || "-"} | ${result.metrics.clarificationCount} | ${result.metrics.maxDeferredRepeat} | ${result.rootCauses.join(", ") || "-"} |`
     );
   }
   lines.push("");
@@ -694,7 +698,15 @@ if payload["exists"]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    tables = ["suppliers", "onboarding_requests", "mitigation_tasks"]
+    tables = [
+        "dojo_workspaces",
+        "dojo_ingredients",
+        "dojo_steps",
+        "dojo_run_notes",
+        "demo_file_workflow_files",
+        "demo_file_workflow_events",
+        "demo_file_workflow_jobs"
+    ]
     for table in tables:
         try:
             cur.execute(f"SELECT COUNT(*) AS count FROM {table}")

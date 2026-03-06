@@ -12,7 +12,11 @@
 }
 
 .demo-app--dojo {
-    grid-template-columns: 14.5rem minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.7rem;
+    background:
+        radial-gradient(64rem 28rem at 50% -10%, rgba(245, 189, 150, 0.14), rgba(245, 189, 150, 0)),
+        linear-gradient(180deg, #f3f0eb, #eeebe5);
 }
 
 .demo-app__sidebar,
@@ -115,6 +119,7 @@
 
 .demo-app__main--dojo {
     grid-template-rows: 1fr;
+    max-width: 100%;
 }
 
 .demo-app__topbar {
