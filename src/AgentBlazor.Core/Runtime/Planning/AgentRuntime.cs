@@ -1578,6 +1578,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     ActionId = a.ActionId,
                     Description = a.Description,
                     RequiresApproval = a.RequiresApproval,
+                    Instructions = a.Instructions,
                     Parameters = a.Parameters.Select(static p => new ActionParameter
                     {
                         Name = p.Name,

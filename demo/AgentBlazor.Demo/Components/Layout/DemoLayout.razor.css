@@ -13,7 +13,9 @@
 
 .demo-app--dojo {
     grid-template-columns: minmax(0, 1fr);
-    padding: 0.7rem;
+    padding: 0;
+    height: 100dvh;
+    overflow: hidden;
     background:
         radial-gradient(64rem 28rem at 50% -10%, rgba(245, 189, 150, 0.14), rgba(245, 189, 150, 0)),
         linear-gradient(180deg, #f3f0eb, #eeebe5);
@@ -120,6 +122,8 @@
 .demo-app__main--dojo {
     grid-template-rows: 1fr;
     max-width: 100%;
+    height: 100%;
+    overflow: hidden;
 }
 
 .demo-app__topbar {
@@ -206,7 +210,10 @@
 }
 
 .demo-app--dojo .demo-app__content {
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
     padding: 0;
 }
 

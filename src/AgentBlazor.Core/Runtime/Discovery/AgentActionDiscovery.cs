@@ -99,7 +99,8 @@ public static class AgentActionDiscovery
                 info.ActionId,
                 info.Description,
                 info.RequiresApproval,
-                BuildStructuredParameters(info.Method)));
+                BuildStructuredParameters(info.Method),
+                info.Instructions));
         }
         return result;
     }
@@ -246,7 +247,8 @@ public static class AgentActionDiscovery
                 FollowUp: x.Attr.FollowUp,
                 InputSchema: BuildInputSchema(x.Method),
                 Method: x.Method,
-                AvailabilityCheck: ResolveAvailabilityMember(type, x.Attr.AvailableWhen)))
+                AvailabilityCheck: ResolveAvailabilityMember(type, x.Attr.AvailableWhen),
+                Instructions: x.Attr.Instructions))
             .ToArray();
 
         var readables = type
@@ -726,7 +728,8 @@ public static class AgentActionDiscovery
         bool FollowUp,
         string InputSchema,
         MethodInfo Method,
-        MemberInfo? AvailabilityCheck);
+        MemberInfo? AvailabilityCheck,
+        string? Instructions);
 
     private sealed record ReadableCacheInfo(
         string StateKey,
@@ -743,7 +746,8 @@ internal sealed record DiscoveredAction(
     string ActionId,
     string Description,
     bool RequiresApproval,
-    IReadOnlyList<DiscoveredParameter> Parameters);
+    IReadOnlyList<DiscoveredParameter> Parameters,
+    string? Instructions = null);
 
 internal sealed record DiscoveredParameter(
     string Name,

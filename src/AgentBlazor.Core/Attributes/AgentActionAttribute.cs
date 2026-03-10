@@ -45,4 +45,12 @@ public sealed class AgentActionAttribute : Attribute
     /// Whether the agent should follow up after this action completes. Defaults to true.
     /// </summary>
     public bool FollowUp { get; set; } = true;
+
+    /// <summary>
+    /// Imperative behavioral guidance injected directly into the planner prompt.
+    /// Use ALWAYS/NEVER language to steer the LLM — e.g. "ALWAYS call this when the user asks
+    /// for a poem. NEVER write the poem text in the message field."
+    /// Eliminates the need for a separate agent-instructions file for per-action behavior.
+    /// </summary>
+    public string? Instructions { get; set; }
 }

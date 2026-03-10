@@ -246,6 +246,20 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
             sb.AppendLine();
         }
 
+        // Emit per-action behavioral rules declared via [AgentAction(Instructions = "...")]
+        var rules = request.MountedComponents
+            .SelectMany(c => c.Actions)
+            .Where(a => !string.IsNullOrWhiteSpace(a.Instructions))
+            .ToList();
+
+        if (rules.Count > 0)
+        {
+            sb.AppendLine("# ACTION BEHAVIOR RULES");
+            foreach (var a in rules)
+                sb.Append("- ").Append(a.ActionId).Append(": ").AppendLine(a.Instructions!.Trim());
+            sb.AppendLine();
+        }
+
         sb.AppendLine();
     }
 

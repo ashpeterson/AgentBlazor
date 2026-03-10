@@ -2393,4 +2393,11 @@
     private sealed record PendingHandoffRequest(string FromAgent, string ToAgent, string? TargetRoute);
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);
     private sealed record PendingApprovalInfo(string ComponentId, string ActionId, string Description, IReadOnlyDictionary<string, object?> Parameters);
+
+    /// <summary>Pre-fills the prompt input with the given text.</summary>
+    public Task InjectAsync(string prompt)
+    {
+        _prompt = prompt;
+        return InvokeAsync(StateHasChanged);
+    }
 }

@@ -421,6 +421,12 @@ public sealed class DojoRecipeModel
     public bool Spicy { get; set; }
 
     public bool Vegetarian { get; set; }
+
+    public bool BudgetFriendly { get; set; }
+
+    public bool OnePotMeal { get; set; }
+
+    public bool Vegan { get; set; }
 }
 
 internal sealed class DojoIngredientDraft

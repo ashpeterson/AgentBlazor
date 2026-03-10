@@ -73,7 +73,8 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
     }
 
     /// <summary>
-    /// Builds the capability with auto-generated fill action.
+    /// Builds the capability with auto-generated fill action plus any [AgentAction]-decorated
+    /// methods on the concrete subclass.
     /// </summary>
     public override ComponentCapability GetCapability()
     {
@@ -116,6 +117,15 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
             RequiresApproval: false,
             InputSchema: "()"));
 
+        // Merge any [AgentAction]-decorated methods on the concrete subclass (e.g. Dojo page actions)
+        if (AgentActionDiscovery.IsAttributeDriven(this))
+        {
+            foreach (var action in AgentActionDiscovery.BuildCapability(this).Actions)
+            {
+                capability.UpsertAction(action);
+            }
+        }
+
         return capability;
     }
 
@@ -124,6 +134,15 @@ public abstract class AgentFormPageBase<TModel> : AgentControllableComponentBase
     /// </summary>
     public override async Task<ActionResult> ExecuteActionAsync(AgentAction action, CancellationToken cancellationToken = default)
     {
+        // Try attribute-driven dispatch first (handles [AgentAction] methods on the concrete subclass)
+        if (AgentActionDiscovery.IsAttributeDriven(this))
+        {
+            var attrResult = await AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
+            if (attrResult.Outcome != ActionOutcome.Failed ||
+                !attrResult.Message.StartsWith("Unknown action '", StringComparison.Ordinal))
+                return attrResult;
+        }
+
         var actionId = action.Name.ToLowerInvariant().Replace("_", "");
         var fillActionId = GetFillActionId().ToLowerInvariant().Replace("_", "");
         var setActionId = GetSetActionId().ToLowerInvariant().Replace("_", "");

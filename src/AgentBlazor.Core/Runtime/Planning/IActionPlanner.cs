@@ -109,6 +109,7 @@ public sealed record AvailableAction
     public required string Description { get; init; }
     public required IReadOnlyList<ActionParameter> Parameters { get; init; }
     public bool RequiresApproval { get; init; }
+    public string? Instructions { get; init; }
 }
 
 /// <summary>

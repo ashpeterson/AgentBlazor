@@ -71,6 +71,17 @@
             </div>
         </section>
 
+        <section class="dojo-workspace__rail-section dojo-workspace__rail-section--prompts">
+            <p class="dojo-workspace__rail-label">Try asking</p>
+            <div class="dojo-workspace__prompt-chips">
+                @foreach (var prompt in CurrentExample.Prompts.Take(2))
+                {
+                    <button type="button" class="dojo-workspace__prompt-chip"
+                            @onclick="() => TryInjectSuggestion(prompt)">@prompt</button>
+                }
+            </div>
+        </section>
+
         <section class="dojo-workspace__rail-section">
             <p class="dojo-workspace__rail-label">Demos</p>
             <div class="dojo-workspace__demo-list">
@@ -94,53 +105,30 @@
     </MudPaper>
 
     <div class="dojo-workspace__main">
-        @if (ShowExampleHero)
-        {
-            <MudPaper Elevation="0" Class="dojo-workspace__hero">
-                <div class="dojo-workspace__hero-copy">
-                    <p class="dojo-workspace__hero-eyebrow">Dojo Example</p>
-                    <div class="dojo-workspace__hero-head">
-                        <MudText Typo="Typo.h4">@CurrentExample.Title</MudText>
-                        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">@CurrentViewLabel</MudChip>
-                    </div>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="dojo-workspace__hero-description">
-                        @CurrentExample.Description
-                    </MudText>
-                </div>
-
-                <div class="dojo-workspace__hero-meta">
-                    <div class="dojo-workspace__hero-prompts">
-                        <p>Try asking</p>
-                        <div class="dojo-workspace__hero-prompt-list">
-                            @foreach (var prompt in CurrentExample.Prompts)
-                            {
-                                <span>@prompt</span>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="dojo-workspace__hero-tags">
-                        @foreach (var tag in CurrentExample.Tags)
-                        {
-                            <span>@tag</span>
-                        }
-                    </div>
-                </div>
-            </MudPaper>
-        }
-
         @if (_viewMode == DojoViewMode.Preview)
         {
             @if (IsExample("agentic-chat"))
             {
                 <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat dojo-canvas--agentic" Style="@BackgroundCanvasStyle">
+                    @if (_generatedPoemText is not null)
+                    {
+                        <div class="dojo-canvas__poem">
+                            @if (_generatedPoemTitle is not null)
+                            {
+                                <p class="dojo-canvas__poem-title">@_generatedPoemTitle</p>
+                            }
+                            <pre class="dojo-canvas__poem-text">@_generatedPoemText</pre>
+                        </div>
+                    }
+
                     <div class="dojo-canvas__center-copy dojo-canvas__center-copy--agentic">
                         <MudText Typo="Typo.h4">@_backgroundStudioHeadline</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@_backgroundStudioBody</MudText>
                     </div>
 
                     <div class="dojo-canvas__chat-shell dojo-canvas__chat-shell--agentic">
-                        <AgentChatSurface FormName="dojo-chat-agentic"
+                        <AgentChatSurface @ref="_agenticChatSurface"
+                                          FormName="dojo-chat-agentic"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -155,7 +143,7 @@
                     <div class="dojo-canvas__suggestions dojo-canvas__suggestions--agentic">
                         @foreach (var suggestion in _backgroundStudioSuggestions)
                         {
-                            <span>@suggestion</span>
+                            <button type="button" @onclick="() => InjectAgenticChatSuggestion(suggestion)">@suggestion</button>
                         }
                     </div>
                 </MudPaper>
@@ -218,7 +206,8 @@
                     </MudPaper>
 
                     <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface FormName="dojo-chat-backend"
+                        <AgentChatSurface @ref="_backendChatSurface"
+                                          FormName="dojo-chat-backend"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -257,13 +246,14 @@
                     </MudPaper>
 
                     <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface FormName="dojo-chat-human-loop"
+                        <AgentChatSurface @ref="_humanLoopChatSurface"
+                                          FormName="dojo-chat-human-loop"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
                                           SessionId="@WorkspaceSessionId"
                                           RequireHandoffApproval="true"
-                                          Placeholder="Make me a sandwich and then finalize the selected steps."
+                                          Placeholder="Ask me to plan any task: make pizza, plan a trip, write code, etc."
                                           Theme="_dojoChatTheme"
                                           CssClass="dojo-embedded-chat" />
                     </div>
@@ -292,7 +282,8 @@
                     </MudPaper>
 
                     <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface FormName="dojo-chat-agentic-ui"
+                        <AgentChatSurface @ref="_agenticUiChatSurface"
+                                          FormName="dojo-chat-agentic-ui"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -324,7 +315,8 @@
                             <p>Haiku Generator</p>
                         </div>
 
-                        <AgentChatSurface FormName="dojo-chat-tool-ui"
+                        <AgentChatSurface @ref="_toolUiChatSurface"
+                                          FormName="dojo-chat-tool-ui"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -384,6 +376,9 @@
                                         <MudCheckBox T="bool" @bind-Value="Model.LowCarb" Label="Low Carb" />
                                         <MudCheckBox T="bool" @bind-Value="Model.Spicy" Label="Spicy" />
                                         <MudCheckBox T="bool" @bind-Value="Model.Vegetarian" Label="Vegetarian" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.BudgetFriendly" Label="Budget-Friendly" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.OnePotMeal" Label="One-Pot Meal" />
+                                        <MudCheckBox T="bool" @bind-Value="Model.Vegan" Label="Vegan" />
                                     </div>
                                 </section>
 
@@ -456,7 +451,8 @@
                             <p>AI Recipe Assistant</p>
                         </div>
 
-                        <AgentChatSurface FormName="dojo-chat-shared-state"
+                        <AgentChatSurface @ref="_sharedStateChatSurface"
+                                          FormName="dojo-chat-shared-state"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -505,7 +501,8 @@
                             @_predictiveAssistantMessage
                         </MudText>
 
-                        <AgentChatSurface FormName="dojo-chat-predictive"
+                        <AgentChatSurface @ref="_predictiveChatSurface"
+                                          FormName="dojo-chat-predictive"
                                           DefaultAgentName="Dojo Workspace Agent"
                                           ShowAgentSelector="false"
                                           LockAgentToCurrentRoute="true"
@@ -638,6 +635,32 @@
     private List<string> _steps = [];
     private List<DojoRunNote> _runNotes = [];
 
+    private AgentChatSurface? _agenticChatSurface;
+    private AgentChatSurface? _backendChatSurface;
+    private AgentChatSurface? _humanLoopChatSurface;
+    private AgentChatSurface? _agenticUiChatSurface;
+    private AgentChatSurface? _toolUiChatSurface;
+    private AgentChatSurface? _sharedStateChatSurface;
+    private AgentChatSurface? _predictiveChatSurface;
+    private string? _generatedPoemTitle;
+    private string? _generatedPoemText;
+
+    private Task TryInjectSuggestion(string text)
+    {
+        var target = _selectedExampleKey switch
+        {
+            "agentic-chat" => _agenticChatSurface,
+            "backend-tool-rendering" => _backendChatSurface,
+            "human-loop" => _humanLoopChatSurface,
+            "agentic-generative-ui" => _agenticUiChatSurface,
+            "tool-based-generative-ui" => _toolUiChatSurface,
+            "shared-state" => _sharedStateChatSurface,
+            "predictive-state" => _predictiveChatSurface,
+            _ => null
+        };
+        return target?.InjectAsync(text) ?? Task.CompletedTask;
+    }
+
     private AgentDialog? _ingredientDialog;
     private bool _ingredientDialogVisible;
     private DojoIngredientDraft _ingredientDraft = new();
@@ -654,7 +677,7 @@
     private string _backgroundStudioTheme = "neutral";
     private string _backgroundStudioHeadline = "How can I help you today?";
     private string _backgroundStudioBody = "Describe a UI change and the mounted Dojo component can respond instantly.";
-    private readonly IReadOnlyList<string> _backgroundStudioSuggestions = ["Change background", "Generate sonnet"];
+    private readonly IReadOnlyList<string> _backgroundStudioSuggestions = ["Change the background to coral", "Write me a short sonnet"];
 
     private List<DojoChecklistStep> _humanLoopSteps = CreateHumanLoopSteps();
     private string _humanLoopStatus = "Ready";
@@ -686,7 +709,9 @@
             ["predictive"] = "predictive-state"
         };
 
-    private static readonly AgentUiDocument _toolBasedGeneratedUiDocument = new()
+    private AgentUiDocument _toolBasedGeneratedUiDocument = CreateDefaultHaikuDocument();
+
+    private static AgentUiDocument CreateDefaultHaikuDocument() => new()
     {
         Blocks =
         [
@@ -733,7 +758,7 @@
             "Agentic Chat",
             "Chat with your Copilot and call front-end tools.",
             ["Chat", "Tools", "Streaming"],
-            ["change the background color to coral", "set dojo view to code", "what components are mounted on this route"],
+            ["change the background to coral", "write me a short sonnet"],
             "<AgentChatSurface LockAgentToCurrentRoute=\"true\" />",
             "Agentic chat keeps the canvas minimal and lets the assistant manipulate mounted UI in place."),
         new(
@@ -749,7 +774,7 @@
             "Human in the loop",
             "Plan a task together and direct the Copilot to take the right steps.",
             ["HITL", "Interactivity"],
-            ["make me a sandwich", "finalize the selected sandwich steps", "toggle sandwich step 3 false"],
+            ["plan a pizza night for 4 people", "plan a hiking trip to the mountains"],
             "<AgentChatSurface RequireHandoffApproval=\"true\" />",
             "Human-in-the-loop mode keeps approval-sensitive actions visible in a single checklist flow."),
         new(
@@ -765,7 +790,7 @@
             "Tool Based Generative UI",
             "Tool-based generated interfaces rendered from tool output.",
             ["Generative ui (action)", "Tools"],
-            ["write me a haiku about nature", "click generated action to add chives", "render the generated table"],
+            ["Write me a haiku about nature", "Generate a haiku about autumn rain", "Create a haiku about the ocean"],
             "<AgentGenerativeSurface Document=\"generatedUi\" />",
             "Tool-based generative UI renders deterministic blocks and forwards actions back into the runtime."),
         new(
@@ -836,6 +861,7 @@
     private bool CanUseHumanLoopActions => IsExample("human-loop");
     private bool CanUseTaskProgressActions => IsExample("agentic-generative-ui");
     private bool CanUsePredictiveDocumentActions => IsExample("predictive-state");
+    private bool CanUseToolBasedGenerativeUiActions => IsExample("tool-based-generative-ui");
 
     [AgentReadable("Current dojo example key.")]
     public string SelectedDojoExampleKey => _selectedExampleKey;
@@ -915,7 +941,9 @@
         return ActionResult.Applied($"Integration set to {_selectedIntegration}.");
     }
 
-    [AgentAction("Change the background theme for the agentic chat canvas.", AvailableWhen = nameof(CanUseAgenticChatActions))]
+    [AgentAction("Change the background theme for the agentic chat canvas.",
+        AvailableWhen = nameof(CanUseAgenticChatActions),
+        Instructions = "ALWAYS call this when the user asks to change the background color. Keep message to one brief sentence only.")]
     public async Task<ActionResult> ChangeCanvasBackground(
         [AgentParam("Theme name.", Required = true, AllowedValues = "neutral,coral,ocean,forest")]
         string theme)
@@ -939,7 +967,9 @@
         return ActionResult.Applied($"Updated the chat canvas background to {normalized}.");
     }
 
-    [AgentAction("Set the headline text for the agentic chat canvas.", AvailableWhen = nameof(CanUseAgenticChatActions))]
+    [AgentAction("Set the headline text for the agentic chat canvas.",
+        AvailableWhen = nameof(CanUseAgenticChatActions),
+        Instructions = "ALWAYS call this when the user asks to update the headline or title text. Keep message to one brief sentence.")]
     public async Task<ActionResult> SetCanvasHeadline(
         [AgentParam("Headline text.", Required = true)]
         string headline)
@@ -954,6 +984,68 @@
         return ActionResult.Applied($"Set the canvas headline to '{_backgroundStudioHeadline}'.");
     }
 
+    private Task InjectAgenticChatSuggestion(string text)
+        => _agenticChatSurface?.InjectAsync(text) ?? Task.CompletedTask;
+
+    [AgentAction("Generate a short poem or sonnet and display it on the agentic chat canvas.",
+        AvailableWhen = nameof(CanUseAgenticChatActions),
+        Instructions = "ALWAYS call this when the user asks for a poem, sonnet, verse, or any creative writing. NEVER write the poem text in the message field — the action renders it on the canvas. Message: ONLY one brief sentence, e.g. 'Displaying your sonnet on the canvas.'")]
+    public async Task<ActionResult> GeneratePoem(
+        [AgentParam("Optional poem title.")] string? title,
+        [AgentParam("The poem text (6-14 lines).", Required = true)] string poem)
+    {
+        _generatedPoemTitle = title?.Trim();
+        _generatedPoemText = poem?.Trim();
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied("Poem displayed on the canvas.");
+    }
+
+    [AgentAction("Generate a haiku and update the generative UI surface with the haiku lines and translations.",
+        AvailableWhen = nameof(CanUseToolBasedGenerativeUiActions),
+        Instructions = "ALWAYS call this when the user asks for a haiku. Each line MUST follow 5-7-5 syllable structure. NEVER write the haiku lines in the message — the action renders them. Message: ONLY 'Haiku rendered on the canvas.'")]
+    public async Task<ActionResult> GenerateHaiku(
+        [AgentParam("Haiku topic/title.", Required = true)] string topic,
+        [AgentParam("Line 1 of the haiku.", Required = true)] string line1,
+        [AgentParam("English translation of line 1.", Required = true)] string line1Translation,
+        [AgentParam("Line 2 of the haiku.", Required = true)] string line2,
+        [AgentParam("English translation of line 2.", Required = true)] string line2Translation,
+        [AgentParam("Line 3 of the haiku.", Required = true)] string line3,
+        [AgentParam("English translation of line 3.", Required = true)] string line3Translation)
+    {
+        _toolBasedGeneratedUiDocument = new AgentUiDocument
+        {
+            Blocks =
+            [
+                new AgentUiBlock
+                {
+                    Id = "haiku-card",
+                    Kind = AgentUiBlockKind.Card,
+                    Title = topic,
+                    Description = $"{line1}\n{line2}\n{line3}"
+                },
+                new AgentUiBlock
+                {
+                    Id = "haiku-table",
+                    Kind = AgentUiBlockKind.Table,
+                    Title = "Haiku Lines",
+                    Columns =
+                    [
+                        new AgentUiTableColumn { Key = "line", Header = "Line" },
+                        new AgentUiTableColumn { Key = "translation", Header = "Translation" }
+                    ],
+                    Rows =
+                    [
+                        new Dictionary<string, object?> { ["line"] = line1, ["translation"] = line1Translation },
+                        new Dictionary<string, object?> { ["line"] = line2, ["translation"] = line2Translation },
+                        new Dictionary<string, object?> { ["line"] = line3, ["translation"] = line3Translation }
+                    ]
+                }
+            ]
+        };
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Haiku about '{topic}' rendered in the generative surface.");
+    }
+
     [AgentAction("Prepare a sandwich plan with the standard steps selected.", AvailableWhen = nameof(CanUseHumanLoopActions))]
     public async Task<ActionResult> PrepareSandwichPlan()
     {
@@ -961,6 +1053,24 @@
         _humanLoopStatus = "Ready";
         await RequestComponentRefreshAsync();
         return ActionResult.Applied("Prepared the sandwich checklist with the default steps.");
+    }
+
+    [AgentAction("Set the human-in-the-loop checklist steps for any task.",
+        AvailableWhen = nameof(CanUseHumanLoopActions),
+        Instructions = "ALWAYS call this for ANY task request (pizza, hiking, coding, travel, etc.). Provide 3-10 concrete steps. Do not use the old sandwich-specific action.")]
+    public async Task<ActionResult> SetTaskPlan(
+        [AgentParam("Short name of the task.", Required = true)] string taskName,
+        [AgentParam("Array of step descriptions (3-10 items).", Required = true)] string[] steps)
+    {
+        if (steps is null || steps.Length == 0)
+            return ActionResult.NeedsClarification("Provide at least one step.");
+
+        _humanLoopSteps = steps
+            .Select((text, idx) => new DojoChecklistStep(idx + 1, text.Trim(), true))
+            .ToList();
+        _humanLoopStatus = "Ready";
+        await RequestComponentRefreshAsync();
+        return ActionResult.Applied($"Checklist set for task '{taskName}' with {steps.Length} steps.");
     }
 
     [AgentAction("Toggle a sandwich checklist step by number.", AvailableWhen = nameof(CanUseHumanLoopActions))]
@@ -996,7 +1106,9 @@
         return ActionResult.Applied("Finalized the sandwich plan.");
     }
 
-    [AgentAction("Plan a travel workflow and populate the long-running task board.", AvailableWhen = nameof(CanUseTaskProgressActions))]
+    [AgentAction("Plan a travel workflow and populate the long-running task board.",
+        AvailableWhen = nameof(CanUseTaskProgressActions),
+        Instructions = "ALWAYS call this when the user describes a travel destination. Then use complete_next_task to advance one step at a time. Narrate each step as if actually executing it.")]
     public async Task<ActionResult> PlanTravelWorkflow(
         [AgentParam("Destination name.")]
         string? destination = null)
@@ -1039,7 +1151,9 @@
         return ActionResult.Applied($"Completed task {next.Number}: {next.Text}");
     }
 
-    [AgentAction("Apply an editorial instruction to the predictive document.", AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
+    [AgentAction("Apply an editorial instruction to the predictive document.",
+        AvailableWhen = nameof(CanUsePredictiveDocumentActions),
+        Instructions = "ALWAYS call this for any document edit request ('make all bold', 'rewrite in professional tone', 'summarize'). Message: 'Applying edits — review the preview and confirm or reject.'")]
     public async Task<ActionResult> ApplyPredictiveDocumentInstruction(
         [AgentParam("Editing instruction.", Required = true)]
         string instruction)
@@ -1069,7 +1183,10 @@
         return ActionResult.Applied($"Applied the predictive document instruction '{normalized}'.");
     }
 
-    [AgentAction("Confirm the pending predictive document changes.", RequiresApproval = true, AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
+    [AgentAction("Confirm the pending predictive document changes.",
+        RequiresApproval = true,
+        AvailableWhen = nameof(CanUsePredictiveDocumentActions),
+        Instructions = "ALWAYS call this when the user accepts the changes (resolves the pending-changes banner). Requires approval.")]
     public async Task<ActionResult> ConfirmPredictiveDocumentChanges()
     {
         _predictiveHasPendingChanges = false;
