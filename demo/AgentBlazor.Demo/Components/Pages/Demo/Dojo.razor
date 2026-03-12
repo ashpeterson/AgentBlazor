@@ -1,89 +1,48 @@
 @page "/demo/dojo"
 @layout DemoLayout
+@using System.Reflection
+@using System.Text
+@using System.Text.Json
 @using AgentBlazor
 @using AgentBlazor.Attributes
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
 @using AgentBlazor.Core.Components
-@using AgentBlazor.Core.Runtime.Agents
-@using AgentBlazor.Runtime
-@using AgentBlazor.Demo.Services
+@using AgentBlazor.Demo.Components.Pages.Demo
 @using MudBlazor
-@inherits AgentFormPageBase<DojoRecipeModel>
-@inject ISnackbar Snackbar
-@inject DojoWorkspaceService WorkspaceService
-@inject DojoExperienceState DojoExperience
+@inherits AgentControllableComponentBase
+@attribute [AgentComponent(AgentId = "dojo-workspace", ComponentType = "DojoIncident")]
 
-<PageTitle>Dojo Workspace — AgentBlazor Demo</PageTitle>
-
-<AgentToolRender ToolId="AgentForm.submit">
-    <InProgress Context="_">
-        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-            Gathering submit parameters...
-        </MudAlert>
-    </InProgress>
-    <Executing Context="_">
-        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
-            Running tool invocation...
-        </MudAlert>
-    </Executing>
-    <Complete Context="ctx">
-        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-2">
-            Tool completed: @ctx.Result
-        </MudAlert>
-    </Complete>
-    <Failed Context="ctx">
-        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">
-            Tool failed: @ctx.Result
-        </MudAlert>
-    </Failed>
-</AgentToolRender>
+<PageTitle>Dojo Workspace</PageTitle>
 
 <div class="dojo-workspace">
-    <MudPaper Elevation="0" Class="dojo-workspace__rail">
-        <MudText Typo="Typo.subtitle1" Class="dojo-workspace__rail-title">AG-UI Interactive Dojo</MudText>
-
-        <section class="dojo-workspace__rail-section">
-            <p class="dojo-workspace__rail-label">Integrations</p>
-            <MudSelect T="string" Value="@_selectedIntegration" ValueChanged="OnIntegrationChanged" Dense="true" Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@("Microsoft Agent Framework (.NET)")">Microsoft Agent Framework (.NET)</MudSelectItem>
-            </MudSelect>
-        </section>
+    <aside class="dojo-workspace__rail">
+        <div class="dojo-workspace__rail-header">
+            <p class="dojo-workspace__eyebrow">AgentBlazor Dojo</p>
+            <MudText Typo="Typo.h6">Three native Blazor agent UI patterns.</MudText>
+        </div>
 
         <section class="dojo-workspace__rail-section">
             <p class="dojo-workspace__rail-label">View</p>
             <div class="dojo-workspace__view-toggle">
-                <button type="button"
-                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Preview) ? "is-active" : null)"
-                        @onclick="() => SetViewMode(DojoViewMode.Preview)">
-                    Preview
-                </button>
-                <button type="button"
-                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Code) ? "is-active" : null)"
-                        @onclick="() => SetViewMode(DojoViewMode.Code)">
-                    Code
-                </button>
-                <button type="button"
-                        class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Docs) ? "is-active" : null)"
-                        @onclick="() => SetViewMode(DojoViewMode.Docs)">
-                    Docs
-                </button>
-            </div>
-        </section>
-
-        <section class="dojo-workspace__rail-section dojo-workspace__rail-section--prompts">
-            <p class="dojo-workspace__rail-label">Try asking</p>
-            <div class="dojo-workspace__prompt-chips">
-                @foreach (var prompt in CurrentExample.Prompts.Take(2))
-                {
-                    <button type="button" class="dojo-workspace__prompt-chip"
-                            @onclick="() => TryInjectSuggestion(prompt)">@prompt</button>
-                }
+                <button type="button" class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Preview) ? "is-active" : null)" @onclick="() => SetViewMode(DojoViewMode.Preview)">Preview</button>
+                <button type="button" class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Code) ? "is-active" : null)" @onclick="() => SetViewMode(DojoViewMode.Code)">Code</button>
+                <button type="button" class="dojo-workspace__view-button @(IsViewMode(DojoViewMode.Docs) ? "is-active" : null)" @onclick="() => SetViewMode(DojoViewMode.Docs)">Docs</button>
             </div>
         </section>
 
         <section class="dojo-workspace__rail-section">
-            <p class="dojo-workspace__rail-label">Demos</p>
+            <p class="dojo-workspace__rail-label">Try asking</p>
+            <div class="dojo-workspace__prompt-chips">
+                @foreach (var prompt in CurrentExample.Prompts)
+                {
+                    <button type="button" class="dojo-workspace__prompt-chip" @onclick="() => InjectPromptAsync(prompt)">@prompt</button>
+                }
+            </div>
+        </section>
+
+        <section class="dojo-workspace__rail-section dojo-workspace__rail-section--fill">
+            <p class="dojo-workspace__rail-label">Pillars</p>
             <div class="dojo-workspace__demo-list">
                 @foreach (var example in _examples)
                 {
@@ -91,7 +50,7 @@
                             class="dojo-workspace__demo-item @(IsSelectedExample(example.Key) ? "is-active" : null)"
                             @onclick="() => SelectExample(example.Key)">
                         <span class="dojo-workspace__demo-title">@example.Title</span>
-                        <span class="dojo-workspace__demo-description">@example.Description</span>
+                        <span class="dojo-workspace__demo-description">@example.ShortDescription</span>
                         <span class="dojo-workspace__demo-tags">
                             @foreach (var tag in example.Tags)
                             {
@@ -102,1436 +61,1161 @@
                 }
             </div>
         </section>
-    </MudPaper>
+    </aside>
 
-    <div class="dojo-workspace__main">
+    <main class="dojo-workspace__main">
+        <header class="dojo-workspace__header">
+            <p class="dojo-workspace__eyebrow">@CurrentExample.Title</p>
+            <MudText Typo="Typo.h4">@CurrentExample.Headline</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@CurrentExample.Subtitle</MudText>
+        </header>
+
         @if (_viewMode == DojoViewMode.Preview)
         {
-            @if (IsExample("agentic-chat"))
-            {
-                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat dojo-canvas--agentic" Style="@BackgroundCanvasStyle">
-                    @if (_generatedPoemText is not null)
+            <div class="dojo-preview">
+                <section class="dojo-stage dojo-stage--canvas">
+                    @if (IsExample("controlled-generative-ui"))
                     {
-                        <div class="dojo-canvas__poem">
-                            @if (_generatedPoemTitle is not null)
-                            {
-                                <p class="dojo-canvas__poem-title">@_generatedPoemTitle</p>
-                            }
-                            <pre class="dojo-canvas__poem-text">@_generatedPoemText</pre>
+                        <div class="dojo-controlled">
+                            <article class="dojo-card dojo-controlled__card">
+                                <div class="dojo-controlled__card-head">
+                                    <div>
+                                        <p class="dojo-controlled__label">Incident review draft</p>
+                                        <MudText Typo="Typo.h5">@Model.Incident</MudText>
+                                    </div>
+                                    <span class="dojo-status-chip @(_controlledReviewQueued ? "is-success" : null)">@(_controlledReviewQueued ? "Review queued" : "Draft")</span>
+                                </div>
+
+                                <div class="dojo-controlled__grid">
+                                    <div class="dojo-key-stat">
+                                        <span>Severity</span>
+                                        <strong>@Model.Severity</strong>
+                                    </div>
+                                    <div class="dojo-key-stat">
+                                        <span>Owner</span>
+                                        <strong>@Model.Owner</strong>
+                                    </div>
+                                    <div class="dojo-key-stat dojo-key-stat--wide">
+                                        <span>Next step</span>
+                                        <strong>@Model.NextStep</strong>
+                                    </div>
+                                </div>
+
+                                <div class="dojo-controlled__actions">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="dojo-controlled__button" OnClick="QueueControlledReviewFromUiAsync">Queue Review</MudButton>
+                                </div>
+                            </article>
+
+                            <article class="dojo-card dojo-controlled__feed">
+                                <div class="dojo-card__head">
+                                    <MudText Typo="Typo.h6">Lifecycle Feed</MudText>
+                                    <span>Host-rendered updates</span>
+                                </div>
+
+                                <div class="dojo-feed">
+                                    @if (_controlledLifecycle.Count == 0)
+                                    {
+                                        <div class="dojo-feed__empty">No actions yet.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in _controlledLifecycle)
+                                        {
+                                            <div class="dojo-feed__item">
+                                                <strong>@item.Timestamp.ToLocalTime().ToString("HH:mm:ss")</strong>
+                                                <span>@item.Message</span>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </article>
                         </div>
                     }
-
-                    <div class="dojo-canvas__center-copy dojo-canvas__center-copy--agentic">
-                        <MudText Typo="Typo.h4">@_backgroundStudioHeadline</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_backgroundStudioBody</MudText>
-                    </div>
-
-                    <div class="dojo-canvas__chat-shell dojo-canvas__chat-shell--agentic">
-                        <AgentChatSurface @ref="_agenticChatSurface"
-                                          FormName="dojo-chat-agentic"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          Placeholder="Change the background color, update the title, or ask what components are mounted."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat" />
-                    </div>
-
-                    <p class="dojo-canvas__agentic-note">AI can make mistakes. Please verify important information.</p>
-
-                    <div class="dojo-canvas__suggestions dojo-canvas__suggestions--agentic">
-                        @foreach (var suggestion in _backgroundStudioSuggestions)
-                        {
-                            <button type="button" @onclick="() => InjectAgenticChatSuggestion(suggestion)">@suggestion</button>
-                        }
-                    </div>
-                </MudPaper>
-            }
-            else if (IsExample("backend-tool-rendering"))
-            {
-                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
-                    <div class="dojo-canvas__center-copy dojo-canvas__center-copy--compact">
-                        <MudText Typo="Typo.h5">Backend Tool Rendering</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            Submit the backend action below or ask the assistant to do it for you. Tool lifecycle events stream into the chat and run notes.
-                        </MudText>
-                    </div>
-
-                    <MudPaper Elevation="0" Class="dojo-backend-panel">
-                        <AgentForm AgentId="dojo-backend-tool-form"
-                                   Model="@_backendToolModel"
-                                   Submitted="OnBackendToolSubmittedAsync">
-                            <ChildContent Context="_">
-                                <DataAnnotationsValidator />
-                                <MudGrid Spacing="2">
-                                    <MudItem xs="12" md="5">
-                                        <MudTextField T="string"
-                                                      Label="Action Label"
-                                                      For="@(() => _backendToolModel.ActionLabel)"
-                                                      @bind-Value="_backendToolModel.ActionLabel" />
-                                    </MudItem>
-                                    <MudItem xs="12" md="4">
-                                        <MudTextField T="string"
-                                                      Label="Operator"
-                                                      For="@(() => _backendToolModel.Operator)"
-                                                      @bind-Value="_backendToolModel.Operator" />
-                                    </MudItem>
-                                    <MudItem xs="12" md="3">
-                                        <MudButton Variant="Variant.Filled"
-                                                   Color="Color.Primary"
-                                                   ButtonType="ButtonType.Submit"
-                                                   FullWidth="true"
-                                                   Class="dojo-backend-panel__submit">
-                                            Submit Tool
-                                        </MudButton>
-                                    </MudItem>
-                                    <MudItem xs="12">
-                                        <MudTextField T="string"
-                                                      Label="Notes"
-                                                      Lines="2"
-                                                      For="@(() => _backendToolModel.Notes)"
-                                                      @bind-Value="_backendToolModel.Notes" />
-                                    </MudItem>
-                                </MudGrid>
-                            </ChildContent>
-                        </AgentForm>
-
-                        <div class="dojo-backend-panel__events">
-                            @foreach (var note in ToolExecutionNotes)
-                            {
-                                <div class="dojo-backend-panel__event">@note.Message</div>
-                            }
-                        </div>
-                    </MudPaper>
-
-                    <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface @ref="_backendChatSurface"
-                                          FormName="dojo-chat-backend"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          Placeholder="Set action label to policy review and submit the backend demo form."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat" />
-                    </div>
-                </MudPaper>
-            }
-            else if (IsExample("human-loop"))
-            {
-                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
-                    <MudPaper Elevation="0" Class="dojo-checklist">
-                        <div class="dojo-checklist__head">
-                            <MudText Typo="Typo.h6">Select Steps</MudText>
-                            <div class="dojo-checklist__meta">
-                                <span>@SelectedSandwichStepCount/@_humanLoopSteps.Count Selected</span>
-                                <span class="dojo-checklist__status">@_humanLoopStatus</span>
+                    else if (IsExample("declarative-generative-ui"))
+                    {
+                        <div class="dojo-declarative">
+                            <div class="dojo-declarative__toolbar">
+                                <div class="dojo-inline-toggle">
+                                    <button type="button" class="dojo-inline-toggle__button @(IsDeclarativeProtocol(DojoDeclarativeProtocol.Native) ? "is-active" : null)" @onclick="() => SetDeclarativeProtocol(DojoDeclarativeProtocol.Native)">Native</button>
+                                    <button type="button" class="dojo-inline-toggle__button @(IsDeclarativeProtocol(DojoDeclarativeProtocol.A2Ui) ? "is-active" : null)" @onclick="() => SetDeclarativeProtocol(DojoDeclarativeProtocol.A2Ui)">A2UI</button>
+                                    <button type="button" class="dojo-inline-toggle__button @(IsDeclarativeProtocol(DojoDeclarativeProtocol.OpenJsonUi) ? "is-active" : null)" @onclick="() => SetDeclarativeProtocol(DojoDeclarativeProtocol.OpenJsonUi)">Open-JSON-UI</button>
+                                </div>
+                                <span class="dojo-status-chip">@DeclarativeProtocolLabel</span>
                             </div>
+
+                            <article class="dojo-card dojo-declarative__surface">
+                                <div class="dojo-card__head">
+                                    <MudText Typo="Typo.h6">@DeclarativePreviewTitle</MudText>
+                                    <span>@_declarativeSummary</span>
+                                </div>
+
+                                <AgentGenerativeSurface Document="@_declarativeDocument"
+                                                        CssClass="dojo-generated-surface"
+                                                        AgentName="Dojo Workspace Agent"
+                                                        ForwardActionsToRuntime="true"
+                                                        ShowRuntimeResponses="false" />
+                            </article>
                         </div>
+                    }
+                    else
+                    {
+                        <div class="dojo-open-ended">
+                            <article class="dojo-card dojo-open-ended__shell">
+                                <div class="dojo-open-ended__toolbar">
+                                    <span class="dojo-open-ended__traffic"><i></i><i></i><i></i></span>
+                                    <span class="dojo-open-ended__url">@_openEndedOriginLabel</span>
+                                    <span class="dojo-status-chip">Sandboxed iframe</span>
+                                </div>
 
-                        <div class="dojo-checklist__progress">
-                            <span style="width:@SandwichSelectionProgress%;"></span>
+                                <iframe class="dojo-open-ended__frame" title="Hosted agent app" sandbox="allow-scripts" srcdoc="@_openEndedAppMarkup"></iframe>
+                            </article>
                         </div>
+                    }
+                </section>
 
-                        @foreach (var step in _humanLoopSteps)
-                        {
-                            <button type="button"
-                                    class="dojo-checklist__item @(step.Selected ? "is-selected" : null)"
-                                    @onclick="() => ToggleSandwichStep(step.Number)">
-                                <span class="dojo-checklist__checkbox">@(step.Selected ? "\u2713" : "")</span>
-                                <span>@step.Text</span>
-                            </button>
-                        }
-                    </MudPaper>
-
-                    <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface @ref="_humanLoopChatSurface"
-                                          FormName="dojo-chat-human-loop"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          RequireHandoffApproval="true"
-                                          Placeholder="Ask me to plan any task: make pizza, plan a trip, write code, etc."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat" />
-                    </div>
-                </MudPaper>
-            }
-            else if (IsExample("agentic-generative-ui"))
-            {
-                <MudPaper Elevation="1" Class="dojo-canvas dojo-canvas--chat">
-                    <MudPaper Elevation="0" Class="dojo-progress-board">
-                        <div class="dojo-progress-board__head">
-                            <MudText Typo="Typo.h6">Task Progress</MudText>
-                            <span>@CompletedTaskCount/@_taskProgressSteps.Count Complete</span>
-                        </div>
-
-                        <div class="dojo-progress-board__progress">
-                            <span style="width:@TaskCompletionProgress%;"></span>
-                        </div>
-
-                        @foreach (var step in _taskProgressSteps)
-                        {
-                            <div class="dojo-progress-board__item @(step.Completed ? "is-complete" : null)">
-                                <span class="dojo-progress-board__dot"></span>
-                                <span>@step.Text</span>
-                            </div>
-                        }
-                    </MudPaper>
-
-                    <div class="dojo-canvas__chat-shell">
-                        <AgentChatSurface @ref="_agenticUiChatSurface"
-                                          FormName="dojo-chat-agentic-ui"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          EnableGeneratedUi="true"
-                                          Placeholder="Plan a vacation to Japan and keep the progress board updated."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat" />
-                    </div>
-                </MudPaper>
-            }
-            else if (IsExample("tool-based-generative-ui"))
-            {
-                <div class="dojo-split-stage dojo-split-stage--tool-ui">
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
-                        <AgentGenerativeSurface Document="@_toolBasedGeneratedUiDocument"
-                                                AgentName="Dojo Workspace Agent"
-                                                SessionId="@WorkspaceSessionId"
-                                                ForwardActionsToRuntime="true"
-                                                ShowRuntimeResponses="false"
-                                                OnActionInvoked="OnGeneratedUiActionInvokedAsync"
-                                                OnRuntimeResponseReceived="OnGeneratedUiRuntimeResponseAsync"
-                                                OnError="OnGeneratedUiErrorAsync"
-                                                CssClass="dojo-generated-surface" />
-                    </MudPaper>
-
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
-                        <div class="dojo-sidechat__head">
-                            <p>Haiku Generator</p>
-                        </div>
-
-                        <AgentChatSurface @ref="_toolUiChatSurface"
-                                          FormName="dojo-chat-tool-ui"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          EnableGeneratedUi="true"
-                                          Placeholder="Write me a haiku about nature."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
-                    </MudPaper>
-                </div>
-            }
-            else if (IsExample("shared-state"))
-            {
-                <div class="dojo-split-stage">
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
-                        <AgentForm AgentId="dojo-recipe-form"
-                                   Model="@Model"
-                                   Submitted="OnRecipeSubmittedAsync">
-                            <ChildContent Context="_">
-                                <DataAnnotationsValidator />
-
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="dojo-recipe__header">
-                                    <MudText Typo="Typo.h4">@Model.Title</MudText>
-                                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">Live Recipe</MudChip>
-                                </MudStack>
-
-                                <MudGrid Spacing="2" Class="dojo-recipe__meta">
-                                    <MudItem xs="12" md="6">
-                                        <MudTextField T="string"
-                                                      Label="Recipe Title"
-                                                      Placeholder="Classic Omelette"
-                                                      For="@(() => Model.Title)"
-                                                      @bind-Value="Model.Title" />
-                                    </MudItem>
-                                    <MudItem xs="6" md="3">
-                                        <MudNumericField T="int"
-                                                         Label="Minutes"
-                                                         For="@(() => Model.Minutes)"
-                                                         @bind-Value="Model.Minutes" />
-                                    </MudItem>
-                                    <MudItem xs="6" md="3">
-                                        <MudSelect T="string"
-                                                   Label="Difficulty"
-                                                   For="@(() => Model.Difficulty)"
-                                                   @bind-Value="Model.Difficulty">
-                                            <MudSelectItem T="string" Value="@("Beginner")">Beginner</MudSelectItem>
-                                            <MudSelectItem T="string" Value="@("Intermediate")">Intermediate</MudSelectItem>
-                                            <MudSelectItem T="string" Value="@("Advanced")">Advanced</MudSelectItem>
-                                        </MudSelect>
-                                    </MudItem>
-                                </MudGrid>
-
-                                <section class="dojo-recipe__section">
-                                    <MudText Typo="Typo.h6">Dietary Preferences</MudText>
-                                    <div class="dojo-recipe__flags">
-                                        <MudCheckBox T="bool" @bind-Value="Model.HighProtein" Label="High Protein" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.LowCarb" Label="Low Carb" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.Spicy" Label="Spicy" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.Vegetarian" Label="Vegetarian" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.BudgetFriendly" Label="Budget-Friendly" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.OnePotMeal" Label="One-Pot Meal" />
-                                        <MudCheckBox T="bool" @bind-Value="Model.Vegan" Label="Vegan" />
-                                    </div>
-                                </section>
-
-                                <section class="dojo-recipe__section">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                                        <MudText Typo="Typo.h6">Ingredients</MudText>
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Size="Size.Small"
-                                                   Color="Color.Primary"
-                                                   OnClick="OpenIngredientDialogAsync">
-                                            + Add Ingredient
-                                        </MudButton>
-                                    </MudStack>
-
-                                    <div class="dojo-recipe__grid">
-                                        @foreach (var ingredient in _ingredients)
-                                        {
-                                            <MudPaper Elevation="0" Class="dojo-recipe__card">
-                                                <MudText Typo="Typo.subtitle2">@ingredient.Name</MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@ingredient.Amount</MudText>
-                                                @if (!string.IsNullOrWhiteSpace(ingredient.Notes))
-                                                {
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@ingredient.Notes</MudText>
-                                                }
-                                            </MudPaper>
-                                        }
-                                    </div>
-                                </section>
-
-                                <section class="dojo-recipe__section">
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-                                        <MudText Typo="Typo.h6">Instructions</MudText>
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Size="Size.Small"
-                                                   Color="Color.Primary"
-                                                   OnClick="OpenStepDialogAsync">
-                                            + Add Step
-                                        </MudButton>
-                                    </MudStack>
-
-                                    <ol class="dojo-recipe__steps">
-                                        @foreach (var step in _steps)
-                                        {
-                                            <li>
-                                                <MudPaper Elevation="0" Class="dojo-recipe__step-card">
-                                                    @step
-                                                </MudPaper>
-                                            </li>
-                                        }
-                                    </ol>
-                                </section>
-
-                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="dojo-recipe__actions">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Last save: @LastSavedLabel</MudText>
-                                    <MudStack Row="true" Spacing="1">
-                                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
-                                            Save Draft
-                                        </MudButton>
-                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowAssistantTip">
-                                            Improve with AI
-                                        </MudButton>
-                                    </MudStack>
-                                </MudStack>
-                            </ChildContent>
-                        </AgentForm>
-                    </MudPaper>
-
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
-                        <div class="dojo-sidechat__head">
-                            <p>AI Recipe Assistant</p>
-                        </div>
-
-                        <AgentChatSurface @ref="_sharedStateChatSurface"
-                                          FormName="dojo-chat-shared-state"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          Placeholder="Add eggs, add onion, create Italian recipe, or make it healthier."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
-                    </MudPaper>
-                </div>
-            }
-            else if (IsExample("predictive-state"))
-            {
-                <div class="dojo-split-stage">
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--artifact">
-                        <div class="dojo-document">
-                            <p class="dojo-document__label">Predictive State Updates Document Editor</p>
-                            @foreach (var line in _predictiveDocumentLines)
-                            {
-                                <p class="dojo-document__line dojo-document__line--@line.Kind.ToString().ToLowerInvariant()">@line.Text</p>
-                            }
-                        </div>
-                    </MudPaper>
-
-                    <MudPaper Elevation="1" Class="dojo-stage dojo-stage--sidechat">
-                        <div class="dojo-sidechat__head">
-                            <p>AI Document Editor</p>
-                        </div>
-
-                        @if (_predictiveHasPendingChanges)
-                        {
-                            <MudPaper Elevation="0" Class="dojo-approval-card">
-                                <MudText Typo="Typo.subtitle1">Confirm Changes</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">@_predictiveApprovalPrompt</MudText>
-                                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1" Class="mt-2">
-                                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="RejectPredictiveChanges">
-                                        Reject
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmPredictiveChangesFromUi">
-                                        Confirm
-                                    </MudButton>
-                                </MudStack>
-                            </MudPaper>
-                        }
-
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="dojo-sidechat__note">
-                            @_predictiveAssistantMessage
-                        </MudText>
-
-                        <AgentChatSurface @ref="_predictiveChatSurface"
-                                          FormName="dojo-chat-predictive"
-                                          DefaultAgentName="Dojo Workspace Agent"
-                                          ShowAgentSelector="false"
-                                          LockAgentToCurrentRoute="true"
-                                          SessionId="@WorkspaceSessionId"
-                                          EnableGeneratedUi="true"
-                                          Placeholder="Make all bold, rewrite the story, or summarize the content."
-                                          Theme="_dojoChatTheme"
-                                          CssClass="dojo-embedded-chat dojo-embedded-chat--side" />
-                    </MudPaper>
-                </div>
-            }
-
+                <aside class="dojo-stage dojo-stage--chat-panel">
+                    <AgentChatSurface @key="_selectedExampleKey"
+                                      @ref="_chatSurface"
+                                      FormName="dojo-chat"
+                                      DefaultAgentName="Dojo Workspace Agent"
+                                      ShowAgentSelector="false"
+                                      LockAgentToCurrentRoute="true"
+                                      Title="Dojo Workspace Agent"
+                                      Placeholder="@CurrentExample.Placeholder"
+                                      CssClass="dojo-embedded-chat" />
+                </aside>
+            </div>
         }
         else if (_viewMode == DojoViewMode.Code)
         {
-            <MudPaper Elevation="0" Class="dojo-workspace__mode-panel">
-                <p class="dojo-workspace__mode-eyebrow">Code</p>
-                <MudText Typo="Typo.h6" Class="mb-2">@CurrentExample.Title</MudText>
-                <pre class="docs-code">@CurrentExample.Code</pre>
-            </MudPaper>
+                <section class="dojo-stage dojo-stage--document dojo-code">
+                @foreach (var codeSection in CurrentCodeSections)
+                {
+                    <article class="dojo-card dojo-code__section">
+                        <div class="dojo-card__head dojo-code__head">
+                            <div>
+                                <MudText Typo="Typo.h6">@codeSection.Title</MudText>
+                                @if (!string.IsNullOrWhiteSpace(codeSection.Description))
+                                {
+                                    <p class="dojo-code__description">@codeSection.Description</p>
+                                }
+                            </div>
+                            <span class="dojo-status-chip">@codeSection.Language</span>
+                        </div>
+
+                        <pre class="docs-code dojo-code__block"><code>@codeSection.Content</code></pre>
+                    </article>
+                }
+            </section>
         }
         else
         {
-            <MudPaper Elevation="0" Class="dojo-workspace__mode-panel">
-                <p class="dojo-workspace__mode-eyebrow">Docs</p>
-                <MudText Typo="Typo.h6" Class="mb-2">@CurrentExample.Title</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">@CurrentExample.Docs</MudText>
-            </MudPaper>
+            <section class="dojo-stage dojo-stage--document dojo-docs">
+                <article class="dojo-card dojo-docs__intro">
+                    <div class="dojo-card__head">
+                        <MudText Typo="Typo.h6">Overview</MudText>
+                        <span class="dojo-status-chip">@CurrentExample.Title</span>
+                    </div>
+                    <p>@CurrentExample.Docs</p>
+                </article>
+
+                @foreach (var docSection in CurrentDocSections)
+                {
+                    <article class="dojo-card dojo-docs__section">
+                        <div class="dojo-card__head">
+                            <MudText Typo="Typo.h6">@docSection.Title</MudText>
+                        </div>
+                        <p>@docSection.Body</p>
+                        @if (docSection.Bullets.Count > 0)
+                        {
+                            <ul class="dojo-docs__list">
+                                @foreach (var bullet in docSection.Bullets)
+                                {
+                                    <li>@bullet</li>
+                                }
+                            </ul>
+                        }
+                    </article>
+                }
+            </section>
         }
-    </div>
-
-    <AgentDialog @ref="_ingredientDialog"
-                 AgentId="dojo-ingredient-dialog"
-                 Visible="@_ingredientDialogVisible"
-                 VisibleChanged="OnIngredientDialogVisibleChanged">
-        <TitleContent>
-            <MudText Typo="Typo.h6">Add Ingredient</MudText>
-        </TitleContent>
-        <DialogContent>
-            <AgentForm AgentId="dojo-ingredient-form"
-                       Model="@_ingredientDraft"
-                       Submitted="OnIngredientSubmittedAsync">
-                <ChildContent Context="_">
-                    <DataAnnotationsValidator />
-                    <MudTextField T="string"
-                                  Label="Ingredient name"
-                                  For="@(() => _ingredientDraft.Name)"
-                                  @bind-Value="_ingredientDraft.Name" />
-                    <MudTextField T="string"
-                                  Label="Amount"
-                                  For="@(() => _ingredientDraft.Amount)"
-                                  @bind-Value="_ingredientDraft.Amount" />
-                    <MudCheckBox T="bool"
-                                 Label="Optional"
-                                 @bind-Value="_ingredientDraft.Optional" />
-                    <MudTextField T="string"
-                                  Label="Notes"
-                                  For="@(() => _ingredientDraft.Notes)"
-                                  @bind-Value="_ingredientDraft.Notes" />
-                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                        <MudButton ButtonType="ButtonType.Submit"
-                                   Variant="Variant.Filled"
-                                   Color="Color.Primary">
-                            Save Ingredient
-                        </MudButton>
-                    </MudStack>
-                </ChildContent>
-            </AgentForm>
-        </DialogContent>
-        <DialogActions>
-            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseIngredientDialogAsync">
-                Close
-            </MudButton>
-        </DialogActions>
-    </AgentDialog>
-
-    <AgentDialog @ref="_stepDialog"
-                 AgentId="dojo-step-dialog"
-                 Visible="@_stepDialogVisible"
-                 VisibleChanged="OnStepDialogVisibleChanged">
-        <TitleContent>
-            <MudText Typo="Typo.h6">Add Instruction Step</MudText>
-        </TitleContent>
-        <DialogContent>
-            <AgentForm AgentId="dojo-step-form"
-                       Model="@_stepDraft"
-                       Submitted="OnStepSubmittedAsync">
-                <ChildContent Context="_">
-                    <DataAnnotationsValidator />
-                    <MudTextField T="string"
-                                  Label="Step text"
-                                  Lines="3"
-                                  For="@(() => _stepDraft.Text)"
-                                  @bind-Value="_stepDraft.Text" />
-                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                        <MudButton ButtonType="ButtonType.Submit"
-                                   Variant="Variant.Filled"
-                                   Color="Color.Primary">
-                            Save Step
-                        </MudButton>
-                    </MudStack>
-                </ChildContent>
-            </AgentForm>
-        </DialogContent>
-        <DialogActions>
-            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseStepDialogAsync">
-                Close
-            </MudButton>
-        </DialogActions>
-    </AgentDialog>
+    </main>
 </div>
 
 @code {
-    protected override string AgentIdValue => "dojo-recipe-workflow";
-    protected override string FormDisplayName => "Recipe";
-
-    private static readonly ChatTheme _dojoChatTheme = new()
-    {
-        Variant = ChatThemeVariant.Light,
-        Style = ChatVisualStyle.Minimal,
-        Spacing = ChatSpacing.Compact,
-        BorderRadius = ChatBorderRadius.Large,
-        EnableGlassEffect = false,
-        AccentColor = "#ff8a57",
-        FontFamily = "\"Public Sans\", \"Segoe UI\", sans-serif",
-        FontSize = "0.93rem"
-    };
-
-    private List<DojoIngredientRow> _ingredients = [];
-    private List<string> _steps = [];
-    private List<DojoRunNote> _runNotes = [];
-
-    private AgentChatSurface? _agenticChatSurface;
-    private AgentChatSurface? _backendChatSurface;
-    private AgentChatSurface? _humanLoopChatSurface;
-    private AgentChatSurface? _agenticUiChatSurface;
-    private AgentChatSurface? _toolUiChatSurface;
-    private AgentChatSurface? _sharedStateChatSurface;
-    private AgentChatSurface? _predictiveChatSurface;
-    private string? _generatedPoemTitle;
-    private string? _generatedPoemText;
-
-    private Task TryInjectSuggestion(string text)
-    {
-        var target = _selectedExampleKey switch
-        {
-            "agentic-chat" => _agenticChatSurface,
-            "backend-tool-rendering" => _backendChatSurface,
-            "human-loop" => _humanLoopChatSurface,
-            "agentic-generative-ui" => _agenticUiChatSurface,
-            "tool-based-generative-ui" => _toolUiChatSurface,
-            "shared-state" => _sharedStateChatSurface,
-            "predictive-state" => _predictiveChatSurface,
-            _ => null
-        };
-        return target?.InjectAsync(text) ?? Task.CompletedTask;
-    }
-
-    private AgentDialog? _ingredientDialog;
-    private bool _ingredientDialogVisible;
-    private DojoIngredientDraft _ingredientDraft = new();
-    private AgentDialog? _stepDialog;
-    private bool _stepDialogVisible;
-    private DojoStepDraft _stepDraft = new();
-    private BackendToolFormModel _backendToolModel = new();
-    private DateTime? _lastSavedUtc;
-
-    private string _selectedIntegration = "Microsoft Agent Framework (.NET)";
+    private AgentChatSurface? _chatSurface;
+    private DojoIncidentModel Model { get; } = new();
     private DojoViewMode _viewMode = DojoViewMode.Preview;
-    private string _selectedExampleKey = "agentic-chat";
+    private string _selectedExampleKey = "controlled-generative-ui";
+    private DojoDeclarativeProtocol _declarativeProtocol = DojoDeclarativeProtocol.Native;
+    private OpenEndedPreset _openEndedPreset = OpenEndedPreset.Analytics;
+    private readonly List<DojoTimelineItem> _controlledLifecycle = [];
+    private AgentUiDocument _declarativeDocument = CreateNativeDeclarativeDocument();
+    private string _declarativePayload = string.Empty;
+    private string _declarativeSummary = "Native AgentUiDocument rendered with Blazor components.";
+    private bool _controlledReviewQueued;
+    private string _openEndedAppMarkup = CreateAnalyticsHostedAppMarkup();
+    private string _openEndedOriginLabel = "about:srcdoc / analytics-cockpit";
 
-    private string _backgroundStudioTheme = "neutral";
-    private string _backgroundStudioHeadline = "How can I help you today?";
-    private string _backgroundStudioBody = "Describe a UI change and the mounted Dojo component can respond instantly.";
-    private readonly IReadOnlyList<string> _backgroundStudioSuggestions = ["Change the background to coral", "Write me a short sonnet"];
-
-    private List<DojoChecklistStep> _humanLoopSteps = CreateHumanLoopSteps();
-    private string _humanLoopStatus = "Ready";
-
-    private List<DojoProgressStep> _taskProgressSteps = CreateTaskProgressSteps();
-
-    private List<DojoDocumentLine> _predictiveDocumentLines = CreatePredictiveDocumentLines();
-    private bool _predictiveHasPendingChanges = true;
-    private string _predictiveApprovalPrompt = "Do you want to accept the changes?";
-    private string _predictiveAssistantMessage =
-        "I have updated the document to make all text bold. Let me know if you need any further adjustments.";
-
-    private static readonly IReadOnlyDictionary<string, string> _exampleAliases =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["chat"] = "agentic-chat",
-            ["agentic"] = "agentic-chat",
-            ["backend"] = "backend-tool-rendering",
-            ["tools"] = "backend-tool-rendering",
-            ["hitl"] = "human-loop",
-            ["humanloop"] = "human-loop",
-            ["human"] = "human-loop",
-            ["generative"] = "agentic-generative-ui",
-            ["agenticui"] = "agentic-generative-ui",
-            ["toolui"] = "tool-based-generative-ui",
-            ["toolbased"] = "tool-based-generative-ui",
-            ["shared"] = "shared-state",
-            ["state"] = "shared-state",
-            ["predictive"] = "predictive-state"
-        };
-
-    private AgentUiDocument _toolBasedGeneratedUiDocument = CreateDefaultHaikuDocument();
-
-    private static AgentUiDocument CreateDefaultHaikuDocument() => new()
+    private DojoExampleDefinition CurrentExample => _examples.First(example => string.Equals(example.Key, _selectedExampleKey, StringComparison.Ordinal));
+    private IReadOnlyList<DojoCodeSection> CurrentCodeSections => BuildCodeSections();
+    private IReadOnlyList<DojoDocSection> CurrentDocSections => BuildDocSections();
+    private string DeclarativeProtocolLabel => _declarativeProtocol switch
     {
-        Blocks =
-        [
-            new AgentUiBlock
-            {
-                Id = "haiku-card",
-                Kind = AgentUiBlockKind.Card,
-                Title = "Blue sky above",
-                Description = "Tool-based generated card output.",
-                Actions =
-                [
-                    new AgentUiAction
-                    {
-                        Id = "add_chives",
-                        Label = "Add Chives",
-                        Prompt = "add ingredient chives amount 1 tbsp optional true"
-                    }
-                ]
-            },
-            new AgentUiBlock
-            {
-                Id = "haiku-table",
-                Kind = AgentUiBlockKind.Table,
-                Title = "Haiku Segments",
-                Columns =
-                [
-                    new AgentUiTableColumn { Key = "line", Header = "Line" },
-                    new AgentUiTableColumn { Key = "translation", Header = "Translation" }
-                ],
-                Rows =
-                [
-                    new Dictionary<string, object?> { ["line"] = "Blue sky above", ["translation"] = "Calm opening line" },
-                    new Dictionary<string, object?> { ["line"] = "Stream's gentle murmuring", ["translation"] = "Quiet motion" },
-                    new Dictionary<string, object?> { ["line"] = "Trees dance in rhythm", ["translation"] = "Closing image" }
-                ]
-            }
-        ]
+        DojoDeclarativeProtocol.A2Ui => "Imported from A2UI",
+        DojoDeclarativeProtocol.OpenJsonUi => "Imported from Open-JSON-UI",
+        _ => "Native AgentUiDocument"
     };
-
+    private string DeclarativePreviewTitle => _declarativeProtocol switch
+    {
+        DojoDeclarativeProtocol.A2Ui => "Imported from A2UI",
+        DojoDeclarativeProtocol.OpenJsonUi => "Imported from Open-JSON-UI",
+        _ => "Blazor-Rendered Generative UI"
+    };
     private static readonly IReadOnlyList<DojoExampleDefinition> _examples =
     [
         new(
-            "agentic-chat",
-            "Agentic Chat",
-            "Chat with your Copilot and call front-end tools.",
-            ["Chat", "Tools", "Streaming"],
-            ["change the background to coral", "write me a short sonnet"],
-            "<AgentChatSurface LockAgentToCurrentRoute=\"true\" />",
-            "Agentic chat keeps the canvas minimal and lets the assistant manipulate mounted UI in place."),
+            "controlled-generative-ui",
+            "Controlled Generative UI",
+            "Prebuilt Blazor UI selected and driven by the agent.",
+            "Prebuilt UI, agent-selected actions",
+            "The host owns the layout and lifecycle. The agent can only update known fields and trigger known actions.",
+            "Controlled generative UI is the highest-control pattern: the UI is authored in Blazor and MudBlazor, and the agent only chooses from exposed actions. This is the right fit for workflows like incident review, approvals, and operator handoff where layout, validation, and lifecycle must stay deterministic.",
+            "Try: make this a P1 checkout incident",
+            ["AG-UI", "Blazor", "High control"],
+            ["make this a P1 checkout incident", "assign the draft to Ash", "queue review"]),
         new(
-            "backend-tool-rendering",
-            "Backend Tool Rendering",
-            "Render and stream your backend tools to the frontend.",
-            ["Agent State", "Collaborating"],
-            ["set action label to policy review", "submit the backend demo form", "show latest tool execution"],
-            "<AgentToolRender ToolId=\"AgentForm.submit\">...</AgentToolRender>",
-            "Backend tool rendering shows tool lifecycle updates in the chat and the canvas itself."),
+            "declarative-generative-ui",
+            "Declarative Generative UI",
+            "Import open declarative payloads and render them with native Blazor components.",
+            "One renderer, multiple open specs",
+            "AgentBlazor keeps a native Blazor renderer and imports A2UI or Open-JSON-UI payloads into one internal document model.",
+            "Declarative generative UI lets the agent return a structured UI description instead of choosing a fully prebuilt screen. In AgentBlazor, open schemas like A2UI and Open-JSON-UI are adapter inputs, while the actual renderer stays Blazor-native so styling, theming, and action wiring remain consistent.",
+            "Try: switch to a2ui import",
+            ["Declarative UI", "A2UI", "Open-JSON-UI"],
+            ["switch to a2ui import", "switch to open-json-ui import", "switch back to native"]),
         new(
-            "human-loop",
-            "Human in the loop",
-            "Plan a task together and direct the Copilot to take the right steps.",
-            ["HITL", "Interactivity"],
-            ["plan a pizza night for 4 people", "plan a hiking trip to the mountains"],
-            "<AgentChatSurface RequireHandoffApproval=\"true\" />",
-            "Human-in-the-loop mode keeps approval-sensitive actions visible in a single checklist flow."),
-        new(
-            "agentic-generative-ui",
-            "Agentic Generative UI",
-            "Assign a long running task to your Copilot and see how it performs.",
-            ["Generative ui (agent)", "Long running task"],
-            ["plan a vacation to Japan", "mark travel task 6 complete", "complete the next task"],
-            "<AgentChatSurface EnableGeneratedUi=\"true\" />",
-            "Agentic generative UI pairs a persistent progress artifact with generated assistant output."),
-        new(
-            "tool-based-generative-ui",
-            "Tool Based Generative UI",
-            "Tool-based generated interfaces rendered from tool output.",
-            ["Generative ui (action)", "Tools"],
-            ["Write me a haiku about nature", "Generate a haiku about autumn rain", "Create a haiku about the ocean"],
-            "<AgentGenerativeSurface Document=\"generatedUi\" />",
-            "Tool-based generative UI renders deterministic blocks and forwards actions back into the runtime."),
-        new(
-            "shared-state",
-            "Shared State between agent and UI",
-            "A recipe Copilot which reads and updates collaboratively.",
-            ["Agent State", "Collaborating"],
-            ["set recipe title to classic omelette", "add ingredient onion amount 1 small", "submit recipe form"],
-            "<AgentForm AgentId=\"dojo-recipe-form\" />",
-            "Shared state keeps form fields, ingredient cards, and assistant actions synchronized."),
-        new(
-            "predictive-state",
-            "Predictive State Updates",
-            "Use collaboration to edit a document in real time with your Copilot.",
-            ["State", "Streaming", "Tools"],
-            ["make all bold", "rewrite the story in a more professional tone", "confirm document changes"],
-            "<AgentChatSurface EnableGeneratedUi=\"true\" />",
-            "Predictive state updates surface pending edits and approval in the same workspace.")
+            "open-ended-generative-ui",
+            "Open-ended Generative UI",
+            "Host a larger app-like surface inside the Blazor shell.",
+            "Hosted app surface inside Blazor",
+            "Use this when the agent needs to swap between broader app experiences instead of a constrained card or form.",
+            "Open-ended generative UI treats the Blazor app as the host shell and lets the agent switch between broader app surfaces while maintaining sandboxing and framing. This is the lowest-control mode and should be used when a card or declarative surface is no longer enough.",
+            "Try: switch to planner workspace",
+            ["Hosted app", "Sandboxed", "Low control"],
+            ["open the analytics cockpit", "switch to planner workspace", "switch to support workspace"])
     ];
 
-    private DojoExampleDefinition CurrentExample =>
-        _examples.FirstOrDefault(x => string.Equals(x.Key, _selectedExampleKey, StringComparison.OrdinalIgnoreCase))
-        ?? _examples[0];
+    [AgentReadable("Currently selected dojo pillar.")]
+    public string SelectedPillar => _selectedExampleKey;
 
-    private string CurrentViewLabel => _viewMode switch
+    [AgentReadable("Current controlled incident title.")]
+    public string Incident => Model.Incident;
+
+    [AgentReadable("Current controlled incident severity.")]
+    public string Severity => Model.Severity;
+
+    [AgentReadable("Current controlled incident owner.")]
+    public string Owner => Model.Owner;
+
+    [AgentReadable("Current controlled incident next step.")]
+    public string NextStep => Model.NextStep;
+
+    [AgentReadable("Current review state.")]
+    public string ReviewState => _controlledReviewQueued ? "review queued" : "draft";
+
+    protected override void OnInitialized()
     {
-        DojoViewMode.Code => "Code",
-        DojoViewMode.Docs => "Docs",
-        _ => "Preview"
-    };
-
-    private bool ShowExampleHero => !(_viewMode == DojoViewMode.Preview && IsExample("agentic-chat"));
-
-    private string WorkspaceSessionId => ComponentRegistry.SessionId;
-
-    private string BackgroundCanvasStyle => _backgroundStudioTheme switch
-    {
-        "coral" => "background: linear-gradient(180deg, #ea8b68, #f2b68c);",
-        "ocean" => "background: linear-gradient(180deg, #67a8cf, #98dfd0);",
-        "forest" => "background: linear-gradient(180deg, #4d8865, #93c08a);",
-        _ => "background: linear-gradient(180deg, #f5f2ef, #efebe6);"
-    };
-
-    private string LastSavedLabel =>
-        _lastSavedUtc is null
-            ? "Not saved yet"
-            : _lastSavedUtc.Value.ToLocalTime().ToString("HH:mm:ss");
-
-    private int SelectedSandwichStepCount => _humanLoopSteps.Count(x => x.Selected);
-
-    private int SandwichSelectionProgress =>
-        _humanLoopSteps.Count == 0 ? 0 : (int)Math.Round(SelectedSandwichStepCount * 100d / _humanLoopSteps.Count);
-
-    private int CompletedTaskCount => _taskProgressSteps.Count(x => x.Completed);
-
-    private int TaskCompletionProgress =>
-        _taskProgressSteps.Count == 0 ? 0 : (int)Math.Round(CompletedTaskCount * 100d / _taskProgressSteps.Count);
-
-    private IReadOnlyList<DojoRunNote> ToolExecutionNotes =>
-        _runNotes
-            .Where(note => note.Message.Contains("submit", StringComparison.OrdinalIgnoreCase) ||
-                           note.Message.Contains("tool", StringComparison.OrdinalIgnoreCase) ||
-                           note.Message.Contains("Applied:", StringComparison.OrdinalIgnoreCase))
-            .TakeLast(3)
-            .ToArray();
-
-    private bool CanUseAgenticChatActions => IsExample("agentic-chat");
-    private bool CanUseHumanLoopActions => IsExample("human-loop");
-    private bool CanUseTaskProgressActions => IsExample("agentic-generative-ui");
-    private bool CanUsePredictiveDocumentActions => IsExample("predictive-state");
-    private bool CanUseToolBasedGenerativeUiActions => IsExample("tool-based-generative-ui");
-
-    [AgentReadable("Current dojo example key.")]
-    public string SelectedDojoExampleKey => _selectedExampleKey;
-
-    [AgentReadable("Current dojo view mode.")]
-    public string SelectedDojoViewMode => ToViewModeKey(_viewMode);
-
-    [AgentReadable("Current dojo integration selector value.")]
-    public string SelectedDojoIntegration => _selectedIntegration;
-
-    [AgentReadable("Current background canvas theme.")]
-    public string BackgroundCanvasTheme => _backgroundStudioTheme;
-
-    [AgentReadable("Current sandwich checklist status.")]
-    public string HumanLoopStatus => _humanLoopStatus;
-
-    [AgentReadable("Current predictive document approval state.")]
-    public string PredictiveApprovalState => _predictiveHasPendingChanges ? "pending" : "resolved";
-
-    protected override async Task OnInitializedAsync()
-    {
-        _selectedIntegration = DojoExperience.SelectedIntegration;
-        _selectedExampleKey = ResolveExampleKey(DojoExperience.SelectedExampleKey) ?? "agentic-chat";
-        _viewMode = ParseViewMode(DojoExperience.SelectedViewMode);
-        SyncDojoExperienceState();
-        await LoadSnapshotAsync();
+        base.OnInitialized();
+        RefreshDeclarativeDemo();
+        RefreshOpenEndedDemo();
     }
 
-    [AgentAction("Select dojo example by key or title without route navigation.")]
-    public async Task<ActionResult> SetDojoExample(
-        [AgentParam("Example key/title.", Required = true)]
-        string example)
-    {
-        var resolved = ResolveExampleKey(example);
-        if (resolved is null)
-        {
-            return ActionResult.NeedsClarification(
-                $"Unknown dojo example '{example}'. Use one of: {string.Join(", ", _examples.Select(x => x.Key))}.");
-        }
 
-        _selectedExampleKey = resolved;
-        _viewMode = DojoViewMode.Preview;
-        SyncDojoExperienceState();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Selected dojo example '{resolved}'.");
-    }
 
-    [AgentAction("Switch dojo view mode between preview, code, and docs.")]
-    public async Task<ActionResult> SetDojoView(
-        [AgentParam("View mode value.", Required = true, AllowedValues = "preview,code,docs")]
-        string viewMode)
-    {
-        if (!TryParseViewMode(viewMode, out var resolvedMode))
-        {
-            return ActionResult.NeedsClarification("Unknown view mode. Use preview, code, or docs.");
-        }
 
-        _viewMode = resolvedMode;
-        SyncDojoExperienceState();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Switched dojo view to {ToViewModeKey(resolvedMode)}.");
-    }
-
-    [AgentAction("Set dojo integration selector value.")]
-    public async Task<ActionResult> SetDojoIntegration(
-        [AgentParam("Integration name.", Required = true)]
-        string integration)
-    {
-        if (string.IsNullOrWhiteSpace(integration))
-        {
-            return ActionResult.NeedsClarification("Provide an integration name.");
-        }
-
-        _selectedIntegration = integration.Trim();
-        SyncDojoExperienceState();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Integration set to {_selectedIntegration}.");
-    }
-
-    [AgentAction("Change the background theme for the agentic chat canvas.",
-        AvailableWhen = nameof(CanUseAgenticChatActions),
-        Instructions = "ALWAYS call this when the user asks to change the background color. Keep message to one brief sentence only.")]
-    public async Task<ActionResult> ChangeCanvasBackground(
-        [AgentParam("Theme name.", Required = true, AllowedValues = "neutral,coral,ocean,forest")]
-        string theme)
-    {
-        var normalized = theme.Trim().ToLowerInvariant();
-        if (normalized is not ("neutral" or "coral" or "ocean" or "forest"))
-        {
-            return ActionResult.NeedsClarification("Use neutral, coral, ocean, or forest.");
-        }
-
-        _backgroundStudioTheme = normalized;
-        _backgroundStudioBody = normalized switch
-        {
-            "coral" => "The background has been updated to a coral-to-peach gradient.",
-            "ocean" => "The background now uses an ocean blue to seafoam gradient.",
-            "forest" => "The background now uses a forest green gradient with softer contrast.",
-            _ => "The background has been reset to a neutral editorial canvas."
-        };
-
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Updated the chat canvas background to {normalized}.");
-    }
-
-    [AgentAction("Set the headline text for the agentic chat canvas.",
-        AvailableWhen = nameof(CanUseAgenticChatActions),
-        Instructions = "ALWAYS call this when the user asks to update the headline or title text. Keep message to one brief sentence.")]
-    public async Task<ActionResult> SetCanvasHeadline(
-        [AgentParam("Headline text.", Required = true)]
-        string headline)
-    {
-        if (string.IsNullOrWhiteSpace(headline))
-        {
-            return ActionResult.NeedsClarification("Provide headline text.");
-        }
-
-        _backgroundStudioHeadline = headline.Trim();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Set the canvas headline to '{_backgroundStudioHeadline}'.");
-    }
-
-    private Task InjectAgenticChatSuggestion(string text)
-        => _agenticChatSurface?.InjectAsync(text) ?? Task.CompletedTask;
-
-    [AgentAction("Generate a short poem or sonnet and display it on the agentic chat canvas.",
-        AvailableWhen = nameof(CanUseAgenticChatActions),
-        Instructions = "ALWAYS call this when the user asks for a poem, sonnet, verse, or any creative writing. NEVER write the poem text in the message field — the action renders it on the canvas. Message: ONLY one brief sentence, e.g. 'Displaying your sonnet on the canvas.'")]
-    public async Task<ActionResult> GeneratePoem(
-        [AgentParam("Optional poem title.")] string? title,
-        [AgentParam("The poem text (6-14 lines).", Required = true)] string poem)
-    {
-        _generatedPoemTitle = title?.Trim();
-        _generatedPoemText = poem?.Trim();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Poem displayed on the canvas.");
-    }
-
-    [AgentAction("Generate a haiku and update the generative UI surface with the haiku lines and translations.",
-        AvailableWhen = nameof(CanUseToolBasedGenerativeUiActions),
-        Instructions = "ALWAYS call this when the user asks for a haiku. Each line MUST follow 5-7-5 syllable structure. NEVER write the haiku lines in the message — the action renders them. Message: ONLY 'Haiku rendered on the canvas.'")]
-    public async Task<ActionResult> GenerateHaiku(
-        [AgentParam("Haiku topic/title.", Required = true)] string topic,
-        [AgentParam("Line 1 of the haiku.", Required = true)] string line1,
-        [AgentParam("English translation of line 1.", Required = true)] string line1Translation,
-        [AgentParam("Line 2 of the haiku.", Required = true)] string line2,
-        [AgentParam("English translation of line 2.", Required = true)] string line2Translation,
-        [AgentParam("Line 3 of the haiku.", Required = true)] string line3,
-        [AgentParam("English translation of line 3.", Required = true)] string line3Translation)
-    {
-        _toolBasedGeneratedUiDocument = new AgentUiDocument
-        {
-            Blocks =
-            [
-                new AgentUiBlock
-                {
-                    Id = "haiku-card",
-                    Kind = AgentUiBlockKind.Card,
-                    Title = topic,
-                    Description = $"{line1}\n{line2}\n{line3}"
-                },
-                new AgentUiBlock
-                {
-                    Id = "haiku-table",
-                    Kind = AgentUiBlockKind.Table,
-                    Title = "Haiku Lines",
-                    Columns =
-                    [
-                        new AgentUiTableColumn { Key = "line", Header = "Line" },
-                        new AgentUiTableColumn { Key = "translation", Header = "Translation" }
-                    ],
-                    Rows =
-                    [
-                        new Dictionary<string, object?> { ["line"] = line1, ["translation"] = line1Translation },
-                        new Dictionary<string, object?> { ["line"] = line2, ["translation"] = line2Translation },
-                        new Dictionary<string, object?> { ["line"] = line3, ["translation"] = line3Translation }
-                    ]
-                }
-            ]
-        };
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Haiku about '{topic}' rendered in the generative surface.");
-    }
-
-    [AgentAction("Prepare a sandwich plan with the standard steps selected.", AvailableWhen = nameof(CanUseHumanLoopActions))]
-    public async Task<ActionResult> PrepareSandwichPlan()
-    {
-        _humanLoopSteps = CreateHumanLoopSteps();
-        _humanLoopStatus = "Ready";
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Prepared the sandwich checklist with the default steps.");
-    }
-
-    [AgentAction("Set the human-in-the-loop checklist steps for any task.",
-        AvailableWhen = nameof(CanUseHumanLoopActions),
-        Instructions = "ALWAYS call this for ANY task request (pizza, hiking, coding, travel, etc.). Provide 3-10 concrete steps. Do not use the old sandwich-specific action.")]
-    public async Task<ActionResult> SetTaskPlan(
-        [AgentParam("Short name of the task.", Required = true)] string taskName,
-        [AgentParam("Array of step descriptions (3-10 items).", Required = true)] string[] steps)
-    {
-        if (steps is null || steps.Length == 0)
-            return ActionResult.NeedsClarification("Provide at least one step.");
-
-        _humanLoopSteps = steps
-            .Select((text, idx) => new DojoChecklistStep(idx + 1, text.Trim(), true))
-            .ToList();
-        _humanLoopStatus = "Ready";
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Checklist set for task '{taskName}' with {steps.Length} steps.");
-    }
-
-    [AgentAction("Toggle a sandwich checklist step by number.", AvailableWhen = nameof(CanUseHumanLoopActions))]
-    public async Task<ActionResult> ToggleSandwichStepSelection(
-        [AgentParam("Step number.", Required = true)]
-        int stepNumber,
-        [AgentParam("Whether the step should be selected.")]
-        bool selected = true)
-    {
-        var step = _humanLoopSteps.FirstOrDefault(x => x.Number == stepNumber);
-        if (step is null)
-        {
-            return ActionResult.NeedsClarification("Unknown sandwich step number.");
-        }
-
-        step.Selected = selected;
-        _humanLoopStatus = SelectedSandwichStepCount == _humanLoopSteps.Count ? "Ready" : "Review";
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Updated sandwich step {stepNumber} selection to {selected}.");
-    }
-
-    [AgentAction("Finalize the selected sandwich steps after approval.", RequiresApproval = true, AvailableWhen = nameof(CanUseHumanLoopActions))]
-    public async Task<ActionResult> FinalizeSandwichPlan()
-    {
-        _humanLoopStatus = "Confirmed";
-        await WorkspaceService.AppendRunNoteAsync(
-            WorkspaceSessionId,
-            $"Confirmed {SelectedSandwichStepCount} sandwich steps.",
-            DateTime.UtcNow,
-            CancellationToken.None);
-        await LoadSnapshotAsync();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Finalized the sandwich plan.");
-    }
-
-    [AgentAction("Plan a travel workflow and populate the long-running task board.",
-        AvailableWhen = nameof(CanUseTaskProgressActions),
-        Instructions = "ALWAYS call this when the user describes a travel destination. Then use complete_next_task to advance one step at a time. Narrate each step as if actually executing it.")]
-    public async Task<ActionResult> PlanTravelWorkflow(
-        [AgentParam("Destination name.")]
-        string? destination = null)
-    {
-        var place = string.IsNullOrWhiteSpace(destination) ? "Japan" : destination.Trim();
-        _taskProgressSteps = CreateTaskProgressSteps(place);
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Prepared the task progress board for travel to {place}.");
-    }
-
-    [AgentAction("Mark a travel task complete by number.", AvailableWhen = nameof(CanUseTaskProgressActions))]
-    public async Task<ActionResult> MarkTravelTaskComplete(
-        [AgentParam("Task number.", Required = true)]
-        int taskNumber,
-        [AgentParam("Whether the task is complete.")]
-        bool completed = true)
-    {
-        var step = _taskProgressSteps.FirstOrDefault(x => x.Number == taskNumber);
-        if (step is null)
-        {
-            return ActionResult.NeedsClarification("Unknown task number.");
-        }
-
-        step.Completed = completed;
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Marked travel task {taskNumber} as {(completed ? "complete" : "incomplete")}.");
-    }
-
-    [AgentAction("Complete the next unfinished travel task.", AvailableWhen = nameof(CanUseTaskProgressActions))]
-    public async Task<ActionResult> CompleteNextTask()
-    {
-        var next = _taskProgressSteps.FirstOrDefault(x => !x.Completed);
-        if (next is null)
-        {
-            return ActionResult.Applied("All travel tasks are already complete.");
-        }
-
-        next.Completed = true;
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Completed task {next.Number}: {next.Text}");
-    }
-
-    [AgentAction("Apply an editorial instruction to the predictive document.",
-        AvailableWhen = nameof(CanUsePredictiveDocumentActions),
-        Instructions = "ALWAYS call this for any document edit request ('make all bold', 'rewrite in professional tone', 'summarize'). Message: 'Applying edits — review the preview and confirm or reject.'")]
-    public async Task<ActionResult> ApplyPredictiveDocumentInstruction(
-        [AgentParam("Editing instruction.", Required = true)]
-        string instruction)
-    {
-        if (string.IsNullOrWhiteSpace(instruction))
-        {
-            return ActionResult.NeedsClarification("Provide an editing instruction.");
-        }
-
-        var normalized = instruction.Trim();
-        _predictiveHasPendingChanges = true;
-        _predictiveApprovalPrompt = "Do you want to accept the changes?";
-        _predictiveAssistantMessage = $"I have updated the document to '{normalized}'. Let me know if you need any further adjustments.";
-
-        if (normalized.Contains("bold", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var line in _predictiveDocumentLines)
-            {
-                if (line.Kind == DojoDocumentLineKind.Accepted)
-                {
-                    line.Text = $"**{line.Text.Trim('*')}**";
-                }
-            }
-        }
-
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied($"Applied the predictive document instruction '{normalized}'.");
-    }
-
-    [AgentAction("Confirm the pending predictive document changes.",
-        RequiresApproval = true,
-        AvailableWhen = nameof(CanUsePredictiveDocumentActions),
-        Instructions = "ALWAYS call this when the user accepts the changes (resolves the pending-changes banner). Requires approval.")]
-    public async Task<ActionResult> ConfirmPredictiveDocumentChanges()
-    {
-        _predictiveHasPendingChanges = false;
-        _predictiveAssistantMessage = "The predictive changes have been confirmed and the document state is now stable.";
-        await WorkspaceService.AppendRunNoteAsync(
-            WorkspaceSessionId,
-            "Confirmed predictive document changes.",
-            DateTime.UtcNow,
-            CancellationToken.None);
-        await LoadSnapshotAsync();
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Confirmed predictive document changes.");
-    }
-
-    [AgentAction("Reject the pending predictive document changes.", AvailableWhen = nameof(CanUsePredictiveDocumentActions))]
-    public async Task<ActionResult> RejectPredictiveDocumentChanges()
-    {
-        _predictiveHasPendingChanges = false;
-        _predictiveAssistantMessage = "The pending predictive changes were rejected.";
-        await RequestComponentRefreshAsync();
-        return ActionResult.Applied("Rejected predictive document changes.");
-    }
-
-    private Task OnIntegrationChanged(string value)
-    {
-        _selectedIntegration = value;
-        DojoExperience.SetIntegration(value);
-        return Task.CompletedTask;
-    }
+    private bool IsSelectedExample(string key) => string.Equals(_selectedExampleKey, key, StringComparison.Ordinal);
+    private bool IsExample(string key) => IsSelectedExample(key);
+    private bool IsViewMode(DojoViewMode mode) => _viewMode == mode;
+    private bool IsDeclarativeProtocol(DojoDeclarativeProtocol protocol) => _declarativeProtocol == protocol;
+    private bool CanUseControlledActions() => IsExample("controlled-generative-ui");
+    private bool CanUseDeclarativeActions() => IsExample("declarative-generative-ui");
+    private bool CanUseOpenEndedActions() => IsExample("open-ended-generative-ui");
 
     private void SelectExample(string key)
     {
-        _selectedExampleKey = ResolveExampleKey(key) ?? "agentic-chat";
-        _viewMode = DojoViewMode.Preview;
-        SyncDojoExperienceState();
+        _selectedExampleKey = key;
     }
 
     private void SetViewMode(DojoViewMode mode)
     {
         _viewMode = mode;
-        DojoExperience.SetViewMode(ToViewModeKey(mode));
     }
 
-    private bool IsSelectedExample(string key) =>
-        string.Equals(_selectedExampleKey, key, StringComparison.OrdinalIgnoreCase);
-
-    private bool IsViewMode(DojoViewMode mode) => _viewMode == mode;
-
-    private bool IsExample(string key) =>
-        string.Equals(_selectedExampleKey, key, StringComparison.OrdinalIgnoreCase);
-
-    private async Task OnRecipeSubmittedAsync()
+    private async Task InjectPromptAsync(string prompt)
     {
-        var snapshot = await WorkspaceService.SaveRecipeAsync(WorkspaceSessionId, Model, CancellationToken.None);
-        ApplySnapshot(snapshot);
-        Snackbar.Add("Recipe draft saved.", Severity.Success);
-    }
-
-    private void ShowAssistantTip()
-    {
-        Snackbar.Add("Use the embedded assistant to improve the recipe from the current Dojo mode.", Severity.Normal);
-    }
-
-    private async Task OpenIngredientDialogAsync()
-    {
-        _ingredientDraft = new DojoIngredientDraft();
-        _ingredientDialogVisible = true;
-        if (_ingredientDialog is not null)
-        {
-            await _ingredientDialog.Open();
-        }
-    }
-
-    private async Task CloseIngredientDialogAsync()
-    {
-        _ingredientDialogVisible = false;
-        if (_ingredientDialog is not null)
-        {
-            await _ingredientDialog.Close();
-        }
-    }
-
-    private Task OnIngredientDialogVisibleChanged(bool visible)
-    {
-        _ingredientDialogVisible = visible;
-        return Task.CompletedTask;
-    }
-
-    private async Task OnIngredientSubmittedAsync()
-    {
-        var snapshot = await WorkspaceService.AddIngredientAsync(WorkspaceSessionId, _ingredientDraft, CancellationToken.None);
-        ApplySnapshot(snapshot);
-        Snackbar.Add($"Added ingredient: {_ingredientDraft.Name.Trim()}", Severity.Success);
-        await CloseIngredientDialogAsync();
-    }
-
-    private async Task OpenStepDialogAsync()
-    {
-        _stepDraft = new DojoStepDraft();
-        _stepDialogVisible = true;
-        if (_stepDialog is not null)
-        {
-            await _stepDialog.Open();
-        }
-    }
-
-    private async Task CloseStepDialogAsync()
-    {
-        _stepDialogVisible = false;
-        if (_stepDialog is not null)
-        {
-            await _stepDialog.Close();
-        }
-    }
-
-    private Task OnStepDialogVisibleChanged(bool visible)
-    {
-        _stepDialogVisible = visible;
-        return Task.CompletedTask;
-    }
-
-    private async Task OnStepSubmittedAsync()
-    {
-        var snapshot = await WorkspaceService.AddStepAsync(WorkspaceSessionId, _stepDraft, CancellationToken.None);
-        ApplySnapshot(snapshot);
-        Snackbar.Add($"Added step {_steps.Count}.", Severity.Success);
-        await CloseStepDialogAsync();
-    }
-
-    private async Task OnBackendToolSubmittedAsync()
-    {
-        var actionLabel = string.IsNullOrWhiteSpace(_backendToolModel.ActionLabel)
-            ? "unnamed action"
-            : _backendToolModel.ActionLabel.Trim();
-        var operatorName = string.IsNullOrWhiteSpace(_backendToolModel.Operator)
-            ? "unknown operator"
-            : _backendToolModel.Operator.Trim();
-
-        await WorkspaceService.AppendRunNoteAsync(
-            WorkspaceSessionId,
-            $"Backend tool submit '{actionLabel}' by {operatorName}.",
-            DateTime.UtcNow,
-            CancellationToken.None);
-
-        await LoadSnapshotAsync();
-        Snackbar.Add("Backend demo action submitted.", Severity.Success);
-    }
-
-    private async Task OnGeneratedUiActionInvokedAsync(AgentUiActionInvocation invocation)
-    {
-        await WorkspaceService.AppendRunNoteAsync(
-            WorkspaceSessionId,
-            $"Generated UI action invoked: {invocation.BlockId}.{invocation.Action.Id}.",
-            DateTime.UtcNow,
-            CancellationToken.None);
-
-        await LoadSnapshotAsync();
-    }
-
-    private async Task OnGeneratedUiRuntimeResponseAsync(AgentTurnResponse response)
-    {
-        if (!string.IsNullOrWhiteSpace(response.ResponseText))
-        {
-            await WorkspaceService.AppendRunNoteAsync(
-                WorkspaceSessionId,
-                $"Generated UI runtime response: {response.ResponseText}",
-                DateTime.UtcNow,
-                CancellationToken.None);
-            await LoadSnapshotAsync();
-        }
-    }
-
-    private Task OnGeneratedUiErrorAsync(Exception exception)
-    {
-        Snackbar.Add($"Generated UI action failed: {exception.Message}", Severity.Error);
-        return Task.CompletedTask;
-    }
-
-    private void ToggleSandwichStep(int stepNumber)
-    {
-        var step = _humanLoopSteps.FirstOrDefault(x => x.Number == stepNumber);
-        if (step is null)
+        if (_chatSurface is null)
         {
             return;
         }
 
-        step.Selected = !step.Selected;
-        _humanLoopStatus = SelectedSandwichStepCount == _humanLoopSteps.Count ? "Ready" : "Review";
+        await _chatSurface.InjectAsync(prompt);
     }
 
-    private void ConfirmPredictiveChangesFromUi()
+    private async Task QueueControlledReviewFromUiAsync()
     {
-        _predictiveHasPendingChanges = false;
-        _predictiveAssistantMessage = "The predictive changes have been confirmed and applied to the document.";
+        await QueueControlledIncidentReview();
     }
 
-    private void RejectPredictiveChanges()
+    [AgentAction("Select the dojo pillar to display.", ActionId = "select_dojo_pillar", FollowUp = false)]
+    public Task SelectDojoPillar(
+        [AgentParam("One of: controlled-generative-ui, declarative-generative-ui, open-ended-generative-ui")] string pillar)
     {
-        _predictiveHasPendingChanges = false;
-        _predictiveAssistantMessage = "The predictive changes were rejected from the Dojo approval card.";
+        var normalized = NormalizeToken(pillar);
+        _selectedExampleKey = normalized switch
+        {
+            "controlled" or "controlledgenerativeui" => "controlled-generative-ui",
+            "declarative" or "declarativegenerativeui" => "declarative-generative-ui",
+            "openended" or "openendedgenerativeui" or "hostedapp" => "open-ended-generative-ui",
+            _ => _selectedExampleKey
+        };
+
+        return RequestComponentRefreshAsync();
     }
 
-    private async Task LoadSnapshotAsync()
+    [AgentAction("Switch the dojo view between preview, code, and docs.", ActionId = "set_dojo_view", FollowUp = false)]
+    public Task SetDojoView([AgentParam("preview, code, or docs")] string view)
     {
-        var snapshot = await WorkspaceService.GetSnapshotAsync(WorkspaceSessionId, CancellationToken.None);
-        ApplySnapshot(snapshot);
-    }
-
-    private void ApplySnapshot(DojoWorkspaceSnapshot snapshot)
-    {
-        Model = snapshot.Recipe;
-        _ingredients = snapshot.Ingredients.ToList();
-        _steps = snapshot.Steps.ToList();
-        _runNotes = snapshot.RunNotes.ToList();
-        _lastSavedUtc = snapshot.LastSavedUtc;
-    }
-
-    private void SyncDojoExperienceState()
-    {
-        DojoExperience.SetIntegration(_selectedIntegration);
-        DojoExperience.SetExample(_selectedExampleKey);
-        DojoExperience.SetViewMode(ToViewModeKey(_viewMode));
-    }
-
-    private static string ToViewModeKey(DojoViewMode viewMode) => viewMode switch
-    {
-        DojoViewMode.Code => "code",
-        DojoViewMode.Docs => "docs",
-        _ => "preview"
-    };
-
-    private static DojoViewMode ParseViewMode(string? value)
-    {
-        return value?.Trim().ToLowerInvariant() switch
+        _viewMode = NormalizeToken(view) switch
         {
             "code" => DojoViewMode.Code,
             "docs" => DojoViewMode.Docs,
             _ => DojoViewMode.Preview
         };
+
+        return RequestComponentRefreshAsync();
     }
 
-    private static bool TryParseViewMode(string? value, out DojoViewMode mode)
+    [AgentAction(
+        "Update the controlled incident draft.",
+        ActionId = "update_controlled_incident_draft",
+        AvailableWhen = nameof(CanUseControlledActions),
+        Instructions = "ALWAYS use this action to change the controlled incident title, severity, owner, or next step. If the user names a new incident domain or summary like checkout, payments, latency, or support, update the incident title to match that new incident. NEVER invent another component id or field-specific action."
+    )]
+    public Task UpdateControlledIncidentDraft(
+        [AgentParam("Incident title, for example 'Checkout latency spike'.")] string? incident = null,
+        [AgentParam("Severity: P1, P2, or P3.")] string? severity = null,
+        [AgentParam("Owner name.")] string? owner = null,
+        [AgentParam("Next operational step.")] string? nextStep = null)
     {
-        if (string.Equals(value, "code", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(incident))
         {
-            mode = DojoViewMode.Code;
-            return true;
+            Model.Incident = incident.Trim();
         }
 
-        if (string.Equals(value, "docs", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(severity))
         {
-            mode = DojoViewMode.Docs;
-            return true;
+            Model.Severity = severity.Trim().ToUpperInvariant();
         }
 
-        if (string.Equals(value, "preview", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(owner))
         {
-            mode = DojoViewMode.Preview;
-            return true;
+            Model.Owner = owner.Trim();
         }
 
-        mode = DojoViewMode.Preview;
-        return false;
+        if (!string.IsNullOrWhiteSpace(nextStep))
+        {
+            Model.NextStep = nextStep.Trim();
+        }
+
+        _controlledReviewQueued = false;
+        AppendControlledLifecycle("Draft updated.");
+        return RequestComponentRefreshAsync();
     }
 
-    private static string? ResolveExampleKey(string? hint)
+    [AgentAction(
+        "Assign the controlled incident draft to an owner.",
+        ActionId = "assign_draft",
+        AvailableWhen = nameof(CanUseControlledActions),
+        Instructions = "ALWAYS use this action when the user says assign the draft to someone."
+    )]
+    public Task AssignDraft([AgentParam("Owner name.")] string assignee)
+        => UpdateControlledIncidentDraft(owner: assignee);
+
+    [AgentAction(
+        "Set the controlled incident owner.",
+        ActionId = "fill_owner",
+        AvailableWhen = nameof(CanUseControlledActions),
+        Instructions = "ALWAYS use this action when the user says change owner to someone."
+    )]
+    public Task FillOwner([AgentParam("Owner name.")] string owner)
+        => UpdateControlledIncidentDraft(owner: owner);
+
+    [AgentAction(
+        "Queue the current incident draft for review.",
+        ActionId = "queue_controlled_incident_review",
+        AvailableWhen = nameof(CanUseControlledActions),
+        Instructions = "ALWAYS use this action when the user asks to submit, queue, or send the review."
+    )]
+    public Task QueueControlledIncidentReview()
     {
-        if (string.IsNullOrWhiteSpace(hint))
-        {
-            return null;
-        }
+        _controlledReviewQueued = true;
+        AppendControlledLifecycle($"Review queued for {Model.Owner}.");
+        return RequestComponentRefreshAsync();
+    }
 
-        var trimmed = hint.Trim();
-        var direct = _examples.FirstOrDefault(x => string.Equals(x.Key, trimmed, StringComparison.OrdinalIgnoreCase));
-        if (direct is not null)
+    [AgentAction(
+        "Switch the declarative demo protocol.",
+        ActionId = "switch_declarative_protocol",
+        AvailableWhen = nameof(CanUseDeclarativeActions),
+        FollowUp = false,
+        Instructions = "Use this action when the user asks for Native, A2UI, or Open-JSON-UI in the declarative demo."
+    )]
+    public Task SwitchDeclarativeProtocol([AgentParam("native, a2ui, or open-json-ui")] string protocol)
+    {
+        _declarativeProtocol = NormalizeToken(protocol) switch
         {
-            return direct.Key;
-        }
+            "a2ui" => DojoDeclarativeProtocol.A2Ui,
+            "openjsonui" => DojoDeclarativeProtocol.OpenJsonUi,
+            _ => DojoDeclarativeProtocol.Native
+        };
 
-        var normalized = NormalizeToken(trimmed);
-        if (normalized.Length == 0)
-        {
-            return null;
-        }
+        RefreshDeclarativeDemo();
+        return RequestComponentRefreshAsync();
+    }
 
-        if (_exampleAliases.TryGetValue(normalized, out var aliasTarget))
+    [AgentAction(
+        "Switch the hosted app surface for the open-ended demo.",
+        ActionId = "switch_open_ended_surface",
+        AvailableWhen = nameof(CanUseOpenEndedActions),
+        FollowUp = false,
+        Instructions = "Use this action when the user asks to open analytics, planner, or support in the hosted app demo."
+    )]
+    public Task SwitchOpenEndedSurface([AgentParam("analytics, planner, or support")] string preset)
+    {
+        _openEndedPreset = NormalizeToken(preset) switch
         {
-            return aliasTarget;
-        }
+            "planner" or "workspace" => OpenEndedPreset.Planner,
+            "support" or "helpdesk" => OpenEndedPreset.Support,
+            _ => OpenEndedPreset.Analytics
+        };
 
-        foreach (var example in _examples)
+        RefreshOpenEndedDemo();
+        return RequestComponentRefreshAsync();
+    }
+
+    private void AppendControlledLifecycle(string message)
+    {
+        _controlledLifecycle.Insert(0, new DojoTimelineItem(DateTimeOffset.UtcNow, message));
+        if (_controlledLifecycle.Count > 6)
         {
-            var keyToken = NormalizeToken(example.Key);
-            var titleToken = NormalizeToken(example.Title);
-            if (string.Equals(keyToken, normalized, StringComparison.Ordinal) ||
-                string.Equals(titleToken, normalized, StringComparison.Ordinal) ||
-                keyToken.Contains(normalized, StringComparison.Ordinal) ||
-                titleToken.Contains(normalized, StringComparison.Ordinal))
+            _controlledLifecycle.RemoveAt(_controlledLifecycle.Count - 1);
+        }
+    }
+
+    private void SetDeclarativeProtocol(DojoDeclarativeProtocol protocol)
+    {
+        _declarativeProtocol = protocol;
+        RefreshDeclarativeDemo();
+    }
+
+    private void RefreshDeclarativeDemo()
+    {
+        switch (_declarativeProtocol)
+        {
+            case DojoDeclarativeProtocol.A2Ui:
+                _declarativePayload = CreateA2UiDeclarativePayload();
+                _declarativeDocument =
+                    AgentUiInterchangeAdapters.FromA2UiJsonLines(_declarativePayload, out _)
+                    ?? CreateFallbackDeclarativeDocument("A2UI import unavailable", "No declarative UI blocks were produced.");
+                _declarativeSummary = "A2UI envelopes are imported into the native AgentUiDocument renderer.";
+                break;
+            case DojoDeclarativeProtocol.OpenJsonUi:
+                _declarativePayload = CreateOpenJsonUiDeclarativePayload();
+                _declarativeDocument =
+                    AgentUiInterchangeAdapters.FromOpenJsonUi(_declarativePayload, out _)
+                    ?? CreateFallbackDeclarativeDocument("Open-JSON-UI import unavailable", "No declarative UI blocks were produced.");
+                _declarativeSummary = "Open-JSON-UI is treated as input while the renderer stays Blazor-native.";
+                break;
+            default:
+                _declarativeDocument = CreateNativeDeclarativeDocument();
+                _declarativePayload = JsonSerializer.Serialize(_declarativeDocument, AgentGenerativeUiSpec.JsonOptions);
+                _declarativeSummary = "Native AgentUiDocument rendered with Blazor components.";
+                break;
+        }
+    }
+
+    private void RefreshOpenEndedDemo()
+    {
+        switch (_openEndedPreset)
+        {
+            case OpenEndedPreset.Planner:
+                _openEndedOriginLabel = "about:srcdoc / planner-workspace";
+                _openEndedAppMarkup = CreatePlannerHostedAppMarkup();
+                break;
+            case OpenEndedPreset.Support:
+                _openEndedOriginLabel = "about:srcdoc / support-workspace";
+                _openEndedAppMarkup = CreateSupportHostedAppMarkup();
+                break;
+            default:
+                _openEndedOriginLabel = "about:srcdoc / analytics-cockpit";
+                _openEndedAppMarkup = CreateAnalyticsHostedAppMarkup();
+                break;
+        }
+    }
+
+    private static AgentUiDocument CreateNativeDeclarativeDocument() => new()
+    {
+        Blocks =
+        [
+            new AgentUiBlock
             {
-                return example.Key;
+                Id = "release-summary",
+                Kind = AgentUiBlockKind.Card,
+                Title = "Release Summary",
+                Description = "Sprint 24 is on track with one blocker flagged.",
+                Actions =
+                [
+                    new AgentUiAction
+                    {
+                        Id = "review_blocker",
+                        Label = "Review blocker",
+                        Prompt = "review the blocker and propose next steps"
+                    }
+                ]
+            },
+            new AgentUiBlock
+            {
+                Id = "release-form",
+                Kind = AgentUiBlockKind.Form,
+                Title = "Launch Draft",
+                Description = "Native AgentUiDocument input rendered in Blazor.",
+                Fields =
+                [
+                    new AgentUiField { Name = "Channel", Label = "Channel", Type = "text", Value = "Web checkout" },
+                    new AgentUiField { Name = "Owner", Label = "Owner", Type = "text", Value = "Ash" },
+                    new AgentUiField { Name = "Status", Label = "Status", Type = "text", Value = "Ready for review" }
+                ]
             }
-        }
+        ]
+    };
 
-        return null;
+    private static AgentUiDocument CreateFallbackDeclarativeDocument(string title, string description) => new()
+    {
+        Blocks =
+        [
+            new AgentUiBlock
+            {
+                Id = "fallback-card",
+                Kind = AgentUiBlockKind.Card,
+                Title = title,
+                Description = description
+            }
+        ]
+    };
+
+    private static string CreateA2UiDeclarativePayload() => """
+{"surfaceUpdate":{"surfaceId":"inventory-surface","components":[{"id":"inventory-summary","type":"card","title":"Inventory Summary","description":"Warehouse inventory is stable and ready for review.","actions":[{"id":"sync_inventory","label":"Sync inventory","prompt":"sync inventory counts for the warehouse dashboard"}]},{"id":"inventory-form","type":"form","title":"Restock Draft","fields":[{"name":"Item","label":"Item","type":"text","required":true},{"name":"Quantity","label":"Quantity","type":"number","required":true},{"name":"Priority","label":"Priority","type":"text"}],"actions":[{"id":"queue_restock","label":"Queue restock","prompt":"queue a restock draft for the selected item"}]}]}}
+{"dataModelUpdate":{"surfaceId":"inventory-surface","path":"/","contents":{"Item":"Espresso Beans","Quantity":24,"Priority":"High"}}}
+{"beginRendering":{"surfaceId":"inventory-surface","root":"inventory-form","styles":{"gap":"16px"}}}
+""";
+
+    private static string CreateOpenJsonUiDeclarativePayload() => """
+{
+  "type": "open-json-ui",
+  "spec": {
+    "components": [
+      {
+        "id": "release-summary",
+        "type": "card",
+        "properties": {
+          "title": "Release Summary",
+          "description": "Sprint 24 is on track with one blocker flagged."
+        }
+      },
+      {
+        "id": "release-table",
+        "type": "table",
+        "properties": {
+          "title": "Feature Readiness",
+          "columns": [
+            { "key": "feature", "header": "Feature" },
+            { "key": "status", "header": "Status" }
+          ],
+          "rows": [
+            { "feature": "Controlled UI", "status": "Ready" },
+            { "feature": "A2UI import", "status": "In review" },
+            { "feature": "Hosted app shell", "status": "Planned" }
+          ]
+        }
+      }
+    ]
+  }
+}
+""";
+
+    private static string CreateAnalyticsHostedAppMarkup() => """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: linear-gradient(180deg, #fffaf4, #f6efe8); color: #1f2937; }
+    .shell { padding: 24px; display: grid; gap: 16px; }
+    .hero { display: flex; justify-content: space-between; align-items: center; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .card, .panel { border-radius: 16px; border: 1px solid #eadfd3; background: rgba(255,255,255,0.86); padding: 16px; }
+    .panel { min-height: 220px; }
+    .metric { font-size: 28px; font-weight: 700; }
+    .muted { color: #7c6f64; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <div>
+        <div class="muted">Analytics cockpit</div>
+        <h2>Checkout Health</h2>
+      </div>
+      <div class="card">Live agent app surface</div>
+    </div>
+    <div class="card-grid">
+      <div class="card"><div class="metric">96.4%</div><div class="muted">Success rate</div></div>
+      <div class="card"><div class="metric">182ms</div><div class="muted">P95 latency</div></div>
+      <div class="card"><div class="metric">3</div><div class="muted">Open regressions</div></div>
+    </div>
+    <div class="panel">A broader app-style surface can live here without being constrained to a single card or form.</div>
+  </div>
+</body>
+</html>
+""";
+
+    private static string CreatePlannerHostedAppMarkup() => """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f7f7f8; color: #111827; }
+    .shell { padding: 24px; display: grid; gap: 18px; }
+    .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .lane { border-radius: 16px; background: white; border: 1px solid #e5e7eb; padding: 14px; }
+    .card { border-radius: 12px; padding: 12px; background: #f9fafb; border: 1px solid #eceff3; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div>
+      <div>Planner workspace</div>
+      <h2>Launch Board</h2>
+    </div>
+    <div class="board">
+      <div class="lane"><strong>Backlog</strong><div class="card">Finalize rollout brief</div></div>
+      <div class="lane"><strong>In Progress</strong><div class="card">Validate checkout alerting</div></div>
+      <div class="lane"><strong>Ready</strong><div class="card">Hand off to support</div></div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+
+    private static string CreateSupportHostedAppMarkup() => """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .shell { padding: 24px; display: grid; gap: 16px; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; gap: 14px; }
+    .pane { border-radius: 16px; background: rgba(15, 23, 42, 0.68); border: 1px solid #334155; padding: 16px; min-height: 260px; }
+    .ticket { padding: 12px 0; border-top: 1px solid #334155; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div>
+      <div>Support workspace</div>
+      <h2>Escalation Queue</h2>
+    </div>
+    <div class="layout">
+      <div class="pane">Views<br/><br/>Critical incidents<br/>Payments<br/>Subscriptions</div>
+      <div class="pane">
+        <strong>Open tickets</strong>
+        <div class="ticket">Checkout retries spiking in EU West</div>
+        <div class="ticket">Payment API latency increased after deploy</div>
+        <div class="ticket">Ops handoff waiting for owner confirmation</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+
+    private static string NormalizeToken(string value)
+        => new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    private IReadOnlyList<DojoCodeSection> BuildCodeSections()
+        => _selectedExampleKey switch
+        {
+            "declarative-generative-ui" => BuildDeclarativeCodeSections(),
+            "open-ended-generative-ui" => BuildOpenEndedCodeSections(),
+            _ => BuildControlledCodeSections()
+        };
+
+    private IReadOnlyList<DojoDocSection> BuildDocSections()
+        => _selectedExampleKey switch
+        {
+            "declarative-generative-ui" => BuildDeclarativeDocSections(),
+            "open-ended-generative-ui" => BuildOpenEndedDocSections(),
+            _ => BuildControlledDocSections()
+        };
+
+    private IReadOnlyList<DojoCodeSection> BuildControlledCodeSections()
+        =>
+        [
+            new(
+                "Component Shell",
+                "razor",
+                "The controlled pillar is a single Blazor component with one fixed AgentId and one explicit ComponentType.",
+                """
+                @page "/demo/dojo"
+                @layout DemoLayout
+                @inherits AgentControllableComponentBase
+                @attribute [AgentComponent(AgentId = "dojo-workspace", ComponentType = "DojoIncident")]
+
+                <div class="dojo-controlled">
+                    <article class="dojo-card dojo-controlled__card">
+                        <MudText Typo="Typo.h5">@Model.Incident</MudText>
+                        <strong>@Model.Severity</strong>
+                        <strong>@Model.Owner</strong>
+                        <MudButton OnClick="QueueControlledReviewFromUiAsync">Queue Review</MudButton>
+                    </article>
+                </div>
+                """),
+            new(
+                "Agent Contract",
+                "csharp",
+                "These are the live action signatures exposed by the controlled pillar today.",
+                BuildActionSnippet(nameof(UpdateControlledIncidentDraft), nameof(AssignDraft), nameof(FillOwner), nameof(QueueControlledIncidentReview))),
+            new(
+                "Readable State",
+                "csharp",
+                "Readable properties are what the planner sees in ACTIVE COMPONENTS and SHARED STATE for this route.",
+                BuildReadableStateSnippet()),
+            new(
+                "Backing Model",
+                "csharp",
+                "The host owns the data shape; the agent only mutates these known fields through exposed actions.",
+                BuildModelSnippet())
+        ];
+
+    private IReadOnlyList<DojoCodeSection> BuildDeclarativeCodeSections()
+    {
+        var protocolExample = _declarativeProtocol switch
+        {
+            DojoDeclarativeProtocol.A2Ui => _declarativePayload,
+            DojoDeclarativeProtocol.OpenJsonUi => _declarativePayload,
+            _ => JsonSerializer.Serialize(_declarativeDocument, AgentGenerativeUiSpec.JsonOptions)
+        };
+
+        return
+        [
+            new(
+                "Renderer Host",
+                "razor",
+                "The Dojo keeps one native Blazor renderer and swaps the input document or imported payload.",
+                """
+                <AgentGenerativeSurface Document="@_declarativeDocument"
+                                        CssClass="dojo-generated-surface"
+                                        AgentName="Dojo Workspace Agent"
+                                        ForwardActionsToRuntime="true"
+                                        ShowRuntimeResponses="false" />
+                """),
+            new(
+                "Protocol Switch Action",
+                "csharp",
+                "The agent changes protocol through one deterministic action instead of mounting a different renderer.",
+                BuildActionSnippet(nameof(SwitchDeclarativeProtocol))),
+            new(
+                "Adapter Entry Points",
+                "csharp",
+                "These are the native AgentBlazor adapter calls used by the declarative pillar.",
+                """
+                _declarativeDocument =
+                    AgentUiInterchangeAdapters.FromA2UiJsonLines(_declarativePayload, out _)
+                    ?? CreateFallbackDeclarativeDocument("A2UI import unavailable", "No declarative UI blocks were produced.");
+
+                _declarativeDocument =
+                    AgentUiInterchangeAdapters.FromOpenJsonUi(_declarativePayload, out _)
+                    ?? CreateFallbackDeclarativeDocument("Open-JSON-UI import unavailable", "No declarative UI blocks were produced.");
+                """),
+            new(
+                "Current Payload",
+                _declarativeProtocol == DojoDeclarativeProtocol.A2Ui ? "jsonl" : "json",
+                $"Live payload for {DeclarativeProtocolLabel}.",
+                protocolExample)
+        ];
     }
 
-    private static string NormalizeToken(string value) =>
-        new(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+    private IReadOnlyList<DojoCodeSection> BuildOpenEndedCodeSections()
+        =>
+        [
+            new(
+                "Hosted Surface",
+                "razor",
+                "The open-ended pillar uses a sandboxed iframe hosted inside the Blazor shell.",
+                """
+                <iframe class="dojo-open-ended__frame"
+                        title="Hosted agent app"
+                        sandbox="allow-scripts"
+                        srcdoc="@_openEndedAppMarkup">
+                </iframe>
+                """),
+            new(
+                "Surface Switch Action",
+                "csharp",
+                "The agent swaps between app presets through one host-controlled action.",
+                BuildActionSnippet(nameof(SwitchOpenEndedSurface))),
+            new(
+                "Current Hosted Markup",
+                "html",
+                $"Current preset: {_openEndedOriginLabel}. The iframe content is still owned and framed by the Blazor host.",
+                _openEndedAppMarkup)
+        ];
 
-    private static List<DojoChecklistStep> CreateHumanLoopSteps() =>
-    [
-        new(1, "Gather ingredients for the sandwich (bread, fillings, condiments).", true),
-        new(2, "Lay out two slices of bread on a clean surface.", true),
-        new(3, "Spread condiments on the bread slices.", true),
-        new(4, "Add the desired fillings to one slice of bread.", true),
-        new(5, "Place the second slice of bread on top.", true),
-        new(6, "Cut the sandwich in halves or quarters if desired.", true),
-        new(7, "Serve and enjoy the sandwich.", true)
-    ];
+    private IReadOnlyList<DojoDocSection> BuildControlledDocSections()
+        =>
+        [
+            new(
+                "What This Demonstrates",
+                "Controlled generative UI is the tightest AgentBlazor pattern: the host ships the exact Blazor UI and the agent can only invoke the actions that component publishes.",
+                [
+                    "The canvas is authored entirely in Razor and MudBlazor.",
+                    "The runtime sees one mounted component type: DojoIncident.",
+                    "The agent can update known fields and queue a known workflow step."
+                ]),
+            new(
+                "Why It Is Trustworthy",
+                "This pillar no longer relies on the generic form page base. The component contract is explicit and route-local, which keeps ACTIVE COMPONENTS narrower and makes planner behavior easier to debug.",
+                [
+                    "AgentId: dojo-workspace",
+                    "ComponentType: DojoIncident",
+                    "Primary actions: update_controlled_incident_draft, assign_draft, fill_owner, queue_controlled_incident_review"
+                ]),
+            new(
+                "When To Use It",
+                "Use this pattern for operator workflows where the host must control layout, validation, and execution semantics.",
+                [
+                    "Incident review and escalation",
+                    "Approval and handoff steps",
+                    "Operational forms where UI drift is unacceptable"
+                ]),
+            new(
+                "Source Of Truth",
+                "The Preview, Code, and prompt flows all point back to the same live component contract in the repo.",
+                [
+                    "demo/AgentBlazor.Demo/Components/Pages/Demo/Dojo.razor",
+                    "demo/AgentBlazor.Demo/Components/Pages/Demo/DojoIncidentModel.cs",
+                    "tests/e2e/specs/dojo.prompt-inspector.spec.cjs"
+                ]),
+            new(
+                "Validation Coverage",
+                "The controlled pillar is covered at both the runtime and browser layers so the behavior shown in Preview matches what the agent can actually execute.",
+                [
+                    "Prompt-backed Playwright checks owner changes, severity/title edits, queue review, and combined updates.",
+                    "Inspector assertions verify planned actions and guard against ValidationFailed or PolicyBlocked runs.",
+                    "The lifecycle feed is host-rendered, so UI state and execution evidence stay aligned."
+                ])
+        ];
 
-    private static List<DojoProgressStep> CreateTaskProgressSteps(string destination = "Japan") =>
-    [
-        new(1, $"Research and decide on travel dates to {destination}.", true),
-        new(2, $"Book flights and accommodations for the trip to {destination}.", true),
-        new(3, $"Create a travel itinerary with destinations and activities in {destination}.", true),
-        new(4, "Check visa requirements and complete necessary documentation.", true),
-        new(5, $"Prepare and pack for the trip to {destination}.", true),
-        new(6, "Arrange travel insurance.", false),
-        new(7, "Exchange currency or arrange payment options.", false),
-        new(8, "Learn a few useful local phrases.", false),
-        new(9, "Plan transportation within the destination.", false),
-        new(10, "Prepare emergency contacts and backups.", false)
-    ];
+    private IReadOnlyList<DojoDocSection> BuildDeclarativeDocSections()
+        =>
+        [
+            new(
+                "What This Demonstrates",
+                "Declarative generative UI lets the agent describe UI as structured data while AgentBlazor keeps the renderer native to Blazor.",
+                [
+                    "Native AgentUiDocument is the canonical internal model.",
+                    "A2UI and Open-JSON-UI are treated as import formats, not primary renderers.",
+                    "One AgentGenerativeSurface renders all supported inputs."
+                ]),
+            new(
+                "Protocol Coverage",
+                "The current adapter layer handles the subset needed for cards, forms, tables, charts, and UI actions in the Dojo.",
+                [
+                    "A2UI envelopes: surfaceUpdate, dataModelUpdate, beginRendering",
+                    "Open-JSON-UI: top-level or spec.components payloads",
+                    "Unsupported payloads return diagnostics instead of partial silent rendering"
+                ]),
+            new(
+                "Why It Is Blazor-First",
+                "The repo is not replacing its internal model with third-party schemas. External specs are mapped into AgentUiDocument so theming, actions, and rendering stay aligned with Blazor.",
+                [
+                    "Render host: AgentGenerativeSurface",
+                    "Adapters: AgentUiInterchangeAdapters.FromA2UiJsonLines / FromOpenJsonUi",
+                    "Tests: AgentUiInterchangeAdaptersTests plus Dojo prompt-backed Playwright"
+                ]),
+            new(
+                "Source Of Truth",
+                "The payloads and adapter entry points shown here are live values used by the page at runtime.",
+                [
+                    "demo/AgentBlazor.Demo/Components/Pages/Demo/Dojo.razor",
+                    "src/AgentBlazor.Core/Components/AgentUiInterchangeAdapters.cs",
+                    "tests/AgentBlazor.Core.Tests/AgentUiInterchangeAdaptersTests.cs"
+                ]),
+            new(
+                "Validation Coverage",
+                "This pillar is validated as both a document import path and a rendered Blazor surface.",
+                [
+                    "Unit tests cover A2UI and Open-JSON-UI imports into AgentUiDocument.",
+                    "Playwright switches protocols from the UI and through live prompts.",
+                    "The Code tab shows the active payload currently mounted in Preview."
+                ])
+        ];
 
-    private static List<DojoDocumentLine> CreatePredictiveDocumentLines() =>
-    [
-        new("Predictive State Updates Document Editor", DojoDocumentLineKind.Muted),
-        new("This demo showcases predictive state updates for real-time document collaboration.", DojoDocumentLineKind.Removed),
-        new("Live document editing updates as the Copilot works.", DojoDocumentLineKind.Removed),
-        new("Candy Beard was a pirate who loved to interact with sugar-coated treasure.", DojoDocumentLineKind.Accepted),
-        new("One day, Candy Beard set sail on his ship, the Sugar Wave, in search of the rarest candy of all.", DojoDocumentLineKind.Accepted),
-        new("Add magical candy that never melted or lost its flavor.", DojoDocumentLineKind.Removed),
-        new("After weeks at sea, they finally came across Infamous Sour Goblins near the woods.", DojoDocumentLineKind.Accepted),
-        new("Change the mysterious island to a more casual tone.", DojoDocumentLineKind.Removed)
-    ];
+    private IReadOnlyList<DojoDocSection> BuildOpenEndedDocSections()
+        =>
+        [
+            new(
+                "What This Demonstrates",
+                "Open-ended generative UI uses Blazor as the host shell for broader app-like experiences instead of a single card or constrained form.",
+                [
+                    "The host owns the shell chrome and sandboxing.",
+                    "The agent swaps between named hosted presets instead of inventing arbitrary pages.",
+                    "This is the lowest-control mode in the Dojo."
+                ]),
+            new(
+                "Safety And Boundaries",
+                "This demo intentionally keeps the hosted app surface constrained to sandboxed srcdoc presets so the boundary between native Blazor UI and hosted content stays explicit.",
+                [
+                    "iframe sandbox: allow-scripts",
+                    "Current presets: analytics, planner, support",
+                    "The surrounding shell remains native Blazor and MudBlazor"
+                ]),
+            new(
+                "When To Use It",
+                "Use this pattern when a card or declarative surface is no longer enough and the agent needs to swap between broader task-specific workspaces.",
+                [
+                    "Analytics cockpits",
+                    "Planning boards",
+                    "Support or operations workspaces"
+                ]),
+            new(
+                "Source Of Truth",
+                "The iframe host markup, preset switch action, and prompt-backed tests are the current contract for this pillar.",
+                [
+                    "demo/AgentBlazor.Demo/Components/Pages/Demo/Dojo.razor",
+                    "tests/e2e/specs/dojo.prompt-inspector.spec.cjs",
+                    "tests/e2e/specs/dojo.spec.cjs"
+                ]),
+            new(
+                "Validation Coverage",
+                "The open-ended pillar is validated as a host-controlled surface, not just a static iframe mock.",
+                [
+                    "Prompt-backed Playwright switches between analytics, planner, and support presets.",
+                    "The Blazor shell, origin label, and sandboxed iframe stay constant while the hosted content changes.",
+                    "Cross-pillar tests verify remounting this surface does not break the shared Dojo shell."
+                ])
+        ];
+
+    private static string BuildReadableStateSnippet()
+    {
+        var readableProperties = typeof(Dojo)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(property => property.GetCustomAttribute<AgentReadableAttribute>() is not null)
+            .ToArray();
+
+        var lines = new List<string>();
+        foreach (var property in readableProperties)
+        {
+            var attribute = property.GetCustomAttribute<AgentReadableAttribute>()!;
+            var attributeBits = new List<string>();
+            if (!string.IsNullOrWhiteSpace(attribute.Description))
+            {
+                attributeBits.Add($"\"{attribute.Description}\"");
+            }
+
+            if (!string.IsNullOrWhiteSpace(attribute.StateKey))
+            {
+                attributeBits.Add($"StateKey = \"{attribute.StateKey}\"");
+            }
+
+            if (attribute.MaxItems != 5)
+            {
+                attributeBits.Add($"MaxItems = {attribute.MaxItems}");
+            }
+
+            lines.Add($"[AgentReadable({string.Join(", ", attributeBits)})]");
+            lines.Add($"public {FormatTypeName(property.PropertyType)} {property.Name} => ...;");
+            lines.Add(string.Empty);
+        }
+
+        return string.Join(Environment.NewLine, lines).TrimEnd();
+    }
+
+    private static string BuildModelSnippet()
+    {
+        var properties = typeof(DojoIncidentModel)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(static property => property.CanRead && property.CanWrite)
+            .ToArray();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("public sealed class DojoIncidentModel");
+        sb.AppendLine("{");
+        foreach (var property in properties)
+        {
+            sb.Append("    public ")
+                .Append(FormatTypeName(property.PropertyType))
+                .Append(' ')
+                .Append(property.Name)
+                .Append(" { get; set; }");
+
+            if (property.GetValue(new DojoIncidentModel()) is { } initialValue)
+            {
+                sb.Append(" = ")
+                    .Append(FormatDefaultLiteral(initialValue))
+                    .Append(';');
+            }
+
+            sb.AppendLine();
+        }
+
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private static string BuildActionSnippet(params string[] methodNames)
+    {
+        var methods = methodNames
+            .Select(name => typeof(Dojo).GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            .Where(static method => method is not null)
+            .Cast<MethodInfo>()
+            .ToArray();
+
+        var lines = new List<string>();
+        foreach (var method in methods)
+        {
+            var attribute = method.GetCustomAttribute<AgentActionAttribute>();
+            if (attribute is null)
+            {
+                continue;
+            }
+
+            var attributeArgs = new List<string>();
+            if (!string.IsNullOrWhiteSpace(attribute.Description))
+            {
+                attributeArgs.Add($"\"{attribute.Description}\"");
+            }
+
+            if (!string.IsNullOrWhiteSpace(attribute.ActionId))
+            {
+                attributeArgs.Add($"ActionId = \"{attribute.ActionId}\"");
+            }
+
+            if (!string.IsNullOrWhiteSpace(attribute.AvailableWhen))
+            {
+                attributeArgs.Add($"AvailableWhen = nameof({attribute.AvailableWhen})");
+            }
+
+            if (!attribute.FollowUp)
+            {
+                attributeArgs.Add("FollowUp = false");
+            }
+
+            if (attribute.RequiresApproval)
+            {
+                attributeArgs.Add("RequiresApproval = true");
+            }
+
+            if (!string.IsNullOrWhiteSpace(attribute.Instructions))
+            {
+                attributeArgs.Add($"Instructions = \"{EscapeCodeString(attribute.Instructions)}\"");
+            }
+
+            lines.Add($"[AgentAction({string.Join(", ", attributeArgs)})]");
+            lines.Add($"public {FormatTypeName(method.ReturnType)} {method.Name}({FormatParameters(method)})");
+            lines.Add(string.Empty);
+        }
+
+        return string.Join(Environment.NewLine, lines).TrimEnd();
+    }
+
+    private static string FormatParameters(MethodInfo method)
+    {
+        return string.Join(", ",
+            method.GetParameters().Select(parameter =>
+            {
+                var attribute = parameter.GetCustomAttribute<AgentParamAttribute>();
+                var prefix = string.Empty;
+                if (attribute is not null)
+                {
+                    var attributeArgs = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(attribute.Description))
+                    {
+                        attributeArgs.Add($"\"{EscapeCodeString(attribute.Description)}\"");
+                    }
+
+                    if (attribute.Required)
+                    {
+                        attributeArgs.Add("Required = true");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(attribute.AllowedValues))
+                    {
+                        attributeArgs.Add($"AllowedValues = \"{EscapeCodeString(attribute.AllowedValues)}\"");
+                    }
+
+                    prefix = $"[AgentParam({string.Join(", ", attributeArgs)})] ";
+                }
+
+                var defaultValue = parameter.HasDefaultValue
+                    ? $" = {FormatParameterDefault(parameter.DefaultValue)}"
+                    : string.Empty;
+                return $"{prefix}{FormatTypeName(parameter.ParameterType)} {parameter.Name}{defaultValue}";
+            }));
+    }
+
+    private static string FormatTypeName(Type type)
+    {
+        var nullableUnderlying = Nullable.GetUnderlyingType(type);
+        if (nullableUnderlying is not null)
+        {
+            return $"{FormatTypeName(nullableUnderlying)}?";
+        }
+
+        if (type == typeof(string)) return "string";
+        if (type == typeof(bool)) return "bool";
+        if (type == typeof(int)) return "int";
+        if (type == typeof(long)) return "long";
+        if (type == typeof(double)) return "double";
+        if (type == typeof(decimal)) return "decimal";
+        if (type == typeof(void)) return "void";
+        if (type == typeof(Task)) return "Task";
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            return $"Task<{FormatTypeName(type.GetGenericArguments()[0])}>";
+        }
+
+        return type.Name;
+    }
+
+    private static string FormatParameterDefault(object? value)
+        => value is null ? "null" : FormatDefaultLiteral(value);
+
+    private static string FormatDefaultLiteral(object value)
+        => value switch
+        {
+            string text => $"\"{EscapeCodeString(text)}\"",
+            bool boolValue => boolValue ? "true" : "false",
+            _ => value.ToString() ?? "null"
+        };
+
+    private static string EscapeCodeString(string value)
+        => value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     private enum DojoViewMode
     {
@@ -1540,53 +1224,41 @@
         Docs
     }
 
+    private enum DojoDeclarativeProtocol
+    {
+        Native,
+        A2Ui,
+        OpenJsonUi
+    }
+
+    private enum OpenEndedPreset
+    {
+        Analytics,
+        Planner,
+        Support
+    }
+
     private sealed record DojoExampleDefinition(
         string Key,
         string Title,
-        string Description,
+        string ShortDescription,
+        string Headline,
+        string Subtitle,
+        string Docs,
+        string Placeholder,
         IReadOnlyList<string> Tags,
-        IReadOnlyList<string> Prompts,
-        string Code,
-        string Docs);
+        IReadOnlyList<string> Prompts);
 
-    private sealed class BackendToolFormModel
-    {
-        public string ActionLabel { get; set; } = "policy review";
-
-        public string Operator { get; set; } = "dojo-operator";
-
-        public string? Notes { get; set; }
-    }
-
-    private sealed class DojoChecklistStep(int number, string text, bool selected)
-    {
-        public int Number { get; } = number;
-
-        public string Text { get; } = text;
-
-        public bool Selected { get; set; } = selected;
-    }
-
-    private sealed class DojoProgressStep(int number, string text, bool completed)
-    {
-        public int Number { get; } = number;
-
-        public string Text { get; } = text;
-
-        public bool Completed { get; set; } = completed;
-    }
-
-    private sealed class DojoDocumentLine(string text, DojoDocumentLineKind kind)
-    {
-        public string Text { get; set; } = text;
-
-        public DojoDocumentLineKind Kind { get; } = kind;
-    }
-
-    private enum DojoDocumentLineKind
-    {
-        Accepted,
-        Removed,
-        Muted
-    }
+    private sealed record DojoCodeSection(string Title, string Language, string Description, string Content);
+    private sealed record DojoDocSection(string Title, string Body, IReadOnlyList<string> Bullets);
+    private sealed record DojoTimelineItem(DateTimeOffset Timestamp, string Message);
 }
+
+
+
+
+
+
+
+
+

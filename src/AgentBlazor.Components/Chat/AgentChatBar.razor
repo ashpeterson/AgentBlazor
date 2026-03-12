@@ -19,7 +19,7 @@
 @inject NavigationManager NavigationManager
 @inject IOptions<AgentBlazorOptions> AgentBlazorOptionsAccessor
 
-<div class="ab-chat-bar @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
+<div class="ab-chat-bar @(HasConversation ? "ab-chat-bar--has-conversation" : "ab-chat-bar--idle") @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
      data-theme="@(Theme?.DataTheme)"
      data-style="@(Theme?.DataStyle)"
      data-radius="@(Theme?.DataRadius)"
@@ -153,6 +153,7 @@
     private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
         new(StringComparer.OrdinalIgnoreCase);
     private string? _historyHydratedForSession;
+    private bool? _lastConversationState;
 
     /// <summary>
     /// Placeholder text for the input field.
@@ -244,6 +245,17 @@
     [Parameter]
     public EventCallback<Exception> OnError { get; set; }
 
+    /// <summary>
+    /// Callback invoked when the bar transitions between idle and conversation-active states.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnConversationStateChanged { get; set; }
+
+    private bool HasConversation =>
+        _timeline.Count > 0 ||
+        !string.IsNullOrWhiteSpace(_streamingResponseText) ||
+        _isBusy;
+
     private string EffectiveSessionId =>
         string.IsNullOrWhiteSpace(SessionId)
             ? ChatSessionState.SessionId
@@ -273,6 +285,7 @@
     protected override async Task OnParametersSetAsync()
     {
         await HydrateTimelineFromHistoryAsync();
+        await NotifyConversationStateChangedIfNeededAsync();
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
@@ -302,6 +315,7 @@
         _activeRunId = null;
         _streamingActivityMessages.Clear();
         StateHasChanged();
+        await NotifyConversationStateChangedIfNeededAsync();
 
         // Add user message to timeline
         _timeline.Add(new ChatBarTimelineItem("user", message, [], [], null));
@@ -348,6 +362,7 @@
         finally
         {
             _isBusy = false;
+            await NotifyConversationStateChangedIfNeededAsync();
         }
     }
 
@@ -359,6 +374,7 @@
         _activeRunId = null;
         await ConversationStore.ClearSessionAsync(EffectiveConversationSessionId);
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
+        await NotifyConversationStateChangedIfNeededAsync();
     }
 
     /// <summary>
@@ -368,6 +384,15 @@
     {
         _prompt = message;
         await SendAsync();
+    }
+
+    /// <summary>
+    /// Pre-fills the prompt input with the given text.
+    /// </summary>
+    public Task InjectAsync(string prompt)
+    {
+        _prompt = prompt;
+        return InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -381,6 +406,7 @@
         _activeRunId = null;
         _ = ConversationStore.ClearSessionAsync(EffectiveConversationSessionId);
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
+        _ = NotifyConversationStateChangedIfNeededAsync();
     }
 
     private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
@@ -504,6 +530,7 @@
 
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
+        await NotifyConversationStateChangedIfNeededAsync();
 
         return finalResponse
             ?? throw new InvalidOperationException("Streaming completed without a final response.");
@@ -825,6 +852,23 @@
                     BuildActivityMessages(turn.ExecutionResults, turn.PlannedActions),
                     null));
             }
+        }
+
+        await NotifyConversationStateChangedIfNeededAsync();
+    }
+
+    private async Task NotifyConversationStateChangedIfNeededAsync()
+    {
+        var hasConversation = HasConversation;
+        if (_lastConversationState == hasConversation)
+        {
+            return;
+        }
+
+        _lastConversationState = hasConversation;
+        if (OnConversationStateChanged.HasDelegate)
+        {
+            await OnConversationStateChanged.InvokeAsync(hasConversation);
         }
     }
 

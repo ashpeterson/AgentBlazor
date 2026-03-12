@@ -162,9 +162,48 @@
 
 /* ─── Base Layout ───────────────────────────────────────────────────────────── */
 
+.ab-chat-surface-shell {
+    height: 100%;
+    min-height: 0;
+}
+
+.ab-chat-surface-shell--with-devtools {
+    position: relative;
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.ab-chat-surface__devtools {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    min-height: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: stretch;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.ab-chat-surface__devtools > * {
+    height: 100%;
+    min-width: 0;
+    pointer-events: auto;
+}
+
+.ab-chat-surface-shell--with-devtools:has(.ab-inspector--inline) .ab-chat-surface {
+    padding-right: calc(var(--ab-chat-padding) + clamp(14rem, 21vw, 17rem) + 0.75rem);
+}
+
 .ab-chat-surface {
     height: 100%;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: var(--ab-chat-gap);
@@ -176,6 +215,17 @@
     box-sizing: border-box;
     border-radius: var(--ab-chat-radius);
     overflow: hidden;
+}
+
+@media (max-width: 1180px) {
+    .ab-chat-surface-shell--with-devtools {
+        overflow: visible;
+    }
+
+    .ab-chat-surface__devtools {
+        position: static;
+        min-height: 18rem;
+    }
 }
 
 /* ─── Header ────────────────────────────────────────────────────────────────── */
@@ -1034,3 +1084,4 @@
     word-break: break-word;
     max-width: 100%;
 }
+

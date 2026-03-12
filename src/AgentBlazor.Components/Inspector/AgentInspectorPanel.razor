@@ -507,10 +507,21 @@
         </div>
     </div>
 }
-else if (!Inline)
+else
 {
-    <button type="button" class="ab-inspector__toggle-btn" @onclick="() => _visible = true" title="Open Agent Inspector">
-        &#128270;
+    <button type="button"
+            class="ab-inspector__toggle-btn @(Inline ? "ab-inspector__toggle-btn--inline" : null)"
+            @onclick="() => _visible = true"
+            title="Open Agent Inspector"
+            aria-label="Open Agent Inspector">
+        @if (Inline)
+        {
+            <span class="ab-inspector__toggle-label">Inspector</span>
+        }
+        else
+        {
+            <span aria-hidden="true">&#128270;</span>
+        }
     </button>
 }
 

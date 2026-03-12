@@ -29,6 +29,7 @@
 
 <ErrorBoundary @ref="_errorBoundary">
     <ChildContent>
+        <div class="ab-chat-surface-shell @(ResolvedShowDevTools ? "ab-chat-surface-shell--with-devtools" : null)">
         <section class="ab-chat-surface @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
                  data-theme="@(Theme?.DataTheme)"
                  data-style="@(Theme?.DataStyle)"
@@ -405,9 +406,13 @@
     </section>
     @if (ResolvedShowDevTools)
     {
-        <AgentInspectorPanel SessionId="@EffectiveSessionId"
-                             AutoShowOnDebug="@ResolvedAutoShowDevTools" />
+        <aside class="ab-chat-surface__devtools" aria-label="Agent inspector">
+            <AgentInspectorPanel SessionId="@EffectiveSessionId"
+                                 Inline="true"
+                                 AutoShowOnDebug="@ResolvedAutoShowDevTools" />
+        </aside>
     }
+    </div>
     </ChildContent>
     <ErrorContent Context="exception">
         <section class="ab-chat-surface ab-chat-surface--error @(Theme?.CssClass) @CssClass"

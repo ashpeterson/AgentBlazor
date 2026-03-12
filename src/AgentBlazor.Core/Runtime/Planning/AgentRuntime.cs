@@ -1654,6 +1654,11 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         var mountedByAgentId = mountedComponents.ToDictionary(
             static m => m.AgentId, StringComparer.OrdinalIgnoreCase);
+        var singleMountedActionComponent = mountedComponents
+            .Where(static m => m.Actions.Count > 0)
+            .ToArray() is var actionable && actionable.Length == 1
+                ? actionable[0]
+                : null;
 
         var anyChanged = false;
         var steps = new List<PlannedStep>(plan.Steps.Count);
@@ -1695,6 +1700,24 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                     {
                         componentId = canonical;
                         stepChanged = true;
+                    }
+                    else if (singleMountedActionComponent is not null)
+                    {
+                        canonical = ResolveAllowedComponentId(singleMountedActionComponent.ComponentType, allowedComponents);
+                        if (!string.IsNullOrWhiteSpace(canonical))
+                        {
+                            componentId = canonical;
+                            targetAgentId ??= singleMountedActionComponent.AgentId;
+
+                            var matchingAction = singleMountedActionComponent.Actions
+                                .FirstOrDefault(a => ActionIdMatches(a.ActionId, actionId));
+                            if (matchingAction is not null)
+                            {
+                                actionId = matchingAction.ActionId;
+                            }
+
+                            stepChanged = true;
+                        }
                     }
                 }
             }

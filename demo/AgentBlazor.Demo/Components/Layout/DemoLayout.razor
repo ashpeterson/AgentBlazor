@@ -1,10 +1,8 @@
 @inherits LayoutComponentBase
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
-@using AgentBlazor.Demo.Services
 @using MudBlazor
 @implements IDisposable
-@inject DojoExperienceState DojoExperience
 @inject NavigationManager NavigationManager
 
 <MudThemeProvider Theme="_activeTheme" IsDarkMode="@(!IsDojoRoute)" />
@@ -244,29 +242,20 @@
 
     private bool IsDojoRoute => CurrentRoutePath.StartsWith("/demo/dojo", StringComparison.OrdinalIgnoreCase);
 
-    private DojoAssistantProfile ActiveDojoProfile => DojoExperience.CurrentAssistantProfile;
+    private string AssistantTitle => "Assistant";
 
-    private string AssistantTitle => IsDojoRoute ? "AI Recipe Assistant" : "Assistant";
+    private string AssistantDescription => "Edit forms, navigate components, and run cross-wrapper actions from the current route.";
 
-    private string AssistantDescription => IsDojoRoute
-        ? ActiveDojoProfile.AssistantDescription
-        : "Edit forms, navigate components, and run cross-wrapper actions from the current route.";
+    private string AssistantPlaceholder => "Try: /agents, /agent Workflow Orchestrator Agent, /approve-handoff, set form fields, submit workflows.";
 
-    private string AssistantPlaceholder => IsDojoRoute
-        ? ActiveDojoProfile.Placeholder
-        : "Try: /agents, /agent Workflow Orchestrator Agent, /approve-handoff, set form fields, submit workflows.";
+    private bool AssistantRequireHandoffApproval => false;
 
-    private bool AssistantRequireHandoffApproval => IsDojoRoute && ActiveDojoProfile.RequireHandoffApproval;
+    private bool AssistantEnableGeneratedUi => true;
 
-    private bool AssistantEnableGeneratedUi => IsDojoRoute
-        ? ActiveDojoProfile.EnableGeneratedUi
-        : true;
-
-    private string? DefaultAssistantAgent => IsDojoRoute ? "Dojo Workspace Agent" : null;
+    private string? DefaultAssistantAgent => null;
 
     protected override void OnInitialized()
     {
-        DojoExperience.Changed += OnDojoExperienceChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
     }
 
@@ -279,8 +268,6 @@
         return Task.CompletedTask;
     }
 
-    private void OnDojoExperienceChanged() => _ = InvokeAsync(StateHasChanged);
-
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
         _ = args;
@@ -290,7 +277,6 @@
 
     public void Dispose()
     {
-        DojoExperience.Changed -= OnDojoExperienceChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 

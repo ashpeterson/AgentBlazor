@@ -20,6 +20,6 @@ module.exports = defineConfig({
     command: "dotnet run --project ../../demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj --urls http://127.0.0.1:5188",
     url: "http://127.0.0.1:5188/demo/dojo",
     timeout: 180000,
-    reuseExistingServer: false
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "1"
   }
 });

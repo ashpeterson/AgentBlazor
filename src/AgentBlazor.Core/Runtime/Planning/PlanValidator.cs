@@ -2,7 +2,7 @@ namespace AgentBlazor.Core.Runtime.Planning;
 
 /// <summary>
 /// Validates action plans before execution.
-/// No inference. No auto-correction. Just validation.
+/// Performs deterministic validation and limited step normalization.
 /// </summary>
 internal sealed class PlanValidator : IPlanValidator
 {
@@ -29,12 +29,14 @@ internal sealed class PlanValidator : IPlanValidator
         }
 
         var stepResults = new List<StepValidationResult>();
+        var normalizedSteps = new List<PlannedStep>(plan.Steps.Count);
         var allValid = true;
 
         foreach (var step in plan.Steps)
         {
             var result = ValidateStep(step, context);
             stepResults.Add(result);
+            normalizedSteps.Add(result.Step);
             if (!result.IsValid)
             {
                 allValid = false;
@@ -43,7 +45,7 @@ internal sealed class PlanValidator : IPlanValidator
 
         return new PlanValidationResult
         {
-            Plan = plan,
+            Plan = plan with { Steps = normalizedSteps },
             IsValid = allValid,
             StepResults = stepResults
         };
@@ -54,32 +56,28 @@ internal sealed class PlanValidator : IPlanValidator
         var errors = new List<string>();
         var missingParams = new List<string>();
 
-        // Find the component
+        var normalizedStep = TryNormalizeStep(step, context);
         var component = context.AllowedComponents.FirstOrDefault(c =>
-            string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase));
-
+            string.Equals(c.ComponentId, normalizedStep.ComponentId, StringComparison.OrdinalIgnoreCase));
         if (component is null)
         {
             errors.Add($"Component '{step.ComponentId}' is not available or not allowed.");
             return new StepValidationResult
             {
-                Step = step,
+                Step = normalizedStep,
                 IsValid = false,
                 Errors = errors,
                 MissingParameters = missingParams
             };
         }
 
-        // Find the action
-        var action = component.Actions.FirstOrDefault(a =>
-            string.Equals(a.ActionId, step.ActionId, StringComparison.OrdinalIgnoreCase));
-
+        var action = component.Actions.FirstOrDefault(a => ActionIdMatches(a.ActionId, normalizedStep.ActionId));
         if (action is null)
         {
-            errors.Add($"Action '{step.ActionId}' is not available on component '{step.ComponentId}'.");
+            errors.Add($"Action '{normalizedStep.ActionId}' is not available on component '{normalizedStep.ComponentId}'.");
             return new StepValidationResult
             {
-                Step = step,
+                Step = normalizedStep,
                 IsValid = false,
                 Errors = errors,
                 MissingParameters = missingParams
@@ -88,12 +86,12 @@ internal sealed class PlanValidator : IPlanValidator
 
         // When a matching component type is mounted, ensure the action is actually
         // available on the live component instance as well (not just in static catalog data).
-        if (!IsActionAvailableOnMountedComponent(step, component.ComponentId, context))
+        if (!IsActionAvailableOnMountedComponent(normalizedStep, component.ComponentId, context))
         {
-            errors.Add($"Action '{step.ActionId}' is not available on the mounted component '{step.ComponentId}'.");
+            errors.Add($"Action '{normalizedStep.ActionId}' is not available on the mounted component '{normalizedStep.ComponentId}'.");
             return new StepValidationResult
             {
-                Step = step,
+                Step = normalizedStep,
                 IsValid = false,
                 Errors = errors,
                 MissingParameters = missingParams
@@ -103,7 +101,7 @@ internal sealed class PlanValidator : IPlanValidator
         // Check required parameters
         foreach (var param in action.Parameters.Where(p => p.Required))
         {
-            if (!step.Arguments.TryGetValue(param.Name, out var value) ||
+            if (!normalizedStep.Arguments.TryGetValue(param.Name, out var value) ||
                 value is null ||
                 (value is string s && string.IsNullOrWhiteSpace(s)))
             {
@@ -129,19 +127,90 @@ internal sealed class PlanValidator : IPlanValidator
         // Check approval requirements
         if (action.RequiresApproval)
         {
-            var actionKey = $"{step.ComponentId}.{step.ActionId}";
+            var actionKey = $"{normalizedStep.ComponentId}.{normalizedStep.ActionId}";
             if (!context.ApprovedActions.Contains(actionKey))
             {
-                errors.Add($"Action '{step.ActionId}' requires approval before execution.");
+                errors.Add($"Action '{normalizedStep.ActionId}' requires approval before execution.");
             }
         }
 
         return new StepValidationResult
         {
-            Step = step,
+            Step = normalizedStep,
             IsValid = errors.Count == 0,
             Errors = errors,
             MissingParameters = missingParams
+        };
+    }
+
+    private static PlannedStep TryNormalizeStep(PlannedStep step, PlanValidationContext context)
+    {
+        var exactComponent = context.AllowedComponents.FirstOrDefault(c =>
+            string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase));
+        if (exactComponent is not null &&
+            exactComponent.Actions.Any(a => ActionIdMatches(a.ActionId, step.ActionId)))
+        {
+            return step;
+        }
+
+        var actionMatches = context.AllowedComponents
+            .Where(component => component.Actions.Any(action => ActionIdMatches(action.ActionId, step.ActionId)))
+            .Where(component => IsActionAvailableOnMountedComponent(step, component.ComponentId, context))
+            .ToArray();
+
+        if (actionMatches.Length == 1)
+        {
+            return step with { ComponentId = actionMatches[0].ComponentId };
+        }
+
+        var argumentMatch = TryNormalizeStepByArguments(step, context);
+        return argumentMatch ?? step;
+    }
+
+    private static PlannedStep? TryNormalizeStepByArguments(PlannedStep step, PlanValidationContext context)
+    {
+        var argumentKeys = step.Arguments.Keys
+            .Where(static key => !string.IsNullOrWhiteSpace(key))
+            .Select(NormalizeToken)
+            .Where(static key => key.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (argumentKeys.Length == 0)
+        {
+            return null;
+        }
+
+        var actionableMounted = context.MountedComponents
+            .Where(static component => component.Actions.Count > 0)
+            .ToArray();
+
+        var preferredComponentIds = actionableMounted.Length == 1
+            ? context.AllowedComponents
+                .Where(component => ComponentTypeMatchesAllowedId(actionableMounted[0].ComponentType, component.ComponentId))
+                .Select(component => component.ComponentId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : null;
+
+        var candidates = context.AllowedComponents
+            .Where(component => preferredComponentIds is null || preferredComponentIds.Contains(component.ComponentId))
+            .SelectMany(component => component.Actions.Select(action => new { Component = component, Action = action }))
+            .Where(candidate => IsActionAvailableOnMountedComponent(
+                step with { ComponentId = candidate.Component.ComponentId, ActionId = candidate.Action.ActionId },
+                candidate.Component.ComponentId,
+                context))
+            .Where(candidate => AcceptsProvidedArguments(candidate.Action, argumentKeys))
+            .ToArray();
+
+        if (candidates.Length != 1)
+        {
+            return null;
+        }
+
+        return step with
+        {
+            ComponentId = candidates[0].Component.ComponentId,
+            ActionId = candidates[0].Action.ActionId
         };
     }
 
@@ -188,4 +257,22 @@ internal sealed class PlanValidator : IPlanValidator
         var normalizedB = b.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant();
         return string.Equals(normalizedA, normalizedB, StringComparison.Ordinal);
     }
+
+    private static bool AcceptsProvidedArguments(AvailableAction action, IReadOnlyCollection<string> argumentKeys)
+    {
+        if (action.Parameters.Count == 0)
+        {
+            return false;
+        }
+
+        var parameterKeys = action.Parameters
+            .Select(static parameter => NormalizeToken(parameter.Name))
+            .Where(static key => key.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return argumentKeys.All(parameterKeys.Contains);
+    }
+
+    private static string NormalizeToken(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 }

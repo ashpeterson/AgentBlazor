@@ -17,7 +17,6 @@ builder.Logging.AddFilter("AgentBlazor", LogLevel.Information);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
-builder.Services.AddScoped<DojoExperienceState>();
 builder.Services.AddSingleton<DojoWorkspaceService>();
 builder.Services.AddScoped<DemoFileWorkflowService>();
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
@@ -59,7 +58,7 @@ builder.Services.AddAgentBlazor(options =>
 
     if (builder.Environment.IsDevelopment())
     {
-       // options.UseDevTools();
+        options.UseDevTools();
     }
 
     if (!string.IsNullOrWhiteSpace(proLicenseKey))
@@ -69,12 +68,13 @@ builder.Services.AddAgentBlazor(options =>
 
     options.ConfigureBuilder(agentBuilder =>
     {
+        agentBuilder.EnablePromptTracing();
         agentBuilder.AddRuntimeEventSubscriber<DojoRuntimeEventSubscriber>();
 
         agentBuilder.AddAgent("Dojo Workspace Agent", agent =>
         {
-            agent.WithDescription("Focused on the interactive dojo recipe workspace.");
-            agent.WithAllowedComponents("AgentForm", "AgentDataGrid", "AgentDialog", "AgentTabs", "AgentNavMenu", "DojoRecipe");
+            agent.WithDescription("Focused on the three-pillar dojo workspace.");
+            agent.WithAllowedComponents("DojoIncident");
             agent.WithMetadata("route_prefixes", "/demo/dojo");
         });
 
@@ -120,3 +120,4 @@ app.MapRazorComponents<App>()
 app.MapAgentBlazorEndpoints();
 
 app.Run();
+

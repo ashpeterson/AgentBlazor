@@ -19,13 +19,17 @@
 }
 
 .ab-inspector--inline {
-    width: 100%;
-    max-height: 500px;
+    width: clamp(14rem, 21vw, 17rem);
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     background: #1e2130;
     color: #e2e8f0;
-    border-radius: 8px;
+    border-radius: 14px;
+    border: 1px solid #2d3148;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
     overflow: hidden;
@@ -91,6 +95,7 @@
 
 .ab-inspector__body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 0.5rem;
     scrollbar-width: thin;
@@ -521,4 +526,54 @@
 
 .ab-inspector__toggle-btn:hover {
     background: #2d3148;
+}
+
+.ab-inspector__toggle-btn--inline {
+    position: static;
+    z-index: auto;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    flex: 0 0 2.75rem;
+    height: 100%;
+    border-radius: 14px;
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.35rem;
+    background: linear-gradient(180deg, #161927, #1e2130);
+    color: #cbd5e1;
+}
+
+.ab-inspector__toggle-btn--inline:hover {
+    color: #ffffff;
+}
+
+.ab-inspector__toggle-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+@media (max-width: 1180px) {
+    .ab-inspector--inline {
+        width: 100%;
+        height: 24rem;
+    }
+
+    .ab-inspector__toggle-btn--inline {
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        min-height: 2.75rem;
+        border-radius: 12px;
+    }
+
+    .ab-inspector__toggle-label {
+        writing-mode: horizontal-tb;
+        transform: none;
+    }
 }

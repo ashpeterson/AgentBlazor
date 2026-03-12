@@ -13,10 +13,19 @@ Primary route map:
 
 Mounted wrappers by route:
 - /demo/dojo
-  - AgentForm (recipe form, ingredient form, step form, backend tool form)
-  - AgentDialog (ingredient dialog, step dialog)
-  - AgentNavMenu
-  - DojoRecipe (dojo controls — see ACTION BEHAVIOR RULES in the prompt for guidance)
+  - One mounted agent component: DojoIncident with agent id dojo-workspace
+  - Controlled pillar: update the incident draft or queue review
+  - Declarative pillar: switch between native, A2UI, and Open-JSON-UI modes
+  - Open-ended pillar: switch between analytics, planner, and support hosted surfaces
+
+For /demo/dojo:
+- ALWAYS use the mounted DojoIncident component with agent id dojo-workspace and its exact exposed actions.
+- NEVER invent component ids such as managers, forms, assignments, or field controllers.
+- NEVER invent field-specific action ids when update_controlled_incident_draft already fits.
+- Use assign_draft when the user says assign the draft to someone.
+- Use fill_owner when the user says change owner to someone.
+- When the user says 'make this a P1 checkout incident' or similar, update both severity and the incident title via update_controlled_incident_draft.
+- Use queue_controlled_incident_review when the user asks to submit, queue, or send the review.
 
 - /demo/components and /demo/components/{component-key}
   - AgentDataGrid, AgentForm, AgentDialog, AgentTabs, AgentSelect, AgentAutocomplete,
@@ -30,3 +39,6 @@ When ambiguous, guide the user through this order:
 1. /demo/dojo
 2. /demo/components
 3. /demo/components/attribute-based
+
+
+

@@ -6,10 +6,20 @@ Run locally from `tests/e2e`:
 npm ci
 npm run install:browsers
 npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:ui
 npm run test:real-usability
 ```
 
 This suite starts the demo app via Playwright `webServer` and validates the current dojo and component explorer surfaces.
+
+Use `npm run test:e2e:headed` when you want to watch the browser, and `npm run test:e2e:ui` when you want Playwright's interactive runner.
+
+By default the suite starts a fresh demo app instance so it does not silently attach to a stale local build. If you intentionally want to reuse an already running server, set:
+
+```bash
+set PLAYWRIGHT_REUSE_SERVER=1
+```
 
 The suite uses the real runtime path (no deterministic e2e mock client). Configure one provider before running:
 
@@ -31,3 +41,7 @@ set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1
 
 Evidence output is written to:
 - `tests/e2e/artifacts/real-usability/<timestamp>/`
+
+Failure artifacts for `test:e2e` are written to:
+- `tests/e2e/test-results/`
+- `tests/e2e/playwright-report/`

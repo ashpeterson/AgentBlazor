@@ -1,1119 +1,472 @@
 .dojo-workspace {
-    flex: 1;
+    height: 100%;
     min-height: 0;
     display: grid;
-    grid-template-columns: 18.5rem minmax(0, 1fr);
-    column-gap: 0;
-    row-gap: 0;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    background:
+        radial-gradient(circle at top left, rgba(240, 159, 102, 0.12), transparent 30%),
+        linear-gradient(180deg, #fffdf9, #f5efe7);
+    color: #1f2937;
     overflow: hidden;
-    color: #1f2430;
 }
 
-.dojo-workspace__hero,
-.dojo-workspace__mode-panel,
-.dojo-canvas,
-.dojo-stage {
-    border-radius: 1rem;
-    border: 1px solid #e6e5e2;
-    box-shadow: 0 14px 36px rgba(18, 24, 38, 0.05);
+.dojo-workspace ::deep .mud-typography-color-secondary {
+    color: #6b7280 !important;
 }
 
-/* ── Sidebar rail — IDE-style panel, not a card ─────────────────────── */
+.dojo-workspace ::deep .mud-button-filled-primary {
+    background: linear-gradient(135deg, #eb8a57, #d66a3a) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+
+.dojo-workspace ::deep .mud-button-filled-primary:hover {
+    background: linear-gradient(135deg, #df7c47, #c95f30) !important;
+}
+
 .dojo-workspace__rail {
-    height: 100%;
-    align-self: stretch;
-    padding: 0;
-    background: #ffffff;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    box-shadow: none;
-    border-radius: 0;
-    border: 0;
-    border-right: 1px solid #e8e6e3;
+    min-height: 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-right: 1px solid #ece3d8;
     overflow-y: auto;
 }
 
-.dojo-workspace__rail-title {
-    flex-shrink: 0;
-    padding: 1rem 1rem 0.85rem;
-    font-size: 0.95rem;
-    font-weight: 300;
-    letter-spacing: -0.01em;
-    text-transform: none;
-    color: #111827;
-    border-bottom: 1px solid #e8e6e3;
-}
-
+.dojo-workspace__rail-header,
 .dojo-workspace__rail-section {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid #e8e6e3;
+    padding: 1rem;
+    border-bottom: 1px solid #efe7de;
 }
 
-/* Last section (demo list) takes remaining height */
-.dojo-workspace__rail-section:last-child {
+.dojo-workspace__rail-section--fill {
     flex: 1 1 auto;
-    overflow-y: auto;
-    border-bottom: 0;
-    padding-bottom: 1rem;
+    min-height: 0;
 }
 
+.dojo-workspace__eyebrow,
 .dojo-workspace__rail-label {
-    margin: 0;
-    padding: 0;
-    font-size: 0.7rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    font-weight: 600;
-    color: #6b7280;
-    border-bottom: 0;
+    color: #8a6d57;
 }
 
-.dojo-workspace__rail ::deep .mud-input-control {
-    margin-top: 0;
-}
-
-.dojo-workspace__rail ::deep .mud-input-slot {
-    min-height: 2.2rem;
-    border-radius: 0.5rem;
-    background: #f9fafb;
-    font-size: 0.82rem;
-}
-
-/* ── View toggle — tab container with border + shadow ────────────────── */
-.dojo-workspace__view-toggle {
+.dojo-workspace__view-toggle,
+.dojo-inline-toggle {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.2rem;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    padding: 0.2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid #eadfd3;
+    border-radius: 0.9rem;
+    background: rgba(245, 239, 231, 0.72);
 }
 
-.dojo-workspace__view-button {
-    min-height: 1.75rem;
+.dojo-workspace__view-button,
+.dojo-inline-toggle__button,
+.dojo-workspace__prompt-chip,
+.dojo-workspace__demo-item {
     border: 0;
-    border-radius: 0.32rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+.dojo-workspace__view-button,
+.dojo-inline-toggle__button {
+    min-height: 2rem;
+    border-radius: 0.7rem;
     background: transparent;
     color: #6b7280;
-    font-size: 0.75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 120ms ease, color 120ms ease;
-}
-
-.dojo-workspace__view-button:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: #374151;
-}
-
-.dojo-workspace__view-button.is-active {
-    background: #111827;
-    color: #ffffff;
+    font-size: 0.8rem;
     font-weight: 600;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
-/* ── Demo list — flat, IDE-style items ───────────────────────────────── */
+.dojo-workspace__view-button.is-active,
+.dojo-inline-toggle__button.is-active {
+    background: #111827;
+    color: #fff;
+}
+
+.dojo-workspace__prompt-chips,
 .dojo-workspace__demo-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-    padding: 0 0.25rem;
-    margin-top: 0.25rem;
+    display: grid;
+    gap: 0.5rem;
 }
 
-.dojo-workspace__demo-item {
-    width: 100%;
+.dojo-workspace__prompt-chip {
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.85rem;
+    background: #f8f4ef;
+    color: #4b5563;
     text-align: left;
-    color: inherit;
-    border: 0;
-    border-radius: 0.4rem;
-    background: transparent;
-    padding: 0.5rem 0.75rem;
-    display: grid;
-    gap: 0.15rem;
-    cursor: pointer;
     transition: background-color 120ms ease;
 }
 
+.dojo-workspace__prompt-chip:hover,
 .dojo-workspace__demo-item:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: #f0e6db;
+}
+
+.dojo-workspace__demo-item {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.8rem;
+    border-radius: 1rem;
+    background: transparent;
+    text-align: left;
 }
 
 .dojo-workspace__demo-item.is-active {
-    background: rgba(0, 0, 0, 0.06);
-    box-shadow: none;
-    transform: none;
+    background: #f4ede5;
 }
 
 .dojo-workspace__demo-title {
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.95rem;
+    font-weight: 700;
     color: #111827;
 }
 
 .dojo-workspace__demo-description {
-    font-size: 0.75rem;
-    color: #6b7280;
+    font-size: 0.8rem;
     line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    color: #6b7280;
 }
 
 .dojo-workspace__demo-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.2rem;
+    gap: 0.35rem;
 }
 
-.dojo-workspace__demo-tags > span {
-    padding: 0.125rem 0.375rem;
+.dojo-workspace__demo-tags > span,
+.dojo-status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
     border-radius: 999px;
-    background: #f3f4f6;
-    color: #374151;
-    border: 0;
-    font-size: 0.68rem;
-    font-weight: 500;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: #f6ede3;
+    color: #7c5d45;
 }
 
-.dojo-workspace__demo-item.is-active .dojo-workspace__demo-tags > span {
-    background: #111827;
-    color: #fff;
-    border-color: transparent;
+.dojo-status-chip.is-success {
+    background: #e6f6ec;
+    color: #21663a;
 }
 
 .dojo-workspace__main {
     min-width: 0;
-    height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 1rem;
+    padding: 1.25rem;
     overflow: hidden;
-    padding: 0;
 }
 
-/* ── Try asking prompt chips ─────────────────────────────────────────── */
-.dojo-workspace__rail-section--prompts {
-    flex-shrink: 0;
+.dojo-workspace__header {
+    display: grid;
+    gap: 0.35rem;
 }
 
-.dojo-workspace__prompt-chips {
+.dojo-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36rem;
+    gap: 1rem;
+}
+
+.dojo-stage,
+.dojo-card {
+    border: 1px solid #eadfd3;
+    border-radius: 1.4rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 18px 40px rgba(82, 61, 44, 0.08);
+}
+
+.dojo-stage--canvas,
+.dojo-stage--chat-panel,
+.dojo-stage--document {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.dojo-stage--canvas,
+.dojo-stage--document {
+    padding: 1.1rem;
+}
+
+.dojo-stage--document {
+    overflow: auto;
+}
+
+.dojo-stage--chat-panel {
     display: flex;
-    flex-direction: column;
-    gap: 0.28rem;
+    min-width: 0;
 }
 
-.dojo-workspace__prompt-chip {
+.dojo-stage--chat-panel ::deep .ab-chat-surface-shell,
+.dojo-stage--chat-panel ::deep .ab-chat-surface {
     width: 100%;
-    text-align: left;
-    padding: 0.32rem 0.55rem;
-    border-radius: 0.4rem;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
-    color: #374151;
-    font-size: 0.7rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 120ms ease;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    height: 100%;
+    min-height: 0;
 }
 
-.dojo-workspace__prompt-chip:hover {
-    background: #f3f4f6;
-    border-color: #d1d5db;
+.dojo-stage--chat-panel ::deep .ab-chat-surface {
+    border-radius: 1.4rem;
+    background: rgba(255, 255, 255, 0.82);
 }
 
-.dojo-workspace__mode-panel {
-    padding: 1.35rem 1.4rem;
-    background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(245, 239, 232, 0.98));
+.dojo-stage--chat-panel ::deep .ab-chat-surface__timeline {
+    min-height: 0;
+    overflow-y: auto;
 }
 
-.dojo-workspace__mode-eyebrow {
+.dojo-controlled,
+.dojo-declarative,
+.dojo-open-ended {
+    height: 100%;
+    min-height: 0;
+}
+
+.dojo-controlled {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    gap: 1rem;
+}
+
+.dojo-controlled__card,
+.dojo-controlled__feed,
+.dojo-declarative__surface,
+.dojo-open-ended__shell {
+    height: 100%;
+    min-height: 0;
+    padding: 1.2rem;
+}
+
+.dojo-controlled__card {
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+}
+
+.dojo-controlled__card-head,
+.dojo-card__head,
+.dojo-open-ended__toolbar,
+.dojo-declarative__toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dojo-controlled__label {
     margin: 0 0 0.35rem;
-    font-size: 0.73rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 0.78rem;
     font-weight: 700;
-    color: #7d8596;
+    text-transform: uppercase;
+    color: #8a6d57;
+}
+
+.dojo-controlled__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+}
+
+.dojo-key-stat {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.95rem 1rem;
+    border-radius: 1rem;
+    background: #faf6f1;
+}
+
+.dojo-key-stat--wide {
+    grid-column: 1 / -1;
+}
+
+.dojo-key-stat > span {
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8b7768;
+}
+
+.dojo-key-stat > strong {
+    color: #1f2937;
+    font-size: 1rem;
+}
+
+.dojo-controlled__actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.dojo-controlled__button {
+    min-width: 9rem;
+}
+
+.dojo-controlled__feed {
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+}
+
+.dojo-feed {
+    display: grid;
+    gap: 0.7rem;
+    align-content: start;
+}
+
+.dojo-feed__item,
+.dojo-feed__empty {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 0.95rem;
+    background: #faf6f1;
+    color: #4b5563;
+    font-size: 0.9rem;
+}
+
+.dojo-feed__item > strong {
+    font-size: 0.76rem;
+    color: #8a6d57;
+}
+
+.dojo-declarative {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.dojo-declarative__surface {
+    overflow: auto;
+}
+
+.dojo-generated-surface {
+    width: 100%;
+}
+
+.dojo-open-ended__shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.dojo-open-ended__traffic {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+.dojo-open-ended__traffic > i {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    background: #e9d2bf;
+}
+
+.dojo-open-ended__url {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #6b7280;
+    font-size: 0.82rem;
+}
+
+.dojo-open-ended__frame {
+    width: 100%;
+    height: 100%;
+    min-height: 28rem;
+    border: 0;
+    border-radius: 1rem;
+    background: #fff;
+}
+
+.dojo-docs {
+    display: grid;
+    gap: 1rem;
+}
+
+.dojo-docs__intro,
+.dojo-docs__section,
+.dojo-code__section {
+    padding: 1.2rem;
+}
+
+.dojo-code,
+.dojo-docs {
+    display: grid;
+    gap: 1rem;
+}
+
+.dojo-code__head {
+    align-items: start;
+}
+
+.dojo-code__description {
+    margin: 0.35rem 0 0;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.dojo-docs__intro > p,
+.dojo-docs__section > p {
+    max-width: 64ch;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #374151;
+}
+
+.dojo-docs__list {
+    margin: 0.9rem 0 0;
+    padding-left: 1.1rem;
+    color: #4b5563;
+    display: grid;
+    gap: 0.55rem;
 }
 
 .docs-code {
     margin: 0;
     overflow: auto;
     padding: 1rem;
-    border-radius: 0.9rem;
-    background: #fffdfa;
-    border: 1px solid #e7dfd6;
+    border-radius: 1rem;
+    background: #fffaf5;
+    border: 1px solid #eadfd3;
     font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: #2d3543;
-}
-
-.dojo-canvas {
-    flex: 1;
-    min-height: 0;
-    padding: 1.9rem 1.9rem 1.15rem;
-    background:
-        linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(245, 240, 234, 0.98)),
-        radial-gradient(circle at top, rgba(244, 177, 129, 0.12), transparent 32%);
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: 1.1rem;
-    overflow: hidden;
-}
-
-.dojo-canvas--chat {
-    align-items: start;
-}
-
-.dojo-canvas--agentic {
-    flex: 1;
-    min-height: 0;
-    padding: 1rem 1.4rem 2rem;
-    grid-template-rows: 1fr auto auto auto;
-    align-items: center;
-    justify-items: center;
-    background: linear-gradient(180deg, rgba(242, 242, 242, 0.98), rgba(238, 238, 238, 0.98));
-}
-
-.dojo-canvas__prompt-pill {
-    justify-self: end;
-    max-width: 20rem;
-    padding: 0.44rem 0.84rem;
-    border-radius: 999px;
-    border: 1px solid #e5dcd0;
-    background: rgba(255, 255, 255, 0.94);
-    color: #5f6878;
-    font-size: 0.76rem;
-    font-weight: 600;
-}
-
-.dojo-canvas__center-copy {
-    max-width: 34rem;
-    justify-self: center;
-    text-align: center;
-    display: grid;
-    gap: 0.35rem;
-    margin-top: 4.5rem;
-}
-
-.dojo-canvas__center-copy--compact {
-    margin-top: 0.5rem;
-}
-
-.dojo-canvas__center-copy--agentic {
-    max-width: 30rem;
-    margin-top: 0;
-    gap: 0.45rem;
-}
-
-.dojo-canvas__center-copy--agentic ::deep h4 {
-    font-size: 2.15rem;
-    font-weight: 700;
-    color: #202531;
-}
-
-.dojo-canvas__center-copy--agentic ::deep .mud-typography-body2 {
-    font-size: 0.88rem;
-    color: #90959d;
-}
-
-.dojo-canvas__center-copy ::deep h4,
-.dojo-canvas__center-copy ::deep h5 {
-    margin: 0;
-    color: #232a36;
-    letter-spacing: -0.02em;
-}
-
-.dojo-canvas__center-copy ::deep .mud-typography-body2 {
-    color: #747c8c;
-}
-
-.dojo-canvas__suggestions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.45rem;
-}
-
-.dojo-canvas__suggestions > span,
-.dojo-canvas__suggestions > button,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__suggestion-chip {
-    padding: 0.34rem 0.66rem;
-    border-radius: 999px;
-    border: 1px solid #e2e2e2;
-    background: rgba(255, 255, 255, 0.86);
-    color: #4a5160;
-    font-size: 0.68rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 140ms ease, border-color 140ms ease;
-}
-
-.dojo-canvas__suggestions > button:hover {
-    background: rgba(255, 255, 255, 0.98);
-    border-color: #d0ccc8;
-}
-
-.dojo-canvas__chat-shell {
-    width: 100%;
-    max-width: 34rem;
-    margin: 0 auto;
-}
-
-.dojo-canvas__chat-shell--agentic {
-    max-width: 36rem;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface,
-.dojo-stage--sidechat ::deep .ab-chat-surface {
-    height: 100%;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-    padding: 0;
-    gap: 0.65rem;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface {
-    width: 100%;
-    min-height: 10rem;
-    display: grid;
-    align-content: end;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__header,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__body,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__label,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item-role,
-.dojo-stage--sidechat ::deep .ab-chat-surface__header,
-.dojo-stage--sidechat ::deep .ab-chat-surface__body,
-.dojo-stage--sidechat ::deep .ab-chat-surface__label,
-.dojo-stage--sidechat ::deep .ab-chat-surface__item-role,
-.dojo-stage--sidechat ::deep .ab-chat-surface__controls > .ab-chat-surface__select {
-    display: none;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__state,
-.dojo-stage--sidechat ::deep .ab-chat-surface__state {
-    align-self: center;
-    padding: 0.35rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__timeline {
-    max-height: 19rem;
-    padding: 0 0.15rem 0.3rem;
-    gap: 0.9rem;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__timeline {
-    max-height: 12rem;
-    justify-items: center;
-    gap: 0.7rem;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item {
-    max-width: 100%;
-    box-shadow: none;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--assistant,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--activity {
-    align-self: stretch;
-    padding: 0;
-    background: transparent;
-    border: 0;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--assistant.ab-chat-surface__item--generated,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--clarification,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--approval {
-    padding: 1rem;
-    border-radius: 1.15rem;
-    background: rgba(255, 255, 255, 0.84);
-    border: 1px solid #e8e0d7;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--user {
-    max-width: max-content;
-    margin-left: auto;
-    padding: 0.45rem 0.82rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid #e4ddd3;
-    color: #515b6d;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item-text {
-    font-size: 0.94rem;
-    line-height: 1.6;
-    color: #303845;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__item--user .ab-chat-surface__item-text {
-    color: #515b6d;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__activity-list,
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__approval-list,
-.dojo-stage--sidechat ::deep .ab-chat-surface__activity-list,
-.dojo-stage--sidechat ::deep .ab-chat-surface__approval-list {
-    margin-top: 0.75rem;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__controls,
-.dojo-stage--sidechat ::deep .ab-chat-surface__controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-    gap: 0.55rem;
-    padding-top: 0;
-    border-top: 0;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__controls {
-    max-width: 32rem;
-    width: 100%;
-    margin: 0 auto;
-    gap: 0.4rem;
-    align-items: center;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__input {
-    min-height: 3.15rem;
-    padding: 0.98rem 3rem 0.92rem 1.15rem;
-    border-color: #dedede;
-    background: #ffffff;
-    box-shadow: 0 10px 24px rgba(18, 24, 38, 0.05);
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__input-wrapper::before {
-    display: none;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__input-wrapper,
-.dojo-stage--sidechat ::deep .ab-chat-surface__input-wrapper {
-    position: relative;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__input-wrapper::before,
-.dojo-stage--sidechat ::deep .ab-chat-surface__input-wrapper::before {
-    content: "+";
-    position: absolute;
-    left: 0.95rem;
-    bottom: 0.86rem;
-    width: 1.35rem;
-    height: 1.35rem;
-    border-radius: 999px;
-    color: #9098a8;
-    font-size: 1rem;
-    line-height: 1.35rem;
-    text-align: center;
-    pointer-events: none;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__input,
-.dojo-stage--sidechat ::deep .ab-chat-surface__input {
-    min-height: 3.15rem;
-    padding: 0.92rem 1rem 0.85rem 2.75rem;
-    border-radius: 1.05rem;
-    border: 1px solid #e1d8ce;
-    background: rgba(255, 255, 255, 0.98);
-    color: #202733;
-    resize: vertical;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__input {
-    border-radius: 999px;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__input {
-    min-height: 3rem;
-    padding: 0.9rem 3rem 0.84rem 2.7rem;
-    border-color: #e3ddd3;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 8px 18px rgba(18, 24, 38, 0.05);
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
-.dojo-stage--sidechat ::deep .ab-chat-surface__submit {
-    align-self: end;
-    min-width: 2.25rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0;
-    border-radius: 999px;
-    background: #eef0f4;
-    color: #6d7688;
-    box-shadow: none;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__submit {
-    min-width: 2rem;
-    width: 2rem;
-    height: 2rem;
-    background: #202531;
-    color: #ffffff;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit::before,
-.dojo-stage--sidechat ::deep .ab-chat-surface__submit::before {
-    content: "↑";
-    font-size: 0.94rem;
-    font-weight: 700;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
-.dojo-stage--sidechat ::deep .ab-chat-surface__submit {
-    font-size: 0;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit:hover:not(:disabled),
-.dojo-stage--sidechat ::deep .ab-chat-surface__submit:hover:not(:disabled) {
-    background: #e4e8ef;
-    transform: none;
-}
-
-.dojo-canvas__chat-shell--agentic ::deep .ab-chat-surface__submit:hover:not(:disabled) {
-    background: #151922;
-}
-
-.dojo-canvas__chat-shell ::deep .ab-chat-surface__submit:disabled,
-.dojo-stage--sidechat ::deep .ab-chat-surface__submit:disabled {
-    opacity: 0.55;
-}
-
-.dojo-canvas__agentic-note {
-    margin: 0;
-    font-size: 0.62rem;
-    color: #9ea3ab;
-    text-align: center;
-}
-
-.dojo-canvas__suggestions--agentic {
-    gap: 0.45rem;
-}
-
-.dojo-canvas__suggestions--agentic > span,
-.dojo-canvas__suggestions--agentic > button {
-    background: rgba(255, 255, 255, 0.66);
-    color: #4a5260;
-    font-size: 0.62rem;
-    padding: 0.24rem 0.52rem;
-}
-
-.dojo-backend-panel,
-.dojo-checklist,
-.dojo-progress-board {
-    max-width: 32rem;
-    width: 100%;
-    margin: 0 auto;
-    padding: 1.1rem;
-    border-radius: 1.1rem;
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid #e8e0d7;
-    box-shadow: 0 16px 32px rgba(18, 24, 38, 0.04);
-}
-
-.dojo-backend-panel {
-    display: grid;
-    gap: 0.85rem;
-}
-
-.dojo-backend-panel__submit {
-    min-height: 3rem;
-}
-
-.dojo-backend-panel__events {
-    display: grid;
-    gap: 0.45rem;
-}
-
-.dojo-backend-panel__event {
-    padding: 0.62rem 0.75rem;
-    border-radius: 0.85rem;
-    background: #f7f5f1;
-    border: 1px solid #e8e0d7;
-    font-size: 0.8rem;
-    color: #5d6575;
-}
-
-.dojo-checklist__head,
-.dojo-progress-board__head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.7rem;
-}
-
-.dojo-checklist__meta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #7a8090;
-}
-
-.dojo-checklist__status {
-    padding: 0.16rem 0.44rem;
-    border-radius: 999px;
-    background: #eef1ff;
-    color: #6b7bf6;
-}
-
-.dojo-checklist__progress,
-.dojo-progress-board__progress {
-    width: 100%;
-    height: 0.35rem;
-    margin-bottom: 0.85rem;
-    border-radius: 999px;
-    overflow: hidden;
-    background: #e7e0d8;
-}
-
-.dojo-checklist__progress > span,
-.dojo-progress-board__progress > span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, #6c7ff8, #b059df);
-}
-
-.dojo-checklist__item,
-.dojo-progress-board__item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 0.45rem;
-    padding: 0.72rem 0.8rem;
-    border-radius: 0.85rem;
-    border: 1px solid #e5ded5;
-    background: #f8f6f2;
-    font-size: 0.84rem;
-    color: #3d4657;
-}
-
-.dojo-checklist__item {
-    cursor: pointer;
-}
-
-.dojo-checklist__item.is-selected {
-    background: #f0efff;
-}
-
-.dojo-checklist__checkbox,
-.dojo-progress-board__dot {
-    flex: 0 0 auto;
-}
-
-.dojo-checklist__checkbox {
-    width: 1rem;
-    height: 1rem;
-    border-radius: 0.28rem;
-    background: #6d80f8;
-    color: #ffffff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.68rem;
-}
-
-.dojo-progress-board__item.is-complete {
-    background: #edf7ee;
-    color: #396d48;
-}
-
-.dojo-progress-board__dot {
-    width: 0.9rem;
-    height: 0.9rem;
-    border-radius: 999px;
-    border: 2px solid #a3acb9;
-}
-
-.dojo-progress-board__item.is-complete .dojo-progress-board__dot {
-    background: #46a05e;
-    border-color: #46a05e;
-}
-
-.dojo-split-stage {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 23rem;
-    gap: 1rem;
-    overflow: hidden;
-}
-
-.dojo-split-stage--tool-ui {
-    grid-template-columns: minmax(0, 1fr) 24rem;
-}
-
-.dojo-stage {
-    height: 100%;
-    min-height: 0;
-    background: linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(245, 239, 232, 0.98));
-    overflow: hidden;
-}
-
-.dojo-stage--artifact {
-    padding: 1.4rem;
-    overflow-y: auto;
-}
-
-.dojo-stage--sidechat {
-    height: 100%;
-    display: grid;
-    grid-template-rows: auto auto 1fr;
-    background: linear-gradient(180deg, rgba(252, 251, 248, 0.98), rgba(247, 243, 237, 0.98));
-}
-
-.dojo-sidechat__head {
-    padding: 1rem 1rem 0.8rem;
-    border-bottom: 1px solid #ece3d8;
-    background: rgba(255, 255, 255, 0.58);
-}
-
-.dojo-sidechat__head p {
-    margin: 0;
-    font-size: 0.8rem;
-    line-height: 1.4;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: #232a36;
-}
-
-.dojo-sidechat__note {
-    margin: 0;
-    padding: 0.9rem 1rem 0;
-    color: #747c8c;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface {
-    padding: 1rem;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__timeline {
-    padding: 0 0 0.4rem;
-    gap: 0.75rem;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__item {
-    max-width: 90%;
-    box-shadow: none;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--assistant,
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--activity {
-    padding: 0.8rem 0.92rem;
-    border-radius: 1rem;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid #e7e0d7;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--user {
-    margin-left: auto;
-    padding: 0.78rem 0.9rem;
-    border: 0;
-    border-radius: 1rem;
-    background: linear-gradient(135deg, #8fb2ff, #6f89ff);
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--user .ab-chat-surface__item-text {
-    color: #ffffff;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--approval,
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--clarification,
-.dojo-stage--sidechat ::deep .ab-chat-surface__item--assistant.ab-chat-surface__item--generated {
-    max-width: 100%;
-    background: #ffffff;
-    border: 1px solid #e7e0d7;
-}
-
-.dojo-stage--sidechat ::deep .ab-chat-surface__controls {
-    padding-top: 0.25rem;
-    border-top: 1px solid #ebe3da;
-}
-
-.dojo-generated-surface {
-    height: 100%;
-}
-
-.dojo-generated-surface ::deep .mud-paper,
-.dojo-stage--artifact ::deep .mud-paper {
-    background: rgba(255, 255, 255, 0.92);
-}
-
-.dojo-recipe__header,
-.dojo-recipe__actions {
-    margin-bottom: 0.85rem;
-}
-
-.dojo-recipe__meta {
-    margin-bottom: 0.75rem;
-}
-
-.dojo-recipe__section {
-    margin-top: 1rem;
-}
-
-.dojo-recipe__flags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem 1rem;
-}
-
-.dojo-recipe__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: 0.6rem;
-}
-
-.dojo-recipe__card,
-.dojo-recipe__step-card {
-    border-radius: 0.95rem;
-    border: 1px solid #e8e0d7;
-    background: rgba(255, 255, 255, 0.94);
-}
-
-.dojo-recipe__card {
-    padding: 0.78rem;
-}
-
-.dojo-recipe__steps {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 0.6rem;
-}
-
-.dojo-recipe__steps li {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.55rem;
-    align-items: start;
-}
-
-.dojo-recipe__steps li::before {
-    content: counter(list-item);
-    width: 1.55rem;
-    height: 1.55rem;
-    margin-top: 0.25rem;
-    border-radius: 999px;
-    background: #f07f54;
-    color: #ffffff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.76rem;
-    font-weight: 700;
-}
-
-.dojo-recipe__step-card {
-    padding: 0.82rem 0.88rem;
-}
-
-.dojo-document {
-    padding: 0.35rem 0.2rem;
-    font-size: 0.94rem;
-    line-height: 1.7;
-    color: #2e3644;
-}
-
-.dojo-document__label {
-    margin: 0 0 1rem;
-    font-size: 0.74rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-weight: 700;
-    color: #7d8596;
-}
-
-.dojo-document__line {
-    display: inline-block;
-    margin: 0 0 0.6rem;
-    padding: 0.15rem 0.28rem;
-    border-radius: 0.32rem;
-}
-
-.dojo-document__line--accepted {
-    background: rgba(124, 195, 132, 0.25);
-}
-
-.dojo-document__line--removed {
-    background: rgba(238, 153, 153, 0.2);
-    text-decoration: line-through;
-}
-
-.dojo-document__line--muted {
-    color: #697285;
-}
-
-.dojo-approval-card {
-    margin: 0.95rem 1rem 0;
-    padding: 1rem;
-    border-radius: 0.95rem;
-    border: 1px solid #e8e0d7;
-    background: rgba(255, 255, 255, 0.94);
-}
-
-.dojo-workspace ::deep .mud-input-slot {
-    border-radius: 0.85rem;
-}
-
-.dojo-workspace ::deep .mud-input-outlined-border {
-    border-color: #ddd6cc;
-}
-
-.dojo-workspace ::deep .mud-button {
-    border-radius: 0.8rem;
-    text-transform: none;
-    font-weight: 700;
-    box-shadow: none;
-}
-
-.dojo-workspace ::deep .mud-button-outlined {
-    border-color: #e1b097;
-    color: #e8774f;
-}
-
-.dojo-workspace ::deep .mud-button-filled {
-    background: linear-gradient(135deg, #f08b5b, #eb7448);
-}
-
-.dojo-workspace ::deep .mud-chip {
-    font-weight: 700;
-}
-
-.dojo-canvas__poem {
-    max-width: 28rem;
-    padding: 1.2rem 1.35rem;
-    border-radius: 1.1rem;
-    border: 1px solid #e5dcd0;
-    background: rgba(255, 255, 255, 0.86);
-    text-align: center;
-}
-
-.dojo-canvas__poem-title {
-    margin: 0 0 0.65rem;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: #8a7362;
-}
-
-.dojo-canvas__poem-text {
-    margin: 0;
-    font-family: "Public Sans", sans-serif;
-    font-size: 0.95rem;
-    line-height: 1.85;
-    color: #303845;
-    white-space: pre-wrap;
+    font-size: 0.81rem;
+    line-height: 1.65;
+    color: #243041;
 }
 
 @media (max-width: 1180px) {
-    .dojo-split-stage,
-    .dojo-split-stage--tool-ui {
-        grid-template-columns: 1fr;
+    .dojo-preview {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(22rem, 28rem);
     }
 
-    .dojo-stage--sidechat {
-        min-height: 26rem;
+    .dojo-controlled {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
     .dojo-workspace {
         grid-template-columns: 1fr;
-        height: auto;
-        min-height: 100dvh;
-        overflow: visible;
-    }
-
-    .dojo-workspace__rail {
-        height: auto;
-        border-right: 0;
-        border-bottom: 1px solid #e8e6e3;
-        overflow-y: visible;
-    }
-
-    .dojo-workspace__rail-section:last-child {
-        overflow-y: visible;
-        flex: none;
+        grid-template-rows: auto minmax(0, 1fr);
     }
 
     .dojo-workspace__main {
-        height: auto;
-        overflow: visible;
-        padding: 0;
-    }
-
-    .dojo-canvas--agentic {
-        flex: none;
-        min-height: calc(100dvh - 2rem);
+        padding: 1rem;
     }
 }
 
-@media (max-width: 760px) {
-    .dojo-canvas,
-    .dojo-stage--artifact {
-        padding: 1rem;
-    }
 
-    .dojo-canvas__center-copy {
-        margin-top: 1rem;
-    }
-
-    .dojo-canvas--agentic {
-        min-height: calc(100dvh - 1rem);
-        padding: 1rem;
-    }
-
-    .dojo-canvas__center-copy--agentic ::deep h4 {
-        font-size: 1.6rem;
-    }
-
-    .dojo-canvas__chat-shell,
-    .dojo-backend-panel,
-    .dojo-checklist,
-    .dojo-progress-board {
-        max-width: 100%;
-    }
-
-    .dojo-canvas__chat-shell ::deep .ab-chat-surface__controls,
-    .dojo-stage--sidechat ::deep .ab-chat-surface__controls {
-        grid-template-columns: 1fr;
-    }
-
-    .dojo-canvas__chat-shell ::deep .ab-chat-surface__submit,
-    .dojo-stage--sidechat ::deep .ab-chat-surface__submit {
-        width: 100%;
-    }
-
-    .dojo-canvas__chat-shell ::deep .ab-chat-surface__submit::before,
-    .dojo-stage--sidechat ::deep .ab-chat-surface__submit::before {
-        content: "Send";
-        font-size: 0.86rem;
-    }
-}

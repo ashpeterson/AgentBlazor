@@ -101,7 +101,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
 {
   "message": "Natural language reply shown to the user (always required)",
   "actions": [
-    { "agentId": "component-instance-id", "action": "action_name", "args": {} }
+    { "agentId": "<exact agentId from ACTIVE COMPONENTS>", "action": "<exact action name from ACTIVE COMPONENTS>", "args": {} }
   ],
   "ui": [
     { "type": "summary.card", "title": "...", "description": "..." }
@@ -119,6 +119,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         sb.AppendLine("- Only set needsClarification=true if CRITICAL information is truly missing and cannot be inferred.");
         sb.AppendLine("- If the user provides ANY data values, use them — do not ask for clarification.");
         sb.AppendLine("- Do not invent agentIds, action names, or routes not listed below.");
+        sb.AppendLine("- Never output placeholder values such as `component-instance-id`, `action_name`, `<agentId>`, or similar template text.");
         sb.AppendLine("- Include all required parameters for each action.");
         sb.AppendLine("- Treat SHARED STATE as the canonical app/session context.");
         sb.AppendLine();
@@ -144,6 +145,7 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
         }
 
         BuildActiveComponentsSection(sb, request);
+        BuildSingleActiveTargetSection(sb, request);
         BuildSharedStateSection(sb, request);
         BuildServiceToolsSection(sb, request);
 
@@ -398,6 +400,29 @@ internal sealed class AgentPlanner : IStructuredActionPlanner
             _logger?.LogWarning(ex, "Failed to parse AgentPlanner response: {Response}", responseText);
             return ActionPlan.NeedsClarification("I couldn't understand that request. Can you rephrase?");
         }
+    }
+
+    private static void BuildSingleActiveTargetSection(StringBuilder sb, ActionPlanRequest request)
+    {
+        var actionable = request.MountedComponents
+            .Where(static component => component.Actions.Count > 0)
+            .ToArray();
+
+        if (actionable.Length != 1)
+        {
+            return;
+        }
+
+        var only = actionable[0];
+        sb.AppendLine("# SINGLE ACTIVE TARGET");
+        sb.AppendLine("There is exactly one actionable mounted component on this route.");
+        sb.Append("Always use agentId: \"").Append(only.AgentId).AppendLine("\" for UI actions on this route.");
+        sb.AppendLine("Do not invent alternative agentIds, aliases, or manager names.");
+        sb.AppendLine("Do not invent field-specific actions like fill_owner, set_owner, set_severity, or manager-style component ids.");
+        sb.AppendLine("When the user wants to edit one field, use the listed compound update action if that is what ACTIVE COMPONENTS exposes.");
+        sb.Append("Available actions on this target: ")
+            .AppendLine(string.Join(", ", only.Actions.Select(static action => action.ActionId)));
+        sb.AppendLine();
     }
 
     private static IReadOnlyList<AgentUiToolCall> BuildUiToolCalls(IReadOnlyList<PlannerUiBlock>? blocks)
