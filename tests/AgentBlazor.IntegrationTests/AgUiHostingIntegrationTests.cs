@@ -120,7 +120,7 @@ public class AgUiHostingIntegrationTests
     }
 
     [Fact]
-    public async Task AgUiRun_PaidTier_BlocksPremiumSubmitAction()
+    public async Task AgUiRun_PaidTier_ExecutesFormSubmitAction()
     {
         var app = await CreateAppAsync(
             BuildPlanJson("AgentForm", "submit"),
@@ -146,14 +146,9 @@ public class AgUiHostingIntegrationTests
             Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
             Assert.Contains("RUN_STARTED", body, StringComparison.Ordinal);
             Assert.Contains("RUN_FINISHED", body, StringComparison.Ordinal);
-            Assert.Contains("Current tier: Paid", body, StringComparison.Ordinal);
-            var hasPolicyFilteredSummary = body.Contains("Filtered actions:", StringComparison.Ordinal);
-            var hasTierValidationMessage = body.Contains("requires", StringComparison.Ordinal)
-                && body.Contains("Current tier: Paid.", StringComparison.Ordinal);
-            Assert.True(
-                hasPolicyFilteredSummary || hasTierValidationMessage,
-                $"Expected blocked-tier diagnostics in stream body. Actual body: {body}");
-            Assert.Equal(0, executor.CallCount);
+            Assert.Contains("TOOL_CALL_START", body, StringComparison.Ordinal);
+            Assert.Contains("TOOL_CALL_END", body, StringComparison.Ordinal);
+            Assert.True(executor.CallCount >= 1, "Executor should be called at least once");
         }
         finally
         {

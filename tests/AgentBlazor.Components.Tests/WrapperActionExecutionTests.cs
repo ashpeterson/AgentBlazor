@@ -77,7 +77,7 @@ public class WrapperActionExecutionTests
         }));
         var page = await grid.ExecuteActionAsync(AgentAction.Create("go_to_page", new Dictionary<string, object?>
         {
-            ["pageIndex"] = 1,
+            ["page"] = 2,
             ["pageSize"] = 2
         }));
         var navigate = await grid.ExecuteActionAsync(AgentAction.Create("select_row", new Dictionary<string, object?>
@@ -91,6 +91,7 @@ public class WrapperActionExecutionTests
         Assert.True(page.Succeeded);
         Assert.True(navigate.Succeeded);
         Assert.True(clear.Succeeded);
+        Assert.Contains("page 2", page.Message, StringComparison.OrdinalIgnoreCase);
 
         Assert.Null(grid.FilterColumn);
         Assert.Null(grid.FilterOperator);
@@ -113,6 +114,7 @@ public class WrapperActionExecutionTests
         var state = grid.GetCurrentState();
         Assert.Equal("RiskScore", state["sortColumn"]?.ToString());
         Assert.Equal("desc", state["sortDirection"]?.ToString());
+        Assert.Equal(1, state["currentPage"]);
         Assert.Null(state["filterColumn"]);
         Assert.Null(state["filterOperator"]);
         Assert.Equal("S3", state["focusedRowKey"]?.ToString());

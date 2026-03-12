@@ -1,8 +1,8 @@
-# Pricing Tiers (Current Wiring)
+# Pricing Tiers
 
-Last updated: 2026-03-05
+Last updated: 2026-03-12
 
-This document describes the current tier model and what is wired in code today.
+This document describes the current tier model and the current reality of what is wired in code.
 
 ## Tier Model
 
@@ -10,86 +10,194 @@ This document describes the current tier model and what is wired in code today.
 - `Paid`
 - `Premium`
 
-Tier primitives live in `AgentBlazor.Licensing/AgentBlazorTier.cs`.
+Tier primitives live in `AgentBlazor.Licensing`.
 
-## How Tiers Are Configured
+## Configuration
 
-Primary path (recommended):
+Recommended path:
 
 ```csharp
 builder.Services.AddAgentBlazor(options =>
 {
     options.UseProLicense("AB-PRO-..."); // Paid
-    // or: options.UseProLicense("AB-ENT-..."); // Premium
+    // or:
+    // options.UseProLicense("AB-ENT-..."); // Premium
 });
 ```
 
 `UseProLicense(...)` currently:
 
-- Validates key format (`AB-PRO-` or `AB-ENT-`, minimum length 24)
-- Sets `AgentBlazorOptions.LicensedTier`
-- Replaces free defaults with paid service implementations
+- validates the key format
+- sets `AgentBlazorOptions.LicensedTier`
+- swaps in paid service implementations
 
-Legacy/hosted compatibility path also exists:
+Dev tools are separate from paid licensing:
 
 ```csharp
-builder.Services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseDevTools(autoShow: true);
+});
 ```
 
-## Component Action Tier Map (Source of Truth)
+The inspector is not a paid-only capability.
 
-Defined in `src/AgentBlazor.Core/Components/AgentComponentTierBoundaries.cs`.
+## Current Component Action Tier Map
 
-| Feature key | Component actions | Required tier |
-|---|---|---|
-| `agentblazor.components.datagrid.basic` | `AgentDataGrid.filter`, `AgentDataGrid.clear_filters`, `AgentDataGrid.sort` | `Free` |
-| `agentblazor.components.datagrid.advanced` | `AgentDataGrid.select_row`, `AgentDataGrid.navigate_to_row`, `AgentDataGrid.go_to_page`, `AgentDataGrid.set_page` | `Paid` |
-| `agentblazor.components.dialog.flow` | `AgentDialog.open`, `AgentDialog.close`, `AgentDialog.confirm` | `Free` |
-| `agentblazor.components.form.assist` | `AgentForm.set_field`, `AgentForm.validate`, `AgentForm.reset` | `Free` |
-| `agentblazor.components.form.submission` | `AgentForm.submit` | `Premium` |
-| `agentblazor.components.navigation.internal` | `AgentNavMenu.navigate_to` | `Free` |
-| `agentblazor.components.navigation.external` | `AgentNavMenu.navigate_external` | `Premium` |
-| `agentblazor.components.tabs.navigation` | `AgentTabs.switch_tab` | `Free` |
-| `agentblazor.components.select.basic` | `AgentSelect.open`, `AgentSelect.close`, `AgentSelect.set_value`, `AgentSelect.clear` | `Free` |
-| `agentblazor.components.autocomplete.basic` | `AgentAutocomplete.set_query`, `AgentAutocomplete.select_option`, `AgentAutocomplete.clear` | `Free` |
-| `agentblazor.components.datepicker.basic` | `AgentDatePicker.set_date`, `AgentDatePicker.clear` | `Free` |
-| `agentblazor.components.daterangepicker.basic` | `AgentDateRangePicker.set_range`, `AgentDateRangePicker.clear` | `Free` |
-| `agentblazor.components.treeview.basic` | `AgentTreeView.expand`, `AgentTreeView.collapse`, `AgentTreeView.select_node` | `Free` |
-| `agentblazor.components.stepper.basic` | `AgentStepper.go_to_step`, `AgentStepper.next`, `AgentStepper.previous` | `Free` |
-| `agentblazor.components.commandbar.basic` | `AgentCommandBar.invoke_command`, `AgentCommandBar.list_commands` | `Free` |
-| `agentblazor.components.fileupload.basic` | `AgentFileUpload.attach`, `AgentFileUpload.remove`, `AgentFileUpload.list_files` | `Free` |
+Source of truth:
 
-## What Changes by Tier Today
+- `src/AgentBlazor.Core/Components/AgentComponentTierBoundaries.cs`
 
-### Free (default)
+### Free
 
-- `IActionHistoryStore` -> `NullActionHistoryStore`
-- `IAdaptiveSuggestionService` -> `StaticSuggestionService`
-- `IProactiveInsightService` -> `NullProactiveInsightService`
-- `IAgentInspectorStore` -> `NullAgentInspectorStore`
-- Runtime extension hooks via `IAgentRuntimeEventSubscriber`
-- Conversation persistence options (`UseConversationStore<TStore>()`, `UseJsonFileConversationStore(...)`)
+All currently shipped built-in component actions are free.
 
-### Paid / Premium (via `UseProLicense`)
+This includes:
 
-- `IActionHistoryStore` -> `InMemoryActionHistoryStore`
-- `IAdaptiveSuggestionService` -> `LlmAdaptiveSuggestionService`
-- `IProactiveInsightService` -> `LlmProactiveInsightService`
-- `IAgentInspectorStore` -> `InMemoryAgentInspectorStore`
+- `AgentDataGrid`
+  - `filter`
+  - `sort`
+  - `clear_filters`
+  - `select_row`
+  - `navigate_to_row`
+  - `go_to_page`
+  - `set_page`
+- `AgentDialog`
+  - `open`
+  - `close`
+  - `confirm`
+- `AgentForm`
+  - `set_field`
+  - `validate`
+  - `reset`
+  - `submit`
+- `AgentNavMenu`
+  - `navigate_to`
+  - `navigate_external`
+- `AgentTabs`
+  - `switch_tab`
+- `AgentSelect`
+  - `open`
+  - `close`
+  - `set_value`
+  - `clear`
+- `AgentAutocomplete`
+  - `set_query`
+  - `select_option`
+  - `clear`
+- `AgentDatePicker`
+  - `set_date`
+  - `clear`
+- `AgentDateRangePicker`
+  - `set_range`
+  - `clear`
+- `AgentTreeView`
+  - `expand`
+  - `collapse`
+  - `select_node`
+- `AgentStepper`
+  - `go_to_step`
+  - `next`
+  - `previous`
+- `AgentCommandBar`
+  - `invoke_command`
+  - `list_commands`
+- `AgentFileUpload`
+  - `attach`
+  - `remove`
+  - `list_files`
+
+## Why This Changed
+
+The current product boundary is:
+
+- core component interaction is part of the free platform
+- paid value should come from intelligence, history, and insights
+
+This means the repo no longer treats baseline component actions as monetized capabilities.
+
+## What Paid Currently Enables
+
+`UseProLicense(...)` currently swaps in:
+
+- `IActionHistoryStore -> InMemoryActionHistoryStore`
+- `IAdaptiveSuggestionService -> LlmAdaptiveSuggestionService`
+- `IProactiveInsightService -> LlmProactiveInsightService`
+- `IAgentInspectorStore -> InMemoryAgentInspectorStore`
+
+## Free Tier Service Defaults
+
+Default free registrations are:
+
+- `IActionHistoryStore -> NullActionHistoryStore`
+- `IAdaptiveSuggestionService -> StaticSuggestionService`
+- `IProactiveInsightService -> NullProactiveInsightService`
+- `IAgentInspectorStore -> NullAgentInspectorStore`
+
+Note:
+
+- `UseDevTools()` can still replace the null inspector store for development without a paid license
+
+## Important Limitation
+
+The current paid story is only partially complete.
+
+What exists:
+
+- action history abstraction
+- adaptive suggestion service
+- proactive insight service
+
+What is still missing:
+
+- durable persistent action history
+- mature cross-session user personalization
+- a finished "persistent user usage for intelligent suggestions" product story
+
+Today the main limitation is that the shipped paid action history implementation is still in-memory, so it does not yet represent durable long-term user intelligence.
 
 ## Enforcement Status
 
-Action-to-tier boundaries are now hard-enforced at runtime:
+Tier enforcement is still real even though current component actions are free.
 
-- agent policy + tier filters are applied before planning when building allowed component actions
-- blocked outcomes return deterministic user-readable diagnostics with current tier context
-- validation also emits explicit tier-required diagnostics when a planned action is above current entitlement
-- AG-UI hosted and standard runtime paths both surface the same blocked-action behavior
+The runtime still:
 
-Service activation differences by tier (history/suggestions/inspector/insights) still apply in addition to action gating.
+- computes allowed actions based on policy and tier
+- blocks actions deterministically when required
+- returns user-readable diagnostics for blocked actions
+- surfaces the same blocked outcomes through both standard runtime and AG-UI paths
 
-## Packaging Summary
+At the moment, that enforcement matters more for future paid intelligence/services than for the currently shipped component actions.
 
-- `Free`: Core runtime + wrapper actions + basic chat UX
-- `Paid`: Adds adaptive suggestions and action history-backed intelligence
-- `Premium`: Adds highest tier for boundaries intended for sensitive actions (for example form submission/external navigation) plus full paid service stack
+## Recommended Product Boundary
+
+The current repository supports this product direction best:
+
+### Free
+
+- deterministic runtime
+- built-in agentic components
+- Blazor-native chat surfaces
+- AG-UI hosting
+- Dojo and agentic component demos
+- dev tools / inspector for development
+
+### Paid
+
+- action history-backed intelligence
+- adaptive suggestions
+- proactive insights
+- future durable user-behavior personalization
+
+### Premium
+
+- reserved for deeper governance, analytics, or enterprise controls once those are real product features
+
+## Summary
+
+Current truth:
+
+- the tier model exists
+- the component-action surface is now free
+- paid differentiation is intended to be intelligence-driven
+- the durable persistent intelligence story has started, but is not finished yet

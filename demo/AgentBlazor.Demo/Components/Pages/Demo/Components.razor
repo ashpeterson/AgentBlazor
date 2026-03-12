@@ -12,369 +12,422 @@
 
 <PageTitle>Components — AgentBlazor Demo</PageTitle>
 
-<div class="demo-doc-page components-page">
-    <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Components</p>
-        <MudText Typo="Typo.h5">AgentBlazor Component Explorer</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            MudBlazor-docs style explorer for every shipped wrapper. Use the left navigation to drill into a single component,
-            or stay on overview to validate the full stack in one pass.
-        </MudText>
+<div class="components-page">
+    <aside class="components-page__catalog">
+        <nav class="components-page__catalog-card" aria-label="Components">
+            <p class="components-page__catalog-label">Component Catalog</p>
+            <div class="components-page__catalog-nav">
+                <a class="components-page__catalog-link @(IsOverviewRoute ? "is-active" : null)"
+                   href="/demo/components"
+                   aria-current="@(IsOverviewRoute ? "page" : null)">
+                    <span>Overview</span>
+                    <small>Choose a component, then drive it with the chat bubble.</small>
+                </a>
 
-        <div class="demo-doc-page__toc">
-            @foreach (var entry in _componentEntries)
-            {
-                <a class="demo-doc-page__toc-link" href="@entry.Href">@entry.Title</a>
-            }
-            <a class="demo-doc-page__toc-link" href="/demo/components/attribute-based">Attribute-Based Example</a>
-        </div>
-    </MudPaper>
+                @foreach (var entry in _componentEntries)
+                {
+                    <a class="components-page__catalog-link @(IsSelected(entry) ? "is-active" : null)"
+                       href="@entry.Href"
+                       aria-current="@(IsSelected(entry) ? "page" : null)">
+                        <span>@entry.Title</span>
+                        <small>@entry.NavSummary</small>
+                    </a>
+                }
 
-    @if (IsUnknownComponent)
-    {
-        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
-            Unknown component route: <code>@ComponentKey</code>. Showing overview instead.
-        </MudAlert>
-    }
-
-    @if (Show("overview"))
-    {
-        <section class="demo-doc-page__section">
-            <MudText Typo="Typo.h6">Coverage</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                Supported wrappers in this explorer: AgentDataGrid, AgentForm, AgentDialog, AgentTabs, AgentSelect,
-                AgentAutocomplete, AgentDatePicker, AgentDateRangePicker, AgentTreeView, AgentStepper,
-                AgentCommandBar, and AgentFileUpload.
-            </MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Final parity example: <MudLink Href="/demo/components/attribute-based">Attribute-based component automation</MudLink>.
-            </MudText>
-        </section>
-    }
-
-    @if (Show("datagrid"))
-    {
-        <section id="datagrid" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentDataGrid</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>sort suppliers by risk score descending</code>, <code>filter region EMEA</code>, <code>go to page 2</code>.
-                </MudText>
+                <a class="components-page__catalog-link" href="/demo/components/attribute-based">
+                    <span>Custom Attribute-Based Component</span>
+                    <small>Use <code>AgentControllableComponentBase</code> for your own component contract.</small>
+                </a>
             </div>
-            <AgentDataGrid TItem="GridSupplierRow"
-                           AgentId="components-datagrid"
-                           Items="@_gridRows"
-                           Dense="true"
-                           Hover="true"
-                           Bordered="true"
-                           Striped="true"
-                           RowKeyProperty="Id">
-                <Columns>
-                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Id" Title="ID" />
-                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
-                    <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
-                    <PropertyColumn T="GridSupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
-                </Columns>
-            </AgentDataGrid>
-        </section>
-    }
+        </nav>
+    </aside>
 
-    @if (Show("form"))
-    {
-        <section id="form" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentForm</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>set supplier name to Apex Labs</code>, <code>set risk tier to High</code>, <code>submit form</code>.
-                </MudText>
-            </div>
-
-            <AgentForm AgentId="components-form" Model="@_componentFormModel" Submitted="OnComponentFormSubmittedAsync">
-                <ChildContent Context="formContext">
-                    <DataAnnotationsValidator />
-                    <MudGrid Spacing="2">
-                        <MudItem xs="12" md="6">
-                            <MudTextField T="string"
-                                          Label="Supplier Name"
-                                          For="@(() => _componentFormModel.SupplierName)"
-                                          @bind-Value="_componentFormModel.SupplierName" />
-                        </MudItem>
-                        <MudItem xs="12" md="3">
-                            <MudSelect T="string"
-                                       Label="Risk Tier"
-                                       For="@(() => _componentFormModel.RiskTier)"
-                                       @bind-Value="_componentFormModel.RiskTier">
-                                <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
-                        <MudItem xs="12" md="3">
-                            <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_componentFormModel.NeedsExpedite" />
-                        </MudItem>
-                    </MudGrid>
-                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Submit</MudButton>
-                    </MudStack>
-                </ChildContent>
-            </AgentForm>
-        </section>
-    }
-
-    @if (Show("dialog"))
-    {
-        <section id="dialog" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentDialog</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>open dialog</code>, <code>confirm dialog</code>, <code>close dialog</code>.
-                </MudText>
-            </div>
-
-            <MudStack Row="true" Spacing="1" Class="mb-2">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenComponentDialogAsync">Open Dialog</MudButton>
-                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Close Dialog</MudButton>
-            </MudStack>
-
-            <AgentDialog @ref="_componentDialog"
-                         AgentId="components-dialog"
-                         Visible="@_componentDialogVisible"
-                         VisibleChanged="OnComponentDialogVisibleChanged">
-                <TitleContent>
-                    <MudText Typo="Typo.h6">Supplier Policy Confirmation</MudText>
-                </TitleContent>
-                <DialogContent>
-                    <MudText Typo="Typo.body2">Confirm this supplier can move from review to approval.</MudText>
-                </DialogContent>
-                <DialogActions>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmComponentDialogAsync">Confirm</MudButton>
-                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Cancel</MudButton>
-                </DialogActions>
-            </AgentDialog>
-        </section>
-    }
-
-    @if (Show("tabs"))
-    {
-        <section id="tabs" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentTabs</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>switch to policy tab</code>.</MudText>
-            </div>
-            <AgentTabs AgentId="components-tabs">
-                <MudTabPanel Text="Summary">
-                    <MudText Typo="Typo.body2">Supplier overview and risk summary.</MudText>
-                </MudTabPanel>
-                <MudTabPanel Text="Policy">
-                    <MudText Typo="Typo.body2">Policy controls and compliance checks.</MudText>
-                </MudTabPanel>
-                <MudTabPanel Text="Audit">
-                    <MudText Typo="Typo.body2">Audit logs and evidence bundle state.</MudText>
-                </MudTabPanel>
-            </AgentTabs>
-        </section>
-    }
-
-    @if (Show("select"))
-    {
-        <section id="select" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentSelect</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set country select value to Germany</code>.</MudText>
-            </div>
-            <AgentSelect AgentId="kit-country-select"
-                         Value="@_selectedCountry"
-                         ValueChanged="OnCountryChanged"
-                         Options="@_countryOptions" />
-            <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedCountry</MudText>
-        </section>
-    }
-
-    @if (Show("autocomplete"))
-    {
-        <section id="autocomplete" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentAutocomplete</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>set supplier search query to Apex and select option Apex Components</code>.
-                </MudText>
-            </div>
-            <AgentAutocomplete AgentId="kit-supplier-autocomplete"
-                               Query="@_supplierQuery"
-                               QueryChanged="OnSupplierQueryChanged"
-                               Value="@_selectedSupplier"
-                               ValueChanged="OnSupplierValueChanged"
-                               Options="@_supplierOptions"
-                               Placeholder="Search suppliers..." />
-            <MudText Typo="Typo.caption" Class="mt-1">Query: @_supplierQuery | Selected: @_selectedSupplier</MudText>
-        </section>
-    }
-
-    @if (Show("date-picker"))
-    {
-        <section id="date-picker" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentDatePicker</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set review date to March 18 2026</code>.</MudText>
-            </div>
-            <AgentDatePicker AgentId="kit-review-date"
-                             Value="@_reviewDate"
-                             ValueChanged="OnReviewDateChanged"
-                             MinDate="@_minReviewDate"
-                             MaxDate="@_maxReviewDate" />
-            <MudText Typo="Typo.caption" Class="mt-1">Review date: @FormatDate(_reviewDate)</MudText>
-        </section>
-    }
-
-    @if (Show("date-range-picker"))
-    {
-        <section id="date-range-picker" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentDateRangePicker</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>set review range from 2026-03-01 to 2026-03-15</code>.</MudText>
-            </div>
-            <AgentDateRangePicker AgentId="kit-review-range"
-                                  StartDate="@_rangeStart"
-                                  StartDateChanged="OnRangeStartChanged"
-                                  EndDate="@_rangeEnd"
-                                  EndDateChanged="OnRangeEndChanged"
-                                  MinDate="@_minReviewDate"
-                                  MaxDate="@_maxReviewDate" />
-            <MudText Typo="Typo.caption" Class="mt-1">Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)</MudText>
-        </section>
-    }
-
-    @if (Show("tree-view"))
-    {
-        <section id="tree-view" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentTreeView</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>expand node compliance and select node policy-documents</code>.
-                </MudText>
-            </div>
-            <AgentTreeView AgentId="kit-workflow-tree"
-                           NodeIds="@_treeNodeIds"
-                           SelectedNodeId="@_selectedTreeNodeId"
-                           SelectedNodeIdChanged="OnTreeNodeSelected"
-                           ExpandedNodeIds="@_expandedTreeNodeIds"
-                           ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
-            <MudText Typo="Typo.caption" Class="mt-1">Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)</MudText>
-        </section>
-    }
-
-    @if (Show("stepper"))
-    {
-        <section id="stepper" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentStepper</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>go to step 2</code>, <code>next step</code>.</MudText>
-            </div>
-            <AgentStepper AgentId="kit-onboarding-stepper"
-                          CurrentStepIndex="@_currentStepIndex"
-                          CurrentStepIndexChanged="OnCurrentStepChanged"
-                          StepIds="@_stepIds" />
-            <MudText Typo="Typo.caption" Class="mt-1">Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])</MudText>
-        </section>
-    }
-
-    @if (Show("command-bar"))
-    {
-        <section id="command-bar" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentCommandBar</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Try: <code>invoke command publish_report</code>.</MudText>
-            </div>
-            <AgentCommandBar AgentId="kit-command-bar"
-                             Commands="@_commands"
-                             CommandInvoked="OnCommandInvoked" />
-            <MudText Typo="Typo.caption" Class="mt-1">Last command: @_lastCommand</MudText>
-        </section>
-    }
-
-    @if (Show("file-upload"))
-    {
-        <section id="file-upload" class="demo-doc-page__section components-page__card">
-            <div class="demo-doc-page__section-head">
-                <MudText Typo="Typo.h6">AgentFileUpload</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Try: <code>attach file risk-summary-q1.pdf</code>, <code>list files</code>, <code>remove file vendor-evidence.csv</code>.
-                </MudText>
-            </div>
-
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-2">
-                Local mode treats names as trusted references. Remote mode treats names as handoff tokens.
+    <main class="components-page__main">
+        @if (IsUnknownComponent)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                Unknown component route: <code>@ComponentKey</code>. Showing the explorer overview instead.
             </MudAlert>
+        }
 
-            <AgentFileUpload AgentId="kit-file-upload"
-                             Files="@_attachedFiles"
-                             FilesChanged="OnFilesChanged" />
-            <MudText Typo="Typo.caption" Class="mt-1">Attached files: @(string.Join(", ", _attachedFiles))</MudText>
-            <MudText Typo="Typo.caption" Class="mt-1">Upload mode: @_uploadPolicyMode</MudText>
+        @if (IsOverviewRoute)
+        {
+@*             <section id="overview" class="components-page__panel components-page__panel--hero">
+                <p class="components-page__section-eyebrow">Component Explorer</p>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    This explorer mirrors a docs workflow: choose a component from the left, inspect its live example in the center,
+                    and use the contents rail on the right to jump between prompts, contract details, and any component-specific notes.
+                </MudText>
+            </section> *@
 
-            <MudStack Row="true" Spacing="1" Class="mt-2">
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="RunRemoteHandoffAsync">
-                    Sync Remote Handoff
-                </MudButton>
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ValidateRemoteTokensAsync">
-                    Validate Tokens
-                </MudButton>
-            </MudStack>
+            <section id="catalog" class="components-page__panel">
+                <div class="components-page__section-head">
+                    <div>
+                        <p class="components-page__section-eyebrow">Catalog</p>
+                        <MudText Typo="Typo.h5">Current drop-in components</MudText>
+                    </div>
+                </div>
 
-            @if (_fileWorkflowEvents.Count > 0)
-            {
-                <ul class="components-page__file-events">
-                    @foreach (var fileEvent in _fileWorkflowEvents)
+                <div class="components-page__catalog-grid">
+                    @foreach (var entry in _componentEntries)
                     {
-                        <li>
-                            <span>@fileEvent.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</span>
-                            <span>@fileEvent.EventType</span>
-                            <span>@fileEvent.Message</span>
-                        </li>
+                        <a class="components-page__catalog-card-tile" href="@entry.Href">
+                            <strong>@entry.Title</strong>
+                            <span>@entry.Summary</span>
+                        </a>
+                    }
+                </div>
+            </section>
+
+            <section id="authoring" class="components-page__panel">
+                <div class="components-page__section-head">
+                    <div>
+                        <p class="components-page__section-eyebrow">Authoring Paths</p>
+                        <MudText Typo="Typo.h5">Use components directly, then graduate to custom contracts</MudText>
+                    </div>
+                </div>
+
+                <div class="components-page__overview-grid">
+                    <div class="components-page__mini-card">
+                        <strong>Agentic components</strong>
+                        <span>Use the catalog on the left to test one built-in component at a time with a clean live example.</span>
+                    </div>
+                    <div class="components-page__mini-card">
+                        <strong>Capability Dojo</strong>
+                        <span>Open the Dojo to see controlled, declarative, and open-ended patterns composed into one workspace.</span>
+                    </div>
+                    <div class="components-page__mini-card">
+                        <strong>Custom component path</strong>
+                        <span>Move to the attribute-based example when you need your own Blazor component contract.</span>
+                    </div>
+                </div>
+            </section>
+        }
+        else if (SelectedComponentEntry is not null)
+        {
+            <section id="overview" class="components-page__panel components-page__panel--hero">
+                <p class="components-page__section-eyebrow">Selected Component</p>
+                <MudText Typo="Typo.h4">@SelectedComponentEntry.Title</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    @SelectedComponentEntry.Summary
+                </MudText>
+
+                <div class="components-page__tag-row">
+                    <span class="components-page__tag">Deterministic actions</span>
+                    <span class="components-page__tag">Native Blazor rendering</span>
+                    <span class="components-page__tag">MudBlazor-friendly</span>
+                    <span class="components-page__tag">Ask via chat bubble</span>
+                </div>
+            </section>
+
+            <section id="example" class="components-page__panel">
+                <div class="components-page__section-head">
+                    <div>
+                        <p class="components-page__section-eyebrow">Live Example</p>
+                        <MudText Typo="Typo.h5">@SelectedComponentEntry.Title in context</MudText>
+                    </div>
+                </div>
+
+                @if (Show("datagrid"))
+                {
+                    <AgentDataGrid TItem="GridSupplierRow"
+                                   AgentId="components-datagrid"
+                                   Items="@_gridRows"
+                                   Dense="true"
+                                   Hover="true"
+                                   Bordered="true"
+                                   Striped="true"
+                                   RowKeyProperty="Id">
+                        <Columns>
+                            <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                            <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                            <PropertyColumn T="GridSupplierRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                            <PropertyColumn T="GridSupplierRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                        </Columns>
+                    </AgentDataGrid>
+                }
+                else if (Show("form"))
+                {
+                    <AgentForm AgentId="components-form" Model="@_componentFormModel" Submitted="OnComponentFormSubmittedAsync">
+                        <ChildContent Context="formContext">
+                            <DataAnnotationsValidator />
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" md="6">
+                                    <MudTextField T="string"
+                                                  Label="Supplier Name"
+                                                  For="@(() => _componentFormModel.SupplierName)"
+                                                  @bind-Value="_componentFormModel.SupplierName" />
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudSelect T="string"
+                                               Label="Risk Tier"
+                                               For="@(() => _componentFormModel.RiskTier)"
+                                               @bind-Value="_componentFormModel.RiskTier">
+                                        <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_componentFormModel.NeedsExpedite" />
+                                </MudItem>
+                            </MudGrid>
+                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Submit</MudButton>
+                            </MudStack>
+                        </ChildContent>
+                    </AgentForm>
+                }
+                else if (Show("dialog"))
+                {
+                    <MudStack Row="true" Spacing="1" Class="mb-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenComponentDialogAsync">Open Dialog</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Close Dialog</MudButton>
+                    </MudStack>
+
+                    <AgentDialog @ref="_componentDialog"
+                                 AgentId="components-dialog"
+                                 Visible="@_componentDialogVisible"
+                                 VisibleChanged="OnComponentDialogVisibleChanged">
+                        <TitleContent>
+                            <MudText Typo="Typo.h6">Supplier Policy Confirmation</MudText>
+                        </TitleContent>
+                        <DialogContent>
+                            <MudText Typo="Typo.body2">Confirm this supplier can move from review to approval.</MudText>
+                        </DialogContent>
+                        <DialogActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmComponentDialogAsync">Confirm</MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseComponentDialogAsync">Cancel</MudButton>
+                        </DialogActions>
+                    </AgentDialog>
+                }
+                else if (Show("nav-menu"))
+                {
+                    <AgentNavMenu AgentId="components-nav-menu" Dense="true">
+                        <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+                        <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Capability Dojo</MudNavLink>
+                        <MudNavLink Href="/demo/components/file-upload" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.UploadFile">File Upload</MudNavLink>
+                    </AgentNavMenu>
+                }
+                else if (Show("tabs"))
+                {
+                    <AgentTabs AgentId="components-tabs">
+                        <MudTabPanel Text="Summary">
+                            <MudText Typo="Typo.body2">Supplier overview and risk summary.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Policy">
+                            <MudText Typo="Typo.body2">Policy controls and compliance checks.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Audit">
+                            <MudText Typo="Typo.body2">Audit logs and evidence bundle state.</MudText>
+                        </MudTabPanel>
+                    </AgentTabs>
+                }
+                else if (Show("select"))
+                {
+                    <AgentSelect AgentId="kit-country-select"
+                                 Value="@_selectedCountry"
+                                 ValueChanged="OnCountryChanged"
+                                 Options="@_countryOptions" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Selected: @_selectedCountry</MudText>
+                }
+                else if (Show("autocomplete"))
+                {
+                    <AgentAutocomplete AgentId="kit-supplier-autocomplete"
+                                       Query="@_supplierQuery"
+                                       QueryChanged="OnSupplierQueryChanged"
+                                       Value="@_selectedSupplier"
+                                       ValueChanged="OnSupplierValueChanged"
+                                       Options="@_supplierOptions"
+                                       Placeholder="Search suppliers..." />
+                    <MudText Typo="Typo.caption" Class="mt-2">Query: @_supplierQuery | Selected: @_selectedSupplier</MudText>
+                }
+                else if (Show("date-picker"))
+                {
+                    <AgentDatePicker AgentId="kit-review-date"
+                                     Value="@_reviewDate"
+                                     ValueChanged="OnReviewDateChanged"
+                                     MinDate="@_minReviewDate"
+                                     MaxDate="@_maxReviewDate" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Review date: @FormatDate(_reviewDate)</MudText>
+                }
+                else if (Show("date-range-picker"))
+                {
+                    <AgentDateRangePicker AgentId="kit-review-range"
+                                          StartDate="@_rangeStart"
+                                          StartDateChanged="OnRangeStartChanged"
+                                          EndDate="@_rangeEnd"
+                                          EndDateChanged="OnRangeEndChanged"
+                                          MinDate="@_minReviewDate"
+                                          MaxDate="@_maxReviewDate" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Range: @FormatDate(_rangeStart) to @FormatDate(_rangeEnd)</MudText>
+                }
+                else if (Show("tree-view"))
+                {
+                    <AgentTreeView AgentId="kit-workflow-tree"
+                                   NodeIds="@_treeNodeIds"
+                                   SelectedNodeId="@_selectedTreeNodeId"
+                                   SelectedNodeIdChanged="OnTreeNodeSelected"
+                                   ExpandedNodeIds="@_expandedTreeNodeIds"
+                                   ExpandedNodeIdsChanged="OnTreeExpandedChanged" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Selected: @_selectedTreeNodeId | Expanded: @string.Join(", ", _expandedTreeNodeIds)</MudText>
+                }
+                else if (Show("stepper"))
+                {
+                    <AgentStepper AgentId="kit-onboarding-stepper"
+                                  CurrentStepIndex="@_currentStepIndex"
+                                  CurrentStepIndexChanged="OnCurrentStepChanged"
+                                  StepIds="@_stepIds" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])</MudText>
+                }
+                else if (Show("command-bar"))
+                {
+                    <AgentCommandBar AgentId="kit-command-bar"
+                                     Commands="@_commands"
+                                     CommandInvoked="OnCommandInvoked" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Last command: @_lastCommand</MudText>
+                }
+                else if (Show("file-upload"))
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                        Local mode treats names as trusted references. Remote mode treats names as handoff tokens.
+                    </MudAlert>
+
+                    <AgentFileUpload AgentId="kit-file-upload"
+                                     Files="@_attachedFiles"
+                                     FilesChanged="OnFilesChanged" />
+                    <MudText Typo="Typo.caption" Class="mt-2">Attached files: @(string.Join(", ", _attachedFiles))</MudText>
+                    <MudText Typo="Typo.caption" Class="mt-1">Upload mode: @_uploadPolicyMode</MudText>
+
+                    <MudStack Row="true" Spacing="1" Class="mt-2">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="RunRemoteHandoffAsync">
+                            Sync Remote Handoff
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ValidateRemoteTokensAsync">
+                            Validate Tokens
+                        </MudButton>
+                    </MudStack>
+                }
+            </section>
+
+            <section id="prompts" class="components-page__panel">
+                <div class="components-page__section-head">
+                    <div>
+                        <p class="components-page__section-eyebrow">Prompt Ideas</p>
+                        <MudText Typo="Typo.h5">Use the chat bubble with these prompts</MudText>
+                    </div>
+                </div>
+
+                <ul class="components-page__prompt-list">
+                    @foreach (var prompt in SelectedComponentEntry.PromptIdeas)
+                    {
+                        <li><code>@prompt</code></li>
                     }
                 </ul>
-            }
+            </section>
 
-            @if (_fileWorkflowJobs.Count > 0)
-            {
-                <div class="components-page__job-block">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Recent workflow jobs</MudText>
-                    <ul class="components-page__file-jobs">
-                        @foreach (var job in _fileWorkflowJobs)
-                        {
-                            <li>
-                                <div class="components-page__job-head">
-                                    <span>@job.UpdatedUtc.ToLocalTime().ToString("HH:mm:ss")</span>
-                                    <span>@job.Operation</span>
-                                    <MudChip T="string" Size="Size.Small" Color="@MapJobStatusColor(job.Status)">
-                                        @job.Status
-                                    </MudChip>
-                                </div>
-                                <div class="components-page__job-detail">
-                                    <span>@job.FileName</span>
-                                    @if (!string.IsNullOrWhiteSpace(job.StorageToken))
-                                    {
-                                        <span>@job.StorageToken</span>
-                                    }
-                                    <span>@job.Message</span>
-                                </div>
-                            </li>
-                        }
-                    </ul>
+            <section id="contract" class="components-page__panel">
+                <div class="components-page__section-head">
+                    <div>
+                        <p class="components-page__section-eyebrow">Component Contract</p>
+                        <MudText Typo="Typo.h5">What the agent can safely do</MudText>
+                    </div>
                 </div>
-            }
-        </section>
-    }
 
-    <section class="demo-doc-page__section components-page__card">
-        <MudText Typo="Typo.h6">Attribute-Based Example</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-            Use the final parity example to compare wrapper-driven control vs convention-first component actions.
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/components/attribute-based">
-            Open Attribute-Based Example
-        </MudButton>
-    </section>
+                <div class="components-page__contract-grid">
+                    <div class="components-page__mini-card">
+                        <strong>Example agent id</strong>
+                        <code>@SelectedComponentEntry.AgentId</code>
+                    </div>
+                    <div class="components-page__mini-card">
+                        <strong>Primary actions</strong>
+                        <div class="components-page__inline-code-list">
+                            @foreach (var action in SelectedComponentEntry.Actions)
+                            {
+                                <code>@action</code>
+                            }
+                        </div>
+                    </div>
+                    <div class="components-page__mini-card">
+                        <strong>Readable state</strong>
+                        <span>@SelectedComponentEntry.Readables</span>
+                    </div>
+                </div>
+            </section>
+
+            @if (Show("file-upload") && (_fileWorkflowEvents.Count > 0 || _fileWorkflowJobs.Count > 0))
+            {
+                <section id="activity" class="components-page__panel">
+                    <div class="components-page__section-head">
+                        <div>
+                            <p class="components-page__section-eyebrow">Workflow Activity</p>
+                            <MudText Typo="Typo.h5">Remote handoff and token validation state</MudText>
+                        </div>
+                    </div>
+
+                    @if (_fileWorkflowEvents.Count > 0)
+                    {
+                        <ul class="components-page__file-events">
+                            @foreach (var fileEvent in _fileWorkflowEvents)
+                            {
+                                <li>
+                                    <span>@fileEvent.TimestampUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                                    <span>@fileEvent.EventType</span>
+                                    <span>@fileEvent.Message</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    @if (_fileWorkflowJobs.Count > 0)
+                    {
+                        <div class="components-page__job-block">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Recent workflow jobs</MudText>
+                            <ul class="components-page__file-jobs">
+                                @foreach (var job in _fileWorkflowJobs)
+                                {
+                                    <li>
+                                        <div class="components-page__job-head">
+                                            <span>@job.UpdatedUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                                            <span>@job.Operation</span>
+                                            <MudChip T="string" Size="Size.Small" Color="@MapJobStatusColor(job.Status)">
+                                                @job.Status
+                                            </MudChip>
+                                        </div>
+                                        <div class="components-page__job-detail">
+                                            <span>@job.FileName</span>
+                                            @if (!string.IsNullOrWhiteSpace(job.StorageToken))
+                                            {
+                                                <span>@job.StorageToken</span>
+                                            }
+                                            <span>@job.Message</span>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </section>
+            }
+        }
+    </main>
+
+    <aside class="components-page__contents">
+        <div class="components-page__contents-card">
+            <p class="components-page__catalog-label">Contents</p>
+            <nav class="components-page__contents-links" aria-label="Contents">
+                @foreach (var link in CurrentContentLinks)
+                {
+                    <a href="@($"#{link.Id}")">@link.Label</a>
+                }
+            </nav>
+
+            <div class="components-page__contents-note">
+                <strong>Prompting</strong>
+                <span>Use the bottom-right chat bubble to drive the currently selected component. The assistant is route-aware and stays scoped to this explorer.</span>
+            </div>
+        </div>
+    </aside>
 </div>
 
 @code {
@@ -465,37 +518,68 @@
 
     private static readonly IReadOnlyList<ComponentEntry> _componentEntries =
     [
-        new("Overview", "/demo/components"),
-        new("AgentDataGrid", "/demo/components/datagrid"),
-        new("AgentForm", "/demo/components/form"),
-        new("AgentDialog", "/demo/components/dialog"),
-        new("AgentTabs", "/demo/components/tabs"),
-        new("AgentSelect", "/demo/components/select"),
-        new("AgentAutocomplete", "/demo/components/autocomplete"),
-        new("AgentDatePicker", "/demo/components/date-picker"),
-        new("AgentDateRangePicker", "/demo/components/date-range-picker"),
-        new("AgentTreeView", "/demo/components/tree-view"),
-        new("AgentStepper", "/demo/components/stepper"),
-        new("AgentCommandBar", "/demo/components/command-bar"),
-        new("AgentFileUpload", "/demo/components/file-upload")
+        new("datagrid", "AgentDataGrid", "/demo/components/datagrid", "Sort, filter, page, and focus grid rows with deterministic actions.", "components-datagrid", "DataGrid actions, current page, focused row, and visible columns.", "Sort and filter supplier records while keeping the grid native to Blazor.", ["sort suppliers by risk score descending", "filter region EMEA", "go to page 2", "clear filters"], ["filter", "sort", "go_to_page", "select_row", "clear_filters"]),
+        new("form", "AgentForm", "/demo/components/form", "Update form fields and submit structured data through a host-owned form.", "components-form", "Current field values and validation-ready form state.", "Edit a supplier review form without giving the agent direct control over layout.", ["set supplier name to Apex Labs", "set risk tier to High", "submit form"], ["set_field", "validate", "reset", "submit"]),
+        new("dialog", "AgentDialog", "/demo/components/dialog", "Open, confirm, and close dialogs while the host still owns the modal content.", "components-dialog", "Dialog visibility plus the currently mounted dialog content.", "Use deterministic dialog orchestration instead of free-form UI generation.", ["open dialog", "confirm dialog", "close dialog"], ["open", "confirm", "close"]),
+        new("nav-menu", "AgentNavMenu", "/demo/components/nav-menu", "Navigate between known routes from a host-defined navigation menu.", "components-nav-menu", "Current route and the menu destinations mounted in the explorer.", "Expose safe internal navigation actions from a Blazor navigation surface.", ["navigate to /demo/dojo", "navigate to /demo/components/file-upload"], ["navigate_to", "navigate_external"]),
+        new("tabs", "AgentTabs", "/demo/components/tabs", "Switch between host-owned tabs without giving up component structure.", "components-tabs", "Active tab index and the available tab labels.", "Move around a multi-panel surface while keeping tab content native.", ["switch to policy tab", "switch to audit tab"], ["switch_tab"]),
+        new("select", "AgentSelect", "/demo/components/select", "Set or clear a select value from a known option list.", "kit-country-select", "Current select value and the available options.", "Use deterministic option selection instead of text-only responses.", ["set country select value to Germany", "clear the select"], ["open", "set_value", "clear", "close"]),
+        new("autocomplete", "AgentAutocomplete", "/demo/components/autocomplete", "Drive query text and option selection in an autocomplete surface.", "kit-supplier-autocomplete", "Current query, selected option, and available supplier matches.", "Let the agent refine search input without replacing the host component.", ["set supplier search query to Apex", "select option Apex Components"], ["set_query", "select_option", "clear"]),
+        new("date-picker", "AgentDatePicker", "/demo/components/date-picker", "Apply single-date values with a typed date picker contract.", "kit-review-date", "Current date, min/max date bounds, and picker state.", "Use natural-language dates while keeping the host-side picker authoritative.", ["set review date to March 18 2026", "clear the review date"], ["set_date", "clear"]),
+        new("date-range-picker", "AgentDateRangePicker", "/demo/components/date-range-picker", "Set date ranges through one deterministic component contract.", "kit-review-range", "Current range plus the allowed date window.", "Use one action surface for paired start and end dates.", ["set review range from 2026-03-01 to 2026-03-15", "clear the review range"], ["set_range", "clear"]),
+        new("tree-view", "AgentTreeView", "/demo/components/tree-view", "Expand, collapse, and select nodes inside a host-owned tree.", "kit-workflow-tree", "Selected node and the currently expanded nodes.", "Drive hierarchical UI without inventing a new tree surface.", ["expand node compliance", "select node policy-documents"], ["expand", "collapse", "select_node"]),
+        new("stepper", "AgentStepper", "/demo/components/stepper", "Advance or jump to workflow steps inside a structured stepper.", "kit-onboarding-stepper", "Current step index and the mounted step ids.", "Use the agent to move through an existing process rather than generate a new one.", ["go to step 2", "next step"], ["go_to_step", "next", "previous"]),
+        new("command-bar", "AgentCommandBar", "/demo/components/command-bar", "Invoke known commands from a host-defined command bar.", "kit-command-bar", "Available commands and the last command the host ran.", "Map natural language onto a curated command surface.", ["invoke command publish_report", "invoke command create_audit_bundle"], ["invoke_command", "list_commands"]),
+        new("file-upload", "AgentFileUpload", "/demo/components/file-upload", "Attach, remove, and list files while tracking local and remote workflow policy.", "kit-file-upload", "Attached files, upload mode, workflow events, and remote handoff jobs.", "Combine deterministic file actions with workflow state the host can audit.", ["attach file risk-summary-q1.pdf", "list files", "remove file vendor-evidence.csv"], ["attach", "remove", "list_files"])
+    ];
+
+    private static readonly IReadOnlyList<ContentLink> _overviewContentLinks =
+    [
+        new("overview", "Overview"),
+        new("catalog", "Catalog"),
+        new("authoring", "Authoring Paths")
+    ];
+
+    private static readonly IReadOnlyList<ContentLink> _componentContentLinks =
+    [
+        new("overview", "Overview"),
+        new("example", "Live Example"),
+        new("prompts", "Prompt Ideas"),
+        new("contract", "Component Contract")
+    ];
+
+    private static readonly IReadOnlyList<ContentLink> _fileUploadContentLinks =
+    [
+        new("overview", "Overview"),
+        new("example", "Live Example"),
+        new("prompts", "Prompt Ideas"),
+        new("contract", "Component Contract"),
+        new("activity", "Workflow Activity")
     ];
 
     private string NormalizedComponentKey => NormalizeComponentKey(ComponentKey);
 
+    private string EffectiveComponentKey => IsUnknownComponent ? "overview" : NormalizedComponentKey;
+
+    private bool IsOverviewRoute => string.Equals(EffectiveComponentKey, "overview", StringComparison.OrdinalIgnoreCase);
+
+    private ComponentEntry? SelectedComponentEntry =>
+        _componentEntries.FirstOrDefault(x => string.Equals(x.Key, EffectiveComponentKey, StringComparison.OrdinalIgnoreCase));
+
+    private IReadOnlyList<ContentLink> CurrentContentLinks =>
+        IsOverviewRoute
+            ? _overviewContentLinks
+            : string.Equals(EffectiveComponentKey, "file-upload", StringComparison.OrdinalIgnoreCase)
+                ? _fileUploadContentLinks
+                : _componentContentLinks;
+
     private bool IsUnknownComponent =>
         !string.Equals(NormalizedComponentKey, "overview", StringComparison.OrdinalIgnoreCase)
-        && !_componentEntries.Any(x => string.Equals(NormalizedComponentKey, ExtractKeyFromHref(x.Href), StringComparison.OrdinalIgnoreCase));
+        && !_componentEntries.Any(x => string.Equals(NormalizedComponentKey, x.Key, StringComparison.OrdinalIgnoreCase));
 
-    private bool Show(string key)
-    {
-        if (IsUnknownComponent)
-        {
-            return true;
-        }
+    private bool Show(string key) => string.Equals(EffectiveComponentKey, key, StringComparison.OrdinalIgnoreCase);
 
-        return string.Equals(NormalizedComponentKey, "overview", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(NormalizedComponentKey, key, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool IsSelected(ComponentEntry entry) => string.Equals(entry.Key, EffectiveComponentKey, StringComparison.OrdinalIgnoreCase);
 
     private async Task OnComponentFormSubmittedAsync()
     {
@@ -710,18 +794,6 @@
         return key.Trim().ToLowerInvariant();
     }
 
-    private static string ExtractKeyFromHref(string href)
-    {
-        const string prefix = "/demo/components/";
-        if (!href.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return "overview";
-        }
-
-        var key = href[prefix.Length..];
-        return string.IsNullOrWhiteSpace(key) ? "overview" : key;
-    }
-
     protected override async Task OnInitializedAsync()
     {
         var snapshot = await FileWorkflowService.GetOrCreateAsync(ComponentRegistry.SessionId, _uploadPolicyMode);
@@ -740,5 +812,17 @@
     }
 
     private sealed record GridSupplierRow(string Id, string Name, string Region, int RiskScore);
-    private sealed record ComponentEntry(string Title, string Href);
+
+    private sealed record ComponentEntry(
+        string Key,
+        string Title,
+        string Href,
+        string Summary,
+        string AgentId,
+        string Readables,
+        string NavSummary,
+        IReadOnlyList<string> PromptIdeas,
+        IReadOnlyList<string> Actions);
+
+    private sealed record ContentLink(string Id, string Label);
 }

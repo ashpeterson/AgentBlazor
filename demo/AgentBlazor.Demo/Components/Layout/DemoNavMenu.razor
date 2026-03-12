@@ -2,13 +2,15 @@
 @using MudBlazor
 
 <AgentNavMenu AgentId="demo-nav" Dense="true">
-    <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Dojo</MudNavLink>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Capability Dojo</MudNavLink>
 
-    <MudNavGroup Title="Components" Icon="@Icons.Material.Filled.Widgets" @bind-Expanded="_componentsExpanded">
+    <MudNavGroup Title="Agentic Components" Icon="@Icons.Material.Filled.Widgets" @bind-Expanded="_componentsExpanded">
         <MudNavLink Href="/demo/components" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewAgenda">Overview</MudNavLink>
         <MudNavLink Href="/demo/components/datagrid" Match="NavLinkMatch.Prefix">AgentDataGrid</MudNavLink>
         <MudNavLink Href="/demo/components/form" Match="NavLinkMatch.Prefix">AgentForm</MudNavLink>
         <MudNavLink Href="/demo/components/dialog" Match="NavLinkMatch.Prefix">AgentDialog</MudNavLink>
+        <MudNavLink Href="/demo/components/nav-menu" Match="NavLinkMatch.Prefix">AgentNavMenu</MudNavLink>
         <MudNavLink Href="/demo/components/tabs" Match="NavLinkMatch.Prefix">AgentTabs</MudNavLink>
         <MudNavLink Href="/demo/components/select" Match="NavLinkMatch.Prefix">AgentSelect</MudNavLink>
         <MudNavLink Href="/demo/components/autocomplete" Match="NavLinkMatch.Prefix">AgentAutocomplete</MudNavLink>
@@ -18,7 +20,7 @@
         <MudNavLink Href="/demo/components/stepper" Match="NavLinkMatch.Prefix">AgentStepper</MudNavLink>
         <MudNavLink Href="/demo/components/command-bar" Match="NavLinkMatch.Prefix">AgentCommandBar</MudNavLink>
         <MudNavLink Href="/demo/components/file-upload" Match="NavLinkMatch.Prefix">AgentFileUpload</MudNavLink>
-        <MudNavLink Href="/demo/components/attribute-based" Match="NavLinkMatch.Prefix">Attribute-Based Example</MudNavLink>
+        <MudNavLink Href="/demo/components/attribute-based" Match="NavLinkMatch.Prefix">Custom Attribute-Based Component</MudNavLink>
     </MudNavGroup>
 </AgentNavMenu>
 

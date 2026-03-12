@@ -31,13 +31,13 @@ public static class AgentComponentTierBoundaries
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridClearFiltersActionId)] =
                 (DataGridBasicFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridNavigateToRowActionId)] =
-                (DataGridAdvancedFeature, AgentBlazorTier.Paid),
+                (DataGridAdvancedFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridSelectRowActionId)] =
-                (DataGridAdvancedFeature, AgentBlazorTier.Paid),
+                (DataGridAdvancedFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridGoToPageActionId)] =
-                (DataGridAdvancedFeature, AgentBlazorTier.Paid),
+                (DataGridAdvancedFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDataGridComponentId, AgentComponentCapabilityProfile.DataGridSetPageActionId)] =
-                (DataGridAdvancedFeature, AgentBlazorTier.Paid),
+                (DataGridAdvancedFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDialogComponentId, AgentComponentCapabilityProfile.DialogOpenActionId)] =
                 (DialogFlowFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentDialogComponentId, AgentComponentCapabilityProfile.DialogCloseActionId)] =
@@ -51,11 +51,11 @@ public static class AgentComponentTierBoundaries
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormResetActionId)] =
                 (FormAssistFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentFormComponentId, AgentComponentCapabilityProfile.FormSubmitActionId)] =
-                (FormSubmissionFeature, AgentBlazorTier.Premium),
+                (FormSubmissionFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentNavMenuComponentId, AgentComponentCapabilityProfile.NavigationNavigateToActionId)] =
                 (NavigationInternalFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentNavMenuComponentId, AgentComponentCapabilityProfile.NavigationNavigateExternalActionId)] =
-                (NavigationExternalFeature, AgentBlazorTier.Premium),
+                (NavigationExternalFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentTabsComponentId, AgentComponentCapabilityProfile.TabsSwitchTabActionId)] =
                 (TabsFeature, AgentBlazorTier.Free),
             [ComponentActionPolicy.ToActionKey(AgentComponentCapabilityProfile.AgentSelectComponentId, AgentComponentCapabilityProfile.SelectOpenActionId)] =

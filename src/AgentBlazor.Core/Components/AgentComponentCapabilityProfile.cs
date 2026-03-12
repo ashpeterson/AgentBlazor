@@ -506,10 +506,11 @@ public static class AgentComponentCapabilityProfile
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "pageIndex": { "type": "integer", "minimum": 0 },
+            "page": { "type": "integer", "minimum": 1 },
+            "pageIndex": { "type": "integer", "minimum": 0, "description": "Legacy zero-based page index." },
             "pageSize": { "type": "integer", "minimum": 1 }
           },
-          "required": ["pageIndex"]
+          "required": ["page"]
         }
         """;
 

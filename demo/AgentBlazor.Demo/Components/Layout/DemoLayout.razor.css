@@ -21,6 +21,12 @@
         linear-gradient(180deg, #f3f0eb, #eeebe5);
 }
 
+.demo-app--components {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+}
+
 .demo-app__sidebar,
 .demo-app__assistant-pane {
     position: sticky;
@@ -126,6 +132,12 @@
     overflow: hidden;
 }
 
+.demo-app__main--components {
+    grid-template-rows: auto 1fr;
+    min-height: 100dvh;
+    gap: 0;
+}
+
 .demo-app__topbar {
     display: flex;
     align-items: center;
@@ -135,6 +147,82 @@
     border-radius: 1rem;
     border: 1px solid var(--ab-border);
     background: linear-gradient(145deg, rgba(14, 22, 37, 0.9), rgba(11, 17, 30, 0.94));
+}
+
+.demo-app__topbar--components {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    padding: 0.95rem 1.45rem;
+    background:
+        linear-gradient(180deg, rgba(10, 16, 28, 0.97), rgba(9, 14, 24, 0.94)),
+        rgba(10, 16, 28, 0.94);
+    backdrop-filter: blur(16px);
+}
+
+.demo-app__masthead-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.72rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.demo-app__masthead-logo {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.65rem;
+    filter: drop-shadow(0 0 12px rgba(110, 168, 254, 0.28));
+}
+
+.demo-app__masthead-copy {
+    display: grid;
+    line-height: 1.1;
+}
+
+.demo-app__masthead-copy strong {
+    font-size: 0.98rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.demo-app__masthead-copy small {
+    color: var(--ab-ink-muted);
+    font-size: 0.77rem;
+}
+
+.demo-app__masthead-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    margin-right: 0.8rem;
+}
+
+.demo-app__masthead-nav a {
+    color: var(--ab-ink-muted);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 0.52rem 0.78rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.demo-app__masthead-nav a:hover {
+    color: var(--ab-ink);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--ab-border);
+}
+
+.demo-app__masthead-nav a[aria-current="page"] {
+    color: var(--ab-ink);
+    background: linear-gradient(90deg, rgba(110, 168, 254, 0.18), rgba(111, 211, 194, 0.1));
+    border-color: var(--ab-border-strong);
 }
 
 .demo-app__topbar-intro {
@@ -207,6 +295,10 @@
     min-height: 0;
     overflow: auto;
     padding: 0.15rem 0.2rem 2.8rem;
+}
+
+.demo-app__content--components {
+    padding: 1.4rem 1.6rem 6rem;
 }
 
 .demo-app--dojo .demo-app__content {
@@ -328,6 +420,10 @@
     display: none;
 }
 
+.demo-app--components .demo-app__assistant-widget {
+    display: block;
+}
+
 #blazor-error-ui {
     color-scheme: light only;
     background: #fff6dc;
@@ -371,6 +467,14 @@
 
     .demo-app__content {
         padding-bottom: 6.2rem;
+    }
+
+    .demo-app__masthead-nav {
+        order: 3;
+        width: 100%;
+        margin: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
 }
 
@@ -420,5 +524,13 @@
 
     .demo-app__theme-select {
         min-width: 100%;
+    }
+
+    .demo-app__topbar--components {
+        padding: 0.85rem 1rem;
+    }
+
+    .demo-app__content--components {
+        padding: 1rem 0.85rem 6.4rem;
     }
 }

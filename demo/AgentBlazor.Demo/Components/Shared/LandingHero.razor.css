@@ -83,6 +83,15 @@
     max-width: 800px;
 }
 
+.landing-hero__eyebrow {
+    margin: 0 0 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(210, 228, 255, 0.72);
+}
+
 .landing-hero__title {
     font-size: clamp(2.5rem, 8vw, 4.5rem);
     font-weight: 800;
@@ -121,6 +130,7 @@
     gap: 1rem;
     justify-content: center;
     flex-wrap: wrap;
+    margin-bottom: 1.25rem;
 }
 
 .landing-hero__cta ::deep .mud-button-filled {
@@ -140,6 +150,27 @@
 .landing-hero__cta ::deep .mud-button-outlined:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: var(--ab-ink-muted);
+}
+
+.landing-hero__cta ::deep .mud-button-text {
+    color: rgba(210, 228, 255, 0.78);
+}
+
+.landing-hero__meta {
+    display: flex;
+    justify-content: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.landing-hero__meta > span {
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(10, 14, 24, 0.45);
+    color: rgba(216, 230, 255, 0.78);
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 /* ── Responsive ─────────────────────────────────── */

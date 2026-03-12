@@ -2,12 +2,14 @@
 
 .landing-getstarted {
     padding: 6rem 2rem;
-    background: var(--ab-bg);
+    background:
+        radial-gradient(72rem 28rem at 50% 0%, rgba(74, 158, 221, 0.08), transparent 60%),
+        var(--ab-bg);
     border-top: 1px solid var(--ab-border);
 }
 
 .landing-getstarted__container {
-    max-width: 900px;
+    max-width: 1080px;
     margin: 0 auto;
 }
 
@@ -34,9 +36,9 @@
 /* ── Steps Container ────────────────────────────── */
 
 .landing-getstarted__steps {
-    display: flex;
-    flex-direction: column;
-    gap: 2.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
 }
 
 /* ── Individual Step ────────────────────────────── */
@@ -44,8 +46,13 @@
 .landing-step {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
     align-items: start;
+    padding: 1.35rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ab-border);
+    background: linear-gradient(180deg, rgba(13, 19, 33, 0.92), rgba(9, 14, 25, 0.97));
+    box-shadow: 0 18px 42px rgba(4, 8, 18, 0.28);
 }
 
 .landing-step__number {
@@ -69,6 +76,22 @@
     gap: 0.75rem;
 }
 
+.landing-step__pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.landing-step__pill-row > span {
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--ab-border);
+    color: var(--ab-ink-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
 .landing-step__title {
     font-size: 1.25rem;
     font-weight: 700;
@@ -86,7 +109,7 @@
 /* ── Code Block ─────────────────────────────────── */
 
 .landing-step__code {
-    margin-top: 0.5rem;
+    margin-top: 0.2rem;
     border-radius: 0.75rem;
     border: 1px solid var(--ab-border);
     background: #0a0d18;
@@ -162,29 +185,6 @@
 
 /* ── Result Badge ───────────────────────────────── */
 
-.landing-step__result {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    background: rgba(46, 204, 135, 0.1);
-    border: 1px solid rgba(46, 204, 135, 0.2);
-    font-size: 0.9rem;
-    color: #2ecc87;
-}
-
-.landing-step__result em {
-    color: #fff;
-    font-style: normal;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0.1rem 0.4rem;
-    border-radius: 0.25rem;
-}
-
-/* ── CTA Section ────────────────────────────────── */
-
 .landing-getstarted__cta {
     display: flex;
     justify-content: center;
@@ -209,6 +209,10 @@
 @media (max-width: 700px) {
     .landing-getstarted {
         padding: 4rem 1.25rem;
+    }
+
+    .landing-getstarted__steps {
+        grid-template-columns: 1fr;
     }
 
     .landing-step {

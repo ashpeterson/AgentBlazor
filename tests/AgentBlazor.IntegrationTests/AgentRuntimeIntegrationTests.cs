@@ -912,7 +912,7 @@ public class AgentRuntimeIntegrationTests
     }
 
     [Fact]
-    public async Task RunTurnAsync_MudPremiumAction_IsBlocked_WhenTierIsPaid()
+    public async Task RunTurnAsync_FormSubmitAction_Executes_WhenTierIsPaid()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
@@ -939,11 +939,14 @@ public class AgentRuntimeIntegrationTests
                 ["agentblazor.approvals"] = "all"
             }));
 
-        Assert.Equal(0, executor.CallCount);
-        Assert.Empty(response.PlannedActions);
-        Assert.Empty(response.ExecutionResults);
-        Assert.Contains("Current tier: Paid", response.ResponseText, StringComparison.Ordinal);
-        Assert.Contains("Filtered actions:", response.ResponseText, StringComparison.Ordinal);
+        Assert.True(executor.CallCount >= 1, "Executor should be called at least once");
+        Assert.Contains(response.PlannedActions, static action =>
+            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(response.ExecutionResults, static result =>
+            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded);
     }
 
     [Fact(Skip = "Custom assembly tools are not yet supported in DeterministicAgentRuntime.")]

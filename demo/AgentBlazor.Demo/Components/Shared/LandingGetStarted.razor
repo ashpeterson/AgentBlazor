@@ -1,126 +1,95 @@
 @using MudBlazor
 
-<section class="landing-getstarted" id="get-started">
+<section class="landing-getstarted" id="explore">
     <div class="landing-getstarted__container">
         <div class="landing-getstarted__header">
-            <h2 class="landing-getstarted__title">Get Started in 4 Steps</h2>
+            <h2 class="landing-getstarted__title">Explore AgentBlazor in 3 Stops</h2>
             <p class="landing-getstarted__subtitle">
-                Add AI-powered control to your existing Blazor app in minutes.
+                The landing page gives the product overview, the Dojo explains the patterns,
+                and Agentic Components shows the reusable building blocks you can drop into a Blazor app.
             </p>
         </div>
 
         <div class="landing-getstarted__steps">
-            @* Step 1: Install *@
             <article class="landing-step">
                 <div class="landing-step__number">1</div>
                 <div class="landing-step__content">
-                    <h3 class="landing-step__title">Install the NuGet packages</h3>
-                    <p class="landing-step__desc">Add AgentBlazor to your project via NuGet.</p>
-                    <div class="landing-step__code">
-                        <div class="landing-step__code-header">
-                            <span>Package Manager</span>
-                            <button class="landing-step__copy" title="Copy to clipboard">
-                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" />
-                            </button>
-                        </div>
-                        <pre><code>dotnet add package AgentBlazor.Components
-dotnet add package AgentBlazor.Hosting</code></pre>
+                    <h3 class="landing-step__title">Start on Home</h3>
+                    <p class="landing-step__desc">
+                        Use this page to understand the product shape: native Blazor agentic UI, AG-UI transport,
+                        runtime visibility, and the split between patterns and reusable components.
+                    </p>
+                    <div class="landing-step__pill-row">
+                        <span>Product overview</span>
+                        <span>Blazor-first positioning</span>
+                        <span>User journey hub</span>
                     </div>
                 </div>
             </article>
 
-            @* Step 2: Register Services *@
             <article class="landing-step">
                 <div class="landing-step__number">2</div>
                 <div class="landing-step__content">
-                    <h3 class="landing-step__title">Register AgentBlazor services</h3>
-                    <p class="landing-step__desc">Configure AgentBlazor with your preferred LLM provider in Program.cs.</p>
+                    <h3 class="landing-step__title">Open the Capability Dojo</h3>
+                    <p class="landing-step__desc">
+                        Walk through controlled, declarative, and open-ended agentic UI in one focused workspace.
+                        This is where you validate how the runtime, prompts, inspector, and host-owned UI fit together.
+                    </p>
                     <div class="landing-step__code">
                         <div class="landing-step__code-header">
-                            <span>Program.cs</span>
+                            <span>What you’ll see</span>
                         </div>
-                        <pre><code><span class="code-keyword">using</span> AgentBlazor;
-
-builder.Services.AddSingleton&lt;MyChartDataSources&gt;();
-
-builder.Services.AddAgentBlazor(options =>
-{
-    options.UseOpenAI(apiKey: <span class="code-string">"your-api-key"</span>);
-    options.UseChartDataResolver(sp => 
-        sp.GetRequiredService&lt;MyChartDataSources&gt;().ResolveAsync);
-    <span class="code-comment">// Or use Ollama, Azure OpenAI, etc.</span>
-});
-
-<span class="code-comment">// Don't forget to map the endpoints</span>
-app.MapAgentBlazorEndpoints();</code></pre>
+                        <pre><code>Controlled: prebuilt Blazor UI + deterministic actions
+Declarative: AgentUiDocument + A2UI/Open-JSON-UI imports
+Open-ended: sandboxed hosted app surfaces inside Blazor</code></pre>
                     </div>
+                    <MudButton Href="/demo/dojo"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Open Capability Dojo
+                    </MudButton>
                 </div>
             </article>
 
-            @* Step 3: Update Components *@
             <article class="landing-step">
                 <div class="landing-step__number">3</div>
                 <div class="landing-step__content">
-                    <h3 class="landing-step__title">Swap in agent-aware components</h3>
-                    <p class="landing-step__desc">Replace MudBlazor components with their AgentBlazor equivalents.</p>
+                    <h3 class="landing-step__title">Browse Agentic Components</h3>
+                    <p class="landing-step__desc">
+                        Open the component catalog to inspect the drop-in primitives: data grids, forms, dialogs,
+                        navigation, dates, commands, uploads, and the attribute-based extension path.
+                    </p>
                     <div class="landing-step__code">
                         <div class="landing-step__code-header">
-                            <span>YourPage.razor</span>
+                            <span>Drop-in shape</span>
                         </div>
-                        <pre><code><span class="code-comment">// Before: Standard MudBlazor</span>
-<span class="code-deleted">&lt;MudDataGrid Items="@@records"&gt;</span>
-
-<span class="code-comment">// After: Agent-controllable</span>
-<span class="code-added">&lt;AgentDataGrid AgentId="records-grid"</span>
-<span class="code-added">               Items="@@records"&gt;</span>
-
-<span class="code-comment">// Same for forms, dialogs, tabs, nav menus...</span>
-<span class="code-added">&lt;AgentForm AgentId="my-form" ...&gt;</span>
-<span class="code-added">&lt;AgentDialog AgentId="my-dialog" ...&gt;</span>
-<span class="code-added">&lt;AgentTabs AgentId="my-tabs" ...&gt;</span></code></pre>
+                        <pre><code>&lt;AgentDataGrid AgentId="records-grid" Items="@@records" /&gt;
+&lt;AgentForm AgentId="review-form" Model="@@model" /&gt;
+&lt;AgentChatSurface Title="Assistant" /&gt;</code></pre>
                     </div>
-                </div>
-            </article>
-
-            @* Step 4: Add Chat *@
-            <article class="landing-step">
-                <div class="landing-step__number">4</div>
-                <div class="landing-step__content">
-                    <h3 class="landing-step__title">Add the chat interface</h3>
-                    <p class="landing-step__desc">Drop in a chat widget — users can now control your UI with natural language.</p>
-                    <div class="landing-step__code">
-                        <div class="landing-step__code-header">
-                            <span>YourPage.razor</span>
-                        </div>
-                        <pre><code><span class="code-comment">// Floating chat bubble (recommended)</span>
-<span class="code-added">&lt;AgentChatWidget Title="Assistant"</span>
-<span class="code-added">                 Description="Ask me to filter, sort, or navigate." /&gt;</span>
-
-<span class="code-comment">// Or embed chat directly in your layout</span>
-<span class="code-added">&lt;AgentChatSurface Title="Agent Chat" /&gt;</span></code></pre>
-                    </div>
-                    <div class="landing-step__result">
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
-                        <span>That's it! Users can now say <em>"show overdue records"</em> and watch the magic happen.</span>
-                    </div>
+                    <MudButton Href="/demo/components"
+                               Variant="Variant.Outlined"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Browse Agentic Components
+                    </MudButton>
                 </div>
             </article>
         </div>
 
         <div class="landing-getstarted__cta">
-            <MudButton Href="demo"
+            <MudButton Href="/demo/dojo"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Large"
                        EndIcon="@Icons.Material.Filled.PlayArrow">
-                See It In Action
+                Start with the Dojo
             </MudButton>
-            <MudButton Href="https://github.com/agentblazor"
-                       Target="_blank"
+            <MudButton Href="/demo/components"
                        Variant="Variant.Outlined"
                        Size="Size.Large"
-                       StartIcon="@Icons.Custom.Brands.GitHub">
-                View on GitHub
+                       StartIcon="@Icons.Material.Filled.Widgets">
+                Open Agentic Components
             </MudButton>
         </div>
     </div>

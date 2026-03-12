@@ -231,13 +231,13 @@ public class ServiceRegistrationTests
                 AgentComponentCapabilityProfile.DataGridFilterActionId));
 
         Assert.Equal(
-            AgentBlazorTier.Paid,
+            AgentBlazorTier.Free,
             AgentComponentTierBoundaries.GetRequiredTier(
                 AgentComponentCapabilityProfile.AgentDataGridComponentId,
                 AgentComponentCapabilityProfile.DataGridSetPageActionId));
 
         Assert.Equal(
-            AgentBlazorTier.Premium,
+            AgentBlazorTier.Free,
             AgentComponentTierBoundaries.GetRequiredTier(
                 AgentComponentCapabilityProfile.AgentFormComponentId,
                 AgentComponentCapabilityProfile.FormSubmitActionId));

@@ -10,8 +10,8 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<div class="demo-app @CurrentThemeCssClass @(IsDojoRoute ? "demo-app--dojo" : null)">
-    @if (!IsDojoRoute)
+<div class="demo-app @CurrentThemeCssClass @(IsDojoRoute ? "demo-app--dojo" : IsComponentsRoute ? "demo-app--components" : null)">
+    @if (!IsDojoRoute && !IsComponentsRoute)
     {
         <aside class="demo-app__sidebar">
             <MudPaper Elevation="0" Class="demo-app__sidebar-card">
@@ -32,45 +32,81 @@
         </aside>
     }
 
-    <main class="demo-app__main @(IsDojoRoute ? "demo-app__main--dojo" : null)">
+    <main class="demo-app__main @(IsDojoRoute ? "demo-app__main--dojo" : IsComponentsRoute ? "demo-app__main--components" : null)">
         @if (!IsDojoRoute)
         {
-            <header class="demo-app__topbar">
-                <div class="demo-app__topbar-intro">
-                    <a href="/" class="demo-app__back">
-                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                        <span>Back to Home</span>
+            @if (IsComponentsRoute)
+            {
+                <header class="demo-app__topbar demo-app__topbar--components">
+                    <a href="/" class="demo-app__masthead-brand">
+                        <img src="logo.png" class="demo-app__masthead-logo" alt="AgentBlazor" />
+                        <span class="demo-app__masthead-copy">
+                            <strong>AgentBlazor</strong>
+                            <small>Agentic Components</small>
+                        </span>
                     </a>
 
-                    <div class="demo-app__title-block">
-                        <p class="demo-app__title-eyebrow">Interactive Agent UI</p>
-                        <h1 class="demo-app__title">AgentBlazor Dojo</h1>
-                    </div>
-                </div>
+                    <nav class="demo-app__masthead-nav" aria-label="Primary">
+                        <a href="/">Home</a>
+                        <a href="/demo/dojo">Capability Dojo</a>
+                        <a href="/demo/components" aria-current="page">Agentic Components</a>
+                    </nav>
 
-                <div class="demo-app__controls">
-                    <MudSelect T="string"
-                               Value="_selectedThemeKey"
-                               ValueChanged="OnThemeChanged"
-                               Label="Theme"
-                               Dense="true"
-                               Variant="Variant.Outlined"
-                               Class="demo-app__theme-select">
-                        @foreach (var option in ThemeOptions)
-                        {
-                            <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-            </header>
+                    <div class="demo-app__controls">
+                        <MudSelect T="string"
+                                   Value="_selectedThemeKey"
+                                   ValueChanged="OnThemeChanged"
+                                   Label="Theme"
+                                   Dense="true"
+                                   Variant="Variant.Outlined"
+                                   Class="demo-app__theme-select">
+                            @foreach (var option in ThemeOptions)
+                            {
+                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </header>
+            }
+            else
+            {
+                <header class="demo-app__topbar">
+                    <div class="demo-app__topbar-intro">
+                        <a href="/" class="demo-app__back">
+                            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                            <span>Back to Home</span>
+                        </a>
+
+                        <div class="demo-app__title-block">
+                            <p class="demo-app__title-eyebrow">Interactive Agent UI</p>
+                            <h1 class="demo-app__title">AgentBlazor Dojo</h1>
+                        </div>
+                    </div>
+
+                    <div class="demo-app__controls">
+                        <MudSelect T="string"
+                                   Value="_selectedThemeKey"
+                                   ValueChanged="OnThemeChanged"
+                                   Label="Theme"
+                                   Dense="true"
+                                   Variant="Variant.Outlined"
+                                   Class="demo-app__theme-select">
+                            @foreach (var option in ThemeOptions)
+                            {
+                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </header>
+            }
         }
 
-        <article class="demo-app__content">
+        <article class="demo-app__content @(IsComponentsRoute ? "demo-app__content--components" : null)">
             @Body
         </article>
     </main>
 
-    @if (!IsDojoRoute)
+    @if (!IsDojoRoute && !IsComponentsRoute)
     {
         <aside class="demo-app__assistant-pane">
             <MudPaper Elevation="0" Class="demo-app__assistant-card">
@@ -241,6 +277,8 @@
     private string CurrentRoutePath => new Uri(NavigationManager.Uri).AbsolutePath;
 
     private bool IsDojoRoute => CurrentRoutePath.StartsWith("/demo/dojo", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
 
     private string AssistantTitle => "Assistant";
 

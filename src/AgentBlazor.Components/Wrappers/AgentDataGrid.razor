@@ -184,13 +184,26 @@
 
     [AgentAction("Navigate to a specific page in the data grid")]
     public async Task<ActionResult> GoToPage(
-        [AgentParam("Zero-based page index", Required = true)] int pageIndex,
+        [AgentParam("One-based page number", Required = true)] int? page = null,
+        [AgentParam("Legacy zero-based page index")] int? pageIndex = null,
         [AgentParam("Number of rows per page")] int? pageSize = null)
     {
-        if (pageIndex < 0)
+        var resolvedPageIndex = pageIndex;
+        if (page.HasValue)
+        {
+            if (page.Value < 1)
+                return ActionResult.NeedsClarification("Page number must be 1 or greater.");
+
+            resolvedPageIndex = page.Value - 1;
+        }
+
+        if (!resolvedPageIndex.HasValue)
+            return ActionResult.NeedsClarification("Page number is required.");
+
+        if (resolvedPageIndex.Value < 0)
             return ActionResult.NeedsClarification("Page index must be zero or greater.");
 
-        CurrentPageIndex = pageIndex;
+        CurrentPageIndex = resolvedPageIndex.Value;
         await CurrentPageIndexChanged.InvokeAsync(CurrentPageIndex);
 
         if (pageSize is > 0)
@@ -200,8 +213,8 @@
         }
 
         return await RefreshAsync(ActionResult.Applied(PageSize > 0
-            ? $"Navigated to page {CurrentPageIndex} (page size {PageSize})."
-            : $"Navigated to page {CurrentPageIndex}."));
+            ? $"Navigated to page {CurrentPageIndex + 1} (page size {PageSize})."
+            : $"Navigated to page {CurrentPageIndex + 1}."));
     }
 
     [AgentAction("Select and focus a specific row by its key value")]
@@ -252,6 +265,7 @@
             ["filterOperator"] = FilterOperator,
             ["filterValue"] = FilterValue?.ToString(),
             ["currentPageIndex"] = CurrentPageIndex,
+            ["currentPage"] = CurrentPageIndex + 1,
             ["pageSize"] = PageSize,
             ["rowKeyProperty"] = RowKeyProperty,
             ["focusedRowKey"] = FocusedRowKey,

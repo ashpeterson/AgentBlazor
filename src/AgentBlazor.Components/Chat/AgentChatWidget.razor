@@ -5,63 +5,66 @@
 @implements IDisposable
 @inject IAgentChatWidgetState WidgetState
 
-<section class="ab-chat-widget @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
+<section class="ab-chat-widget @(WidgetState.IsOpen ? "ab-chat-widget--open" : null) @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
          data-theme="@(Theme?.DataTheme)"
          data-style="@(Theme?.DataStyle)"
          data-radius="@(Theme?.DataRadius)"
          style="@HostStyle"
          aria-label="Chat widget">
-    @if (WidgetState.IsOpen)
-    {
-        <div class="ab-chat-widget__window" role="dialog" aria-modal="true" aria-label="@(Title ?? "Agent chat")">
-            <header class="ab-chat-widget__window-header">
-                <span id="@HeaderLabelId">@(Title ?? "Agent Assistant")</span>
-                <button type="button"
-                        class="ab-chat-widget__icon-btn"
-                        @onclick="Close"
-                        aria-label="Minimize chat widget">
-                    <span aria-hidden="true">&minus;</span>
-                </button>
-            </header>
+    <div class="ab-chat-widget__window"
+         role="dialog"
+         aria-modal="true"
+         aria-hidden="@(!WidgetState.IsOpen)"
+         aria-label="@(Title ?? "Agent chat")">
+        <header class="ab-chat-widget__window-header">
+            <span id="@HeaderLabelId">@(Title ?? "Agent Assistant")</span>
+            <button type="button"
+                    class="ab-chat-widget__icon-btn"
+                    @onclick="Close"
+                    tabindex="@(WidgetState.IsOpen ? 0 : -1)"
+                    aria-label="Minimize chat widget">
+                <span aria-hidden="true">&minus;</span>
+            </button>
+        </header>
 
-            <div class="ab-chat-widget__window-body">
-                <AgentChatSurface Title="@Title"
-                                 Description="@Description"
-                                 FormName="@FormName"
-                                 DefaultAgentName="@DefaultAgentName"
-                                 ShowAgentSelector="@ShowAgentSelector"
-                                 LockedAgentName="@LockedAgentName"
-                                 LockAgentToCurrentRoute="@LockAgentToCurrentRoute"
-                                 EnableAgentHandoff="@EnableAgentHandoff"
-                                 AutoNavigateOnRouteLockedHandoff="@AutoNavigateOnRouteLockedHandoff"
-                                 RequireHandoffApproval="@RequireHandoffApproval"
-                                 HandoffApprovalPolicy="@HandoffApprovalPolicy"
-                                 HandoffPolicy="@HandoffPolicy"
-                                 MaxHandoffsPerSession="@MaxHandoffsPerSession"
-                                 MaxHandoffsPerPair="@MaxHandoffsPerPair"
-                                 MaxHandoffsPerWindow="@MaxHandoffsPerWindow"
-                                 HandoffWindowMinutes="@HandoffWindowMinutes"
-                                 MaxPairHandoffsPerWindow="@MaxPairHandoffsPerWindow"
-                                 BlockImmediateReturnHandoff="@BlockImmediateReturnHandoff"
-                                 SessionId="@SessionId"
-                                 Placeholder="@Placeholder"
-                                 EnableGeneratedUi="@EnableGeneratedUi"
-                                 ShowDevTools="@ShowDevTools"
-                                 AutoShowDevTools="@AutoShowDevTools"
-                                 Theme="@Theme"
-                                 CssClass="@CssClass" />
-            </div>
+        <div class="ab-chat-widget__window-body">
+            <AgentChatSurface Title="@Title"
+                             Description="@Description"
+                             FormName="@FormName"
+                             DefaultAgentName="@DefaultAgentName"
+                             ShowAgentSelector="@ShowAgentSelector"
+                             LockedAgentName="@LockedAgentName"
+                             LockAgentToCurrentRoute="@LockAgentToCurrentRoute"
+                             EnableAgentHandoff="@EnableAgentHandoff"
+                             AutoNavigateOnRouteLockedHandoff="@AutoNavigateOnRouteLockedHandoff"
+                             RequireHandoffApproval="@RequireHandoffApproval"
+                             HandoffApprovalPolicy="@HandoffApprovalPolicy"
+                             HandoffPolicy="@HandoffPolicy"
+                             MaxHandoffsPerSession="@MaxHandoffsPerSession"
+                             MaxHandoffsPerPair="@MaxHandoffsPerPair"
+                             MaxHandoffsPerWindow="@MaxHandoffsPerWindow"
+                             HandoffWindowMinutes="@HandoffWindowMinutes"
+                             MaxPairHandoffsPerWindow="@MaxPairHandoffsPerWindow"
+                             BlockImmediateReturnHandoff="@BlockImmediateReturnHandoff"
+                             SessionId="@SessionId"
+                             Placeholder="@Placeholder"
+                             EnableGeneratedUi="@EnableGeneratedUi"
+                             ShowDevTools="@ShowDevTools"
+                             AutoShowDevTools="@AutoShowDevTools"
+                             Theme="@Theme"
+                             CssClass="@CssClass" />
         </div>
-    }
-    else
-    {
-        <button type="button"
-                class="ab-chat-widget__bubble"
-                @onclick="Open"
-                aria-label="@(BubbleAriaLabel ?? "Open agent chat")">
-            <span class="ab-chat-widget__bubble-label" aria-hidden="true">@BubbleLabel</span>
-        </button>
-    }
+    </div>
+
+    <button type="button"
+            class="ab-chat-widget__bubble"
+            @onclick="Open"
+            aria-hidden="@WidgetState.IsOpen"
+            aria-expanded="@WidgetState.IsOpen"
+            tabindex="@(WidgetState.IsOpen ? -1 : 0)"
+            aria-label="@(BubbleAriaLabel ?? "Open agent chat")">
+        <span class="ab-chat-widget__bubble-label" aria-hidden="true">@BubbleLabel</span>
+    </button>
 </section>
 
 @code {

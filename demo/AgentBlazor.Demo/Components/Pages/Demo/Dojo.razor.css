@@ -4,39 +4,40 @@
     display: grid;
     grid-template-columns: 18rem minmax(0, 1fr);
     background:
-        radial-gradient(circle at top left, rgba(240, 159, 102, 0.12), transparent 30%),
-        linear-gradient(180deg, #fffdf9, #f5efe7);
-    color: #1f2937;
+        radial-gradient(72rem 26rem at -10% -15%, color-mix(in srgb, var(--ab-accent) 22%, transparent), transparent 60%),
+        radial-gradient(60rem 24rem at 120% -10%, color-mix(in srgb, var(--ab-accent) 12%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--ab-bg-soft), var(--ab-bg));
+    color: var(--ab-ink);
     overflow: hidden;
 }
 
 .dojo-workspace ::deep .mud-typography-color-secondary {
-    color: #6b7280 !important;
+    color: var(--ab-ink-muted) !important;
 }
 
 .dojo-workspace ::deep .mud-button-filled-primary {
-    background: linear-gradient(135deg, #eb8a57, #d66a3a) !important;
+    background: linear-gradient(135deg, var(--ab-accent), color-mix(in srgb, var(--ab-accent) 78%, #0f1421)) !important;
     color: #fff !important;
-    box-shadow: none !important;
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ab-accent) 28%, transparent) !important;
 }
 
 .dojo-workspace ::deep .mud-button-filled-primary:hover {
-    background: linear-gradient(135deg, #df7c47, #c95f30) !important;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ab-accent) 92%, #ffffff), var(--ab-accent)) !important;
 }
 
 .dojo-workspace__rail {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: rgba(255, 255, 255, 0.9);
-    border-right: 1px solid #ece3d8;
+    background: linear-gradient(180deg, rgba(12, 19, 32, 0.96), rgba(9, 15, 26, 0.98));
+    border-right: 1px solid var(--ab-border);
     overflow-y: auto;
 }
 
 .dojo-workspace__rail-header,
 .dojo-workspace__rail-section {
     padding: 1rem;
-    border-bottom: 1px solid #efe7de;
+    border-bottom: 1px solid var(--ab-border);
 }
 
 .dojo-workspace__rail-section--fill {
@@ -51,7 +52,7 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #8a6d57;
+    color: var(--ab-ink-muted);
 }
 
 .dojo-workspace__view-toggle,
@@ -60,9 +61,9 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.25rem;
     padding: 0.25rem;
-    border: 1px solid #eadfd3;
+    border: 1px solid var(--ab-border);
     border-radius: 0.9rem;
-    background: rgba(245, 239, 231, 0.72);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .dojo-workspace__view-button,
@@ -79,15 +80,16 @@
     min-height: 2rem;
     border-radius: 0.7rem;
     background: transparent;
-    color: #6b7280;
+    color: var(--ab-ink-muted);
     font-size: 0.8rem;
     font-weight: 600;
 }
 
 .dojo-workspace__view-button.is-active,
 .dojo-inline-toggle__button.is-active {
-    background: #111827;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ab-accent) 22%, transparent), color-mix(in srgb, var(--ab-accent) 10%, transparent));
     color: #fff;
+    border: 1px solid var(--ab-border-strong);
 }
 
 .dojo-workspace__prompt-chips,
@@ -99,15 +101,15 @@
 .dojo-workspace__prompt-chip {
     padding: 0.65rem 0.75rem;
     border-radius: 0.85rem;
-    background: #f8f4ef;
-    color: #4b5563;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ab-ink-muted);
     text-align: left;
     transition: background-color 120ms ease;
 }
 
 .dojo-workspace__prompt-chip:hover,
 .dojo-workspace__demo-item:hover {
-    background: #f0e6db;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .dojo-workspace__demo-item {
@@ -120,19 +122,20 @@
 }
 
 .dojo-workspace__demo-item.is-active {
-    background: #f4ede5;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ab-accent) 18%, transparent), rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--ab-border-strong);
 }
 
 .dojo-workspace__demo-title {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--ab-ink);
 }
 
 .dojo-workspace__demo-description {
     font-size: 0.8rem;
     line-height: 1.45;
-    color: #6b7280;
+    color: var(--ab-ink-muted);
 }
 
 .dojo-workspace__demo-tags {
@@ -149,13 +152,15 @@
     border-radius: 999px;
     font-size: 0.72rem;
     font-weight: 700;
-    background: #f6ede3;
-    color: #7c5d45;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ab-ink-muted);
+    border: 1px solid var(--ab-border);
 }
 
 .dojo-status-chip.is-success {
-    background: #e6f6ec;
-    color: #21663a;
+    background: rgba(46, 204, 135, 0.12);
+    color: #7fe1ae;
+    border-color: rgba(46, 204, 135, 0.3);
 }
 
 .dojo-workspace__main {
@@ -183,10 +188,10 @@
 
 .dojo-stage,
 .dojo-card {
-    border: 1px solid #eadfd3;
+    border: 1px solid var(--ab-border);
     border-radius: 1.4rem;
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 18px 40px rgba(82, 61, 44, 0.08);
+    background: linear-gradient(180deg, rgba(16, 25, 41, 0.9), rgba(11, 18, 30, 0.95));
+    box-shadow: var(--ab-shadow);
 }
 
 .dojo-stage--canvas,
@@ -219,7 +224,7 @@
 
 .dojo-stage--chat-panel ::deep .ab-chat-surface {
     border-radius: 1.4rem;
-    background: rgba(255, 255, 255, 0.82);
+    background: linear-gradient(180deg, rgba(16, 25, 41, 0.9), rgba(11, 18, 30, 0.95));
 }
 
 .dojo-stage--chat-panel ::deep .ab-chat-surface__timeline {
@@ -270,7 +275,7 @@
     font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
-    color: #8a6d57;
+    color: var(--ab-ink-muted);
 }
 
 .dojo-controlled__grid {
@@ -284,7 +289,8 @@
     gap: 0.35rem;
     padding: 0.95rem 1rem;
     border-radius: 1rem;
-    background: #faf6f1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ab-border);
 }
 
 .dojo-key-stat--wide {
@@ -296,11 +302,11 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #8b7768;
+    color: var(--ab-ink-muted);
 }
 
 .dojo-key-stat > strong {
-    color: #1f2937;
+    color: var(--ab-ink);
     font-size: 1rem;
 }
 
@@ -331,14 +337,15 @@
     gap: 0.25rem;
     padding: 0.85rem 0.95rem;
     border-radius: 0.95rem;
-    background: #faf6f1;
-    color: #4b5563;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ab-ink-muted);
     font-size: 0.9rem;
+    border: 1px solid var(--ab-border);
 }
 
 .dojo-feed__item > strong {
     font-size: 0.76rem;
-    color: #8a6d57;
+    color: var(--ab-ink);
 }
 
 .dojo-declarative {
@@ -370,13 +377,13 @@
     width: 0.7rem;
     height: 0.7rem;
     border-radius: 999px;
-    background: #e9d2bf;
+    background: color-mix(in srgb, var(--ab-accent) 55%, #ffffff);
 }
 
 .dojo-open-ended__url {
     flex: 1 1 auto;
     min-width: 0;
-    color: #6b7280;
+    color: var(--ab-ink-muted);
     font-size: 0.82rem;
 }
 
@@ -412,7 +419,7 @@
 
 .dojo-code__description {
     margin: 0.35rem 0 0;
-    color: #6b7280;
+    color: var(--ab-ink-muted);
     font-size: 0.92rem;
     line-height: 1.6;
 }
@@ -423,13 +430,13 @@
     margin: 0;
     font-size: 1rem;
     line-height: 1.7;
-    color: #374151;
+    color: color-mix(in srgb, var(--ab-ink) 90%, transparent);
 }
 
 .dojo-docs__list {
     margin: 0.9rem 0 0;
     padding-left: 1.1rem;
-    color: #4b5563;
+    color: var(--ab-ink-muted);
     display: grid;
     gap: 0.55rem;
 }
@@ -439,12 +446,12 @@
     overflow: auto;
     padding: 1rem;
     border-radius: 1rem;
-    background: #fffaf5;
-    border: 1px solid #eadfd3;
+    background: rgba(8, 13, 23, 0.92);
+    border: 1px solid var(--ab-border);
     font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
     font-size: 0.81rem;
     line-height: 1.65;
-    color: #243041;
+    color: #dbe8ff;
 }
 
 @media (max-width: 1180px) {
