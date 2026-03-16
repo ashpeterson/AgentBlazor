@@ -33,9 +33,10 @@ jobs:
       - name: Validate Central Package Pinning
         shell: pwsh
         run: |
-          $matches = rg -n "<PackageReference[^>]*Version=" -g "*.csproj"
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host $matches
+          $matches = Get-ChildItem -Recurse -Filter *.csproj |
+            Select-String -Pattern '<PackageReference[^>]*Version='
+          if ($matches) {
+            $matches | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
             throw "Found PackageReference entries with inline Version. Use Directory.Packages.props."
           }
           if (-not (Test-Path "Directory.Packages.props")) {
