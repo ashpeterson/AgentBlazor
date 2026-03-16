@@ -43,8 +43,8 @@ jobs:
             throw "Directory.Packages.props is missing."
           }
 
-      - name: Restore (locked mode)
-        run: dotnet restore AgentBlazor.slnx --locked-mode
+      - name: Restore
+        run: dotnet restore AgentBlazor.slnx --force-evaluate
 
       - name: Build
         run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
