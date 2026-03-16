@@ -1,6 +1,6 @@
 # Pricing Tiers
 
-Last updated: 2026-03-12
+Last updated: 2026-03-16
 
 This document describes the current tier model and the current reality of what is wired in code.
 
@@ -51,6 +51,11 @@ Source of truth:
 ### Free
 
 All currently shipped built-in component actions are free.
+
+That remains compatible with the current product direction after the MudBlazor compatibility work:
+
+- drop-in component adoption should not be blocked by paid gates
+- paid value should come from intelligence and persistence, not from basic UI control
 
 This includes:
 
@@ -156,6 +161,8 @@ What is still missing:
 
 Today the main limitation is that the shipped paid action history implementation is still in-memory, so it does not yet represent durable long-term user intelligence.
 
+This is still the largest product-level gap in the repository today.
+
 ## Enforcement Status
 
 Tier enforcement is still real even though current component actions are free.
@@ -201,3 +208,4 @@ Current truth:
 - the component-action surface is now free
 - paid differentiation is intended to be intelligence-driven
 - the durable persistent intelligence story has started, but is not finished yet
+- the component compatibility push has reduced adoption risk on the UI side, so the biggest outstanding monetization risk is now the incomplete persistence/intelligence story rather than component gating

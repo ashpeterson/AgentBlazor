@@ -1,0 +1,210 @@
+@page "/demo/components/parity/workflow-navigation"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>MudTabs and MudStepper vs Agent equivalents</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudTabs and MudStepper side by side with Agent equivalents</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This proof page keeps the host-owned workflow structure intact: the same tab panels, the same step titles,
+            and the same external state controls drive both the Mud baseline and the Agent drop-in versions.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Use the page controls to move both surfaces in lockstep, then compare the rendered tab and step state.
+            The Agent versions also support prompts like <code>switch to tab 1</code> and <code>go to step 2</code>.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetBothTabsToPolicyAsync">
+                Set both tabs to Policy
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SetBothTabsToSummaryAsync">
+                Reset both tabs to Summary
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="MoveBothSteppersToReviewAsync">
+                Move both steppers to Review
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ResetBothSteppersAsync">
+                Reset both steppers
+            </MudButton>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared tab composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudTabs baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor tabs with host-owned active-index state.
+                    </MudText>
+
+                    <MudTabs ActivePanelIndex="@_mudTabIndex" ActivePanelIndexChanged="OnMudTabIndexChanged">
+                        <MudTabPanel Text="Summary">
+                            <MudText Typo="Typo.body2">Supplier overview and risk summary.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Policy">
+                            <MudText Typo="Typo.body2">Policy controls and compliance checks.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Audit">
+                            <MudText Typo="Typo.body2">Audit logs and evidence bundle state.</MudText>
+                        </MudTabPanel>
+                    </MudTabs>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Active tab: @_tabLabels[_mudTabIndex]</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentTabs drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same tab-panel composition with agent metadata layered on top.
+                    </MudText>
+
+                    <AgentTabs AgentId="parity-agent-tabs"
+                               ActivePanelIndex="@_agentTabIndex"
+                               ActivePanelIndexChanged="OnAgentTabIndexChanged">
+                        <MudTabPanel Text="Summary">
+                            <MudText Typo="Typo.body2">Supplier overview and risk summary.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Policy">
+                            <MudText Typo="Typo.body2">Policy controls and compliance checks.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Audit">
+                            <MudText Typo="Typo.body2">Audit logs and evidence bundle state.</MudText>
+                        </MudTabPanel>
+                    </AgentTabs>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Active tab: @_tabLabels[_agentTabIndex]</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared stepper composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudStepper baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor stepper with host-owned active-index state.
+                    </MudText>
+
+                    <MudStepper ActiveIndex="@_mudStepIndex" ActiveIndexChanged="OnMudStepIndexChanged">
+                        <MudStep Title="@_stepLabels[0]">
+                            <MudText Typo="Typo.body2">Create the onboarding kit and confirm the intake owner.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepLabels[1]">
+                            <MudText Typo="Typo.body2">Collect the required documents and verify policy coverage.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepLabels[2]">
+                            <MudText Typo="Typo.body2">Run the review checks and prepare the final submission.</MudText>
+                        </MudStep>
+                    </MudStepper>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Current step: @_stepLabels[_mudStepIndex]</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentStepper drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same stepper shape with agent metadata and deterministic navigation layered on top.
+                    </MudText>
+
+                    <AgentStepper AgentId="parity-agent-stepper"
+                                  CurrentStepIndex="@_agentStepIndex"
+                                  CurrentStepIndexChanged="OnAgentStepIndexChanged">
+                        <MudStep Title="@_stepLabels[0]">
+                            <MudText Typo="Typo.body2">Create the onboarding kit and confirm the intake owner.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepLabels[1]">
+                            <MudText Typo="Typo.body2">Collect the required documents and verify policy coverage.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepLabels[2]">
+                            <MudText Typo="Typo.body2">Run the review checks and prepare the final submission.</MudText>
+                        </MudStep>
+                    </AgentStepper>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Current step: @_stepLabels[_agentStepIndex]</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private readonly string[] _tabLabels = ["Summary", "Policy", "Audit"];
+    private readonly string[] _stepLabels = ["Intake", "Documents", "Review"];
+
+    private int _mudTabIndex;
+    private int _agentTabIndex;
+    private int _mudStepIndex;
+    private int _agentStepIndex;
+
+    private Task OnMudTabIndexChanged(int index)
+    {
+        _mudTabIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentTabIndexChanged(int index)
+    {
+        _agentTabIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudStepIndexChanged(int index)
+    {
+        _mudStepIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentStepIndexChanged(int index)
+    {
+        _agentStepIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task SetBothTabsToPolicyAsync()
+    {
+        _mudTabIndex = 1;
+        _agentTabIndex = 1;
+        return Task.CompletedTask;
+    }
+
+    private Task SetBothTabsToSummaryAsync()
+    {
+        _mudTabIndex = 0;
+        _agentTabIndex = 0;
+        return Task.CompletedTask;
+    }
+
+    private Task MoveBothSteppersToReviewAsync()
+    {
+        _mudStepIndex = 2;
+        _agentStepIndex = 2;
+        return Task.CompletedTask;
+    }
+
+    private Task ResetBothSteppersAsync()
+    {
+        _mudStepIndex = 0;
+        _agentStepIndex = 0;
+        return Task.CompletedTask;
+    }
+}

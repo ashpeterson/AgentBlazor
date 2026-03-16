@@ -1,0 +1,236 @@
+@page "/demo/components/parity/choice-inputs"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>MudSelect and MudAutocomplete vs Agent equivalents</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudSelect and MudAutocomplete side by side with Agent equivalents</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This proof page keeps the host-owned option lists, labels, placeholders, and binding shape intact
+            for choice inputs. The only swap is <code>Mud*</code> to <code>Agent*</code>.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Use the page controls to seed or clear both examples at once, then compare the visible state.
+            The Agent controls also support prompts like <code>set country select value to Germany</code> and
+            <code>set supplier search query to Apex</code>.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetBothCountriesToGermanyAsync">
+                Set both selects to Germany
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearBothCountriesAsync">
+                Clear both selects
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="SeedBothSupplierSearchesAsync">
+                Seed both searches with Apex
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ClearBothSupplierSearchesAsync">
+                Clear both searches
+            </MudButton>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared select composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudSelect baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor select with explicit <code>MudSelectItem</code> child content.
+                    </MudText>
+
+                    <MudSelect T="string"
+                               Label="Country"
+                               Value="@_mudCountry"
+                               ValueChanged="OnMudCountryChanged"
+                               Clearable="true">
+                        @foreach (var country in _countryOptions)
+                        {
+                            <MudSelectItem T="string" Value="@country">@country</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Selected: @(_mudCountry ?? "None")</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentSelect drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same child-content pattern with agent metadata layered on top.
+                    </MudText>
+
+                    <AgentSelect T="string"
+                                 AgentId="parity-agent-select"
+                                 Label="Country"
+                                 Value="@_agentCountry"
+                                 ValueChanged="OnAgentCountryChanged"
+                                 Clearable="true">
+                        @foreach (var country in _countryOptions)
+                        {
+                            <MudSelectItem T="string" Value="@country">@country</MudSelectItem>
+                        }
+                    </AgentSelect>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Selected: @(_agentCountry ?? "None")</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared autocomplete composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudAutocomplete baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor autocomplete with the same shared search function and host-owned text/value state.
+                    </MudText>
+
+                    <MudAutocomplete T="string"
+                                     Label="Supplier search"
+                                     Placeholder="Search suppliers..."
+                                     Text="@_mudSupplierQuery"
+                                     TextChanged="OnMudSupplierQueryChanged"
+                                     Value="@_mudSelectedSupplier"
+                                     ValueChanged="OnMudSupplierChanged"
+                                     SearchFunc="SearchSuppliers"
+                                     Clearable="true" />
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Query: @(_mudSupplierQuery ?? "None")</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Selected supplier: @(_mudSelectedSupplier ?? "None")</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentAutocomplete drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same search and binding surface, with deterministic agent actions layered on top.
+                    </MudText>
+
+                    <AgentAutocomplete T="string"
+                                       AgentId="parity-agent-autocomplete"
+                                       Label="Supplier search"
+                                       Placeholder="Search suppliers..."
+                                       Text="@_agentSupplierQuery"
+                                       TextChanged="OnAgentSupplierQueryChanged"
+                                       Value="@_agentSelectedSupplier"
+                                       ValueChanged="OnAgentSupplierChanged"
+                                       SearchFunc="SearchSuppliers"
+                                       Clearable="true" />
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Query: @(_agentSupplierQuery ?? "None")</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Selected supplier: @(_agentSelectedSupplier ?? "None")</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private readonly string[] _countryOptions = ["United Kingdom", "Germany", "Japan", "United States"];
+    private readonly string[] _supplierOptions = ["Apex Components", "Atlas Metals", "Beacon Industrial", "Cinder Logistics"];
+
+    private string? _mudCountry = "United Kingdom";
+    private string? _agentCountry = "United Kingdom";
+    private string? _mudSupplierQuery = "Atlas";
+    private string? _agentSupplierQuery = "Atlas";
+    private string? _mudSelectedSupplier = "Atlas Metals";
+    private string? _agentSelectedSupplier = "Atlas Metals";
+
+    private Task OnMudCountryChanged(string? value)
+    {
+        _mudCountry = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentCountryChanged(string? value)
+    {
+        _agentCountry = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudSupplierQueryChanged(string value)
+    {
+        _mudSupplierQuery = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentSupplierQueryChanged(string value)
+    {
+        _agentSupplierQuery = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudSupplierChanged(string? value)
+    {
+        _mudSelectedSupplier = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentSupplierChanged(string? value)
+    {
+        _agentSelectedSupplier = value;
+        return Task.CompletedTask;
+    }
+
+    private Task SetBothCountriesToGermanyAsync()
+    {
+        _mudCountry = "Germany";
+        _agentCountry = "Germany";
+        return Task.CompletedTask;
+    }
+
+    private Task ClearBothCountriesAsync()
+    {
+        _mudCountry = null;
+        _agentCountry = null;
+        return Task.CompletedTask;
+    }
+
+    private Task SeedBothSupplierSearchesAsync()
+    {
+        _mudSupplierQuery = "Apex";
+        _agentSupplierQuery = "Apex";
+        _mudSelectedSupplier = "Apex Components";
+        _agentSelectedSupplier = "Apex Components";
+        return Task.CompletedTask;
+    }
+
+    private Task ClearBothSupplierSearchesAsync()
+    {
+        _mudSupplierQuery = null;
+        _agentSupplierQuery = null;
+        _mudSelectedSupplier = null;
+        _agentSelectedSupplier = null;
+        return Task.CompletedTask;
+    }
+
+    private Task<IEnumerable<string>> SearchSuppliers(string value, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IEnumerable<string> results = _supplierOptions;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            results = results.Where(option => option.Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(results);
+    }
+}

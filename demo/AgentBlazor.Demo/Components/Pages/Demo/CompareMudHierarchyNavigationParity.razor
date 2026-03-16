@@ -1,0 +1,181 @@
+@page "/demo/components/parity/hierarchy-navigation"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+@inject NavigationManager Navigation
+
+<PageTitle>MudNavMenu and MudTreeView vs Agent equivalents</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudNavMenu and MudTreeView side by side with Agent equivalents</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This proof page keeps the same hierarchical navigation structure across both versions: the same in-page nav links,
+            the same tree nodes, and the same host-owned selection and expansion state.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Use the controls to select and expand the same tree nodes in both surfaces. The nav menus also use the same hash links,
+            while the Agent versions add deterministic navigation and tree actions on top.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SelectBothAuditNodesAsync">
+                Select both tree views on Audit
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ExpandBothPolicyGroupsAsync">
+                Expand both policy groups
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" Href="#policy">
+                Jump to policy section
+            </MudButton>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared nav-menu composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudNavMenu baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor nav menu using the same in-page section links.
+                    </MudText>
+
+                    <MudNavMenu Dense="true">
+                        <MudNavLink Href="#summary" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Description">Summary</MudNavLink>
+                        <MudNavLink Href="#policy" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Gavel">Policy</MudNavLink>
+                        <MudNavLink Href="#audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Verified">Audit</MudNavLink>
+                    </MudNavMenu>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Current URI: @Navigation.Uri</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentNavMenu drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same nav-link composition with agent metadata layered on top.
+                    </MudText>
+
+                    <AgentNavMenu AgentId="parity-agent-navmenu" Dense="true">
+                        <MudNavLink Href="#summary" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Description">Summary</MudNavLink>
+                        <MudNavLink Href="#policy" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Gavel">Policy</MudNavLink>
+                        <MudNavLink Href="#audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Verified">Audit</MudNavLink>
+                    </AgentNavMenu>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Current URI: @Navigation.Uri</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6" Class="mb-2">Shared tree-view composition</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudTreeView baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor tree view with the same node structure and host-owned selection state.
+                    </MudText>
+
+                    <MudTreeView T="string"
+                                 SelectedValue="@_mudSelectedNode"
+                                 SelectedValueChanged="OnMudSelectedNodeChanged">
+                        <MudTreeViewItem T="string" Text="Summary" Value="@("Summary")" />
+                        <MudTreeViewItem T="string" Text="Policy" Value="@("Policy")" Expanded="@_mudPolicyExpanded">
+                            <MudTreeViewItem T="string" Text="Audit" Value="@("Audit")" />
+                        </MudTreeViewItem>
+                    </MudTreeView>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Selected node: @(_mudSelectedNode ?? "None")</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Policy expanded: @_mudPolicyExpanded</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentTreeView drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same tree-item structure with agent metadata layered on top.
+                    </MudText>
+
+                    <AgentTreeView T="string"
+                                   AgentId="parity-agent-treeview"
+                                   SelectedValue="@_agentSelectedNode"
+                                   SelectedValueChanged="OnAgentSelectedNodeChanged">
+                        <MudTreeViewItem T="string" Text="Summary" Value="@("Summary")" />
+                        <MudTreeViewItem T="string" Text="Policy" Value="@("Policy")" Expanded="@_agentPolicyExpanded">
+                            <MudTreeViewItem T="string" Text="Audit" Value="@("Audit")" />
+                        </MudTreeViewItem>
+                    </AgentTreeView>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Class="d-block">Selected node: @(_agentSelectedNode ?? "None")</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Policy expanded: @_agentPolicyExpanded</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <section id="summary" class="demo-doc-page__section">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6">Summary</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Shared in-page destination for nav-menu parity.</MudText>
+        </MudPaper>
+    </section>
+
+    <section id="policy" class="demo-doc-page__section">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6">Policy</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Shared in-page destination for nav-menu parity.</MudText>
+        </MudPaper>
+    </section>
+
+    <section id="audit" class="demo-doc-page__section">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6">Audit</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Shared in-page destination for nav-menu parity.</MudText>
+        </MudPaper>
+    </section>
+</div>
+
+@code {
+    private string? _mudSelectedNode = "Summary";
+    private string? _agentSelectedNode = "Summary";
+    private bool _mudPolicyExpanded;
+    private bool _agentPolicyExpanded;
+
+    private Task OnMudSelectedNodeChanged(string? value)
+    {
+        _mudSelectedNode = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentSelectedNodeChanged(string? value)
+    {
+        _agentSelectedNode = value;
+        return Task.CompletedTask;
+    }
+
+    private Task SelectBothAuditNodesAsync()
+    {
+        _mudSelectedNode = "Audit";
+        _agentSelectedNode = "Audit";
+        return Task.CompletedTask;
+    }
+
+    private Task ExpandBothPolicyGroupsAsync()
+    {
+        _mudPolicyExpanded = true;
+        _agentPolicyExpanded = true;
+        return Task.CompletedTask;
+    }
+}

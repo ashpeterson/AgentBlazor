@@ -1,7 +1,10 @@
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Runtime;
 using AgentBlazor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
+using System.Reflection;
 
 #pragma warning disable BL0005 // Setting parameters directly is intentional in wrapper logic unit tests.
 
@@ -319,6 +322,34 @@ public class WrapperActionExecutionTests
     }
 
     [Fact]
+    public async Task AgentDialog_ExecutesOpenConfirmAndClose_Actions()
+    {
+        var dialog = new AgentDialog
+        {
+            AgentId = "supplier-dialog",
+            OnConfirm = () => Task.FromResult(ActionResult.Applied("Confirmed supplier dialog."))
+        };
+
+        bool? observedVisible = null;
+        var callbacks = new EventCallbackFactory();
+        dialog.VisibleChanged = callbacks.Create<bool>(this, value => observedVisible = value);
+
+        var open = await dialog.ExecuteActionAsync(AgentAction.Create("open"));
+        var confirm = await dialog.ExecuteActionAsync(AgentAction.Create("confirm"));
+        var close = await dialog.ExecuteActionAsync(AgentAction.Create("close"));
+
+        Assert.True(open.Succeeded);
+        Assert.True(confirm.Succeeded);
+        Assert.True(close.Succeeded);
+        Assert.False(dialog.Visible);
+        Assert.False(observedVisible);
+        Assert.Equal("Confirmed supplier dialog.", confirm.Message);
+
+        var state = dialog.GetCurrentState();
+        Assert.Equal(false, state["visible"]);
+    }
+
+    [Fact]
     public async Task AgentFormPageBase_SetField_UpdatesSingleField_AndOpensDialog()
     {
         var page = new RecipeFormPage();
@@ -353,7 +384,7 @@ public class WrapperActionExecutionTests
     [Fact]
     public async Task AgentSelect_ExecutesOpenSetValueClearAndClose_Actions()
     {
-        var select = new AgentSelect
+        var select = new AgentSelect<string>
         {
             AgentId = "country-select",
             Options = ["United Kingdom", "United States", "Canada"]
@@ -361,7 +392,7 @@ public class WrapperActionExecutionTests
 
         string? observedValue = null;
         var callbacks = new EventCallbackFactory();
-        select.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
+        select.ValueChanged = callbacks.Create<string>(this, value => observedValue = value);
 
         var open = await select.ExecuteActionAsync(AgentAction.Create("open"));
         var set = await select.ExecuteActionAsync(AgentAction.Create("set_value", new Dictionary<string, object?>
@@ -386,9 +417,36 @@ public class WrapperActionExecutionTests
     }
 
     [Fact]
+    public async Task AgentTabs_ExecutesSwitchTab_Action()
+    {
+        var tabs = new AgentTabs
+        {
+            AgentId = "components-tabs",
+            ActivePanelIndex = 0
+        };
+
+        var observedIndex = -1;
+        var callbacks = new EventCallbackFactory();
+        tabs.ActivePanelIndexChanged = callbacks.Create<int>(this, index => observedIndex = index);
+
+        var switchTab = await tabs.ExecuteActionAsync(AgentAction.Create("switch_tab", new Dictionary<string, object?>
+        {
+            ["index"] = 2
+        }));
+
+        Assert.True(switchTab.Succeeded);
+        Assert.Equal(2, tabs.ActivePanelIndex);
+        Assert.Equal(2, observedIndex);
+
+        var state = tabs.GetCurrentState();
+        Assert.Equal(2, state["activePanelIndex"]);
+        Assert.Empty((string[])state["availableTabs"]!);
+    }
+
+    [Fact]
     public async Task AgentAutocomplete_ExecutesSetQuerySelectOptionAndClear_Actions()
     {
-        var autocomplete = new AgentAutocomplete
+        var autocomplete = new AgentAutocomplete<string>
         {
             AgentId = "country-autocomplete",
             Options = ["United Kingdom", "United States", "Canada"]
@@ -398,7 +456,7 @@ public class WrapperActionExecutionTests
         string? observedValue = null;
         var callbacks = new EventCallbackFactory();
         autocomplete.QueryChanged = callbacks.Create<string?>(this, query => observedQuery = query);
-        autocomplete.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
+        autocomplete.ValueChanged = callbacks.Create<string>(this, value => observedValue = value);
 
         var setQuery = await autocomplete.ExecuteActionAsync(AgentAction.Create("set_query", new Dictionary<string, object?>
         {
@@ -514,7 +572,7 @@ public class WrapperActionExecutionTests
     [Fact]
     public async Task AgentTreeView_ExecutesExpandSelectAndCollapse_Actions()
     {
-        var tree = new AgentTreeView
+        var tree = new AgentTreeView<string>
         {
             AgentId = "supplier-tree",
             NodeIds = ["root", "supplier-a", "supplier-b"]
@@ -551,6 +609,36 @@ public class WrapperActionExecutionTests
         var state = tree.GetCurrentState();
         Assert.Equal("supplier-a", state["selectedNodeId"]);
         Assert.Empty((string[])state["expandedNodeIds"]!);
+    }
+
+    [Fact]
+    public async Task AgentNavMenu_ExecutesInternalAndExternalNavigation_Actions()
+    {
+        var nav = new AgentNavMenu
+        {
+            AgentId = "demo-nav"
+        };
+
+        var navigation = new TestNavigationManager();
+        typeof(AgentNavMenu)
+            .GetProperty("Navigation", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(nav, navigation);
+
+        var internalNavigate = await nav.ExecuteActionAsync(AgentAction.Create("navigate_to", new Dictionary<string, object?>
+        {
+            ["uri"] = "/demo/components"
+        }));
+        var externalNavigate = await nav.ExecuteActionAsync(AgentAction.Create("navigate_external", new Dictionary<string, object?>
+        {
+            ["url"] = "https://example.com/docs"
+        }));
+
+        Assert.True(internalNavigate.Succeeded);
+        Assert.True(externalNavigate.Succeeded);
+        Assert.Equal("https://example.com/docs", nav.CurrentUri);
+
+        var state = nav.GetCurrentState();
+        Assert.Equal("https://example.com/docs", state["uri"]);
     }
 
     [Fact]
@@ -638,14 +726,14 @@ public class WrapperActionExecutionTests
     [Fact]
     public async Task AgentFileUpload_ExecutesAttachListAndRemove_Actions()
     {
-        var upload = new AgentFileUpload
+        var upload = new AgentFileUpload<IReadOnlyList<IBrowserFile>>
         {
             AgentId = "attachments"
         };
 
         IReadOnlyList<string>? observedFiles = null;
         var callbacks = new EventCallbackFactory();
-        upload.FilesChanged = callbacks.Create<IReadOnlyList<string>>(this, files => observedFiles = files);
+        upload.FileNamesChanged = callbacks.Create<IReadOnlyList<string>>(this, files => observedFiles = files);
 
         var attach = await upload.ExecuteActionAsync(AgentAction.Create("attach", new Dictionary<string, object?>
         {
@@ -691,6 +779,24 @@ public class WrapperActionExecutionTests
         public string FirstName { get; set; } = string.Empty;
 
         public string LastName { get; set; } = string.Empty;
+    }
+
+    private sealed class TestNavigationManager : NavigationManager
+    {
+        public TestNavigationManager()
+        {
+            Initialize("https://example.com/", "https://example.com/");
+        }
+
+        protected override void NavigateToCore(string uri, bool forceLoad)
+        {
+            Uri = ToAbsoluteUri(uri).ToString();
+        }
+
+        protected override void NavigateToCore(string uri, NavigationOptions options)
+        {
+            Uri = ToAbsoluteUri(uri).ToString();
+        }
     }
 
     private sealed class RecipeFormPage : AgentFormPageBase<RecipeModel>

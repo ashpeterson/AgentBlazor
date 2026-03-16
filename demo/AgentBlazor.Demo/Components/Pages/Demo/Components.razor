@@ -2,6 +2,7 @@
 @page "/demo/components/{ComponentKey}"
 @layout DemoLayout
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
 @using AgentBlazor.Components
 @using AgentBlazor.Core.Runtime.Interfaces
 @using AgentBlazor.Demo.Services
@@ -100,6 +101,10 @@
                         <strong>Custom component path</strong>
                         <span>Move to the attribute-based example when you need your own Blazor component contract.</span>
                     </div>
+                    <div class="components-page__mini-card">
+                        <strong>Compatibility proofs</strong>
+                        <span><a href="/demo/components/parity/form">Open the form proof</a>, <a href="/demo/components/parity/datagrid">the data grid proof</a>, <a href="/demo/components/parity/dialog">the dialog proof</a>, <a href="/demo/components/parity/choice-inputs">the select and autocomplete proof</a>, <a href="/demo/components/parity/file-upload">the file upload proof</a>, <a href="/demo/components/parity/date-pickers">the date-picker proof</a>, <a href="/demo/components/parity/workflow-navigation">the tabs and stepper proof</a>, <a href="/demo/components/parity/hierarchy-navigation">the nav-menu and tree-view proof</a>, or <a href="/demo/components/parity/composed-workflow">the composed workflow proof</a> to validate the drop-in claim.</span>
+                    </div>
                 </div>
             </section>
         }
@@ -148,34 +153,37 @@
                 }
                 else if (Show("form"))
                 {
-                    <AgentForm AgentId="components-form" Model="@_componentFormModel" Submitted="OnComponentFormSubmittedAsync">
-                        <ChildContent Context="formContext">
-                            <DataAnnotationsValidator />
-                            <MudGrid Spacing="2">
-                                <MudItem xs="12" md="6">
-                                    <MudTextField T="string"
-                                                  Label="Supplier Name"
-                                                  For="@(() => _componentFormModel.SupplierName)"
-                                                  @bind-Value="_componentFormModel.SupplierName" />
-                                </MudItem>
-                                <MudItem xs="12" md="3">
-                                    <MudSelect T="string"
-                                               Label="Risk Tier"
-                                               For="@(() => _componentFormModel.RiskTier)"
-                                               @bind-Value="_componentFormModel.RiskTier">
-                                        <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
-                                        <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
-                                        <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
-                                    </MudSelect>
-                                </MudItem>
-                                <MudItem xs="12" md="3">
-                                    <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_componentFormModel.NeedsExpedite" />
-                                </MudItem>
-                            </MudGrid>
-                            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
-                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Submit</MudButton>
-                            </MudStack>
-                        </ChildContent>
+                    <AgentForm @ref="_componentForm"
+                               AgentId="components-form"
+                               Model="@_componentFormModel"
+                               Submitted="OnComponentFormSubmittedAsync">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                              Label="Supplier Name"
+                                              For="@(() => _componentFormModel.SupplierName)"
+                                              @bind-Value="_componentFormModel.SupplierName" />
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudSelect T="string"
+                                           Label="Risk Tier"
+                                           For="@(() => _componentFormModel.RiskTier)"
+                                           @bind-Value="_componentFormModel.RiskTier">
+                                    <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_componentFormModel.NeedsExpedite" />
+                            </MudItem>
+                        </MudGrid>
+                        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                            <MudButton ButtonType="ButtonType.Button"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="SubmitComponentFormAsync">Submit</MudButton>
+                        </MudStack>
                     </AgentForm>
                 }
                 else if (Show("dialog"))
@@ -225,7 +233,8 @@
                 }
                 else if (Show("select"))
                 {
-                    <AgentSelect AgentId="kit-country-select"
+                    <AgentSelect T="string"
+                                 AgentId="kit-country-select"
                                  Value="@_selectedCountry"
                                  ValueChanged="OnCountryChanged"
                                  Options="@_countryOptions" />
@@ -233,7 +242,8 @@
                 }
                 else if (Show("autocomplete"))
                 {
-                    <AgentAutocomplete AgentId="kit-supplier-autocomplete"
+                    <AgentAutocomplete T="string"
+                                       AgentId="kit-supplier-autocomplete"
                                        Query="@_supplierQuery"
                                        QueryChanged="OnSupplierQueryChanged"
                                        Value="@_selectedSupplier"
@@ -264,7 +274,7 @@
                 }
                 else if (Show("tree-view"))
                 {
-                    <AgentTreeView AgentId="kit-workflow-tree"
+                    <AgentTreeView T="string" AgentId="kit-workflow-tree"
                                    NodeIds="@_treeNodeIds"
                                    SelectedNodeId="@_selectedTreeNodeId"
                                    SelectedNodeIdChanged="OnTreeNodeSelected"
@@ -276,8 +286,17 @@
                 {
                     <AgentStepper AgentId="kit-onboarding-stepper"
                                   CurrentStepIndex="@_currentStepIndex"
-                                  CurrentStepIndexChanged="OnCurrentStepChanged"
-                                  StepIds="@_stepIds" />
+                                  CurrentStepIndexChanged="OnCurrentStepChanged">
+                        <MudStep Title="@_stepIds[0]">
+                            <MudText Typo="Typo.body2">Create the onboarding kit and confirm the intake owner.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepIds[1]">
+                            <MudText Typo="Typo.body2">Collect the required documents and verify policy coverage.</MudText>
+                        </MudStep>
+                        <MudStep Title="@_stepIds[2]">
+                            <MudText Typo="Typo.body2">Run the review checks and prepare the final submission.</MudText>
+                        </MudStep>
+                    </AgentStepper>
                     <MudText Typo="Typo.caption" Class="mt-2">Current step: @_currentStepIndex (@_stepIds[_currentStepIndex])</MudText>
                 }
                 else if (Show("command-bar"))
@@ -293,9 +312,9 @@
                         Local mode treats names as trusted references. Remote mode treats names as handoff tokens.
                     </MudAlert>
 
-                    <AgentFileUpload AgentId="kit-file-upload"
-                                     Files="@_attachedFiles"
-                                     FilesChanged="OnFilesChanged" />
+                    <AgentFileUpload T="IReadOnlyList<IBrowserFile>" AgentId="kit-file-upload"
+                                     FileNames="@_attachedFiles"
+                                     FileNamesChanged="OnFilesChanged" />
                     <MudText Typo="Typo.caption" Class="mt-2">Attached files: @(string.Join(", ", _attachedFiles))</MudText>
                     <MudText Typo="Typo.caption" Class="mt-1">Upload mode: @_uploadPolicyMode</MudText>
 
@@ -435,6 +454,7 @@
     public string? ComponentKey { get; set; }
 
     private AgentDialog? _componentDialog;
+    private AgentForm? _componentForm;
     private bool _componentDialogVisible;
 
     private readonly ComponentFormModel _componentFormModel = new()
@@ -519,7 +539,7 @@
     private static readonly IReadOnlyList<ComponentEntry> _componentEntries =
     [
         new("datagrid", "AgentDataGrid", "/demo/components/datagrid", "Sort, filter, page, and focus grid rows with deterministic actions.", "components-datagrid", "DataGrid actions, current page, focused row, and visible columns.", "Sort and filter supplier records while keeping the grid native to Blazor.", ["sort suppliers by risk score descending", "filter region EMEA", "go to page 2", "clear filters"], ["filter", "sort", "go_to_page", "select_row", "clear_filters"]),
-        new("form", "AgentForm", "/demo/components/form", "Update form fields and submit structured data through a host-owned form.", "components-form", "Current field values and validation-ready form state.", "Edit a supplier review form without giving the agent direct control over layout.", ["set supplier name to Apex Labs", "set risk tier to High", "submit form"], ["set_field", "validate", "reset", "submit"]),
+        new("form", "AgentForm", "/demo/components/form", "Validate, reset, and submit structured data through a host-owned MudForm surface.", "components-form", "Current field values, validation errors, and metadata for the host-owned form model.", "Keep the full MudForm surface while layering agent-driven validation and submission on top.", ["validate the form", "reset the form", "submit form"], ["validate", "reset", "submit"]),
         new("dialog", "AgentDialog", "/demo/components/dialog", "Open, confirm, and close dialogs while the host still owns the modal content.", "components-dialog", "Dialog visibility plus the currently mounted dialog content.", "Use deterministic dialog orchestration instead of free-form UI generation.", ["open dialog", "confirm dialog", "close dialog"], ["open", "confirm", "close"]),
         new("nav-menu", "AgentNavMenu", "/demo/components/nav-menu", "Navigate between known routes from a host-defined navigation menu.", "components-nav-menu", "Current route and the menu destinations mounted in the explorer.", "Expose safe internal navigation actions from a Blazor navigation surface.", ["navigate to /demo/dojo", "navigate to /demo/components/file-upload"], ["navigate_to", "navigate_external"]),
         new("tabs", "AgentTabs", "/demo/components/tabs", "Switch between host-owned tabs without giving up component structure.", "components-tabs", "Active tab index and the available tab labels.", "Move around a multi-panel surface while keeping tab content native.", ["switch to policy tab", "switch to audit tab"], ["switch_tab"]),
@@ -585,6 +605,16 @@
     {
         Snackbar.Add("Component form submitted.", Severity.Success);
         await Task.CompletedTask;
+    }
+
+    private async Task SubmitComponentFormAsync()
+    {
+        if (_componentForm is null)
+        {
+            return;
+        }
+
+        await _componentForm.SubmitForm();
     }
 
     private async Task OpenComponentDialogAsync()

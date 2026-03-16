@@ -12,7 +12,7 @@ test.describe("Landing page", () => {
 
     await page.locator("#hero").getByRole("link", { name: "Browse Agentic Components" }).click();
     await expect(page).toHaveURL(/\/demo\/components$/);
-    await expect(page.getByRole("heading", { name: "Start with a single component, not a crowded demo dashboard." })).toBeVisible();
+    await expect(page.locator("#catalog").getByRole("heading", { name: "Current drop-in components" })).toBeVisible();
 
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("#hero").getByRole("link", { name: "Open Capability Dojo" }).click();

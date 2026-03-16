@@ -1,0 +1,165 @@
+@page "/demo/components/parity/dialog"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Core.Runtime.Agents
+@using AgentBlazor.Runtime
+@using MudBlazor
+
+<PageTitle>MudDialog vs AgentDialog</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudDialog and AgentDialog side by side</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This proof page keeps the same inline dialog structure across both versions: shared title content,
+            shared body content, shared action layout, and host-owned visibility state.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Use the page controls to open or close both dialogs together, then compare the content and action flow.
+            The Agent dialog can also respond to prompts like <code>open dialog</code>, <code>confirm</code>, and <code>close dialog</code>.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenBothDialogsAsync">
+                Open both dialogs
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="CloseBothDialogsAsync">
+                Close both dialogs
+            </MudButton>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudDialog baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native inline MudBlazor dialog with host-owned visibility and confirmation state.
+                    </MudText>
+                    <MudText Typo="Typo.caption">Visible: @_mudDialogVisible</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Confirm count: @_mudConfirmCount</MudText>
+
+                    <MudDialog Visible="@_mudDialogVisible" VisibleChanged="OnMudDialogVisibleChanged">
+                        <TitleContent>
+                            <MudText Typo="Typo.h6">Supplier Approval Review</MudText>
+                        </TitleContent>
+                        <DialogContent>
+                            <MudText Typo="Typo.body2">
+                                Review the supplier evidence bundle before moving this request to approval.
+                            </MudText>
+                        </DialogContent>
+                        <DialogActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmMudDialogAsync">
+                                Confirm
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseMudDialogAsync">
+                                Cancel
+                            </MudButton>
+                        </DialogActions>
+                    </MudDialog>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentDialog drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Same inline dialog structure with agent metadata and deterministic dialog actions layered on top.
+                    </MudText>
+                    <MudText Typo="Typo.caption">Visible: @_agentDialogVisible</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Confirm count: @_agentConfirmCount</MudText>
+
+                    <AgentDialog AgentId="parity-agent-dialog"
+                                 Visible="@_agentDialogVisible"
+                                 VisibleChanged="OnAgentDialogVisibleChanged"
+                                 OnConfirm="ConfirmAgentDialogActionAsync">
+                        <TitleContent>
+                            <MudText Typo="Typo.h6">Supplier Approval Review</MudText>
+                        </TitleContent>
+                        <DialogContent>
+                            <MudText Typo="Typo.body2">
+                                Review the supplier evidence bundle before moving this request to approval.
+                            </MudText>
+                        </DialogContent>
+                        <DialogActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmAgentDialogButtonAsync">
+                                Confirm
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CloseAgentDialogAsync">
+                                Cancel
+                            </MudButton>
+                        </DialogActions>
+                    </AgentDialog>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private bool _mudDialogVisible;
+    private bool _agentDialogVisible;
+    private int _mudConfirmCount;
+    private int _agentConfirmCount;
+
+    private Task OpenBothDialogsAsync()
+    {
+        _mudDialogVisible = true;
+        _agentDialogVisible = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseBothDialogsAsync()
+    {
+        _mudDialogVisible = false;
+        _agentDialogVisible = false;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudDialogVisibleChanged(bool visible)
+    {
+        _mudDialogVisible = visible;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentDialogVisibleChanged(bool visible)
+    {
+        _agentDialogVisible = visible;
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmMudDialogAsync()
+    {
+        _mudConfirmCount++;
+        _mudDialogVisible = false;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseMudDialogAsync()
+    {
+        _mudDialogVisible = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmAgentDialogButtonAsync()
+    {
+        await ConfirmAgentDialogActionAsync();
+    }
+
+    private Task CloseAgentDialogAsync()
+    {
+        _agentDialogVisible = false;
+        return Task.CompletedTask;
+    }
+
+    private Task<ActionResult> ConfirmAgentDialogActionAsync()
+    {
+        _agentConfirmCount++;
+        _agentDialogVisible = false;
+        return Task.FromResult(ActionResult.Applied("Confirmed agent dialog."));
+    }
+}

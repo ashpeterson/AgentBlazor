@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-12
+Last updated: 2026-03-16
 
 ## Current Product Shape
 
@@ -83,6 +83,36 @@ The current built-in component set is:
 - `AgentFileUpload`
 - attribute-based custom components via `AgentControllableComponentBase`
 
+Most high-surface MudBlazor-backed components have now been moved onto native-first implementations:
+
+- `AgentDataGrid -> MudDataGrid`
+- `AgentDialog -> MudDialog`
+- `AgentForm -> MudForm`
+- `AgentNavMenu -> MudNavMenu`
+- `AgentTabs -> MudTabs`
+- `AgentSelect -> MudSelect`
+- `AgentAutocomplete -> MudAutocomplete`
+- `AgentDatePicker -> MudDatePicker`
+- `AgentDateRangePicker -> MudDateRangePicker`
+- `AgentTreeView -> MudTreeView`
+- `AgentStepper -> MudStepper`
+- `AgentFileUpload -> MudFileUpload`
+
+Compatibility proof is now materially in place, not just planned:
+
+- side-by-side parity pages exist for:
+  - `MudForm -> AgentForm`
+  - `MudDataGrid -> AgentDataGrid`
+  - `MudDialog -> AgentDialog`
+  - `MudSelect/MudAutocomplete -> AgentSelect/AgentAutocomplete`
+  - `MudFileUpload -> AgentFileUpload`
+  - `MudDatePicker/MudDateRangePicker -> AgentDatePicker/AgentDateRangePicker`
+  - `MudTabs/MudStepper -> AgentTabs/AgentStepper`
+  - `MudNavMenu/MudTreeView -> AgentNavMenu/AgentTreeView`
+  - a composed multi-control workflow screen
+- rendered parity coverage now exists in `AgentBlazor.Components.Tests`
+- browser coverage now exercises the proof routes in the Playwright suite
+
 The components explorer is now a docs-style surface:
 
 - top navigation bar
@@ -157,7 +187,7 @@ Latest local verification:
 - `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj`
 - `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj`
 - `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj`
-- `npx playwright test --config=playwright.config.cjs`
+- `npm --prefix tests/e2e run test:e2e`
 
 Latest browser status:
 
@@ -171,6 +201,7 @@ Coverage includes:
 - prompt-backed Dojo validation across all three pillars
 - failure-path / clarification-path checks
 - components explorer layout and focused component routes
+- side-by-side parity proof routes, including the composed workflow screen
 
 ## Current Gaps
 
@@ -185,9 +216,13 @@ Coverage includes:
 ### Demo Gaps
 
 - The Dojo now tells the right story, but it is still a curated showcase rather than a complete playground.
+- Compatibility proof now exists for every shipped Mud-backed `Agent*` component, but some surfaces are still only proven in one or two shapes:
+  - `AgentTreeView` still needs deeper hierarchy and expansion scenarios
+  - composed workflow proof should grow beyond the current single screen
+  - `AgentDataGrid` still needs stronger public proof around richer server-backed and templated usage
 - The components explorer is strong for drop-in primitives, but richer production narratives are still uneven across:
+  - `AgentDataGrid`
   - `AgentTreeView`
-  - `AgentStepper`
   - `AgentCommandBar`
   - `AgentFileUpload`
 
@@ -198,14 +233,17 @@ Coverage includes:
 
 ## What Needs Doing Next
 
-1. Build a durable action history store so paid suggestions and insights are grounded in persistent user behavior.
-2. Keep strengthening prompt determinism and observability on focused component routes.
-3. Deepen workflow examples for the more complex agentic components.
-4. Expand declarative adapter coverage while keeping `AgentUiDocument` as the native rendering model.
-5. Continue refining the home -> dojo -> components journey so the public demo feels like one product, not a set of samples.
+1. Keep expanding parity proof depth for the remaining weaker surfaces, especially richer `TreeView` variants, more complex `DataGrid` screens, and additional composed workflow variants.
+2. Decide and document the long-term role of `AgentCommandBar` as the intentional non-Mud special case in an otherwise Mud-compatible component story.
+3. Build the next product-level gap, not another compatibility reset:
+   - durable paid intelligence
+   - deeper hosted/open-ended controls if that product line continues
+4. Keep strengthening prompt determinism and observability on focused component routes.
+5. Expand declarative adapter coverage while keeping `AgentUiDocument` as the native rendering model.
 
 ## Reference Docs
 
 - Architecture: `docs/architecture.md`
 - Expansion roadmap: `docs/component-expansion-plan.md`
+- MudBlazor compatibility roadmap: `docs/mudblazor-compatibility-roadmap.md`
 - Tier model: `docs/pricing-tiers.md`

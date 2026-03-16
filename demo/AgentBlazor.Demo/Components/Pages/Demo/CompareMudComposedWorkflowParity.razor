@@ -1,0 +1,377 @@
+@page "/demo/components/parity/composed-workflow"
+@layout DemoLayout
+@using System.ComponentModel.DataAnnotations
+@using AgentBlazor.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+
+<PageTitle>Composed MudBlazor workflow vs Agent equivalents</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">A composed workflow screen with Mud and Agent components side by side</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This page proves the drop-in claim on a realistic screen instead of one control at a time.
+            Both columns use the same host-owned workflow state: tabs, stepper, form fields, review date, and evidence bundle.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Use the page controls to seed or advance both screens together, then compare the rendered workflow state.
+            The Agent version keeps the same layout while exposing deterministic actions for the individual controls.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SeedBothWorkflowsAsync">
+                Seed both workflow screens
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SwitchBothToDocumentsAsync">
+                Switch both tabs to Documents
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="MoveBothToReviewAsync">
+                Move both steppers to Review
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="ClearBothEvidenceBundlesAsync">
+                Clear both evidence bundles
+            </MudButton>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">Mud workflow baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor composition with host-owned workflow state.
+                    </MudText>
+
+                    <MudTabs ActivePanelIndex="@_mudTabIndex" ActivePanelIndexChanged="OnMudTabIndexChanged">
+                        <MudTabPanel Text="Overview">
+                            <MudText Typo="Typo.body2">Supplier summary and review intake.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Documents">
+                            <MudText Typo="Typo.body2">Evidence bundle and supporting files.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Approval">
+                            <MudText Typo="Typo.body2">Final review and sign-off.</MudText>
+                        </MudTabPanel>
+                    </MudTabs>
+
+                    <MudStepper ActiveIndex="@_mudStepIndex" ActiveIndexChanged="OnMudStepIndexChanged" Class="mt-4">
+                        <MudStep Title="Intake">
+                            <MudText Typo="Typo.body2">Capture supplier context and assign a risk tier.</MudText>
+                        </MudStep>
+                        <MudStep Title="Documents">
+                            <MudText Typo="Typo.body2">Collect evidence and confirm the review window.</MudText>
+                        </MudStep>
+                        <MudStep Title="Review">
+                            <MudText Typo="Typo.body2">Prepare the final workflow handoff.</MudText>
+                        </MudStep>
+                    </MudStepper>
+
+                    <MudForm Model="@_mudModel" Class="mt-4">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                              Label="Supplier Name"
+                                              For="@(() => _mudModel.SupplierName)"
+                                              @bind-Value="_mudModel.SupplierName" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudSelect T="string"
+                                           Label="Risk Tier"
+                                           For="@(() => _mudModel.RiskTier)"
+                                           @bind-Value="_mudModel.RiskTier">
+                                    <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+                    </MudForm>
+
+                    <MudDatePicker Label="Review date"
+                                   Date="@_mudReviewDate"
+                                   DateChanged="OnMudReviewDateChanged"
+                                   MinDate="@_minReviewDate"
+                                   MaxDate="@_maxReviewDate"
+                                   Class="mt-4" />
+
+                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                   Files="@_mudFiles"
+                                   FilesChanged="OnMudFilesChanged"
+                                   Hidden="false"
+                                   Accept=".pdf,.csv"
+                                   AppendMultipleFiles="true"
+                                   Class="mt-4">
+                        <SelectedTemplate Context="files">
+                            <MudStack Spacing="1">
+                                @if (files is not null)
+                                {
+                                    foreach (var file in files)
+                                    {
+                                        <MudText Typo="Typo.body2">@file.Name</MudText>
+                                    }
+                                }
+                            </MudStack>
+                        </SelectedTemplate>
+                    </MudFileUpload>
+
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.caption" Class="d-block">Active tab: @_workflowTabs[_mudTabIndex]</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Current step: @_workflowSteps[_mudStepIndex]</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Supplier: @_mudModel.SupplierName</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Risk tier: @_mudModel.RiskTier</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Review date: @FormatDate(_mudReviewDate)</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Files count: @_mudFiles.Count</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">Agent workflow drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        The same workflow composition with agent metadata layered across the mounted controls.
+                    </MudText>
+
+                    <AgentTabs AgentId="parity-workflow-tabs"
+                               ActivePanelIndex="@_agentTabIndex"
+                               ActivePanelIndexChanged="OnAgentTabIndexChanged">
+                        <MudTabPanel Text="Overview">
+                            <MudText Typo="Typo.body2">Supplier summary and review intake.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Documents">
+                            <MudText Typo="Typo.body2">Evidence bundle and supporting files.</MudText>
+                        </MudTabPanel>
+                        <MudTabPanel Text="Approval">
+                            <MudText Typo="Typo.body2">Final review and sign-off.</MudText>
+                        </MudTabPanel>
+                    </AgentTabs>
+
+                    <AgentStepper AgentId="parity-workflow-stepper"
+                                  CurrentStepIndex="@_agentStepIndex"
+                                  CurrentStepIndexChanged="OnAgentStepIndexChanged"
+                                  Class="mt-4">
+                        <MudStep Title="Intake">
+                            <MudText Typo="Typo.body2">Capture supplier context and assign a risk tier.</MudText>
+                        </MudStep>
+                        <MudStep Title="Documents">
+                            <MudText Typo="Typo.body2">Collect evidence and confirm the review window.</MudText>
+                        </MudStep>
+                        <MudStep Title="Review">
+                            <MudText Typo="Typo.body2">Prepare the final workflow handoff.</MudText>
+                        </MudStep>
+                    </AgentStepper>
+
+                    <AgentForm AgentId="parity-workflow-form"
+                               FormName="parity-workflow-form"
+                               Model="@_agentModel"
+                               Class="mt-4">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                              Label="Supplier Name"
+                                              For="@(() => _agentModel.SupplierName)"
+                                              @bind-Value="_agentModel.SupplierName" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudSelect T="string"
+                                           Label="Risk Tier"
+                                           For="@(() => _agentModel.RiskTier)"
+                                           @bind-Value="_agentModel.RiskTier">
+                                    <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+                    </AgentForm>
+
+                    <AgentDatePicker AgentId="parity-workflow-date"
+                                     Label="Review date"
+                                     Value="@_agentReviewDate"
+                                     ValueChanged="OnAgentReviewDateChanged"
+                                     MinDate="@_minReviewDate"
+                                     MaxDate="@_maxReviewDate"
+                                     Class="mt-4" />
+
+                    <AgentFileUpload T="IReadOnlyList<IBrowserFile>"
+                                     AgentId="parity-workflow-upload"
+                                     Files="@_agentFiles"
+                                     FilesChanged="OnAgentFilesChanged"
+                                     Hidden="false"
+                                     Accept=".pdf,.csv"
+                                     AppendMultipleFiles="true"
+                                     Class="mt-4">
+                        <SelectedTemplate Context="files">
+                            <MudStack Spacing="1">
+                                @if (files is not null)
+                                {
+                                    foreach (var file in files)
+                                    {
+                                        <MudText Typo="Typo.body2">@file.Name</MudText>
+                                    }
+                                }
+                            </MudStack>
+                        </SelectedTemplate>
+                    </AgentFileUpload>
+
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.caption" Class="d-block">Active tab: @_workflowTabs[_agentTabIndex]</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Current step: @_workflowSteps[_agentStepIndex]</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Supplier: @_agentModel.SupplierName</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Risk tier: @_agentModel.RiskTier</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Review date: @FormatDate(_agentReviewDate)</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Files count: @_agentFiles.Count</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private readonly string[] _workflowTabs = ["Overview", "Documents", "Approval"];
+    private readonly string[] _workflowSteps = ["Intake", "Documents", "Review"];
+    private readonly DateTime _minReviewDate = new(2026, 3, 10);
+    private readonly DateTime _maxReviewDate = new(2026, 3, 31);
+
+    private readonly WorkflowParityModel _mudModel = new()
+    {
+        SupplierName = "Baseline Supplier",
+        RiskTier = "Medium"
+    };
+
+    private readonly WorkflowParityModel _agentModel = new()
+    {
+        SupplierName = "Baseline Supplier",
+        RiskTier = "Medium"
+    };
+
+    private int _mudTabIndex;
+    private int _agentTabIndex;
+    private int _mudStepIndex;
+    private int _agentStepIndex;
+    private DateTime? _mudReviewDate = new(2026, 3, 18);
+    private DateTime? _agentReviewDate = new(2026, 3, 18);
+    private IReadOnlyList<IBrowserFile> _mudFiles = [];
+    private IReadOnlyList<IBrowserFile> _agentFiles = [];
+
+    private Task OnMudTabIndexChanged(int index)
+    {
+        _mudTabIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentTabIndexChanged(int index)
+    {
+        _agentTabIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudStepIndexChanged(int index)
+    {
+        _mudStepIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentStepIndexChanged(int index)
+    {
+        _agentStepIndex = index;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudReviewDateChanged(DateTime? value)
+    {
+        _mudReviewDate = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentReviewDateChanged(DateTime? value)
+    {
+        _agentReviewDate = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMudFilesChanged(IReadOnlyList<IBrowserFile>? files)
+    {
+        _mudFiles = files ?? [];
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentFilesChanged(IReadOnlyList<IBrowserFile>? files)
+    {
+        _agentFiles = files ?? [];
+        return Task.CompletedTask;
+    }
+
+    private Task SeedBothWorkflowsAsync()
+    {
+        _mudModel.SupplierName = "Northwind Components";
+        _agentModel.SupplierName = "Northwind Components";
+        _mudModel.RiskTier = "High";
+        _agentModel.RiskTier = "High";
+        _mudReviewDate = new DateTime(2026, 3, 26);
+        _agentReviewDate = new DateTime(2026, 3, 26);
+        _mudFiles = CreateEvidenceBundle();
+        _agentFiles = CreateEvidenceBundle();
+        return Task.CompletedTask;
+    }
+
+    private Task SwitchBothToDocumentsAsync()
+    {
+        _mudTabIndex = 1;
+        _agentTabIndex = 1;
+        return Task.CompletedTask;
+    }
+
+    private Task MoveBothToReviewAsync()
+    {
+        _mudStepIndex = 2;
+        _agentStepIndex = 2;
+        return Task.CompletedTask;
+    }
+
+    private Task ClearBothEvidenceBundlesAsync()
+    {
+        _mudFiles = [];
+        _agentFiles = [];
+        return Task.CompletedTask;
+    }
+
+    private static IReadOnlyList<IBrowserFile> CreateEvidenceBundle() =>
+    [
+        new DemoBrowserFile("risk-summary-q1.pdf", "application/pdf", 128_000),
+        new DemoBrowserFile("vendor-checklist.csv", "text/csv", 24_000)
+    ];
+
+    private static string FormatDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? "None";
+
+    private sealed class WorkflowParityModel
+    {
+        [Required]
+        public string SupplierName { get; set; } = string.Empty;
+
+        [Required]
+        public string RiskTier { get; set; } = "Medium";
+    }
+
+    private sealed class DemoBrowserFile(string name, string contentType, long size) : IBrowserFile
+    {
+        public string Name { get; } = name;
+
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UtcNow;
+
+        public long Size { get; } = size;
+
+        public string ContentType { get; } = contentType;
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new MemoryStream();
+        }
+    }
+}

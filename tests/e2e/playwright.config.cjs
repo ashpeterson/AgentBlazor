@@ -2,6 +2,9 @@ const { defineConfig } = require("@playwright/test");
 
 module.exports = defineConfig({
   testDir: "./specs",
+  // The demo server and prompt-backed dojo flows are resource-sensitive; keep
+  // the default run serial and allow overrides when higher parallelism is safe.
+  workers: process.env.PLAYWRIGHT_WORKERS ? Number(process.env.PLAYWRIGHT_WORKERS) : 1,
   timeout: 180000,
   expect: {
     timeout: 30000

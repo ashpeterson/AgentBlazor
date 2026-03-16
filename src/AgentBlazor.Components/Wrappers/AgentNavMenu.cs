@@ -1,32 +1,24 @@
 using AgentBlazor.Attributes;
-using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Discovery;
 using AgentBlazor.Core.Runtime.Interfaces;
-using AgentBlazor.Runtime;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using MudBlazor;
 
-namespace AgentBlazor;
+namespace AgentBlazor.Components;
 
-/// <summary>
-/// Base class for Blazor components that can be controlled by the agent runtime.
-///
-/// Subclasses can use [AgentAction] / [AgentReadable] / [AgentParam] attributes for
-/// zero-boilerplate registration, or override GetCapability() / GetCurrentState() /
-/// ExecuteActionAsync() for full manual control.
-/// </summary>
-public abstract class AgentControllableComponentBase : ComponentBase, IAgentControllable, IDisposable
+public class AgentNavMenu : MudNavMenu, IAgentControllable, IDisposable
 {
     [Inject]
-    protected IAgentComponentRegistry ComponentRegistry { get; set; } = default!;
+    private IAgentComponentRegistry ComponentRegistry { get; set; } = default!;
 
     [Inject]
     private IAgentNavigationIntentService NavigationIntentService { get; set; } = default!;
 
     [Inject]
-    private NavigationManager? Navigation { get; set; }
+    private NavigationManager Navigation { get; set; } = default!;
 
     [Inject]
     private ILoggerFactory? LoggerFactory { get; set; }
@@ -37,12 +29,13 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
     [Parameter]
     public string AgentId { get; set; } = string.Empty;
 
-    private ILogger? _logger;
-    private string? _resolvedComponentType;
-    private AgentControllableComponentRuntimeSupport? _runtimeSupport;
+    public string ComponentType => "NavMenu";
 
-    public virtual string ComponentType => _resolvedComponentType ??=
-        AgentControllableComponentRuntimeSupport.ResolveDefaultComponentType(GetType());
+    private AgentControllableComponentRuntimeSupport? _runtimeSupport;
+    private ILogger? _logger;
+
+    [AgentReadable("Current page URI")]
+    public string CurrentUri => Navigation.Uri;
 
     protected override void OnInitialized()
     {
@@ -50,6 +43,7 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         _logger ??= LoggerFactory?.CreateLogger(GetType());
         _runtimeSupport ??= CreateRuntimeSupport();
         _runtimeSupport.OnInitialized();
+        EnsureAgentUserAttributes();
     }
 
     protected override async Task OnInitializedAsync()
@@ -59,26 +53,25 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         await _runtimeSupport.OnInitializedAsync();
     }
 
-    /// <summary>
-    /// Returns the component's capability description.
-    /// Default implementation uses [AgentAction]-decorated methods via reflection.
-    /// Override to provide a fully custom capability descriptor.
-    /// </summary>
-    public virtual ComponentCapability GetCapability()
-        => AgentActionDiscovery.BuildCapability(this);
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        EnsureAgentUserAttributes();
+    }
 
-    /// <summary>
-    /// Returns the component's current readable state.
-    /// Default implementation uses [AgentReadable]-decorated properties via reflection.
-    /// Override to provide a fully custom state snapshot.
-    /// </summary>
-    public virtual ComponentState GetCurrentState()
-        => AgentActionDiscovery.BuildState(this);
+    public void Dispose()
+    {
+        _runtimeSupport?.Dispose();
+    }
 
-    /// <summary>
-    /// Dispatches an agent action to the matching [AgentAction]-decorated method.
-    /// Override to handle actions manually instead of via attribute discovery.
-    /// </summary>
+    public ComponentCapability GetCapability() => AgentActionDiscovery.BuildCapability(this);
+
+    public virtual ComponentState GetCurrentState() => new()
+    {
+        ["uri"] = Navigation.Uri,
+        ["dense"] = Dense
+    };
+
     public virtual async Task<ActionResult> ExecuteActionAsync(
         AgentAction action,
         CancellationToken cancellationToken = default)
@@ -94,27 +87,34 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
         }
         catch (InvalidOperationException)
         {
-            // Unit tests may instantiate wrappers without a renderer — execute directly.
             return await AgentActionDiscovery.ExecuteActionAsync(this, action, cancellationToken);
         }
     }
 
-    protected Task RequestComponentRefreshAsync()
+    [AgentAction("Navigate to an internal application route")]
+    public Task<ActionResult> NavigateTo(
+        [AgentParam("The route URI to navigate to (e.g. /demo/suppliers)", Required = true)] string uri)
     {
-        try
+        if (string.IsNullOrWhiteSpace(uri))
         {
-            return InvokeAsync(StateHasChanged);
+            return Task.FromResult(ActionResult.NeedsClarification("Action 'navigate_to' requires a 'uri' parameter."));
         }
-        catch (InvalidOperationException)
-        {
-            // Unit tests may instantiate wrappers without a renderer — ignore.
-            return Task.CompletedTask;
-        }
+
+        Navigation.NavigateTo(uri, forceLoad: false);
+        return Task.FromResult(ActionResult.Applied($"Navigated to {uri}."));
     }
 
-    public virtual void Dispose()
+    [AgentAction("Navigate to an external URL", RequiresApproval = true)]
+    public Task<ActionResult> NavigateExternal(
+        [AgentParam("The full external URL to navigate to", Required = true)] string url)
     {
-        _runtimeSupport?.Dispose();
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return Task.FromResult(ActionResult.NeedsClarification("Action 'navigate_external' requires a 'url' parameter."));
+        }
+
+        Navigation.NavigateTo(url, forceLoad: true);
+        return Task.FromResult(ActionResult.Applied($"Navigated externally to {url}."));
     }
 
     private AgentControllableComponentRuntimeSupport CreateRuntimeSupport()
@@ -132,5 +132,29 @@ public abstract class AgentControllableComponentBase : ComponentBase, IAgentCont
             setAgentId: value => AgentId = value,
             executeActionAsync: action => ExecuteActionAsync(action),
             requestComponentRefreshAsync: RequestComponentRefreshAsync);
+    }
+
+    private void EnsureAgentUserAttributes()
+    {
+        UserAttributes ??= [];
+        if (!UserAttributes.ContainsKey("id"))
+        {
+            UserAttributes["id"] = AgentId;
+        }
+
+        UserAttributes["data-ab-type"] = "navmenu";
+        UserAttributes["data-ab-agentid"] = AgentId;
+    }
+
+    private Task RequestComponentRefreshAsync()
+    {
+        try
+        {
+            return InvokeAsync(StateHasChanged);
+        }
+        catch (InvalidOperationException)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

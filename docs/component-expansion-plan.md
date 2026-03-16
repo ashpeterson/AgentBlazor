@@ -1,6 +1,6 @@
 # Product Expansion Plan
 
-Last updated: 2026-03-12
+Last updated: 2026-03-16
 
 ## Goal
 
@@ -35,7 +35,7 @@ That means:
 
 ### Agentic Components
 
-The built-in drop-in component set is broad and the docs-style explorer is in place.
+The built-in drop-in component set is broad, the docs-style explorer is in place, and the MudBlazor compatibility rewrite is now materially underway rather than hypothetical.
 
 The next need is less breadth and more believable workflow depth.
 
@@ -59,8 +59,13 @@ Objective:
 
 - make the built-in components feel production-ready, not just controllable
 
+Critical requirement:
+
+- shipped `Agent*` components need to become true drop-in replacements for complex MudBlazor usage, not only simplified wrapper examples
+
 Priority components:
 
+- `AgentDataGrid`
 - `AgentTreeView`
 - `AgentStepper`
 - `AgentCommandBar`
@@ -68,10 +73,25 @@ Priority components:
 
 Needed work:
 
+- finish the compatibility-first proof story around the native-first component set
+- preserve and validate richer MudBlazor scenarios such as server-backed grids, deeper trees, and more composed workflows
 - richer live examples
 - more realistic prompt scenarios
 - better state transitions and workflow traces
 - clearer contract docs inside the explorer
+
+Current status:
+
+- the high-surface Mud-backed `Agent*` components have already been moved onto native-first implementations
+- side-by-side parity pages now exist for every shipped Mud-backed `Agent*` component
+- rendered parity tests and browser coverage are in place
+
+Remaining work:
+
+- deepen `AgentDataGrid` proof around richer server-backed and templated usage
+- deepen `AgentTreeView` proof around hierarchy-heavy screens
+- decide and document the long-term role of `AgentCommandBar`
+- continue broadening composed-screen proofs so the story is not only isolated component parity
 
 ### 2. Dojo Refinement
 
@@ -144,7 +164,7 @@ Needed work:
 
 ## Recommended Delivery Order
 
-1. deepen the higher-value agentic component scenarios
+1. deepen the higher-value agentic component scenarios and public proof surfaces
 2. implement durable paid action history
 3. expand declarative adapter coverage
 4. continue inspector and troubleshooting improvements
@@ -183,3 +203,13 @@ AgentBlazor should clearly communicate:
 - "Here are the agentic components you can drop into a Blazor app today."
 - "Here is how the broader agentic UI patterns work in Blazor."
 - "Here is where paid intelligence adds value once persistence is real."
+
+Current state against that standard:
+
+- the drop-in component story is now credible and publicly demonstrated
+- the broader Blazor-first pattern story is already visible through Home, Dojo, and Agentic Components
+- the weakest remaining product message is still paid intelligence, because persistence is not complete yet
+
+Compatibility planning reference:
+
+- `docs/mudblazor-compatibility-roadmap.md`

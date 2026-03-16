@@ -72,8 +72,11 @@ async function getLatestRunEventText(page) {
   const runList = inspector.locator(".ab-inspector__run-item");
   await runList.first().click();
 
-  await inspector.getByRole("tab", { name: "Events" }).click();
-  await expect(inspector.locator(".ab-inspector__summary-chip").first()).toBeVisible({ timeout: 30000 });
+  const eventsTab = inspector.getByRole("tab", { name: "Events" });
+  await eventsTab.click();
+  await expect(eventsTab).toHaveClass(/ab-inspector__tab--active/, { timeout: 30000 });
+  await expect(inspector.locator(".ab-inspector__run-summary")).toBeVisible({ timeout: 30000 });
+  await expect(inspector.locator(".ab-inspector__event-list").first()).toBeVisible({ timeout: 30000 });
 
   return (await inspector.locator(".ab-inspector__body").textContent()) ?? "";
 }
@@ -315,6 +318,5 @@ test.describe("Dojo prompt inspector", () => {
     });
   });
 });
-
 
 

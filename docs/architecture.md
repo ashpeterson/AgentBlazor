@@ -1,6 +1,6 @@
 # AgentBlazor Architecture
 
-Last updated: 2026-03-12
+Last updated: 2026-03-16
 
 ## Purpose
 
@@ -67,6 +67,12 @@ Owns the native Blazor UI surface:
 - generative UI rendering components
 
 This layer is where Blazor and MudBlazor stay first-class.
+
+Current architectural state:
+
+- high-surface agentic components have been moved toward true MudBlazor compatibility instead of narrow wrapper subsets
+- reusable agent behavior is no longer expected to live only in `AgentControllableComponentBase`
+- shared runtime support now exists so Mud-backed `Agent*` components can preserve the full native MudBlazor contract while still participating in the agent runtime
 
 ### AgentBlazor.Hosting
 
@@ -259,6 +265,56 @@ The shipped built-in component set is:
 - `AgentCommandBar`
 - `AgentFileUpload`
 
+Most MudBlazor-backed components now follow the native-first pattern:
+
+- `AgentDataGrid -> MudDataGrid`
+- `AgentDialog -> MudDialog`
+- `AgentForm -> MudForm`
+- `AgentNavMenu -> MudNavMenu`
+- `AgentTabs -> MudTabs`
+- `AgentSelect -> MudSelect`
+- `AgentAutocomplete -> MudAutocomplete`
+- `AgentDatePicker -> MudDatePicker`
+- `AgentDateRangePicker -> MudDateRangePicker`
+- `AgentTreeView -> MudTreeView`
+- `AgentStepper -> MudStepper`
+- `AgentFileUpload -> MudFileUpload`
+
+The remaining architectural outlier is:
+
+- `AgentCommandBar`
+
+That is currently intentional because it is a custom AgentBlazor primitive rather than a thin MudBlazor counterpart.
+
+## Compatibility Proof Model
+
+Compatibility is no longer only an internal design goal.
+
+The repository now proves the current drop-in story through:
+
+- side-by-side demo pages in the demo app
+- rendered parity tests in `AgentBlazor.Components.Tests`
+- prompt-aware browser coverage in the Playwright suite
+
+Current proof areas include:
+
+- isolated component parity pages for forms, grids, dialogs, choice inputs, file upload, date pickers, workflow navigation, and hierarchy navigation
+- one broader composed workflow page that mounts several Mud-backed `Agent*` components together on the same screen
+
+## Current Architectural Gaps
+
+The main remaining architectural gaps are now narrower:
+
+- deeper proof of richer `MudDataGrid` server-backed and heavily templated usage
+- deeper hierarchy scenarios for `AgentTreeView`
+- clearer positioning for `AgentCommandBar` as a custom primitive inside an otherwise Mud-compatible component line
+- durable paid intelligence and broader hosted/open-ended controls, which are product gaps more than compatibility gaps
+- `AgentDateRangePicker`
+- `AgentTreeView`
+- `AgentStepper`
+- `AgentCommandBar`
+- `AgentFileUpload`
+
 Custom component authoring is also a first-class architectural path through:
 
 - `AgentControllableComponentBase`
@@ -349,4 +405,5 @@ Do not:
 
 - Current status: `docs/STATUS.md`
 - Product roadmap: `docs/component-expansion-plan.md`
+- MudBlazor compatibility roadmap: `docs/mudblazor-compatibility-roadmap.md`
 - Tier model: `docs/pricing-tiers.md`

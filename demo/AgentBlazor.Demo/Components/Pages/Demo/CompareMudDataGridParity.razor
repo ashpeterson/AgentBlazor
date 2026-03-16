@@ -1,0 +1,128 @@
+@page "/demo/components/parity/datagrid"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>MudDataGrid vs AgentDataGrid</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudDataGrid and AgentDataGrid side by side</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This proof page keeps the same grid shape across both versions: shared rows, shared columns,
+            shared toolbar content, shared pager content, and shared empty-state content.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try prompts like <code>sort by risk score desc</code>, <code>filter region eq EMEA</code>,
+            or <code>go to page 2</code> against the Agent grid while comparing the visual surface to the Mud baseline.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2" AlignItems="AlignItems.Center">
+            <MudSwitch T="bool" Value="@_showEmptyState" ValueChanged="OnShowEmptyStateChanged" Label="Show empty state" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Toggle both grids into the same no-records state to confirm slot parity.
+            </MudText>
+        </MudStack>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudDataGrid baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor grid usage with host-owned rows and slots.
+                    </MudText>
+
+                    <MudDataGrid T="GridParityRow"
+                                 Items="@VisibleRows"
+                                 Dense="true"
+                                 Hover="true"
+                                 Bordered="true"
+                                 Striped="true"
+                                 RowsPerPage="2">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.subtitle2">Shared supplier toolbar</MudText>
+                        </ToolBarContent>
+                        <NoRecordsContent>
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">No suppliers match the current view.</MudAlert>
+                        </NoRecordsContent>
+                        <Columns>
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                            <PropertyColumn T="GridParityRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                        </Columns>
+                        <PagerContent>
+                            <MudDataGridPager T="GridParityRow" PageSizeOptions="new[] { 2, 4 }" />
+                        </PagerContent>
+                    </MudDataGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentDataGrid drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Same grid shape with agent metadata and deterministic actions layered on top.
+                    </MudText>
+
+                    <AgentDataGrid TItem="GridParityRow"
+                                   AgentId="parity-agent-grid"
+                                   Items="@VisibleRows"
+                                   Dense="true"
+                                   Hover="true"
+                                   Bordered="true"
+                                   Striped="true"
+                                   RowsPerPage="2"
+                                   RowKeyProperty="Id">
+                        <ToolBarContent>
+                            <MudText Typo="Typo.subtitle2">Shared supplier toolbar</MudText>
+                        </ToolBarContent>
+                        <NoRecordsContent>
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">No suppliers match the current view.</MudAlert>
+                        </NoRecordsContent>
+                        <Columns>
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                            <PropertyColumn T="GridParityRow" TProperty="string" Property="x => x.Region" Title="Region" />
+                            <PropertyColumn T="GridParityRow" TProperty="int" Property="x => x.RiskScore" Title="Risk Score" />
+                        </Columns>
+                        <PagerContent>
+                            <MudDataGridPager T="GridParityRow" PageSizeOptions="new[] { 2, 4 }" />
+                        </PagerContent>
+                    </AgentDataGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private readonly GridParityRow[] _rows =
+    [
+        new("SUP-001", "Alpine Components", "EMEA", 82),
+        new("SUP-002", "Beacon Industrial", "APAC", 55),
+        new("SUP-003", "Cinder Logistics", "NA", 34),
+        new("SUP-004", "Delta Fabrication", "EMEA", 71)
+    ];
+
+    private bool _showEmptyState;
+
+    private IReadOnlyList<GridParityRow> VisibleRows => _showEmptyState ? [] : _rows;
+
+    private Task OnShowEmptyStateChanged(bool value)
+    {
+        _showEmptyState = value;
+        return Task.CompletedTask;
+    }
+
+    private sealed record GridParityRow(
+        string Id,
+        string Name,
+        string Region,
+        int RiskScore);
+}

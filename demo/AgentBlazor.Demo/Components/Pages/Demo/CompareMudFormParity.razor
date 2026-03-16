@@ -1,0 +1,167 @@
+@page "/demo/components/parity/form"
+@layout DemoLayout
+@using System.ComponentModel.DataAnnotations
+@using AgentBlazor.Components
+@using MudBlazor
+
+<PageTitle>MudForm vs AgentForm</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Compatibility Proof</p>
+        <MudText Typo="Typo.h5">MudForm and AgentForm side by side</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This page keeps the host-owned form shape intact and swaps only the form component itself.
+            The goal is to prove drop-in compatibility before asking users to trust the broader component catalog.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try the same edits on both forms. The Agent version keeps the same MudBlazor child-content model,
+            while also supporting prompts like <code>validate the form</code> and <code>submit form</code>.
+        </MudText>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudText Typo="Typo.h6">Shared host model and shared child content</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Both examples use the same field structure: <code>MudTextField</code>, <code>MudSelect</code>,
+            <code>MudCheckBox</code>, and a host-owned submit button.
+        </MudText>
+    </section>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" lg="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">MudForm baseline</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Native MudBlazor usage with no agent layer.
+                    </MudText>
+
+                    <MudForm Model="@_mudModel">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                              Label="Supplier Name"
+                                              For="@(() => _mudModel.SupplierName)"
+                                              @bind-Value="_mudModel.SupplierName" />
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudSelect T="string"
+                                           Label="Risk Tier"
+                                           For="@(() => _mudModel.RiskTier)"
+                                           @bind-Value="_mudModel.RiskTier">
+                                    <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_mudModel.NeedsExpedite" />
+                            </MudItem>
+                        </MudGrid>
+                        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                            <MudButton ButtonType="ButtonType.Button"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="SubmitMudFormAsync">Submit</MudButton>
+                        </MudStack>
+                    </MudForm>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption">Submit count: @_mudSubmitCount</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Supplier: @_mudModel.SupplierName</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Tier: @_mudModel.RiskTier</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Needs Expedite: @_mudModel.NeedsExpedite</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" lg="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">AgentForm drop-in</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Same host-owned field composition, with agent metadata and runtime actions layered on top.
+                    </MudText>
+
+                    <AgentForm AgentId="parity-agent-form"
+                               FormName="parity-agent-form"
+                               Model="@_agentModel"
+                               Submitted="OnAgentFormSubmittedAsync">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudTextField T="string"
+                                              Label="Supplier Name"
+                                              For="@(() => _agentModel.SupplierName)"
+                                              @bind-Value="_agentModel.SupplierName" />
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudSelect T="string"
+                                           Label="Risk Tier"
+                                           For="@(() => _agentModel.RiskTier)"
+                                           @bind-Value="_agentModel.RiskTier">
+                                    <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" md="3">
+                                <MudCheckBox T="bool" Label="Needs Expedite" @bind-Value="_agentModel.NeedsExpedite" />
+                            </MudItem>
+                        </MudGrid>
+                        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-2">
+                            <MudButton ButtonType="ButtonType.Button"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="OnAgentFormSubmittedAsync">Submit</MudButton>
+                        </MudStack>
+                    </AgentForm>
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption">Submit count: @_agentSubmitCount</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Supplier: @_agentModel.SupplierName</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Tier: @_agentModel.RiskTier</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">Needs Expedite: @_agentModel.NeedsExpedite</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private readonly SupplierParityModel _mudModel = new()
+    {
+        SupplierName = "Baseline Supplier",
+        RiskTier = "Medium"
+    };
+
+    private readonly SupplierParityModel _agentModel = new()
+    {
+        SupplierName = "Agent Supplier",
+        RiskTier = "Medium"
+    };
+
+    private int _mudSubmitCount;
+    private int _agentSubmitCount;
+
+    private Task SubmitMudFormAsync()
+    {
+        _mudSubmitCount++;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAgentFormSubmittedAsync()
+    {
+        _agentSubmitCount++;
+        return Task.CompletedTask;
+    }
+
+    private sealed class SupplierParityModel
+    {
+        [Required]
+        public string SupplierName { get; set; } = string.Empty;
+
+        [Required]
+        public string RiskTier { get; set; } = "Medium";
+
+        public bool NeedsExpedite { get; set; }
+    }
+}
