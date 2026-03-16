@@ -83,6 +83,7 @@ Invoke-Step "Creating scratch Blazor app" {
 $importsPath = Join-Path (Join-Path $scratchRoot "Components") "_Imports.razor"
 $homePath = Join-Path (Join-Path (Join-Path $scratchRoot "Components") "Pages") "Home.razor"
 $projectPath = Join-Path $scratchRoot "$ProjectName.csproj"
+$programPath = Join-Path $scratchRoot "Program.cs"
 
 Invoke-Step "Writing local package reference" {
     $projectContent = Get-Content -Path $projectPath -Raw
@@ -98,13 +99,30 @@ Invoke-Step "Writing local package reference" {
 }
 
 Invoke-Step "Restoring against local package source" {
-    dotnet restore $projectPath -nologo --force-evaluate --source $packageOutputDir --source https://api.nuget.org/v3/index.json
+    dotnet restore $projectPath -nologo --force-evaluate "--source=$packageOutputDir" "--source=https://api.nuget.org/v3/index.json"
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet restore failed."
     }
 }
 
 Invoke-Step "Writing smoke test component usage" {
+    $programContent = Get-Content -Path $programPath -Raw
+    if ($programContent -notmatch "using AgentBlazor;") {
+        $programContent = "using AgentBlazor;`r`n" + $programContent
+    }
+
+    if ($programContent -notmatch "using MudBlazor.Services;") {
+        $programContent = "using MudBlazor.Services;`r`n" + $programContent
+    }
+
+    if ($programContent -notmatch [regex]::Escape("builder.Services.AddAgentBlazor();")) {
+        $programContent = $programContent.Replace(
+            "builder.Services.AddRazorComponents()`r`n    .AddInteractiveServerComponents();",
+            "builder.Services.AddRazorComponents()`r`n    .AddInteractiveServerComponents();`r`nbuilder.Services.AddMudServices();`r`nbuilder.Services.AddAgentBlazor();")
+    }
+
+    Set-Content -Path $programPath -Value $programContent
+
     $existingImports = Get-Content -Path $importsPath -Raw
     $requiredImports = @(
         "@using AgentBlazor.Components",
@@ -148,6 +166,66 @@ Invoke-Step "Building scratch app against local package" {
     }
 }
 
+Invoke-Step "Running scratch app startup check" {
+    $port = 5187
+    $stdoutLog = Join-Path $scratchRoot "agentblazor-smoke.stdout.log"
+    $stderrLog = Join-Path $scratchRoot "agentblazor-smoke.stderr.log"
+
+    foreach ($path in @($stdoutLog, $stderrLog)) {
+        if (Test-Path $path) {
+            Remove-Item -Force $path
+        }
+    }
+
+    $process = Start-Process dotnet `
+        -ArgumentList @("run", "--project", $projectPath, "--no-build", "--urls", "http://127.0.0.1:$port") `
+        -WorkingDirectory $scratchRoot `
+        -PassThru `
+        -RedirectStandardOutput $stdoutLog `
+        -RedirectStandardError $stderrLog
+
+    try {
+        $ready = $false
+        for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Milliseconds 500
+
+            $stdout = if (Test-Path $stdoutLog) { Get-Content -Path $stdoutLog -Raw } else { "" }
+            $stderr = if (Test-Path $stderrLog) { Get-Content -Path $stderrLog -Raw } else { "" }
+
+            if ($stdout -match "Now listening on:" -or $stderr -match "Now listening on:") {
+                $ready = $true
+                break
+            }
+
+            if ($process.HasExited) {
+                break
+            }
+        }
+
+        if (-not $ready) {
+            if (Test-Path $stdoutLog) {
+                Get-Content -Path $stdoutLog -Raw | Write-Host
+            }
+
+            if (Test-Path $stderrLog) {
+                Get-Content -Path $stderrLog -Raw | Write-Host
+            }
+
+            throw "Scratch app failed to start."
+        }
+
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -UseBasicParsing
+        if ($response.StatusCode -ne 200 -or $response.Content -notmatch "smoke-tabs") {
+            throw "Scratch app did not render the expected AgentTabs markup."
+        }
+    }
+    finally {
+        if ($process -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "Smoke test passed for $PackageId $PackageVersion." -ForegroundColor Green
 
@@ -155,6 +233,22 @@ if ($KeepScratch) {
     Write-Host "Scratch app kept at: $scratchRoot"
 }
 else {
-    Remove-Item -Recurse -Force $scratchRoot
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        try {
+            if (Test-Path $scratchRoot) {
+                Remove-Item -Recurse -Force $scratchRoot
+            }
+
+            break
+        }
+        catch {
+            if ($attempt -eq 4) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
     Write-Host "Scratch app removed: $scratchRoot"
 }

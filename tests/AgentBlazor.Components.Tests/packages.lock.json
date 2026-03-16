@@ -675,10 +675,14 @@
       "AgentBlazor": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.Hosting": "[1.0.0, )",
+          "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
           "Markdig": "[0.38.0, )",
+          "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
+          "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )",
+          "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )",
           "Microsoft.AspNetCore.Components.Web": "[10.0.2, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )",
+          "Microsoft.Extensions.Options": "[10.0.2, )",
           "MudBlazor": "[8.15.0, )"
         }
       },
@@ -691,34 +695,10 @@
           "Microsoft.Extensions.Options": "[10.0.2, )"
         }
       },
-      "agentblazor.defaultagent": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )"
-        }
-      },
-      "agentblazor.hosting": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.DefaultAgent": "[1.0.0, )",
-          "AgentBlazor.Licensing": "[1.0.0, )",
-          "AgentBlazor.ProviderAdapters": "[1.0.0, )",
-          "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"
-        }
-      },
       "agentblazor.licensing": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )"
-        }
-      },
-      "agentblazor.provideradapters": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )",
-          "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
-          "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )"
         }
       },
       "Azure.AI.OpenAI": {

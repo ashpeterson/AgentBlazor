@@ -220,7 +220,11 @@
       "AgentBlazor": {
         "type": "Project",
         "dependencies": {
+          "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
           "Markdig": "[0.38.0, )",
+          "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
+          "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )",
+          "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )",
           "MudBlazor": "[8.15.0, )"
         }
       },
