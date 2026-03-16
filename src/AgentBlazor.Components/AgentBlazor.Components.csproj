@@ -7,6 +7,14 @@
     <AssemblyName>AgentBlazor</AssemblyName>
     <PackageId>AgentBlazor</PackageId>
     <Description>Agentic component library for ASP.NET Core Blazor.</Description>
+    <Authors>Ash Peterson</Authors>
+    <PackageTags>blazor;aspnetcore;ai;agents;mudblazor;ui</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/ashpeterson/AgentBlazor</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ashpeterson/AgentBlazor</PackageProjectUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferenceBuildOutputs</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
 
 
@@ -21,8 +29,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
-    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" PrivateAssets="all" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
+
+  <Target Name="IncludeProjectReferenceBuildOutputs" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -98,7 +98,7 @@ Most high-surface MudBlazor-backed components have now been moved onto native-fi
 - `AgentStepper -> MudStepper`
 - `AgentFileUpload -> MudFileUpload`
 
-Compatibility proof is now materially in place, not just planned:
+Baseline compatibility proof is now materially in place, not just planned:
 
 - side-by-side parity pages exist for:
   - `MudForm -> AgentForm`
@@ -112,6 +112,11 @@ Compatibility proof is now materially in place, not just planned:
   - a composed multi-control workflow screen
 - rendered parity coverage now exists in `AgentBlazor.Components.Tests`
 - browser coverage now exercises the proof routes in the Playwright suite
+
+Release posture:
+
+- the next package should be treated as a parity-foundation preview for real-project validation
+- public proof is strong enough for an initial NuGet prerelease, but not yet for claiming full complex-screen parity across every MudBlazor workflow
 
 The components explorer is now a docs-style surface:
 
@@ -220,6 +225,9 @@ Coverage includes:
   - `AgentTreeView` still needs deeper hierarchy and expansion scenarios
   - composed workflow proof should grow beyond the current single screen
   - `AgentDataGrid` still needs stronger public proof around richer server-backed and templated usage
+- `AgentFileUpload` should be treated as host-workflow-first:
+  - file-name actions are useful for deterministic workflow state and demos
+  - real browser file payloads still remain host-owned and should not be implied to be agent-synthesizable
 - The components explorer is strong for drop-in primitives, but richer production narratives are still uneven across:
   - `AgentDataGrid`
   - `AgentTreeView`
@@ -246,4 +254,6 @@ Coverage includes:
 - Architecture: `docs/architecture.md`
 - Expansion roadmap: `docs/component-expansion-plan.md`
 - MudBlazor compatibility roadmap: `docs/mudblazor-compatibility-roadmap.md`
+- NuGet prerelease checklist: `docs/nuget-prerelease-checklist.md`
+- GitHub Packages private preview: `docs/github-packages-private-preview.md`
 - Tier model: `docs/pricing-tiers.md`

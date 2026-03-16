@@ -334,6 +334,7 @@ Current status:
 
 - the demo now meets the baseline proof requirement for the current shipped Mud-backed set
 - the remaining need is depth, not initial coverage
+- this is strong enough for a NuGet prerelease focused on real-project validation, but not yet for broad claims of full complex-screen parity
 
 ## Non-Negotiables
 

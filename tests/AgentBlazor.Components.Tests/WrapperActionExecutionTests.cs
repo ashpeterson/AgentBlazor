@@ -756,6 +756,63 @@ public class WrapperActionExecutionTests
         Assert.Equal(0, state["fileCount"]);
     }
 
+    [Fact]
+    public async Task AgentFileUpload_ListFiles_PrefersConcreteBrowserFiles_OverStaleCompatibilityNames()
+    {
+        var upload = new AgentFileUpload<IReadOnlyList<IBrowserFile>>
+        {
+            AgentId = "attachments",
+            Files =
+            [
+                new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
+            ],
+            FileNames = ["stale-token.txt"]
+        };
+
+        var result = await upload.ExecuteActionAsync(AgentAction.Create("list_files"));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("evidence.pdf", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stale-token.txt", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.Files);
+        Assert.Single(files);
+        Assert.Equal("evidence.pdf", files[0].Name);
+
+        var state = upload.GetCurrentState();
+        Assert.Equal(["evidence.pdf"], (string[])state["files"]!);
+    }
+
+    [Fact]
+    public async Task AgentFileUpload_Attach_Fails_WhenConcreteBrowserFilesAlreadySelected()
+    {
+        var upload = new AgentFileUpload<IReadOnlyList<IBrowserFile>>
+        {
+            AgentId = "attachments",
+            Files =
+            [
+                new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
+            ]
+        };
+
+        IReadOnlyList<string>? observedFiles = null;
+        var callbacks = new EventCallbackFactory();
+        upload.FileNamesChanged = callbacks.Create<IReadOnlyList<string>>(this, files => observedFiles = files);
+
+        var result = await upload.ExecuteActionAsync(AgentAction.Create("attach", new Dictionary<string, object?>
+        {
+            ["fileName"] = "quote.pdf"
+        }));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("cannot synthesize a real browser file", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(observedFiles);
+
+        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.Files);
+        Assert.Single(files);
+        Assert.Equal("evidence.pdf", files[0].Name);
+    }
+
     // NOTE: SetField tests removed because the SetField action was removed from AgentForm.
     // The generic SetField approach is unreliable for forms inside dialogs (forms aren't mounted
     // when dialog is closed). The recommended pattern is to create compound workflow actions
@@ -779,6 +836,23 @@ public class WrapperActionExecutionTests
         public string FirstName { get; set; } = string.Empty;
 
         public string LastName { get; set; } = string.Empty;
+    }
+
+    private sealed class ConcreteBrowserFile(string name, string contentType, long size) : IBrowserFile
+    {
+        public string Name { get; } = name;
+
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UtcNow;
+
+        public long Size { get; } = size;
+
+        public string ContentType { get; } = contentType;
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new MemoryStream();
+        }
     }
 
     private sealed class TestNavigationManager : NavigationManager

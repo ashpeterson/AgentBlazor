@@ -309,11 +309,6 @@ The main remaining architectural gaps are now narrower:
 - deeper hierarchy scenarios for `AgentTreeView`
 - clearer positioning for `AgentCommandBar` as a custom primitive inside an otherwise Mud-compatible component line
 - durable paid intelligence and broader hosted/open-ended controls, which are product gaps more than compatibility gaps
-- `AgentDateRangePicker`
-- `AgentTreeView`
-- `AgentStepper`
-- `AgentCommandBar`
-- `AgentFileUpload`
 
 Custom component authoring is also a first-class architectural path through:
 

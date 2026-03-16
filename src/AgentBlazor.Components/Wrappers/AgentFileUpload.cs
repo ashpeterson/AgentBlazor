@@ -129,9 +129,10 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
             return ActionResult.Failure("Attach by file name is only supported when T is IBrowserFile or IReadOnlyList<IBrowserFile>.");
         }
 
-        if (!ShouldUseFileNameCompatibilityMode() && !CanSafelyReplaceCurrentFiles())
+        if (HasConcreteBrowserFiles())
         {
-            return ActionResult.Failure("Attach by file name requires FileNames compatibility mode when real browser files are already selected.");
+            return ActionResult.Failure(
+                "Attach by file name cannot synthesize a real browser file while concrete browser files are already selected. Use the host upload UI or FileNames-only mode.");
         }
 
         var updatedFiles = GetEffectiveFileNames()
@@ -250,6 +251,11 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
             return;
         }
 
+        if (!CanSafelyReplaceCurrentFiles())
+        {
+            return;
+        }
+
         var normalizedNames = NormalizeFileNames(FileNames);
         var currentNames = NormalizeFileNames(ExtractFileNames(Files));
         if (normalizedNames.SequenceEqual(currentNames, StringComparer.OrdinalIgnoreCase))
@@ -262,6 +268,11 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private IReadOnlyList<string> GetEffectiveFileNames()
     {
+        if (SupportsBrowserFileValue() && HasConcreteBrowserFiles())
+        {
+            return NormalizeFileNames(ExtractFileNames(Files));
+        }
+
         if (ShouldUseFileNameCompatibilityMode())
         {
             return NormalizeFileNames(FileNames);
@@ -296,9 +307,25 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
         };
     }
 
+    private bool HasConcreteBrowserFiles()
+    {
+        return Files switch
+        {
+            IBrowserFile file => file is not NamedBrowserFile,
+            IReadOnlyList<IBrowserFile> fileList => fileList.Any(static file => file is not NamedBrowserFile),
+            _ => false
+        };
+    }
+
     private async Task ApplyFileNamesAsync(IReadOnlyList<string> fileNames)
     {
         if (!SupportsBrowserFileValue())
+        {
+            await PublishFileNamesOnlyAsync(fileNames);
+            return;
+        }
+
+        if (!CanSafelyReplaceCurrentFiles())
         {
             await PublishFileNamesOnlyAsync(fileNames);
             return;
@@ -391,13 +418,29 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private static IReadOnlyList<string> NormalizeFileNames(IEnumerable<string>? fileNames)
     {
-        return fileNames?
-            .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
-            .Select(static fileName => fileName.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static fileName => fileName, StringComparer.OrdinalIgnoreCase)
-            .ToArray()
-            ?? [];
+        if (fileNames is null)
+        {
+            return [];
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var normalized = new List<string>();
+
+        foreach (var fileName in fileNames)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                continue;
+            }
+
+            var trimmed = fileName.Trim();
+            if (seen.Add(trimmed))
+            {
+                normalized.Add(trimmed);
+            }
+        }
+
+        return normalized;
     }
 
     private void EnsureAgentUserAttributes()

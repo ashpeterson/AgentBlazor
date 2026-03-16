@@ -183,13 +183,18 @@ Legacy supplier/workflow URLs still exist as redirects, but they are no longer t
 
 ## Current Status
 
-As of 2026-03-06:
-- core wrapper breadth is in place
-- shared state, handoffs, and runtime inspection foundations are shipped
-- the demo has been repositioned around a CopilotKit-style dojo plus a MudBlazor-style components explorer
-- the dojo now uses a lighter dedicated shell with `agentic-chat` as the default first-run experience
-- end-to-end regression coverage now targets the active dojo/components routes instead of the retired workflow demo pages
-- the main open demo task is finishing per-example dojo fidelity beyond the new default shell
+As of 2026-03-16:
+- the repo is in a parity-foundation phase for a first real-project NuGet preview
+- high-surface `Agent*` components now inherit the corresponding MudBlazor components directly where feasible
+- the demo story is consolidated around Home -> Dojo -> Components
+- side-by-side compatibility proof routes exist for the shipped Mud-backed component set
+- component, core, integration, and Playwright coverage are in place for the current public demo flows
+
+Known gaps before calling the package broadly production-ready:
+- richer `MudDataGrid` proof for server-backed and heavily templated scenarios
+- deeper hierarchy proof for `AgentTreeView`
+- real-project validation in an external consumer app
+- `AgentFileUpload` agent actions operate on file names and host-owned workflow state; they do not synthesize real browser upload payloads
 
 ## License
 
