@@ -33,6 +33,40 @@ public static class AgentProviderRegistrationExtensions
         return services;
     }
 
+    public static IServiceCollection AddOpenAIProvider(
+        this IServiceCollection services,
+        string model,
+        string apiKey,
+        string endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+
+        var normalizedEndpoint = endpoint.TrimEnd('/');
+
+        services.Configure<AgentBlazorOptions>(options =>
+        {
+            options.Provider.Kind = AgentProviderKind.OpenAI;
+            options.Provider.Model = model;
+            options.Provider.ApiKey = apiKey;
+            options.Provider.Endpoint = normalizedEndpoint;
+        });
+        services.Replace(ServiceDescriptor.Singleton<IChatClient>(_ =>
+        {
+            var client = new OpenAIClient(
+                new ApiKeyCredential(apiKey),
+                new OpenAIClientOptions
+                {
+                    Endpoint = new Uri(normalizedEndpoint, UriKind.Absolute)
+                });
+            return client.GetChatClient(model).AsIChatClient();
+        }));
+
+        return services;
+    }
+
     public static IServiceCollection AddAzureOpenAIProvider(
         this IServiceCollection services,
         string endpoint,
@@ -67,6 +101,51 @@ public static class AgentProviderRegistrationExtensions
                 return client.GetChatClient(deploymentName).AsIChatClient();
             }));
         }
+
+        return services;
+    }
+
+    public static IServiceCollection AddOriginAIProvider(
+        this IServiceCollection services,
+        string endpoint,
+        string apiKey,
+        string tenantInfo = "origin-ai",
+        string chatSource = "agentblazor",
+        string? systemPrompt = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantInfo);
+
+        var normalizedEndpoint = endpoint.TrimEnd('/');
+
+        services.Configure<AgentBlazorOptions>(options =>
+        {
+            options.Provider.Kind = AgentProviderKind.Custom;
+            options.Provider.Endpoint = normalizedEndpoint;
+            options.Provider.ApiKey = apiKey;
+            options.Provider.AdditionalSettings["Provider"] = "OriginAI";
+            options.Provider.AdditionalSettings["TenantInfo"] = tenantInfo;
+            options.Provider.AdditionalSettings["ChatSource"] = chatSource;
+            if (!string.IsNullOrWhiteSpace(systemPrompt))
+            {
+                options.Provider.AdditionalSettings["SystemPrompt"] = systemPrompt;
+            }
+        });
+
+        services.AddHttpClient("AgentBlazor.OriginAI", client =>
+        {
+            client.BaseAddress = new Uri(normalizedEndpoint, UriKind.Absolute);
+            client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+            client.DefaultRequestHeaders.Add("X-Tenant-Info", tenantInfo);
+        });
+
+        services.Replace(ServiceDescriptor.Singleton<IChatClient>(sp =>
+            new OriginAIChatClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient("AgentBlazor.OriginAI"),
+                chatSource,
+                systemPrompt)));
 
         return services;
     }

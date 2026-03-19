@@ -392,12 +392,14 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         catch (InvalidOperationException)
         {
             _isOpen = true;
-            await OnOpen.InvokeAsync();
+            Open = true;
+            await OpenChanged.InvokeAsync(true);
         }
         catch (Exception) when (!_hasRendered)
         {
             _isOpen = true;
-            await OnOpen.InvokeAsync();
+            Open = true;
+            await OpenChanged.InvokeAsync(true);
         }
     }
 
@@ -411,12 +413,14 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         catch (InvalidOperationException)
         {
             _isOpen = false;
-            await OnClose.InvokeAsync();
+            Open = false;
+            await OpenChanged.InvokeAsync(false);
         }
         catch (Exception) when (!_hasRendered)
         {
             _isOpen = false;
-            await OnClose.InvokeAsync();
+            Open = false;
+            await OpenChanged.InvokeAsync(false);
         }
     }
 

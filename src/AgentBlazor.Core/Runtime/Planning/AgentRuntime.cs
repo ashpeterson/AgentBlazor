@@ -8,6 +8,7 @@ using System.Threading.Channels;
 using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Runtime;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
@@ -28,6 +29,8 @@ namespace AgentBlazor.Core.Runtime.Planning;
 /// Agent runtime: Plan → Validate → Execute.
 /// Registry is resolved per-request from AgentComponentRegistryHub using the circuit session ID.
 /// </summary>
+// Legacy built-in runtime implementation. Kept temporarily behind IAgentRuntimeAdapter
+// while the architecture moves to an external-runtime-backed adapter model.
 internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 {
     private const string RunIdContextKey = AgentRuntimeContextKeys.RunId;
@@ -257,673 +260,150 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             : runId!;
         var inspectorRunId = Guid.NewGuid().ToString("N");
         var inspectorStartedAt = DateTimeOffset.UtcNow;
-        var inspectorEvents = new List<AgentBlazor.Core.Paid.InspectorEvent>();
+        var inspector = new TurnInspectorCollector();
         ActionPlan? inspectorPlan = null;
         var conversationSessionId = sessionId;
-        void AppendInspectorEvent(
-            string kind,
-            string? detail = null,
-            string? componentId = null,
-            string? actionId = null)
-        {
-            inspectorEvents.Add(new AgentBlazor.Core.Paid.InspectorEvent(
-                Timestamp: DateTimeOffset.UtcNow,
-                Kind: kind,
-                ComponentId: componentId,
-                ActionId: actionId,
-                Detail: detail));
-        }
 
-        // Resolve the per-circuit registry for this session
-        IAgentComponentRegistry? registry = null;
-        _registryHub?.TryGet(sessionId, out registry);
-        var mountedComponents = GetMountedComponents(registry);
-        var currentRoute = ResolveCurrentRoute(request.Context, mountedComponents);
-        AppendInspectorEvent("RunStarted", $"User message: {request.UserMessage}");
-        if (!string.IsNullOrWhiteSpace(currentRoute))
-        {
-            AppendInspectorEvent("CurrentRoute", currentRoute);
-        }
-
-        var registration = ResolveAgent(request.AgentName, request.Context, currentRoute);
-        if (registration is not null)
-        {
-            AppendInspectorEvent("AgentResolved", registration.Name);
-        }
-        else
-        {
-            AppendInspectorEvent("AgentResolutionFailed", BuildNoAgentReasonDetail(request.AgentName, request.Context, currentRoute));
-        }
-
-        if (request.Context is not null &&
-            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffFrom, out var handoffFrom) &&
-            !string.IsNullOrWhiteSpace(handoffFrom) &&
-            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffTo, out var handoffTo) &&
-            !string.IsNullOrWhiteSpace(handoffTo))
-        {
-            var handoffAt = request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffAt, out var rawHandoffAt)
-                ? rawHandoffAt
-                : null;
-            var handoffDetail = string.IsNullOrWhiteSpace(handoffAt)
-                ? $"{handoffFrom} -> {handoffTo}"
-                : $"{handoffFrom} -> {handoffTo} @ {handoffAt}";
-            AppendInspectorEvent("AgentHandoff", handoffDetail);
-        }
-
-        traceBuilder.RecordEntry(request, registration?.Name);
-
-        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
-        {
-            Kind = AgentTurnStreamEventKind.RunStarted,
-            AgentName = registration?.Name ?? "none"
-        });
-        await NotifyTurnStartedAsync(
+        var turnPreamble = await HandleTurnPreambleAsync(
+            request,
             sessionId,
             runId,
-            registration?.Name ?? "none",
-            request.UserMessage,
-            CancellationToken.None);
+            traceBuilder,
+            (kind, detail, componentId, actionId) => inspector.Append(kind, detail, componentId, actionId),
+            emitEvent);
+        var registry = turnPreamble.Registry;
+        var mountedComponents = turnPreamble.MountedComponents;
+        var currentRoute = turnPreamble.CurrentRoute;
+        var registration = turnPreamble.Registration;
 
         if (registration is null)
         {
-            var noAgentResponse = await HandleNoAgentAsync(
-                traceBuilder,
-                request.AgentName,
-                request.Context,
-                cancellationToken);
-            AppendInspectorEvent("RunFinished", noAgentResponse.ResponseText);
-            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, noAgentResponse, cancellationToken);
-            await EmitTextDeltasAsync(noAgentResponse.AgentName, noAgentResponse.ResponseText, emitEvent);
-            await EmitRunFinishedAsync(noAgentResponse, emitEvent);
-            RecordInspectorRun(
-                inspectorRunId,
-                sessionId,
-                noAgentResponse.AgentName,
-                inspectorStartedAt,
-                plan: null,
-                executionResults: [],
-                events: inspectorEvents,
-                succeeded: false,
-                errorMessage: noAgentResponse.ResponseText);
-            await NotifyTurnFinishedAsync(
-                sessionId,
-                runId,
-                noAgentResponse.AgentName,
-                request.UserMessage,
-                noAgentResponse,
-                CancellationToken.None);
-            return noAgentResponse;
+            return await HandleNoAgentTurnAsync(
+                new EarlyExitTurnContext(
+                    sessionId,
+                    runId,
+                    conversationSessionId,
+                    request,
+                    inspectorRunId,
+                    inspectorStartedAt,
+                    inspector.Events,
+                    emitEvent,
+                    cancellationToken),
+                traceBuilder);
         }
 
-        conversationSessionId = ResolveConversationSessionId(sessionId, registration.Name, request);
-        var conversationHistory = await BuildConversationHistoryAsync(conversationSessionId, cancellationToken);
-        AppendInspectorEvent("ConversationHydrated", $"Turns loaded: {conversationHistory.Count}");
-        var allowedPolicy = GetAllowedComponents(registration);
-        var allowedComponents = allowedPolicy.AllowedComponents;
-        // Augment with any custom [AgentAction] components not already in the catalog
-        allowedComponents = AugmentAllowedWithMounted(allowedComponents, mountedComponents);
-        AppendInspectorEvent(
-            "CapabilitiesReady",
-            $"Allowed components: {allowedComponents.Count}, blocked-by-policy: {allowedPolicy.BlockedByAgentPolicy.Count}, blocked-by-tier: {allowedPolicy.BlockedByTier.Count}");
-        var sharedStateBase = new Dictionary<string, string>(
-            _sharedStateStore.GetSnapshot(registration.Name, sessionId).Values,
-            StringComparer.OrdinalIgnoreCase);
-        ApplyContextSharedStateSnapshot(sharedStateBase, request.Context);
-        ApplyContextSharedStateDelta(sharedStateBase, request.Context);
-        var latestSharedState = BuildSharedStateSnapshot(
-            sharedStateBase,
+        var turnSetup = await HandleTurnSetupPhaseAsync(
+            registration,
+            sessionId,
+            sharedStateRunId,
+            request,
             mountedComponents,
-            currentRoute);
-        AppendInspectorEvent("StateSnapshot", SerializeInspectorPayload(latestSharedState));
-        _sharedStateStore.SaveSnapshot(registration.Name, sessionId, sharedStateRunId, latestSharedState);
-        await EmitSharedStateSnapshotAsync(registration.Name, latestSharedState, emitEvent);
-        var providerConfigured = _planner.IsProviderConfigured;
-
-        await TrackStartedAsync(registration.Name, request, providerConfigured);
+            currentRoute,
+            (kind, detail) => inspector.Append(kind, detail),
+            emitEvent,
+            cancellationToken);
+        conversationSessionId = turnSetup.ConversationSessionId;
+        var conversationHistory = turnSetup.ConversationHistory;
+        var allowedPolicy = turnSetup.AllowedPolicy;
+        var allowedComponents = turnSetup.AllowedComponents;
+        var latestSharedState = turnSetup.LatestSharedState;
+        var providerConfigured = turnSetup.ProviderConfigured;
 
         if (allowedComponents.Count == 0)
         {
-            var policyBlockedMessage = BuildNoAllowedActionsResponseText(
+            return await HandlePolicyBlockedTurnAsync(
+                new EarlyExitTurnContext(
+                    sessionId,
+                    runId,
+                    conversationSessionId,
+                    request,
+                    inspectorRunId,
+                    inspectorStartedAt,
+                    inspector.Events,
+                    emitEvent,
+                    cancellationToken),
+                registration.Name,
+                traceBuilder,
                 allowedPolicy.BlockedByAgentPolicy,
-                allowedPolicy.BlockedByTier);
-            AppendInspectorEvent("PolicyBlocked", policyBlockedMessage);
-
-            if (traceBuilder.IsEnabled)
-            {
-                traceBuilder.RecordFailure(policyBlockedMessage);
-                await StoreTraceAsync(traceBuilder, cancellationToken);
-            }
-
-            var policyBlockedResponse = new AgentTurnResponse(
-                AgentName: registration.Name,
-                ResponseText: policyBlockedMessage,
-                PlannedActions: [],
-                ExecutionResults: []);
-            await TrackFinishedAsync(
-                registration.Name,
-                request,
-                AgentBlazorRunOutcome.Failed,
-                plannedCount: 0,
-                executedCount: 0,
-                providerConfigured: providerConfigured);
-            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, policyBlockedResponse, cancellationToken);
-            await EmitTextDeltasAsync(registration.Name, policyBlockedResponse.ResponseText, emitEvent);
-            await EmitRunFinishedAsync(policyBlockedResponse, emitEvent);
-            RecordInspectorRun(
-                inspectorRunId,
-                sessionId,
-                registration.Name,
-                inspectorStartedAt,
-                plan: null,
-                executionResults: [],
-                events: inspectorEvents,
-                succeeded: false,
-                errorMessage: policyBlockedResponse.ResponseText);
-            await NotifyTurnFinishedAsync(
-                sessionId,
-                runId,
-                registration.Name,
-                request.UserMessage,
-                policyBlockedResponse,
-                CancellationToken.None);
-            return policyBlockedResponse;
+                allowedPolicy.BlockedByTier,
+                providerConfigured,
+                (kind, detail) => inspector.Append(kind, detail));
         }
 
         if (!providerConfigured)
         {
-            var providerMissingResponse = await BuildProviderMissingResponseAsync(
-                registration.Name, traceBuilder, cancellationToken);
-            AppendInspectorEvent("ProviderMissing", providerMissingResponse.ResponseText);
-
-            await TrackFinishedAsync(registration.Name, request, AgentBlazorRunOutcome.ProviderMissing,
-                plannedCount: 0, executedCount: 0, providerConfigured: false);
-            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, providerMissingResponse, cancellationToken);
-            await EmitTextDeltasAsync(providerMissingResponse.AgentName, providerMissingResponse.ResponseText, emitEvent);
-            await EmitRunFinishedAsync(providerMissingResponse, emitEvent);
-            RecordInspectorRun(
-                inspectorRunId,
-                sessionId,
+            return await HandleProviderMissingTurnAsync(
+                new EarlyExitTurnContext(
+                    sessionId,
+                    runId,
+                    conversationSessionId,
+                    request,
+                    inspectorRunId,
+                    inspectorStartedAt,
+                    inspector.Events,
+                    emitEvent,
+                    cancellationToken),
                 registration.Name,
-                inspectorStartedAt,
-                plan: null,
-                executionResults: [],
-                events: inspectorEvents,
-                succeeded: false,
-                errorMessage: providerMissingResponse.ResponseText);
-            await NotifyTurnFinishedAsync(
-                sessionId,
-                runId,
-                providerMissingResponse.AgentName,
-                request.UserMessage,
-                providerMissingResponse,
-                CancellationToken.None);
-            return providerMissingResponse;
+                traceBuilder,
+                (kind, detail) => inspector.Append(kind, detail));
         }
 
         try
         {
-            // PHASE 1: PLAN
-            _logger?.LogInformation("Planning: {Request}", request.UserMessage);
-            AppendInspectorEvent("PlanningStarted");
-
-            var availableRoutes = _routeRegistry.GetAll()
-                .Select(r => new AvailableRoute { Path = r.Path, Description = r.Description, Aliases = r.Aliases })
-                .ToList();
-
-            // Gather service tools from registry + MCP providers
-            var serviceTools = await GatherServiceToolsAsync(cancellationToken);
-
-            var planRequest = new ActionPlanRequest
-            {
-                UserMessage = request.UserMessage,
-                SessionId = sessionId,
-                UserId = request.GetEffectiveUserId(),
-                GenerateUi = IsGeneratedUiRequested(request.Context),
-                GeneratedUiAction = request.GeneratedUiAction,
-                AvailableComponents = allowedComponents,
-                MountedComponents = mountedComponents,
-                ConversationHistory = conversationHistory,
-                SharedState = latestSharedState,
-                AvailableRoutes = availableRoutes,
-                AgentInstructions = registration.Instructions,
-                CurrentRoute = currentRoute,
-                ServiceTools = serviceTools
-            };
-
-            var plan = await _planner.PlanAsync(planRequest, cancellationToken);
-            inspectorPlan = plan;
-
-            // Resolve agentId-based steps to canonical component types for validation
-            plan = ResolveComponentTypes(plan, mountedComponents, allowedComponents);
-            plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
-            inspectorPlan = plan;
-            AppendInspectorEvent("PlanningFinished", $"Steps: {plan.Steps.Count}, Clarification: {plan.RequiresClarification}");
-            foreach (var step in plan.Steps)
-            {
-                AppendInspectorEvent(
-                    "PlannedAction",
-                    SerializeInspectorPayload(step.Arguments),
-                    step.ComponentId,
-                    step.ActionId);
-            }
-
-            // Determine response text from the plan's message or build one
-            var planMessage = plan.Message;
-
-            if (plan.RequiresClarification &&
-                TryRecoverSingleFieldFormEditPlan(
-                    request.UserMessage,
-                    mountedComponents,
+            var flowResult = await HandleTurnFlowAsync(
+                new TurnFlowContext(
+                    registration,
+                    sessionId,
+                    runId,
+                    sharedStateRunId,
+                    conversationSessionId,
+                    request,
+                    inspectorRunId,
+                    inspectorStartedAt,
+                    inspector.Events,
+                    traceBuilder,
                     allowedComponents,
-                    plan,
-                    out var recoveredPlan))
-            {
-                plan = recoveredPlan;
-                inspectorPlan = recoveredPlan;
-                planMessage = recoveredPlan.Message;
-
-                var recoveredStep = recoveredPlan.Steps[0];
-                AppendInspectorEvent(
-                    "ClarificationAutoRecovered",
-                    $"Recovered as {recoveredStep.ComponentId}.{recoveredStep.ActionId}",
-                    recoveredStep.ComponentId,
-                    recoveredStep.ActionId);
-                AppendInspectorEvent(
-                    "PlannedAction",
-                    SerializeInspectorPayload(recoveredStep.Arguments),
-                    recoveredStep.ComponentId,
-                    recoveredStep.ActionId);
-            }
-
-            if (plan.RequiresClarification)
-            {
-                _logger?.LogInformation("Clarification needed: {Question}", plan.ClarificationNeeded);
-                var clarificationText = plan.ClarificationNeeded!;
-                AppendInspectorEvent("ClarificationRequired", clarificationText);
-                var clarificationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
-                    AgentName: registration.Name,
-                    ResponseText: clarificationText,
-                    PlannedActions: [],
-                    ExecutionResults: []), plan);
-                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, clarificationResponse, cancellationToken);
-                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
-                {
-                    Kind = AgentTurnStreamEventKind.ClarificationRequired,
-                    AgentName = registration.Name,
-                    ClarificationQuestion = clarificationText
-                });
-                await EmitTextDeltasAsync(registration.Name, planMessage ?? clarificationText, emitEvent);
-                await EmitRunFinishedAsync(clarificationResponse, emitEvent);
-                RecordInspectorRun(
-                    inspectorRunId,
-                    sessionId,
-                    registration.Name,
-                    inspectorStartedAt,
-                    inspectorPlan,
-                    executionResults: [],
-                    events: inspectorEvents,
-                    succeeded: false,
-                    errorMessage: clarificationText);
-                await NotifyTurnFinishedAsync(
-                    sessionId,
-                    runId,
-                    registration.Name,
-                    request.UserMessage,
-                    clarificationResponse,
-                    CancellationToken.None);
-                return clarificationResponse;
-            }
-
-            if (plan.IsEmpty)
-            {
-                _logger?.LogInformation("Plan is empty — no actions");
-                var emptyText = planMessage ?? "I understood your request but no actions are needed.";
-                AppendInspectorEvent("PlanEmpty", emptyText);
-                var emptyResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
-                    AgentName: registration.Name,
-                    ResponseText: emptyText,
-                    PlannedActions: [],
-                    ExecutionResults: []), plan);
-                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, emptyResponse, cancellationToken);
-                await EmitTextDeltasAsync(registration.Name, emptyText, emitEvent);
-                await EmitRunFinishedAsync(emptyResponse, emitEvent);
-                RecordInspectorRun(
-                    inspectorRunId,
-                    sessionId,
-                    registration.Name,
-                    inspectorStartedAt,
-                    inspectorPlan,
-                    executionResults: [],
-                    events: inspectorEvents,
-                    succeeded: true,
-                    errorMessage: null);
-                await NotifyTurnFinishedAsync(
-                    sessionId,
-                    runId,
-                    registration.Name,
-                    request.UserMessage,
-                    emptyResponse,
-                    CancellationToken.None);
-                return emptyResponse;
-            }
-
-            _logger?.LogInformation("Plan has {StepCount} steps", plan.Steps.Count);
-
-            var plannedActions = CreatePlannedActions(plan);
-            await EmitPlannedActionsAsync(plannedActions, emitEvent);
-            await NotifyToolExecutionStartedAsync(
-                sessionId,
-                runId,
-                registration.Name,
-                plannedActions,
-                CancellationToken.None);
-
-            var runtimeContext = request.Context is null
-                ? null
-                : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase);
-            var approvedActions = GetApprovedActions(plan, allowedComponents, runtimeContext);
-            var pendingApprovals = GetPendingApprovals(plan, allowedComponents, approvedActions);
-            if (pendingApprovals.Count > 0)
-            {
-                AppendInspectorEvent("ApprovalRequired", SerializeInspectorPayload(pendingApprovals));
-            }
-
-            if (pendingApprovals.Count > 0)
-            {
-                var blockedResults = pendingApprovals
-                    .Select(static p => new ComponentActionExecutionResult(
-                        p.ComponentId, p.ActionId,
-                        Outcome: ActionOutcome.Blocked,
-                        Message: $"Approval required for {p.ComponentId}.{p.ActionId}."))
-                    .ToArray();
-                var approvalText = BuildApprovalRequiredResponseText(pendingApprovals);
-
-                if (traceBuilder.IsEnabled)
-                {
-                    traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
-                        .RecordExecution(blockedResults)
-                        .RecordSuccess(approvalText);
-                    await StoreTraceAsync(traceBuilder, cancellationToken);
-                }
-
-                var approvalResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
-                    AgentName: registration.Name,
-                    ResponseText: approvalText,
-                    PlannedActions: plannedActions,
-                    ExecutionResults: blockedResults)
-                {
-                    RequiresApproval = true,
-                    PendingApprovals = pendingApprovals
-                }, plan);
-                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, approvalResponse, cancellationToken);
-                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
-                {
-                    Kind = AgentTurnStreamEventKind.ApprovalRequired,
-                    AgentName = registration.Name,
-                    PendingApprovals = pendingApprovals
-                });
-                await EmitExecutionResultsAsync(blockedResults, emitEvent);
-                await EmitTextDeltasAsync(registration.Name, approvalText, emitEvent);
-                await EmitRunFinishedAsync(approvalResponse, emitEvent);
-                RecordInspectorRun(
-                    inspectorRunId,
-                    sessionId,
-                    registration.Name,
-                    inspectorStartedAt,
-                    inspectorPlan,
-                    blockedResults,
-                    inspectorEvents,
-                    succeeded: false,
-                    errorMessage: approvalText);
-                await NotifyTurnFinishedAsync(
-                    sessionId,
-                    runId,
-                    registration.Name,
-                    request.UserMessage,
-                    approvalResponse,
-                    CancellationToken.None);
-                return approvalResponse;
-            }
-
-            // PHASE 2: VALIDATE
-            _logger?.LogInformation("Validating plan");
-            AppendInspectorEvent("ValidationStarted");
-
-            var validationContext = new PlanValidationContext
-            {
-                AllowedComponents = allowedComponents,
-                MountedComponents = mountedComponents,
-                ApprovedActions = approvedActions
-            };
-
-            var validationResult = _validator.Validate(plan, validationContext);
-
-            if (!validationResult.IsValid)
-            {
-                var validationFailures = BuildValidationFailureResults(validationResult);
-                var clarification = validationFailures
-                    .Select(static f => f.Message)
-                    .FirstOrDefault(static message =>
-                        message.Contains("Current tier:", StringComparison.OrdinalIgnoreCase))
-                    ?? validationResult.BuildClarificationQuestion()
-                    ?? "The plan could not be validated.";
-                AppendInspectorEvent("ValidationFailed", SerializeInspectorPayload(validationFailures));
-
-                if (traceBuilder.IsEnabled)
-                {
-                    traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
-                        .RecordExecution(validationFailures)
-                        .RecordSuccess(clarification);
-                    await StoreTraceAsync(traceBuilder, cancellationToken);
-                }
-
-                var validationResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
-                    AgentName: registration.Name,
-                    ResponseText: clarification,
-                    PlannedActions: [],
-                    ExecutionResults: validationFailures), plan);
-                await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, validationResponse, cancellationToken);
-                await EmitExecutionResultsAsync(validationFailures, emitEvent);
-                await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
-                {
-                    Kind = AgentTurnStreamEventKind.ClarificationRequired,
-                    AgentName = registration.Name,
-                    ClarificationQuestion = clarification
-                });
-                await EmitTextDeltasAsync(registration.Name, clarification, emitEvent);
-                await EmitRunFinishedAsync(validationResponse, emitEvent);
-                RecordInspectorRun(
-                    inspectorRunId,
-                    sessionId,
-                    registration.Name,
-                    inspectorStartedAt,
-                    inspectorPlan,
-                    validationFailures,
-                    inspectorEvents,
-                    succeeded: false,
-                    errorMessage: clarification);
-                await NotifyTurnFinishedAsync(
-                    sessionId,
-                    runId,
-                    registration.Name,
-                    request.UserMessage,
-                    validationResponse,
-                    CancellationToken.None);
-                return validationResponse;
-            }
-            AppendInspectorEvent("ValidationPassed");
-
-            // PHASE 3: EXECUTE
-            _logger?.LogInformation("Executing plan");
-            AppendInspectorEvent("ExecutionStarted");
-
-            var executionOptions = new PlanExecutionOptions
-            {
-                ContinueOnFailure = false,
-                SessionId = sessionId,
-                RunId = request.Context is not null &&
-                        request.Context.TryGetValue(RunIdContextKey, out var contextRunId) &&
-                        !string.IsNullOrWhiteSpace(contextRunId)
-                    ? contextRunId
-                    : null
-            };
-
-            // Partition plan steps: service tool steps vs component steps
-            var toolSteps = plan.Steps.Where(s => string.Equals(s.ComponentId, "tool", StringComparison.OrdinalIgnoreCase)).ToList();
-            var componentPlan = toolSteps.Count > 0
-                ? plan with { Steps = plan.Steps.Where(s => !string.Equals(s.ComponentId, "tool", StringComparison.OrdinalIgnoreCase)).ToList() }
-                : plan;
-
-            var executionResult = await _executor.ExecuteAsync(componentPlan, executionOptions, cancellationToken);
-
-            // Execute service tool steps
-            var toolResults = new List<ComponentActionExecutionResult>();
-            foreach (var toolStep in toolSteps)
-            {
-                var toolResult = await ExecuteServiceToolAsync(toolStep, cancellationToken);
-                toolResults.Add(toolResult);
-            }
-
-            var executionResults = executionResult.StepResults
-                .Select(r => new ComponentActionExecutionResult(
-                    r.Step.ComponentId, r.Step.ActionId, r.Outcome, r.Message))
-                .Concat(toolResults)
-                .ToArray();
-            await EmitExecutionResultsAsync(executionResults, emitEvent);
-            await NotifyToolExecutionFinishedAsync(
-                sessionId,
-                runId,
-                registration.Name,
-                executionResults,
-                CancellationToken.None);
-
-            var mountedComponentsAfterExecution = GetMountedComponents(registry);
-            var currentRouteAfterExecution = NormalizeRoutePath(ExtractCurrentRoute(mountedComponentsAfterExecution)) ?? currentRoute;
-            var sharedStateAfterExecution = BuildSharedStateSnapshot(
-                latestSharedState,
-                mountedComponentsAfterExecution,
-                currentRouteAfterExecution);
-            var sharedStateDelta = BuildSharedStateDelta(latestSharedState, sharedStateAfterExecution);
-            if (sharedStateDelta.Count > 0)
-            {
-                _sharedStateStore.ApplyDelta(registration.Name, sessionId, sharedStateRunId, sharedStateDelta);
-                await EmitSharedStateDeltaAsync(registration.Name, sharedStateDelta, emitEvent);
-                latestSharedState = sharedStateAfterExecution;
-                await EmitSharedStateSnapshotAsync(registration.Name, latestSharedState, emitEvent);
-                AppendInspectorEvent("StateDelta", SerializeInspectorPayload(sharedStateDelta));
-                AppendInspectorEvent("StateSnapshot", SerializeInspectorPayload(latestSharedState));
-            }
-
-            // When execution fully succeeded, use the LLM's plan message if available.
-            // When any step failed (NeedsClarification, Failed, etc.), surface the execution message instead.
-            var allToolsSucceeded = toolResults.All(r => r.Succeeded);
-            var overallSucceeded = executionResult.Succeeded && allToolsSucceeded;
-            var responseText = overallSucceeded
-                ? (planMessage ?? BuildResponseText(executionResult))
-                : BuildResponseText(executionResult);
-            stopwatch.Stop();
-
-            if (traceBuilder.IsEnabled)
-            {
-                traceBuilder.RecordPlanning(plannedActions, allowedComponents.Count)
-                    .RecordExecution(executionResults)
-                    .RecordSuccess(responseText);
-                await StoreTraceAsync(traceBuilder, cancellationToken);
-            }
-
-            await TrackFinishedAsync(registration.Name, request,
-                overallSucceeded ? AgentBlazorRunOutcome.Succeeded : AgentBlazorRunOutcome.Failed,
-                plannedActions.Length, executionResults.Length, providerConfigured);
-
-            _logger?.LogInformation(
-                "Turn completed in {Duration}ms — {Success}/{Total} steps succeeded",
-                stopwatch.ElapsedMilliseconds, executionResult.SuccessCount, executionResult.StepResults.Count);
-
-            var successResponse = AttachPlannedGeneratedUi(new AgentTurnResponse(
-                AgentName: registration.Name,
-                ResponseText: responseText,
-                PlannedActions: plannedActions,
-                ExecutionResults: executionResults), plan);
-            AppendInspectorEvent("ExecutionFinished", $"Succeeded: {overallSucceeded}");
-            AppendInspectorEvent("RunFinished", responseText);
-            await StoreConversationTurnAsync(conversationSessionId, request.UserMessage, successResponse, cancellationToken);
-
-            // Record inspector data
-            RecordInspectorRun(
-                inspectorRunId,
-                sessionId,
-                registration.Name,
-                inspectorStartedAt,
-                inspectorPlan,
-                executionResults,
-                inspectorEvents,
-                succeeded: overallSucceeded,
-                errorMessage: overallSucceeded ? null : responseText);
-            await RecordActionHistoryAsync(
-                sessionId,
-                request.GetEffectiveUserId(),
-                request.UserMessage,
-                executionResults,
-                plan,
-                cancellationToken);
-            await EmitReasoningEventsAsync(registration.Name, plan.ReasoningContent, emitEvent);
-            await EmitTextDeltasAsync(registration.Name, responseText, emitEvent);
-            await EmitRunFinishedAsync(successResponse, emitEvent);
-            await NotifyTurnFinishedAsync(
-                sessionId,
-                runId,
-                registration.Name,
-                request.UserMessage,
-                successResponse,
-                CancellationToken.None);
-            return successResponse;
+                    mountedComponents,
+                    conversationHistory,
+                    latestSharedState,
+                    currentRoute,
+                    providerConfigured,
+                    registry,
+                    stopwatch,
+                    inspector,
+                    emitEvent,
+                    cancellationToken));
+            inspectorPlan = flowResult.InspectorPlan;
+            return flowResult.Response;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            traceBuilder.RecordCanceled();
-            await StoreTraceAsync(traceBuilder, CancellationToken.None);
-            AppendInspectorEvent("RunCanceled", "Turn canceled.");
-            RecordInspectorRun(
-                inspectorRunId,
+            await HandleTurnCanceledAsync(
                 sessionId,
-                registration?.Name ?? "none",
+                inspectorRunId,
                 inspectorStartedAt,
                 inspectorPlan,
-                executionResults: [],
-                events: inspectorEvents,
-                succeeded: false,
-                errorMessage: "Run canceled.");
+                inspector.Events,
+                registration?.Name ?? "none",
+                traceBuilder,
+                (kind, detail) => inspector.Append(kind, detail));
             throw;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Turn failed");
-            traceBuilder.RecordFailure(ex.Message);
-            await StoreTraceAsync(traceBuilder, CancellationToken.None);
-            AppendInspectorEvent("RunError", ex.Message);
-            RecordInspectorRun(
-                inspectorRunId,
-                sessionId,
-                registration?.Name ?? "none",
-                inspectorStartedAt,
-                inspectorPlan,
-                executionResults: [],
-                events: inspectorEvents,
-                succeeded: false,
-                errorMessage: ex.Message);
-            await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunError,
-                AgentName = registration?.Name,
-                ErrorMessage = ex.Message
-            });
-            await NotifyErrorAsync(
+            await HandleTurnFailedAsync(
                 sessionId,
                 runId,
-                registration?.Name ?? "none",
                 request.UserMessage,
-                ex.Message,
-                CancellationToken.None);
+                inspectorRunId,
+                inspectorStartedAt,
+                inspectorPlan,
+                inspector.Events,
+                registration?.Name,
+                ex,
+                traceBuilder,
+                (kind, detail) => inspector.Append(kind, detail),
+                emitEvent);
             throw;
         }
     }
@@ -979,32 +459,10 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     private static bool TryGetContextAgentName(
         IDictionary<string, string>? context,
         out string? agentName)
-    {
-        agentName = null;
-        return context is not null &&
-               context.TryGetValue(AgentRuntimeContextKeys.AgentName, out agentName) &&
-               !string.IsNullOrWhiteSpace(agentName);
-    }
+        => RuntimeTurnPreflight.TryGetContextAgentName(context, out agentName);
 
     private static bool IsAgentLockRequested(IDictionary<string, string>? context)
-    {
-        if (context is null ||
-            !context.TryGetValue(AgentRuntimeContextKeys.AgentLock, out var rawValue) ||
-            string.IsNullOrWhiteSpace(rawValue))
-        {
-            return false;
-        }
-
-        if (bool.TryParse(rawValue, out var parsed))
-        {
-            return parsed;
-        }
-
-        return rawValue.Equals("1", StringComparison.OrdinalIgnoreCase) ||
-               rawValue.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
-               rawValue.Equals("y", StringComparison.OrdinalIgnoreCase) ||
-               rawValue.Equals("on", StringComparison.OrdinalIgnoreCase);
-    }
+        => RuntimeTurnPreflight.IsAgentLockRequested(context);
 
     private bool TryResolveRouteScopedAgent(string? currentRoute, out AgentRegistration registration)
     {
@@ -1206,37 +664,16 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
     private AllowedComponentPolicyResult GetAllowedComponents(AgentRegistration registration)
     {
-        var components = _componentCatalog.GetComponents();
-        var agentPolicyEvaluation = ComponentActionPolicy.EvaluateAllowedCapabilities(
-            components, registration.AllowedComponents, registration.AllowedActions);
         var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
-        var tierFiltered = new List<ComponentCapability>();
-        var blockedByTier = new List<string>();
-
-        foreach (var component in agentPolicyEvaluation.AllowedComponents)
-        {
-            var componentCopy = new ComponentCapability(component.ComponentId, component.Description);
-            foreach (var action in component.Actions)
-            {
-                var requiredTier = AgentComponentTierBoundaries.GetRequiredTier(component.ComponentId, action.ActionId);
-                if (effectiveTier < requiredTier)
-                {
-                    blockedByTier.Add(ComponentActionPolicy.ToActionKey(component.ComponentId, action.ActionId));
-                    continue;
-                }
-
-                componentCopy.UpsertAction(action);
-            }
-
-            if (componentCopy.Actions.Count > 0)
-            {
-                tierFiltered.Add(componentCopy);
-            }
-        }
+        var capabilityPolicy = RuntimeCapabilityPolicy.Evaluate(
+            _componentCatalog.GetComponents(),
+            registration.AllowedComponents,
+            registration.AllowedActions,
+            effectiveTier);
 
         // Catalog-sourced components drive validation and approval-gating.
         // Parameters here are for the validator only; the prompt uses mounted.Actions from discovery.
-        var allowedComponents = tierFiltered
+        var allowedComponents = capabilityPolicy.AllowedCapabilities
             .Select(c => new AvailableComponent
             {
                 ComponentId = c.ComponentId,
@@ -1253,11 +690,8 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         return new AllowedComponentPolicyResult(
             AllowedComponents: allowedComponents,
-            BlockedByAgentPolicy: agentPolicyEvaluation.BlockedActionKeys,
-            BlockedByTier: blockedByTier
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static x => x, StringComparer.OrdinalIgnoreCase)
-                .ToArray());
+            BlockedByAgentPolicy: capabilityPolicy.BlockedByAgentPolicy,
+            BlockedByTier: capabilityPolicy.BlockedByTier);
     }
 
     /// <summary>
@@ -2029,72 +1463,6 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
     // Approval / Validation helpers
     // -------------------------------------------------------------------------
 
-    private static IReadOnlySet<string> GetApprovedActions(
-        ActionPlan plan,
-        IReadOnlyList<AvailableComponent> allowedComponents,
-        IReadOnlyDictionary<string, string>? context)
-    {
-        var approved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (context is null || context.Count == 0) return approved;
-
-        foreach (var step in plan.Steps)
-        {
-            var action = allowedComponents
-                .FirstOrDefault(c => string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase))
-                ?.Actions.FirstOrDefault(a => string.Equals(a.ActionId, step.ActionId, StringComparison.OrdinalIgnoreCase));
-
-            if (action is null || !action.RequiresApproval) continue;
-
-            if (ComponentActionApprovalPolicy.IsApprovalGranted(step.ComponentId, step.ActionId, context))
-                approved.Add($"{step.ComponentId}.{step.ActionId}");
-        }
-
-        return approved;
-    }
-
-    private static IReadOnlyList<PendingApproval> GetPendingApprovals(
-        ActionPlan plan,
-        IReadOnlyList<AvailableComponent> allowedComponents,
-        IReadOnlySet<string> approvedActions)
-    {
-        var pending = new List<PendingApproval>();
-        foreach (var step in plan.Steps)
-        {
-            var action = allowedComponents
-                .FirstOrDefault(c => string.Equals(c.ComponentId, step.ComponentId, StringComparison.OrdinalIgnoreCase))
-                ?.Actions.FirstOrDefault(a => string.Equals(a.ActionId, step.ActionId, StringComparison.OrdinalIgnoreCase));
-
-            if (action is null || !action.RequiresApproval) continue;
-            if (approvedActions.Contains($"{step.ComponentId}.{step.ActionId}")) continue;
-
-            pending.Add(new PendingApproval(
-                step.ComponentId,
-                step.ActionId,
-                action.Description,
-                step.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)));
-        }
-
-        return pending;
-    }
-
-    private ComponentActionExecutionResult[] BuildValidationFailureResults(PlanValidationResult validationResult)
-        => validationResult.StepResults
-            .Where(static s => !s.IsValid)
-            .Select(s =>
-            {
-                var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
-                var requiredTier = AgentComponentTierBoundaries.GetRequiredTier(s.Step.ComponentId, s.Step.ActionId);
-
-                var message = effectiveTier < requiredTier
-                    ? $"Action '{s.Step.ComponentId}.{s.Step.ActionId}' requires '{requiredTier}' tier. Current tier: {effectiveTier}."
-                    : s.MissingParameters.Count > 0
-                        ? $"Action '{s.Step.ActionId}' requires '{s.MissingParameters[0]}' parameter."
-                        : s.Errors.FirstOrDefault() ?? "Plan validation failed.";
-                return new ComponentActionExecutionResult(s.Step.ComponentId, s.Step.ActionId,
-                    Outcome: ActionOutcome.NeedsClarification, Message: message);
-            })
-            .ToArray();
-
     private static PlannedComponentAction[] CreatePlannedActions(ActionPlan plan)
         => plan.Steps
             .Select(static s => new PlannedComponentAction(
@@ -2103,42 +1471,11 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 s.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase)))
             .ToArray();
 
-    private static string BuildApprovalRequiredResponseText(IReadOnlyList<PendingApproval> pending)
-        => pending.Count == 1
-            ? $"Approval required for {pending[0].ComponentId}.{pending[0].ActionId}."
-            : $"Approval required for {pending.Count} actions.";
-
-    private static string BuildResponseText(PlanExecutionResult result)
-    {
-        if (result.StepResults.Count == 0) return "I understood your request but no actions were required.";
-
-        var failures = result.StepResults.Where(r => r.Outcome is ActionOutcome.Failed).ToList();
-        if (failures.Count > 0) return failures[0].Message;
-
-        var clarification = result.StepResults.Where(r => r.Outcome is ActionOutcome.NeedsClarification).ToList();
-        if (clarification.Count > 0) return clarification[0].Message;
-
-        var blocked = result.StepResults.Where(r => r.Outcome is ActionOutcome.Blocked).ToList();
-        if (blocked.Count > 0) return blocked.Count == 1 ? blocked[0].Message : $"Blocked {blocked.Count} actions pending approval.";
-
-        var applied = result.AppliedCount;
-        return applied == 1 ? "Done." : $"Completed {applied} actions.";
-    }
-
-    private AgentTurnResponse AttachPlannedGeneratedUi(AgentTurnResponse response, ActionPlan plan)
-    {
-        if (plan.UiToolCalls.Count == 0) return response;
-
-        var generatedUi = _uiToolCatalog.BuildDocument(plan.UiToolCalls, out var renderErrors);
-        if (generatedUi is null)
-        {
-            if (renderErrors.Count > 0)
-                _logger?.LogWarning("Generated UI rendering failed: {Errors}", string.Join("; ", renderErrors));
-            return response;
-        }
-
-        return response with { GeneratedUi = generatedUi };
-    }
+    private AgentUiDocument? BuildPlanGeneratedUi(ActionPlan plan)
+        => RuntimeGeneratedUi.BuildDocument(
+            _uiToolCatalog,
+            plan.UiToolCalls,
+            message => _logger?.LogWarning("Generated UI rendering failed: {Errors}", message));
 
     // -------------------------------------------------------------------------
     // Conversation store
@@ -2153,18 +1490,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         try
         {
             var history = await _conversationStore.GetHistoryAsync(sessionId, cancellationToken);
-            if (history is null || history.Turns.Count == 0) return [];
-
-            var plannerTurns = new List<ConversationTurn>(history.Turns.Count * 2);
-            foreach (var turn in history.Turns.TakeLast(10))
-            {
-                if (!string.IsNullOrWhiteSpace(turn.UserMessage))
-                    plannerTurns.Add(new ConversationTurn { Role = "user", Content = turn.UserMessage });
-                if (!string.IsNullOrWhiteSpace(turn.AgentResponse))
-                    plannerTurns.Add(new ConversationTurn { Role = "assistant", Content = turn.AgentResponse });
-            }
-
-            return plannerTurns;
+            return RuntimeConversationHistory.ToPlannerTurns(history);
         }
         catch (Exception ex)
         {
@@ -2183,15 +1509,10 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         try
         {
-            await _conversationStore.AppendTurnAsync(sessionId, new Conversation.ConversationTurn
-            {
-                Timestamp = DateTime.UtcNow,
-                UserMessage = userMessage,
-                AgentResponse = response.ResponseText,
-                PlannedActions = response.PlannedActions,
-                ExecutionResults = response.ExecutionResults,
-                GeneratedUi = response.GeneratedUi
-            }, cancellationToken);
+            await _conversationStore.AppendTurnAsync(
+                sessionId,
+                RuntimePersistenceRecords.CreateConversationTurn(userMessage, response),
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -2218,28 +1539,17 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
 
         try
         {
-            var allEvents = new List<AgentBlazor.Core.Paid.InspectorEvent>(events);
-            foreach (var result in executionResults)
-            {
-                allEvents.Add(new AgentBlazor.Core.Paid.InspectorEvent(
-                    DateTimeOffset.UtcNow,
-                    result.Succeeded ? "ToolCallResult" : "ToolCallFailed",
-                    result.ComponentId,
-                    result.ActionId,
-                    result.Message));
-            }
-
-            _inspectorStore.RecordRun(new AgentBlazor.Core.Paid.InspectorRunRecord(
-                RunId: runId,
-                SessionId: sessionId,
-                AgentName: agentName,
-                StartedAt: startedAt,
-                FinishedAt: DateTimeOffset.UtcNow,
-                SystemPrompt: plan?.SystemPrompt,
-                RawPlanResponse: plan?.RawResponse,
-                Events: allEvents,
-                Succeeded: succeeded,
-                ErrorMessage: errorMessage));
+            _inspectorStore.RecordRun(RuntimePersistenceRecords.CreateInspectorRunRecord(
+                runId,
+                sessionId,
+                agentName,
+                startedAt,
+                plan?.SystemPrompt,
+                plan?.RawResponse,
+                events,
+                executionResults,
+                succeeded,
+                errorMessage));
         }
         catch (Exception ex)
         {
@@ -2924,40 +2234,1005 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IDictionary<string, string>? context,
         CancellationToken cancellationToken)
     {
-        var registeredCount = _agentRegistry.GetAll().Count;
-        var responseText = BuildNoAgentResponseText(registeredCount, requestedAgentName, context);
+        var response = RuntimeEarlyExitResponses.BuildNoAgentResponse(
+            _agentRegistry.GetAll().Count,
+            requestedAgentName,
+            context);
 
         if (traceBuilder.IsEnabled)
         {
-            traceBuilder.RecordFailure(responseText);
+            traceBuilder.RecordFailure(response.ResponseText);
             await StoreTraceAsync(traceBuilder, cancellationToken);
         }
 
-        return new AgentTurnResponse("none", responseText, [], []);
+        return response;
+    }
+
+    private async Task<TurnPreambleResult> HandleTurnPreambleAsync(
+        AgentTurnRequest request,
+        string sessionId,
+        string? runId,
+        PromptTraceBuilder traceBuilder,
+        Action<string, string?, string?, string?> appendInspectorEvent,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        IAgentComponentRegistry? registry = null;
+        _registryHub?.TryGet(sessionId, out registry);
+        var mountedComponents = GetMountedComponents(registry);
+        var currentRoute = ResolveCurrentRoute(request.Context, mountedComponents);
+
+        appendInspectorEvent("RunStarted", $"User message: {request.UserMessage}", null, null);
+        if (!string.IsNullOrWhiteSpace(currentRoute))
+        {
+            appendInspectorEvent("CurrentRoute", currentRoute, null, null);
+        }
+
+        var registration = ResolveAgent(request.AgentName, request.Context, currentRoute);
+        if (registration is not null)
+        {
+            appendInspectorEvent("AgentResolved", registration.Name, null, null);
+        }
+        else
+        {
+            appendInspectorEvent(
+                "AgentResolutionFailed",
+                BuildNoAgentReasonDetail(request.AgentName, request.Context, currentRoute),
+                null,
+                null);
+        }
+
+        if (request.Context is not null &&
+            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffFrom, out var handoffFrom) &&
+            !string.IsNullOrWhiteSpace(handoffFrom) &&
+            request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffTo, out var handoffTo) &&
+            !string.IsNullOrWhiteSpace(handoffTo))
+        {
+            var handoffAt = request.Context.TryGetValue(AgentRuntimeContextKeys.AgentHandoffAt, out var rawHandoffAt)
+                ? rawHandoffAt
+                : null;
+            var handoffDetail = string.IsNullOrWhiteSpace(handoffAt)
+                ? $"{handoffFrom} -> {handoffTo}"
+                : $"{handoffFrom} -> {handoffTo} @ {handoffAt}";
+            appendInspectorEvent("AgentHandoff", handoffDetail, null, null);
+        }
+
+        traceBuilder.RecordEntry(request, registration?.Name);
+
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunStarted,
+            AgentName = registration?.Name ?? "none"
+        });
+        await NotifyTurnStartedAsync(
+            sessionId,
+            runId,
+            registration?.Name ?? "none",
+            request.UserMessage,
+            CancellationToken.None);
+
+        return new TurnPreambleResult(registry, mountedComponents, currentRoute, registration);
+    }
+
+    private async Task<TurnSetupPhaseResult> HandleTurnSetupPhaseAsync(
+        AgentRegistration registration,
+        string sessionId,
+        string sharedStateRunId,
+        AgentTurnRequest request,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        string? currentRoute,
+        Action<string, string?> appendInspectorEvent,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
+        CancellationToken cancellationToken)
+    {
+        var conversationSessionId = ResolveConversationSessionId(sessionId, registration.Name, request);
+        var conversationHistory = await BuildConversationHistoryAsync(conversationSessionId, cancellationToken);
+        appendInspectorEvent("ConversationHydrated", $"Turns loaded: {conversationHistory.Count}");
+
+        var allowedPolicy = GetAllowedComponents(registration);
+        var allowedComponents = allowedPolicy.AllowedComponents;
+        allowedComponents = AugmentAllowedWithMounted(allowedComponents, mountedComponents);
+        appendInspectorEvent(
+            "CapabilitiesReady",
+            $"Allowed components: {allowedComponents.Count}, blocked-by-policy: {allowedPolicy.BlockedByAgentPolicy.Count}, blocked-by-tier: {allowedPolicy.BlockedByTier.Count}");
+
+        var sharedStateBase = new Dictionary<string, string>(
+            _sharedStateStore.GetSnapshot(registration.Name, sessionId).Values,
+            StringComparer.OrdinalIgnoreCase);
+        ApplyContextSharedStateSnapshot(sharedStateBase, request.Context);
+        ApplyContextSharedStateDelta(sharedStateBase, request.Context);
+        var latestSharedState = BuildSharedStateSnapshot(
+            sharedStateBase,
+            mountedComponents,
+            currentRoute);
+        appendInspectorEvent("StateSnapshot", SerializeInspectorPayload(latestSharedState));
+        _sharedStateStore.SaveSnapshot(registration.Name, sessionId, sharedStateRunId, latestSharedState);
+        await EmitSharedStateSnapshotAsync(registration.Name, latestSharedState, emitEvent);
+
+        var providerConfigured = _planner.IsProviderConfigured;
+        await TrackStartedAsync(registration.Name, request, providerConfigured);
+
+        return new TurnSetupPhaseResult(
+            conversationSessionId,
+            conversationHistory,
+            allowedPolicy,
+            allowedComponents,
+            latestSharedState,
+            providerConfigured);
+    }
+
+    private async Task<AgentTurnResponse> HandleNoAgentTurnAsync(
+        EarlyExitTurnContext context,
+        PromptTraceBuilder traceBuilder)
+    {
+        var response = await HandleNoAgentAsync(
+            traceBuilder,
+            context.Request.AgentName,
+            context.Request.Context,
+            context.CancellationToken);
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.Request.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            response.AgentName,
+            null,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            response,
+            executionResults: [],
+            succeeded: false,
+            errorMessage: response.ResponseText,
+            appendRunFinishedInspectorEvent: true);
+        return response;
     }
 
     private async Task<AgentTurnResponse> BuildProviderMissingResponseAsync(string agentName, PromptTraceBuilder traceBuilder, CancellationToken cancellationToken)
     {
-        const string message =
-            "**No AI provider configured.** " +
-            "Add one of the following to your `Program.cs`:\n\n" +
-            "```csharp\n" +
-            "// OpenAI\n" +
-            "options.UseOpenAI(apiKey: \"sk-...\", model: \"gpt-4o-mini\");\n\n" +
-            "// Azure OpenAI\n" +
-            "options.UseAzureOpenAI(endpoint: \"https://...\", deploymentName: \"...\");\n\n" +
-            "// Ollama (free, local)\n" +
-            "options.UseOllama(model: \"llama3.2\");\n" +
-            "```\n\n" +
-            "Set your API key via environment variable `OPENAI_API_KEY` or in `appsettings.json`.";
-
         if (traceBuilder.IsEnabled)
         {
-            traceBuilder.RecordFailure("No AI provider configured");
+            traceBuilder.RecordFailure(RuntimeEarlyExitResponses.NoProviderConfiguredTraceMessage);
             await StoreTraceAsync(traceBuilder, cancellationToken);
         }
 
-        return new AgentTurnResponse(agentName, message, [], []);
+        return RuntimeEarlyExitResponses.BuildProviderMissingResponse(agentName);
+    }
+
+    private async Task<AgentTurnResponse> HandlePolicyBlockedTurnAsync(
+        EarlyExitTurnContext context,
+        string agentName,
+        PromptTraceBuilder traceBuilder,
+        IReadOnlyList<string> blockedByAgentPolicy,
+        IReadOnlyList<string> blockedByTier,
+        bool providerConfigured,
+        Action<string, string?> appendInspectorEvent)
+    {
+        var policyBlockedMessage = BuildNoAllowedActionsResponseText(blockedByAgentPolicy, blockedByTier);
+        appendInspectorEvent("PolicyBlocked", policyBlockedMessage);
+
+        if (traceBuilder.IsEnabled)
+        {
+            traceBuilder.RecordFailure(policyBlockedMessage);
+            await StoreTraceAsync(traceBuilder, context.CancellationToken);
+        }
+
+        var response = new AgentTurnResponse(
+            AgentName: agentName,
+            ResponseText: policyBlockedMessage,
+            PlannedActions: [],
+            ExecutionResults: []);
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.Request.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            agentName,
+            null,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+        await TrackFinishedAsync(
+            agentName,
+            context.Request,
+            AgentBlazorRunOutcome.Failed,
+            plannedCount: 0,
+            executedCount: 0,
+            providerConfigured: providerConfigured);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            response,
+            executionResults: [],
+            succeeded: false,
+            errorMessage: response.ResponseText);
+        return response;
+    }
+
+    private async Task<AgentTurnResponse> HandleProviderMissingTurnAsync(
+        EarlyExitTurnContext context,
+        string agentName,
+        PromptTraceBuilder traceBuilder,
+        Action<string, string?> appendInspectorEvent)
+    {
+        var response = await BuildProviderMissingResponseAsync(agentName, traceBuilder, context.CancellationToken);
+        appendInspectorEvent("ProviderMissing", response.ResponseText);
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.Request.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            response.AgentName,
+            null,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+
+        await TrackFinishedAsync(
+            agentName,
+            context.Request,
+            AgentBlazorRunOutcome.ProviderMissing,
+            plannedCount: 0,
+            executedCount: 0,
+            providerConfigured: false);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            response,
+            executionResults: [],
+            succeeded: false,
+            errorMessage: response.ResponseText);
+        return response;
+    }
+
+    private async Task<PlanningPhaseResult> HandlePlanningPhaseAsync(
+        AgentTurnRequest request,
+        string sessionId,
+        string? registrationInstructions,
+        IReadOnlyList<AvailableComponent> allowedComponents,
+        IReadOnlyList<MountedComponentState> mountedComponents,
+        IReadOnlyList<ConversationTurn> conversationHistory,
+        IReadOnlyDictionary<string, string> latestSharedState,
+        string? currentRoute,
+        Action<string, string?, string?, string?> appendInspectorEvent,
+        CancellationToken cancellationToken)
+    {
+        var availableRoutes = _routeRegistry.GetAll()
+            .Select(static route => new AvailableRoute
+            {
+                Path = route.Path,
+                Description = route.Description,
+                Aliases = route.Aliases
+            })
+            .ToList();
+
+        var serviceTools = await GatherServiceToolsAsync(cancellationToken);
+        var planRequest = RuntimePlanExecution.BuildPlanRequest(
+            request,
+            sessionId,
+            allowedComponents,
+            mountedComponents,
+            conversationHistory,
+            latestSharedState,
+            availableRoutes,
+            registrationInstructions,
+            currentRoute,
+            serviceTools);
+
+        var plannerPlan = await _planner.PlanAsync(planRequest, cancellationToken);
+        var plan = ResolveComponentTypes(plannerPlan, mountedComponents, allowedComponents);
+        plan = EnforceGeneratedUiActionPolicies(plan, request.GeneratedUiAction, request.UserMessage);
+
+        appendInspectorEvent("PlanningFinished", $"Steps: {plan.Steps.Count}, Clarification: {plan.RequiresClarification}", null, null);
+        foreach (var step in plan.Steps)
+        {
+            appendInspectorEvent(
+                "PlannedAction",
+                SerializeInspectorPayload(step.Arguments),
+                step.ComponentId,
+                step.ActionId);
+        }
+
+        var planMessage = plan.Message;
+        if (plan.RequiresClarification &&
+            TryRecoverSingleFieldFormEditPlan(
+                request.UserMessage,
+                mountedComponents,
+                allowedComponents,
+                plan,
+                out var recoveredPlan))
+        {
+            plan = recoveredPlan;
+            planMessage = recoveredPlan.Message;
+
+            var recoveredStep = recoveredPlan.Steps[0];
+            appendInspectorEvent(
+                "ClarificationAutoRecovered",
+                $"Recovered as {recoveredStep.ComponentId}.{recoveredStep.ActionId}",
+                recoveredStep.ComponentId,
+                recoveredStep.ActionId);
+            appendInspectorEvent(
+                "PlannedAction",
+                SerializeInspectorPayload(recoveredStep.Arguments),
+                recoveredStep.ComponentId,
+                recoveredStep.ActionId);
+        }
+
+        return new PlanningPhaseResult(plan, plan, planMessage);
+    }
+
+    private async Task<TurnFlowResult> HandleTurnFlowAsync(TurnFlowContext flow)
+    {
+        _logger?.LogInformation("Planning: {Request}", flow.Request.UserMessage);
+        flow.Inspector.Append("PlanningStarted");
+
+        var planningPhase = await HandlePlanningPhaseAsync(
+            flow.Request,
+            flow.SessionId,
+            flow.Registration.Instructions,
+            flow.AllowedComponents,
+            flow.MountedComponents,
+            flow.ConversationHistory,
+            flow.LatestSharedState,
+            flow.CurrentRoute,
+            (kind, detail, componentId, actionId) => flow.Inspector.Append(kind, detail, componentId, actionId),
+            flow.CancellationToken);
+        var plan = planningPhase.Plan;
+        var inspectorPlan = planningPhase.InspectorPlan;
+        var planMessage = planningPhase.PlanMessage;
+
+        if (plan.RequiresClarification)
+        {
+            return new TurnFlowResult(
+                inspectorPlan,
+                await HandlePlannerClarificationRequiredAsync(new PlannerTerminalContext(
+                    flow.Registration.Name,
+                    flow.SessionId,
+                    flow.RunId,
+                    flow.ConversationSessionId,
+                    flow.Request.UserMessage,
+                    flow.InspectorRunId,
+                    flow.InspectorStartedAt,
+                    inspectorPlan,
+                    flow.InspectorEvents,
+                    (kind, detail) => flow.Inspector.Append(kind, detail),
+                    plan,
+                    planMessage,
+                    flow.EmitEvent,
+                    flow.CancellationToken)));
+        }
+
+        if (plan.IsEmpty)
+        {
+            return new TurnFlowResult(
+                inspectorPlan,
+                await HandleEmptyPlanAsync(new PlannerTerminalContext(
+                    flow.Registration.Name,
+                    flow.SessionId,
+                    flow.RunId,
+                    flow.ConversationSessionId,
+                    flow.Request.UserMessage,
+                    flow.InspectorRunId,
+                    flow.InspectorStartedAt,
+                    inspectorPlan,
+                    flow.InspectorEvents,
+                    (kind, detail) => flow.Inspector.Append(kind, detail),
+                    plan,
+                    planMessage,
+                    flow.EmitEvent,
+                    flow.CancellationToken)));
+        }
+
+        var preExecution = await HandlePreExecutionPhasesAsync(
+            new PreExecutionContext(
+                flow.Registration.Name,
+                flow.SessionId,
+                flow.RunId,
+                flow.ConversationSessionId,
+                flow.Request,
+                flow.InspectorRunId,
+                flow.InspectorStartedAt,
+                inspectorPlan,
+                flow.InspectorEvents,
+                flow.TraceBuilder,
+                flow.AllowedComponents,
+                flow.MountedComponents,
+                plan,
+                (kind, detail) => flow.Inspector.Append(kind, detail),
+                flow.EmitEvent,
+                flow.CancellationToken));
+        if (preExecution.TerminalResponse is not null)
+        {
+            return new TurnFlowResult(inspectorPlan, preExecution.TerminalResponse);
+        }
+
+        var plannedActions = preExecution.PlannedActions;
+
+        _logger?.LogInformation("Executing plan");
+        flow.Inspector.Append("ExecutionStarted");
+
+        var executionPhase = await HandleExecutionPhaseAsync(
+            flow.Registration.Name,
+            flow.SessionId,
+            flow.RunId,
+            flow.SharedStateRunId,
+            flow.Request.Context,
+            plan,
+            flow.LatestSharedState,
+            flow.Registry,
+            flow.CurrentRoute,
+            (kind, detail) => flow.Inspector.Append(kind, detail),
+            flow.EmitEvent,
+            flow.CancellationToken);
+        var executionResult = executionPhase.ExecutionResult;
+        var executionResults = executionPhase.ExecutionResults;
+        var toolResults = executionPhase.ToolResults;
+
+        var allToolsSucceeded = toolResults.All(r => r.Succeeded);
+        var overallSucceeded = executionResult.Succeeded && allToolsSucceeded;
+        var responseText = overallSucceeded
+            ? (planMessage ?? RuntimePlanResponses.BuildExecutionResponseText(executionResult))
+            : RuntimePlanResponses.BuildExecutionResponseText(executionResult);
+        flow.Stopwatch.Stop();
+        _logger?.LogInformation(
+            "Turn completed in {Duration}ms — {Success}/{Total} steps succeeded",
+            flow.Stopwatch.ElapsedMilliseconds,
+            executionResult.SuccessCount,
+            executionResult.StepResults.Count);
+
+        return new TurnFlowResult(
+            inspectorPlan,
+            await HandleExecutionCompletedAsync(
+                new ExecutionCompletionContext(
+                    flow.Registration.Name,
+                    flow.SessionId,
+                    flow.RunId,
+                    flow.ConversationSessionId,
+                    flow.Request,
+                    flow.InspectorRunId,
+                    flow.InspectorStartedAt,
+                    inspectorPlan,
+                    flow.InspectorEvents,
+                    (kind, detail) => flow.Inspector.Append(kind, detail),
+                    flow.TraceBuilder,
+                    flow.AllowedComponents.Count,
+                    plannedActions,
+                    plan,
+                    executionResult,
+                    executionResults,
+                    responseText,
+                    overallSucceeded,
+                    flow.ProviderConfigured,
+                    flow.EmitEvent,
+                    flow.CancellationToken)));
+    }
+
+    private async Task<PreExecutionPhaseResult> HandlePreExecutionPhasesAsync(PreExecutionContext context)
+    {
+        _logger?.LogInformation("Plan has {StepCount} steps", context.Plan.Steps.Count);
+
+        var plannedActions = CreatePlannedActions(context.Plan);
+        await EmitPlannedActionsAsync(plannedActions, context.EmitEvent);
+        await NotifyToolExecutionStartedAsync(
+            context.SessionId,
+            context.RunId,
+            context.AgentName,
+            plannedActions,
+            CancellationToken.None);
+
+        var runtimeContext = context.Request.Context is null
+            ? null
+            : new Dictionary<string, string>(context.Request.Context, StringComparer.OrdinalIgnoreCase);
+        var approvedActions = RuntimePlanApprovals.BuildApprovedActions(context.Plan, context.AllowedComponents, runtimeContext);
+        var pendingApprovals = RuntimePlanApprovals.BuildPendingApprovals(context.Plan, context.AllowedComponents, approvedActions);
+        if (pendingApprovals.Count > 0)
+        {
+            context.AppendInspectorEvent("ApprovalRequired", SerializeInspectorPayload(pendingApprovals));
+            return new PreExecutionPhaseResult(
+                plannedActions,
+                await HandleApprovalRequiredAsync(
+                    context.AgentName,
+                    context.SessionId,
+                    context.RunId,
+                    context.ConversationSessionId,
+                    context.Request.UserMessage,
+                    context.InspectorRunId,
+                    context.InspectorStartedAt,
+                    context.InspectorPlan,
+                    context.InspectorEvents,
+                    context.TraceBuilder,
+                    context.AllowedComponents.Count,
+                    plannedActions,
+                    pendingApprovals,
+                    context.Plan,
+                    context.EmitEvent,
+                    context.CancellationToken));
+        }
+
+        _logger?.LogInformation("Validating plan");
+        context.AppendInspectorEvent("ValidationStarted", null);
+
+        var validationContext = RuntimePlanApprovals.BuildValidationContext(
+            context.AllowedComponents,
+            context.MountedComponents,
+            approvedActions);
+        var validationResult = _validator.Validate(context.Plan, validationContext);
+        if (!validationResult.IsValid)
+        {
+            return new PreExecutionPhaseResult(
+                plannedActions,
+                await HandleValidationFailedAsync(
+                    context.AgentName,
+                    context.SessionId,
+                    context.RunId,
+                    context.ConversationSessionId,
+                    context.Request.UserMessage,
+                    context.InspectorRunId,
+                    context.InspectorStartedAt,
+                    context.InspectorPlan,
+                    context.InspectorEvents,
+                    context.AppendInspectorEvent,
+                    context.TraceBuilder,
+                    context.AllowedComponents.Count,
+                    plannedActions,
+                    validationResult,
+                    context.Plan,
+                    context.EmitEvent,
+                    context.CancellationToken));
+        }
+
+        context.AppendInspectorEvent("ValidationPassed", null);
+        return new PreExecutionPhaseResult(plannedActions, null);
+    }
+
+    private async Task<AgentTurnResponse> HandlePlannerClarificationRequiredAsync(PlannerTerminalContext context)
+    {
+        _logger?.LogInformation("Clarification needed: {Question}", context.Plan.ClarificationNeeded);
+        var clarificationText = context.Plan.ClarificationNeeded!;
+        context.AppendInspectorEvent("ClarificationRequired", clarificationText);
+
+        var clarificationResponse = RuntimeTurnResponses.Build(
+            context.AgentName,
+            clarificationText,
+            [],
+            [],
+            generatedUi: BuildPlanGeneratedUi(context.Plan),
+            clarificationQuestion: clarificationText);
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            context.AgentName,
+            context.InspectorPlan,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+        await EmitEventAsync(context.EmitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ClarificationRequired,
+            AgentName = context.AgentName,
+            ClarificationQuestion = clarificationText
+        });
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            clarificationResponse,
+            executionResults: [],
+            succeeded: false,
+            errorMessage: clarificationText,
+            textToEmit: context.PlanMessage ?? clarificationText);
+        return clarificationResponse;
+    }
+
+    private async Task<AgentTurnResponse> HandleEmptyPlanAsync(PlannerTerminalContext context)
+    {
+        _logger?.LogInformation("Plan is empty — no actions");
+        var emptyText = context.PlanMessage ?? "I understood your request but no actions are needed.";
+        context.AppendInspectorEvent("PlanEmpty", emptyText);
+
+        var emptyResponse = RuntimeTurnResponses.Build(
+            context.AgentName,
+            emptyText,
+            [],
+            [],
+            generatedUi: BuildPlanGeneratedUi(context.Plan));
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            context.AgentName,
+            context.InspectorPlan,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            emptyResponse,
+            executionResults: [],
+            succeeded: true,
+            errorMessage: null);
+        return emptyResponse;
+    }
+
+    private async Task<AgentTurnResponse> HandleApprovalRequiredAsync(
+        string agentName,
+        string sessionId,
+        string? runId,
+        string conversationSessionId,
+        string userMessage,
+        string inspectorRunId,
+        DateTimeOffset inspectorStartedAt,
+        ActionPlan? inspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> inspectorEvents,
+        PromptTraceBuilder traceBuilder,
+        int allowedComponentCount,
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        IReadOnlyList<PendingApproval> pendingApprovals,
+        ActionPlan plan,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
+        CancellationToken cancellationToken)
+    {
+        var blockedResults = pendingApprovals
+            .Select(static approval => new ComponentActionExecutionResult(
+                approval.ComponentId,
+                approval.ActionId,
+                Outcome: ActionOutcome.Blocked,
+                Message: $"Approval required for {approval.ComponentId}.{approval.ActionId}."))
+            .ToArray();
+        var approvalText = RuntimePlanApprovals.BuildApprovalRequiredResponseText(pendingApprovals);
+
+        if (traceBuilder.IsEnabled)
+        {
+            traceBuilder.RecordPlanning(plannedActions, allowedComponentCount)
+                .RecordExecution(blockedResults)
+                .RecordSuccess(approvalText);
+            await StoreTraceAsync(traceBuilder, cancellationToken);
+        }
+
+        var approvalResponse = RuntimeTurnResponses.Build(
+            agentName,
+            approvalText,
+            plannedActions,
+            blockedResults,
+            generatedUi: BuildPlanGeneratedUi(plan),
+            pendingApprovals: pendingApprovals,
+            requiresApproval: true);
+        var terminalTurn = new TerminalTurnContext(
+            sessionId,
+            runId,
+            conversationSessionId,
+            userMessage,
+            inspectorRunId,
+            inspectorStartedAt,
+            agentName,
+            inspectorPlan,
+            inspectorEvents,
+            emitEvent,
+            cancellationToken);
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ApprovalRequired,
+            AgentName = agentName,
+            PendingApprovals = pendingApprovals
+        });
+        await EmitExecutionResultsAsync(blockedResults, emitEvent);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            approvalResponse,
+            blockedResults,
+            succeeded: false,
+            errorMessage: approvalText);
+        return approvalResponse;
+    }
+
+    private async Task<AgentTurnResponse> HandleValidationFailedAsync(
+        string agentName,
+        string sessionId,
+        string? runId,
+        string conversationSessionId,
+        string userMessage,
+        string inspectorRunId,
+        DateTimeOffset inspectorStartedAt,
+        ActionPlan? inspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> inspectorEvents,
+        Action<string, string?> appendInspectorEvent,
+        PromptTraceBuilder traceBuilder,
+        int allowedComponentCount,
+        IReadOnlyList<PlannedComponentAction> plannedActions,
+        PlanValidationResult validationResult,
+        ActionPlan plan,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
+        CancellationToken cancellationToken)
+    {
+        var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
+        var validationFailures = RuntimePlanResponses.BuildValidationFailureResults(validationResult, effectiveTier);
+        var clarification = RuntimePlanResponses.BuildValidationClarificationText(validationResult, validationFailures);
+        appendInspectorEvent("ValidationFailed", SerializeInspectorPayload(validationFailures));
+
+        if (traceBuilder.IsEnabled)
+        {
+            traceBuilder.RecordPlanning(plannedActions, allowedComponentCount)
+                .RecordExecution(validationFailures)
+                .RecordSuccess(clarification);
+            await StoreTraceAsync(traceBuilder, cancellationToken);
+        }
+
+        var validationResponse = RuntimeTurnResponses.Build(
+            agentName,
+            clarification,
+            [],
+            validationFailures,
+            generatedUi: BuildPlanGeneratedUi(plan),
+            clarificationQuestion: clarification);
+        var terminalTurn = new TerminalTurnContext(
+            sessionId,
+            runId,
+            conversationSessionId,
+            userMessage,
+            inspectorRunId,
+            inspectorStartedAt,
+            agentName,
+            inspectorPlan,
+            inspectorEvents,
+            emitEvent,
+            cancellationToken);
+        await EmitExecutionResultsAsync(validationFailures, emitEvent);
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ClarificationRequired,
+            AgentName = agentName,
+            ClarificationQuestion = clarification
+        });
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            validationResponse,
+            validationFailures,
+            succeeded: false,
+            errorMessage: clarification);
+        return validationResponse;
+    }
+
+    private async Task<AgentTurnResponse> HandleExecutionCompletedAsync(ExecutionCompletionContext context)
+    {
+        if (context.TraceBuilder.IsEnabled)
+        {
+            context.TraceBuilder.RecordPlanning(context.PlannedActions, context.AllowedComponentCount)
+                .RecordExecution(context.ExecutionResults)
+                .RecordSuccess(context.ResponseText);
+            await StoreTraceAsync(context.TraceBuilder, context.CancellationToken);
+        }
+
+        await TrackFinishedAsync(
+            context.AgentName,
+            context.Request,
+            context.OverallSucceeded ? AgentBlazorRunOutcome.Succeeded : AgentBlazorRunOutcome.Failed,
+            context.PlannedActions.Count,
+            context.ExecutionResults.Count,
+            context.ProviderConfigured);
+
+        var turnResponse = RuntimeTurnResponses.Build(
+            context.AgentName,
+            context.ResponseText,
+            context.PlannedActions,
+            context.ExecutionResults,
+            generatedUi: BuildPlanGeneratedUi(context.Plan));
+        var terminalTurn = new TerminalTurnContext(
+            context.SessionId,
+            context.RunId,
+            context.ConversationSessionId,
+            context.Request.UserMessage,
+            context.InspectorRunId,
+            context.InspectorStartedAt,
+            context.AgentName,
+            context.InspectorPlan,
+            context.InspectorEvents,
+            context.EmitEvent,
+            context.CancellationToken);
+        context.AppendInspectorEvent("ExecutionFinished", $"Succeeded: {context.OverallSucceeded}");
+        context.AppendInspectorEvent("RunFinished", context.ResponseText);
+        await RecordActionHistoryAsync(
+            context.SessionId,
+            context.Request.GetEffectiveUserId(),
+            context.Request.UserMessage,
+            [.. context.ExecutionResults],
+            context.Plan,
+            context.CancellationToken);
+        await EmitReasoningEventsAsync(context.AgentName, context.Plan.ReasoningContent, context.EmitEvent);
+        await FinalizeTurnResponseAsync(
+            terminalTurn,
+            turnResponse,
+            context.ExecutionResults,
+            succeeded: context.OverallSucceeded,
+            errorMessage: context.OverallSucceeded ? null : context.ResponseText);
+        return turnResponse;
+    }
+
+    private async Task HandleTurnCanceledAsync(
+        string sessionId,
+        string inspectorRunId,
+        DateTimeOffset inspectorStartedAt,
+        ActionPlan? inspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> inspectorEvents,
+        string agentName,
+        PromptTraceBuilder traceBuilder,
+        Action<string, string?> appendInspectorEvent)
+    {
+        traceBuilder.RecordCanceled();
+        await StoreTraceAsync(traceBuilder, CancellationToken.None);
+        appendInspectorEvent("RunCanceled", "Turn canceled.");
+        RecordInspectorRun(
+            inspectorRunId,
+            sessionId,
+            agentName,
+            inspectorStartedAt,
+            inspectorPlan,
+            executionResults: [],
+            events: inspectorEvents,
+            succeeded: false,
+            errorMessage: "Run canceled.");
+    }
+
+    private async Task HandleTurnFailedAsync(
+        string sessionId,
+        string? runId,
+        string userMessage,
+        string inspectorRunId,
+        DateTimeOffset inspectorStartedAt,
+        ActionPlan? inspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> inspectorEvents,
+        string? agentName,
+        Exception exception,
+        PromptTraceBuilder traceBuilder,
+        Action<string, string?> appendInspectorEvent,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent)
+    {
+        _logger?.LogError(exception, "Turn failed");
+        traceBuilder.RecordFailure(exception.Message);
+        await StoreTraceAsync(traceBuilder, CancellationToken.None);
+        appendInspectorEvent("RunError", exception.Message);
+        RecordInspectorRun(
+            inspectorRunId,
+            sessionId,
+            agentName ?? "none",
+            inspectorStartedAt,
+            inspectorPlan,
+            executionResults: [],
+            events: inspectorEvents,
+            succeeded: false,
+            errorMessage: exception.Message);
+        await EmitEventAsync(emitEvent, new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunError,
+            AgentName = agentName,
+            ErrorMessage = exception.Message
+        });
+        await NotifyErrorAsync(
+            sessionId,
+            runId,
+            agentName ?? "none",
+            userMessage,
+            exception.Message,
+            CancellationToken.None);
+    }
+
+    private async Task<ExecutionPhaseResult> HandleExecutionPhaseAsync(
+        string agentName,
+        string sessionId,
+        string? runId,
+        string sharedStateRunId,
+        IDictionary<string, string>? requestContext,
+        ActionPlan plan,
+        IReadOnlyDictionary<string, string> latestSharedState,
+        IAgentComponentRegistry? registry,
+        string? currentRoute,
+        Action<string, string?> appendInspectorEvent,
+        Func<AgentTurnStreamEvent, ValueTask>? emitEvent,
+        CancellationToken cancellationToken)
+    {
+        var executionOptions = RuntimePlanExecution.BuildExecutionOptions(
+            sessionId,
+            requestContext,
+            RunIdContextKey);
+        var partition = RuntimePlanExecution.Partition(plan);
+        var executionResult = await _executor.ExecuteAsync(partition.ComponentPlan, executionOptions, cancellationToken);
+
+        var toolResults = new List<ComponentActionExecutionResult>();
+        foreach (var toolStep in partition.ToolSteps)
+        {
+            var toolResult = await ExecuteServiceToolAsync(toolStep, cancellationToken);
+            toolResults.Add(toolResult);
+        }
+
+        var executionResults = RuntimePlanExecution.CombineExecutionResults(executionResult, toolResults);
+        await EmitExecutionResultsAsync(executionResults, emitEvent);
+        await NotifyToolExecutionFinishedAsync(
+            sessionId,
+            runId,
+            agentName,
+            executionResults,
+            CancellationToken.None);
+
+        var nextSharedState = latestSharedState;
+        var mountedComponentsAfterExecution = GetMountedComponents(registry);
+        var currentRouteAfterExecution = NormalizeRoutePath(ExtractCurrentRoute(mountedComponentsAfterExecution)) ?? currentRoute;
+        var sharedStateAfterExecution = BuildSharedStateSnapshot(
+            latestSharedState,
+            mountedComponentsAfterExecution,
+            currentRouteAfterExecution);
+        var sharedStateDelta = BuildSharedStateDelta(latestSharedState, sharedStateAfterExecution);
+        if (sharedStateDelta.Count > 0)
+        {
+            _sharedStateStore.ApplyDelta(agentName, sessionId, sharedStateRunId, sharedStateDelta);
+            await EmitSharedStateDeltaAsync(agentName, sharedStateDelta, emitEvent);
+            nextSharedState = sharedStateAfterExecution;
+            await EmitSharedStateSnapshotAsync(agentName, nextSharedState, emitEvent);
+            appendInspectorEvent("StateDelta", SerializeInspectorPayload(sharedStateDelta));
+            appendInspectorEvent("StateSnapshot", SerializeInspectorPayload(nextSharedState));
+        }
+
+        return new ExecutionPhaseResult(
+            executionResult,
+            executionResults,
+            toolResults,
+            nextSharedState);
+    }
+
+    private async Task FinalizeTurnResponseAsync(
+        TerminalTurnContext terminalTurn,
+        AgentTurnResponse response,
+        IReadOnlyList<ComponentActionExecutionResult> executionResults,
+        bool succeeded,
+        string? errorMessage,
+        bool appendRunFinishedInspectorEvent = false,
+        string? textToEmit = null)
+    {
+        await StoreConversationTurnAsync(
+            terminalTurn.ConversationSessionId,
+            terminalTurn.UserMessage,
+            response,
+            terminalTurn.CancellationToken);
+        await EmitTextDeltasAsync(terminalTurn.AgentName, textToEmit ?? response.ResponseText, terminalTurn.EmitEvent);
+        await EmitRunFinishedAsync(response, terminalTurn.EmitEvent);
+
+        var recordedEvents = appendRunFinishedInspectorEvent
+            ? [
+                .. terminalTurn.InspectorEvents,
+                new AgentBlazor.Core.Paid.InspectorEvent(
+                    Timestamp: DateTimeOffset.UtcNow,
+                    Kind: "RunFinished",
+                    ComponentId: null,
+                    ActionId: null,
+                    Detail: response.ResponseText)
+            ]
+            : terminalTurn.InspectorEvents;
+
+        RecordInspectorRun(
+            terminalTurn.InspectorRunId,
+            terminalTurn.SessionId,
+            terminalTurn.AgentName,
+            terminalTurn.InspectorStartedAt,
+            terminalTurn.InspectorPlan,
+            executionResults,
+            recordedEvents,
+            succeeded,
+            errorMessage);
+        await NotifyTurnFinishedAsync(
+            terminalTurn.SessionId,
+            terminalTurn.RunId,
+            terminalTurn.AgentName,
+            terminalTurn.UserMessage,
+            response,
+            CancellationToken.None);
     }
 
     private string BuildNoAllowedActionsResponseText(
@@ -2965,69 +3240,22 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         IReadOnlyList<string> blockedByTier)
     {
         var effectiveTier = _entitlementService?.CurrentTier ?? _options.Value.LicensedTier;
-        var allBlocked = blockedByAgentPolicy
-            .Concat(blockedByTier)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var summary = ComponentActionPolicy.SummarizeBlockedActions(allBlocked);
-
-        if (allBlocked.Length == 0)
-        {
-            return $"No allowed component actions are available for this agent policy.\n\nCurrent tier: {effectiveTier}";
-        }
-
-        return
-            "No allowed component actions are available for this agent policy.\n\n" +
-            $"Current tier: {effectiveTier}\n" +
-            $"Filtered actions: {summary}";
+        return RuntimeEarlyExitResponses.BuildNoAllowedActionsResponseText(
+            blockedByAgentPolicy,
+            blockedByTier,
+            effectiveTier,
+            "component actions");
     }
 
     // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
 
-    private static bool IsGeneratedUiRequested(IDictionary<string, string>? context)
-        => context is not null &&
-           context.TryGetValue(AgentGenerativeUiSpec.GenerateUiContextKey, out var raw) &&
-           bool.TryParse(raw, out var val) && val;
-
     private static string BuildNoAgentResponseText(
         int registeredCount,
         string? requestedAgentName,
         IDictionary<string, string>? context)
-    {
-        if (registeredCount == 0)
-        {
-            return "No agents are registered.";
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestedAgentName))
-        {
-            return $"Requested agent '{requestedAgentName}' is not registered.";
-        }
-
-        if (context is not null &&
-            context.TryGetValue(AgentRuntimeContextKeys.AgentName, out var contextAgentName) &&
-            !string.IsNullOrWhiteSpace(contextAgentName))
-        {
-            return $"Requested agent '{contextAgentName}' is not registered.";
-        }
-
-        if (IsAgentLockRequested(context))
-        {
-            if (context is not null &&
-                context.TryGetValue(AgentRuntimeContextKeys.CurrentRoute, out var currentRoute) &&
-                !string.IsNullOrWhiteSpace(currentRoute))
-            {
-                return $"No route-locked agent is configured for '{currentRoute}'.";
-            }
-
-            return "Agent lock is enabled, but no matching registered agent could be resolved.";
-        }
-
-        return "No matching agent could be resolved for this request.";
-    }
+        => RuntimeTurnPreflight.BuildNoAgentResponseText(registeredCount, requestedAgentName, context);
 
     private static string BuildNoAgentReasonDetail(
         string? requestedAgentName,
@@ -3057,5 +3285,163 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         }
 
         return "Agent could not be resolved from request context.";
+    }
+
+    private sealed record PlanningPhaseResult(
+        ActionPlan Plan,
+        ActionPlan InspectorPlan,
+        string? PlanMessage);
+
+    private sealed record TurnPreambleResult(
+        IAgentComponentRegistry? Registry,
+        IReadOnlyList<MountedComponentState> MountedComponents,
+        string? CurrentRoute,
+        AgentRegistration? Registration);
+
+    private sealed record TurnSetupPhaseResult(
+        string ConversationSessionId,
+        IReadOnlyList<ConversationTurn> ConversationHistory,
+        AllowedComponentPolicyResult AllowedPolicy,
+        IReadOnlyList<AvailableComponent> AllowedComponents,
+        IReadOnlyDictionary<string, string> LatestSharedState,
+        bool ProviderConfigured);
+
+    private sealed record ExecutionPhaseResult(
+        PlanExecutionResult ExecutionResult,
+        ComponentActionExecutionResult[] ExecutionResults,
+        IReadOnlyList<ComponentActionExecutionResult> ToolResults,
+        IReadOnlyDictionary<string, string> LatestSharedState);
+
+    private sealed record PreExecutionPhaseResult(
+        IReadOnlyList<PlannedComponentAction> PlannedActions,
+        AgentTurnResponse? TerminalResponse);
+
+    private sealed record PreExecutionContext(
+        string AgentName,
+        string SessionId,
+        string? RunId,
+        string ConversationSessionId,
+        AgentTurnRequest Request,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        ActionPlan? InspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        PromptTraceBuilder TraceBuilder,
+        IReadOnlyList<AvailableComponent> AllowedComponents,
+        IReadOnlyList<MountedComponentState> MountedComponents,
+        ActionPlan Plan,
+        Action<string, string?> AppendInspectorEvent,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed record ExecutionCompletionContext(
+        string AgentName,
+        string SessionId,
+        string? RunId,
+        string ConversationSessionId,
+        AgentTurnRequest Request,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        ActionPlan? InspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        Action<string, string?> AppendInspectorEvent,
+        PromptTraceBuilder TraceBuilder,
+        int AllowedComponentCount,
+        IReadOnlyList<PlannedComponentAction> PlannedActions,
+        ActionPlan Plan,
+        PlanExecutionResult ExecutionResult,
+        IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
+        string ResponseText,
+        bool OverallSucceeded,
+        bool ProviderConfigured,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed record PlannerTerminalContext(
+        string AgentName,
+        string SessionId,
+        string? RunId,
+        string ConversationSessionId,
+        string UserMessage,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        ActionPlan? InspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        Action<string, string?> AppendInspectorEvent,
+        ActionPlan Plan,
+        string? PlanMessage,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed record EarlyExitTurnContext(
+        string SessionId,
+        string? RunId,
+        string ConversationSessionId,
+        AgentTurnRequest Request,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed record TurnFlowResult(
+        ActionPlan? InspectorPlan,
+        AgentTurnResponse Response);
+
+    private sealed record TurnFlowContext(
+        AgentRegistration Registration,
+        string SessionId,
+        string? RunId,
+        string SharedStateRunId,
+        string ConversationSessionId,
+        AgentTurnRequest Request,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        PromptTraceBuilder TraceBuilder,
+        IReadOnlyList<AvailableComponent> AllowedComponents,
+        IReadOnlyList<MountedComponentState> MountedComponents,
+        IReadOnlyList<ConversationTurn> ConversationHistory,
+        IReadOnlyDictionary<string, string> LatestSharedState,
+        string? CurrentRoute,
+        bool ProviderConfigured,
+        IAgentComponentRegistry? Registry,
+        Stopwatch Stopwatch,
+        TurnInspectorCollector Inspector,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed record TerminalTurnContext(
+        string SessionId,
+        string? RunId,
+        string ConversationSessionId,
+        string UserMessage,
+        string InspectorRunId,
+        DateTimeOffset InspectorStartedAt,
+        string AgentName,
+        ActionPlan? InspectorPlan,
+        IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> InspectorEvents,
+        Func<AgentTurnStreamEvent, ValueTask>? EmitEvent,
+        CancellationToken CancellationToken);
+
+    private sealed class TurnInspectorCollector
+    {
+        private readonly List<AgentBlazor.Core.Paid.InspectorEvent> _events = [];
+
+        public IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> Events => _events;
+
+        public void Append(
+            string kind,
+            string? detail = null,
+            string? componentId = null,
+            string? actionId = null)
+        {
+            _events.Add(new AgentBlazor.Core.Paid.InspectorEvent(
+                Timestamp: DateTimeOffset.UtcNow,
+                Kind: kind,
+                ComponentId: componentId,
+                ActionId: actionId,
+                Detail: detail));
+        }
     }
 }

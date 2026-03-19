@@ -1,5 +1,6 @@
 using AgentBlazor.Components.Render;
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Options;
 using Microsoft.AspNetCore.Builder;
@@ -31,6 +32,21 @@ public static class AgentBlazorServiceExtensions
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton<AgentBlazor.Telemetry.IAgentBlazorTelemetrySink>(
             static sp => sp.GetRequiredService<TSink>());
+        return services;
+    }
+
+    public static IServiceCollection AddAgentBlazorRuntimeAdapter<TAdapter>(this IServiceCollection services)
+        where TAdapter : class, IAgentRuntimeAdapter
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IAgentRuntimeAdapter, TAdapter>();
+        return services;
+    }
+
+    public static IServiceCollection AddAgentBlazorChatClientRuntimeAdapter(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.Replace(ServiceDescriptor.Singleton<IAgentRuntimeAdapter, ChatClientRuntimeAdapter>());
         return services;
     }
 

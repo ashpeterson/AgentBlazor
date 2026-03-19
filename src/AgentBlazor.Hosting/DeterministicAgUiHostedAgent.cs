@@ -15,7 +15,9 @@ using Microsoft.Extensions.Options;
 namespace AgentBlazor.Hosting;
 
 internal sealed class DeterministicAgUiHostedAgent(
-    IAgentRuntime runtime,
+    IAgentRuntimeAdapter runtimeAdapter,
+    IAgentExecutionScopeAccessor executionScopeAccessor,
+    IServiceProvider serviceProvider,
     IAgentRegistry agentRegistry,
     IOptions<AgentBlazorOptions> options,
     IAgentBlazorTelemetrySink telemetrySink,
@@ -28,15 +30,15 @@ internal sealed class DeterministicAgUiHostedAgent(
     private const string UserIdContextKey = AgentRuntimeContextKeys.UserId;
     private const string AgentNameContextKey = AgentRuntimeContextKeys.AgentName;
 
-    private readonly IAgentRuntime _runtime = runtime;
+    private readonly IAgentRuntimeAdapter _runtimeAdapter = runtimeAdapter;
+    private readonly IAgentExecutionScopeAccessor _executionScopeAccessor = executionScopeAccessor;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly IAgentRegistry _agentRegistry = agentRegistry;
     private readonly IOptions<AgentBlazorOptions> _options = options;
     private readonly IAgentBlazorTelemetrySink _telemetrySink = telemetrySink;
     private readonly IAgentSharedStateStore _sharedStateStore = sharedStateStore;
     private readonly AgentComponentRegistryHub? _registryHub = registryHub;
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
-    private readonly IAgentRuntimeStreaming? _streamingRuntime = runtime as IAgentRuntimeStreaming;
-
     public override string? Name => ResolveAgentRegistration(null).Name;
 
     public override string? Description => ResolveAgentRegistration(null).Description;
@@ -80,9 +82,25 @@ internal sealed class DeterministicAgUiHostedAgent(
             invocation.HasContext,
             AgentBlazorRunEventKind.Started));
 
-        if (invocation.Operation is HostedRunOperation.Stop && _streamingRuntime is not null)
+        if (invocation.Operation is HostedRunOperation.Stop)
         {
-            var stopped = await _streamingRuntime.StopRunAsync(invocation.RunId, cancellationToken);
+            if (!_runtimeAdapter.SupportsCancellation)
+            {
+                var unsupportedStopResponse = new AgentTurnResponse(
+                    invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
+                    "Active run cancellation is not supported by the configured runtime adapter.",
+                    PlannedActions: [],
+                    ExecutionResults: []);
+
+                await TrackRunEventAsync(CreateRunEvent(
+                    unsupportedStopResponse.AgentName,
+                    invocation.HasContext,
+                    AgentBlazorRunEventKind.Finished,
+                    AgentBlazorRunOutcome.Succeeded));
+                return ToAgentResponse(unsupportedStopResponse, invocation);
+            }
+
+            var stopped = await _runtimeAdapter.StopRunAsync(invocation.RunId, cancellationToken);
             var stopResponse = new AgentTurnResponse(
                 invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
                 stopped
@@ -102,7 +120,8 @@ internal sealed class DeterministicAgUiHostedAgent(
         AgentTurnResponse response;
         try
         {
-            response = await _runtime.RunTurnAsync(invocation.Request, cancellationToken);
+            using var runtimeExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
+            response = await _runtimeAdapter.RunTurnAsync(invocation.Request, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -149,9 +168,27 @@ internal sealed class DeterministicAgUiHostedAgent(
             invocation.HasContext,
             AgentBlazorRunEventKind.Started));
 
-        if (invocation.Operation is HostedRunOperation.Stop && _streamingRuntime is not null)
+        if (invocation.Operation is HostedRunOperation.Stop)
         {
-            var stopped = await _streamingRuntime.StopRunAsync(invocation.RunId, cancellationToken);
+            if (!_runtimeAdapter.SupportsCancellation)
+            {
+                var unsupportedTimestamp = DateTimeOffset.UtcNow;
+                yield return CreateTextUpdate(
+                    invocation.RunId,
+                    $"{invocation.RunId}:assistant:stop:unsupported",
+                    "Active run cancellation is not supported by the configured runtime adapter.",
+                    unsupportedTimestamp,
+                    invocation.Request.AgentName);
+
+                await TrackRunEventAsync(CreateRunEvent(
+                    invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
+                    invocation.HasContext,
+                    AgentBlazorRunEventKind.Finished,
+                    AgentBlazorRunOutcome.Succeeded));
+                yield break;
+            }
+
+            var stopped = await _runtimeAdapter.StopRunAsync(invocation.RunId, cancellationToken);
             var timestamp = DateTimeOffset.UtcNow;
             var stopPayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
@@ -181,12 +218,30 @@ internal sealed class DeterministicAgUiHostedAgent(
             yield break;
         }
 
-        if (_streamingRuntime is null)
+        if (invocation.Operation is HostedRunOperation.Connect && !_runtimeAdapter.SupportsReconnect)
+        {
+            yield return CreateTextUpdate(
+                invocation.RunId,
+                $"{invocation.RunId}:assistant:connect:unsupported",
+                "Run reconnection is not supported by the configured runtime adapter.",
+                DateTimeOffset.UtcNow,
+                invocation.Request.AgentName);
+
+            await TrackRunEventAsync(CreateRunEvent(
+                invocation.Request.AgentName ?? ResolveAgentRegistration(null).Name,
+                invocation.HasContext,
+                AgentBlazorRunEventKind.Finished,
+                AgentBlazorRunOutcome.Succeeded));
+            yield break;
+        }
+
+        if (!_runtimeAdapter.SupportsStreaming)
         {
             AgentTurnResponse nonStreamingResponse;
             try
             {
-                nonStreamingResponse = await _runtime.RunTurnAsync(invocation.Request, cancellationToken);
+                using var runtimeExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
+                nonStreamingResponse = await _runtimeAdapter.RunTurnAsync(invocation.Request, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -225,9 +280,10 @@ internal sealed class DeterministicAgUiHostedAgent(
         }
 
         var mappingState = new MappingState(invocation.RunId);
+        using var streamExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
         var stream = (invocation.Operation is HostedRunOperation.Connect
-                ? _streamingRuntime.ConnectRunStreamAsync(invocation.RunId, cancellationToken)
-                : _streamingRuntime.RunTurnStreamingAsync(invocation.Request, cancellationToken))
+                ? _runtimeAdapter.ConnectRunStreamAsync(invocation.RunId, cancellationToken)
+                : _runtimeAdapter.RunTurnStreamingAsync(invocation.Request, cancellationToken))
             .GetAsyncEnumerator(cancellationToken);
         var switchedToReconnectStream = invocation.Operation is HostedRunOperation.Connect;
         try
@@ -257,11 +313,12 @@ internal sealed class DeterministicAgUiHostedAgent(
                 catch (Exception ex)
                 {
                     if (!switchedToReconnectStream &&
+                        _runtimeAdapter.SupportsReconnect &&
                         invocation.Operation is HostedRunOperation.Run &&
                         IsRunAlreadyActiveException(ex))
                     {
                         await stream.DisposeAsync();
-                        stream = _streamingRuntime
+                        stream = _runtimeAdapter
                             .ConnectRunStreamAsync(invocation.RunId, cancellationToken)
                             .GetAsyncEnumerator(cancellationToken);
                         switchedToReconnectStream = true;
@@ -907,7 +964,16 @@ internal sealed class DeterministicAgUiHostedAgent(
                     {
                         ["componentId"] = pending.ComponentId,
                         ["actionId"] = pending.ActionId,
-                        ["description"] = pending.Description
+                        ["description"] = pending.Description,
+                        ["policyDecision"] = pending.PolicyDecision is null
+                            ? null
+                            : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["allowed"] = pending.PolicyDecision.Allowed,
+                                ["riskClass"] = pending.PolicyDecision.RiskClass.ToString(),
+                                ["approvalMode"] = pending.PolicyDecision.ApprovalMode.ToString(),
+                                ["reason"] = pending.PolicyDecision.Reason
+                            }
                     })
                     .ToArray() ?? [];
                 var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -993,7 +1059,9 @@ internal sealed class DeterministicAgUiHostedAgent(
             AdditionalProperties = new AdditionalPropertiesDictionary
             {
                 ["agentblazor_requires_clarification"] = response.RequiresClarification,
-                ["agentblazor_requires_approval"] = response.RequiresApproval
+                ["agentblazor_requires_approval"] = response.RequiresApproval,
+                ["agentblazor_execution_step_count"] = response.ExecutionPlan?.Steps.Count ?? response.PlannedActions.Count,
+                ["agentblazor_context_freshness"] = response.ExecutionPlan?.Context.Freshness.ToString()
             }
         };
     }

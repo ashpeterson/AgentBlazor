@@ -255,17 +255,17 @@
         };
     }
 
-    private static List<ChartSeries> BuildSeries(IReadOnlyList<AgentUiChartSeries> series)
+    private static List<ChartSeries<double>> BuildSeries(IReadOnlyList<AgentUiChartSeries> series)
     {
         if (series.Count == 0)
         {
             return [];
         }
 
-        var chartSeries = new List<ChartSeries>(series.Count);
+        var chartSeries = new List<ChartSeries<double>>(series.Count);
         foreach (var entry in series)
         {
-            chartSeries.Add(new ChartSeries
+            chartSeries.Add(new ChartSeries<double>
             {
                 Name = entry.Name,
                 Data = entry.Data.ToArray()

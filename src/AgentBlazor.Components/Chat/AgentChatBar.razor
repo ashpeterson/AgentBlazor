@@ -5,12 +5,14 @@
 @using AgentBlazor.Core.Models
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
+@using AgentBlazor.Core.Runtime.Conversation
 @using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Execution
 @using AgentBlazor.Options
 @using Microsoft.Extensions.Options
 @implements IDisposable
 @using MudBlazor
-@inject IAgentRuntime AgentRuntime
+@inject IAgentRuntimeAdapter RuntimeAdapter
 @inject IAgentDeferredActionEvents DeferredActionEvents
 @inject IConversationStore ConversationStore
 @inject IAgentChatSessionState ChatSessionState
@@ -18,6 +20,8 @@
 @inject IAgentActionRenderRegistry ActionRenderRegistry
 @inject NavigationManager NavigationManager
 @inject IOptions<AgentBlazorOptions> AgentBlazorOptionsAccessor
+@inject IServiceProvider ServiceProvider
+@inject IAgentExecutionScopeAccessor ExecutionScopeAccessor
 
 <div class="ab-chat-bar @(HasConversation ? "ab-chat-bar--has-conversation" : "ab-chat-bar--idle") @(Theme?.CssClass) @(Theme?.GetFeatureClasses()) @CssClass"
      data-theme="@(Theme?.DataTheme)"
@@ -73,13 +77,17 @@
                 <article class="ab-chat-bar__message ab-chat-bar__message--@item.Role">
                     <div class="ab-chat-bar__message-role">@GetRoleLabel(item.Role)</div>
                     <div class="ab-chat-bar__message-text">@item.Text</div>
-                    @if (item.PlannedActions.Count > 0)
+                    @if (TryGetPlanSummary(item, out var planSummary))
+                    {
+                        <div class="ab-chat-bar__message-text">@planSummary</div>
+                    }
+                    @if (GetDisplayStepChips(item).Count > 0)
                     {
                         <div class="ab-chat-bar__message-actions">
-                            @foreach (var action in item.PlannedActions)
+                            @foreach (var action in GetDisplayStepChips(item))
                             {
                                 <span class="ab-chat-bar__action-chip">
-                                    @action.ComponentId.@action.ActionId
+                                    @action
                                 </span>
                             }
                         </div>
@@ -318,7 +326,7 @@
         await NotifyConversationStateChangedIfNeededAsync();
 
         // Add user message to timeline
-        _timeline.Add(new ChatBarTimelineItem("user", message, [], [], null));
+        _timeline.Add(new ChatBarTimelineItem("user", message, [], null, [], null));
 
         await OnMessageSent.InvokeAsync(message);
 
@@ -332,7 +340,7 @@
 
             var activityMessages = _streamingActivityMessages.Count > 0
                 ? _streamingActivityMessages.ToArray()
-                : BuildActivityMessages(response.ExecutionResults, response.PlannedActions);
+                : BuildActivityMessages(response);
 
             // Add agent response to timeline
             var runId = string.IsNullOrWhiteSpace(_activeRunId) ? null : _activeRunId;
@@ -340,6 +348,7 @@
                 "assistant",
                 response.ResponseText,
                 response.PlannedActions,
+                response.ExecutionPlan,
                 activityMessages,
                 runId));
             if (!string.IsNullOrWhiteSpace(runId))
@@ -356,7 +365,7 @@
             _streamingResponseText = string.Empty;
             _streamingAgentName = null;
             _streamingActivityMessages.Clear();
-            _timeline.Add(new ChatBarTimelineItem("assistant", $"Error: {ex.Message}", [], [], null));
+            _timeline.Add(new ChatBarTimelineItem("assistant", $"Error: {ex.Message}", [], null, [], null));
             await OnError.InvokeAsync(ex);
         }
         finally
@@ -411,9 +420,11 @@
 
     private async Task<AgentTurnResponse> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
     {
-        if (AgentRuntime is not IAgentRuntimeStreaming streamingRuntime)
+        using var executionScope = ExecutionScopeAccessor.Push(ServiceProvider);
+
+        if (!RuntimeAdapter.SupportsStreaming)
         {
-            return await AgentRuntime.RunTurnAsync(request);
+            return await RuntimeAdapter.RunTurnAsync(request);
         }
 
         _streamingResponseText = string.Empty;
@@ -422,7 +433,7 @@
         _streamingActivityMessages.Clear();
 
         AgentTurnResponse? finalResponse = null;
-        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(request))
+        await foreach (var streamEvent in RuntimeAdapter.RunTurnStreamingAsync(request))
         {
             if (string.IsNullOrWhiteSpace(_activeRunId) &&
                 !string.IsNullOrWhiteSpace(streamEvent.RunId))
@@ -559,7 +570,7 @@
                 Result: actionEvent.Message);
             if (!TryAttachActivityToAssociatedTurn(activity, actionEvent.RunId))
             {
-                _timeline.Add(new ChatBarTimelineItem("activity", message, [], [], actionEvent.RunId));
+                _timeline.Add(new ChatBarTimelineItem("activity", message, [], null, [], actionEvent.RunId));
             }
 
             StateHasChanged();
@@ -840,7 +851,7 @@
         {
             if (!string.IsNullOrWhiteSpace(turn.UserMessage))
             {
-                _timeline.Add(new ChatBarTimelineItem("user", turn.UserMessage, [], [], null));
+                _timeline.Add(new ChatBarTimelineItem("user", turn.UserMessage, [], null, [], null));
             }
 
             if (!string.IsNullOrWhiteSpace(turn.AgentResponse))
@@ -849,7 +860,8 @@
                     "assistant",
                     turn.AgentResponse,
                     turn.PlannedActions,
-                    BuildActivityMessages(turn.ExecutionResults, turn.PlannedActions),
+                    turn.ExecutionPlan,
+                    BuildActivityMessages(turn),
                     null));
             }
         }
@@ -870,6 +882,67 @@
         {
             await OnConversationStateChanged.InvokeAsync(hasConversation);
         }
+    }
+
+    private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
+        ConversationTurn turn)
+    {
+        if (turn.ExecutionPlan?.Steps.Count > 0)
+        {
+            return turn.ExecutionPlan.Steps
+                .Select(step => new ActivityMessage(
+                    BuildActivityKey(step.TargetId, step.ActionId),
+                    string.IsNullOrWhiteSpace(step.Message)
+                        ? FormatExecutionStepActivity(step)
+                        : $"{FormatExecutionStepActivity(step)}: {step.Message}",
+                    step.Status is not AgentExecutionStepStatus.Failed and not AgentExecutionStepStatus.Blocked,
+                    step.TargetId,
+                    step.ActionId,
+                    MapStepStatus(step.Status),
+                    step.Arguments,
+                    step.PolicyDecision))
+                .ToArray();
+        }
+
+        return BuildActivityMessages(turn.ExecutionResults, turn.PlannedActions);
+    }
+
+    private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
+        AgentTurnResponse response)
+    {
+        if (response.ExecutionPlan?.Steps.Count > 0)
+        {
+            return response.ExecutionPlan.Steps
+                .Select(step => new ActivityMessage(
+                    BuildActivityKey(step.TargetId, step.ActionId),
+                    string.IsNullOrWhiteSpace(step.Message)
+                        ? FormatExecutionStepActivity(step)
+                        : $"{FormatExecutionStepActivity(step)}: {step.Message}",
+                    step.Status is not AgentExecutionStepStatus.Failed and not AgentExecutionStepStatus.Blocked,
+                    step.TargetId,
+                    step.ActionId,
+                    MapStepStatus(step.Status),
+                    step.Arguments,
+                    step.PolicyDecision))
+                .ToArray();
+        }
+
+        return BuildActivityMessages(response.ExecutionResults, response.PlannedActions);
+    }
+
+    private static string FormatExecutionStepActivity(AgentExecutionStep step)
+    {
+        var label = step.RequiresApproval
+            ? "Approval"
+            : step.Kind switch
+            {
+                AgentExecutionStepKind.SemanticCapability => "Capability",
+                AgentExecutionStepKind.ServiceTool => "Tool",
+                AgentExecutionStepKind.GeneratedUiTool => "UI Block",
+                _ => "UI"
+            };
+
+        return $"{label} {step.TargetId}.{step.ActionId}";
     }
 
     private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
@@ -901,6 +974,77 @@
         return messages;
     }
 
+    private static ActionStatus MapStepStatus(AgentExecutionStepStatus status) =>
+        status switch
+        {
+            AgentExecutionStepStatus.Pending => ActionStatus.InProgress,
+            AgentExecutionStepStatus.ApprovalRequired => ActionStatus.Executing,
+            AgentExecutionStepStatus.NeedsClarification => ActionStatus.Failed,
+            AgentExecutionStepStatus.Blocked => ActionStatus.Failed,
+            AgentExecutionStepStatus.Failed => ActionStatus.Failed,
+            _ => ActionStatus.Complete
+        };
+
+    private static IReadOnlyList<string> GetDisplayStepChips(ChatBarTimelineItem item)
+    {
+        if (item.ExecutionPlan?.Steps.Count > 0)
+        {
+            return item.ExecutionPlan.Steps
+                .Select(static step => $"{step.TargetId}.{step.ActionId}")
+                .ToArray();
+        }
+
+        if (item.PlannedActions.Count == 0)
+        {
+            return [];
+        }
+
+        return item.PlannedActions
+            .Select(static action => $"{action.ComponentId}.{action.ActionId}")
+            .ToArray();
+    }
+
+    private static bool TryGetPlanSummary(ChatBarTimelineItem item, out string summary)
+    {
+        if (item.ExecutionPlan is { Steps.Count: > 0 } plan)
+        {
+            var approvalCount = plan.Steps.Count(static step => step.RequiresApproval);
+            var mutationCount = plan.Steps.Count(static step =>
+                step.PolicyDecision.RiskClass is not AgentRiskClass.ReadOnly);
+
+            var parts = new List<string>
+            {
+                plan.Steps.Count == 1
+                    ? "Plan: 1 step"
+                    : $"Plan: {plan.Steps.Count} steps"
+            };
+
+            if (mutationCount > 0)
+            {
+                parts.Add(mutationCount == 1 ? "1 mutating" : $"{mutationCount} mutating");
+            }
+
+            if (approvalCount > 0)
+            {
+                parts.Add(approvalCount == 1 ? "1 approval" : $"{approvalCount} approvals");
+            }
+
+            summary = string.Join(" • ", parts);
+            return true;
+        }
+
+        if (item.PlannedActions.Count > 0)
+        {
+            summary = item.PlannedActions.Count == 1
+                ? "Plan: 1 action."
+                : $"Plan: {item.PlannedActions.Count} actions.";
+            return true;
+        }
+
+        summary = string.Empty;
+        return false;
+    }
+
     private static string GetRoleLabel(string role) =>
         role switch
         {
@@ -913,6 +1057,7 @@
         string Role,
         string Text,
         IReadOnlyList<PlannedComponentAction> PlannedActions,
+        AgentExecutionPlan? ExecutionPlan,
         IReadOnlyList<ActivityMessage> ActivityMessages,
         string? RunId);
 

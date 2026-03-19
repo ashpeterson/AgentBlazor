@@ -1,4 +1,5 @@
 using AgentBlazor.Agents;
+using AgentBlazor.App;
 using AgentBlazor.Components;
 using AgentBlazor.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using AgentBlazor.Telemetry;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
@@ -16,7 +18,9 @@ using AgentBlazor.Core.Runtime.State;
 using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Runtime;
 using AgentBlazor.Core.Paid;
+using Microsoft.Extensions.AI;
 
 namespace AgentBlazor.Services;
 
@@ -41,6 +45,9 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IComponentCapabilityCatalog>(sp => BuildComponentCatalog(
             sp.GetRequiredService<IOptions<AgentBlazorOptions>>().Value,
             sp.GetRequiredService<AgentBlazorConfigurationStore>()));
+        services.TryAddSingleton<IAgentCapabilityRegistry>(sp =>
+            new ReflectionAgentCapabilityRegistry(
+                sp.GetRequiredService<AgentBlazorConfigurationStore>().CapabilityTypes));
         services.TryAddSingleton<IAgentRegistry>(sp => BuildAgentRegistry(
             sp.GetRequiredService<IOptions<AgentBlazorOptions>>().Value,
             sp.GetRequiredService<AgentBlazorConfigurationStore>(),
@@ -59,6 +66,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentChatWidgetState, AgentChatWidgetState>();
         services.TryAddScoped<IAgentChatSessionState, AgentChatSessionState>();
         services.TryAddSingleton<IAgentChatSessionEvents, AgentChatSessionEvents>();
+        services.TryAddSingleton<IAgentExecutionScopeAccessor, AgentExecutionScopeAccessor>();
 
         // Circuit-scoped component registry — each Blazor Server circuit gets its own registry
         services.TryAddSingleton<AgentComponentRegistryHub>();
@@ -66,11 +74,21 @@ public static class AgentBlazorServiceCollectionExtensions
 
         services.TryAddSingleton<IAgentUiToolCatalog, DefaultAgentUiToolCatalog>();
 
-        // Core runtime: Plan (AgentPlanner) → Validate → Execute
+        // Legacy runtime: Plan (AgentPlanner) -> Validate -> Execute.
+        // Kept as a compatibility fallback while the adapter-first path becomes default.
         services.TryAddSingleton<IStructuredActionPlanner, AgentPlanner>();
         services.TryAddSingleton<IPlanValidator, PlanValidator>();
         services.TryAddSingleton<IPlanExecutor, PlanExecutor>();
         services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
+        services.TryAddSingleton<IAgentRuntimeAdapter>(sp =>
+        {
+            if (sp.GetService<IChatClient>() is not null)
+            {
+                return ActivatorUtilities.CreateInstance<ChatClientRuntimeAdapter>(sp);
+            }
+
+            return new LegacyAgentRuntimeAdapter(sp.GetRequiredService<IAgentRuntime>());
+        });
 
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
         services.TryAddSingleton<IAgentNavigationIntentService, InMemoryAgentNavigationIntentService>();

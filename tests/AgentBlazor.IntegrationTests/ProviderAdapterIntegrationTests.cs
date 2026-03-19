@@ -81,6 +81,29 @@ public class ProviderAdapterIntegrationTests
     }
 
     [Fact]
+    public void OriginAiProvider_RegistersFrameworkChatClient()
+    {
+        var services = new ServiceCollection();
+
+        services.AddOriginAIProvider(
+            "https://origin-ai.azurewebsites.net/",
+            "demo-api-key",
+            tenantInfo: "origin-ai");
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var chatClient = provider.GetService<IChatClient>();
+
+        Assert.Equal(AgentProviderKind.Custom, options.Provider.Kind);
+        Assert.Equal("https://origin-ai.azurewebsites.net", options.Provider.Endpoint);
+        Assert.Equal("demo-api-key", options.Provider.ApiKey);
+        Assert.Equal("origin-ai", options.Provider.AdditionalSettings["TenantInfo"]);
+        Assert.Equal("OriginAI", options.Provider.AdditionalSettings["Provider"]);
+        Assert.NotNull(chatClient);
+    }
+
+    [Fact]
     public async Task OllamaProvider_RunTurnAsync_WorksWhenLocalOllamaAvailable()
     {
         if (!await IsOllamaAvailableAsync())

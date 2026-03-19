@@ -293,6 +293,58 @@ public class AgUiHostingIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task AgUiRun_ConnectOperation_ReturnsHelpfulMessage_WhenReconnectUnsupported()
+    {
+        var runtimeAdapter = new StreamingOnlyRuntimeAdapter();
+        var app = await CreateAppWithRuntimeAdapterAsync(runtimeAdapter);
+        try
+        {
+            using var client = CreateClient(app);
+
+            var response = await client.PostAsJsonAsync(
+                "/agentblazor/agui/run",
+                CreateRunPayload(runId: "connect-unsupported", forwardedProps: new { ag_ui_operation = "connect" }));
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Contains("RUN_STARTED", body, StringComparison.Ordinal);
+            Assert.Contains("RUN_FINISHED", body, StringComparison.Ordinal);
+            Assert.Contains("Run reconnection is not supported by the configured runtime adapter.", body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task AgUiRun_StopOperation_ReturnsHelpfulMessage_WhenCancellationUnsupported()
+    {
+        var runtimeAdapter = new StreamingOnlyRuntimeAdapter();
+        var app = await CreateAppWithRuntimeAdapterAsync(runtimeAdapter);
+        try
+        {
+            using var client = CreateClient(app);
+
+            var response = await client.PostAsJsonAsync(
+                "/agentblazor/agui/run",
+                CreateRunPayload(runId: "stop-unsupported", forwardedProps: new { ag_ui_operation = "stop" }));
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Contains("RUN_STARTED", body, StringComparison.Ordinal);
+            Assert.Contains("RUN_FINISHED", body, StringComparison.Ordinal);
+            Assert.Contains("Active run cancellation is not supported by the configured runtime adapter.", body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
     private static async Task<WebApplication> CreateAppAsync(
         string planJson,
         AgentBlazorTier? tier = null,
@@ -318,7 +370,8 @@ public class AgUiHostingIntegrationTests
         {
             ConfigureDefaultAgent(options);
             configureOptions?.Invoke(options);
-        });
+        })
+            .UseLegacyRuntimeAdapter();
 
         builder.Services.AddAgentBlazorHosting();
 
@@ -336,6 +389,21 @@ public class AgUiHostingIntegrationTests
         builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent);
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<IAgentRuntime>(static sp => sp.GetRequiredService<ControlStreamingRuntime>());
+        builder.Services.AddAgentBlazorHosting();
+
+        var app = builder.Build();
+        app.MapAgentBlazorAgUiRun();
+        app.Urls.Add("http://127.0.0.1:0");
+        await app.StartAsync();
+
+        return app;
+    }
+
+    private static async Task<WebApplication> CreateAppWithRuntimeAdapterAsync(IAgentRuntimeAdapter runtimeAdapter)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
+            .UseRuntimeAdapter(_ => runtimeAdapter);
         builder.Services.AddAgentBlazorHosting();
 
         var app = builder.Build();
@@ -740,6 +808,94 @@ public class AgUiHostingIntegrationTests
                 AgentName = "AgentBlazor UI Agent",
                 TextDelta = textDelta
             };
+        }
+    }
+
+    private sealed class StreamingOnlyRuntimeAdapter : IAgentRuntimeAdapter
+    {
+        public bool SupportsStreaming => true;
+
+        public bool SupportsReconnect => false;
+
+        public bool SupportsCancellation => false;
+
+        public Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
+        {
+            _ = request;
+            _ = cancellationToken;
+            return Task.FromResult(new AgentTurnResponse("AgentBlazor UI Agent", "Completed.", [], []));
+        }
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
+            AgentTurnRequest request,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            var runId = request.Context is not null &&
+                        request.Context.TryGetValue("ag_ui_run_id", out var contextRunId) &&
+                        !string.IsNullOrWhiteSpace(contextRunId)
+                ? contextRunId
+                : Guid.NewGuid().ToString("N");
+
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunStarted,
+                RunId = runId,
+                Sequence = 1,
+                Timestamp = DateTimeOffset.UtcNow,
+                AgentName = "AgentBlazor UI Agent"
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageStart,
+                RunId = runId,
+                Sequence = 2,
+                Timestamp = DateTimeOffset.UtcNow,
+                AgentName = "AgentBlazor UI Agent"
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageContent,
+                RunId = runId,
+                Sequence = 3,
+                Timestamp = DateTimeOffset.UtcNow,
+                AgentName = "AgentBlazor UI Agent",
+                TextDelta = "Streaming response."
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageEnd,
+                RunId = runId,
+                Sequence = 4,
+                Timestamp = DateTimeOffset.UtcNow,
+                AgentName = "AgentBlazor UI Agent"
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunFinished,
+                RunId = runId,
+                Sequence = 5,
+                Timestamp = DateTimeOffset.UtcNow,
+                AgentName = "AgentBlazor UI Agent"
+            };
+
+            await Task.CompletedTask;
+        }
+
+        public IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+            string runId,
+            CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            _ = cancellationToken;
+            throw new NotSupportedException();
+        }
+
+        public Task<bool> StopRunAsync(string runId, CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            _ = cancellationToken;
+            throw new NotSupportedException();
         }
     }
 }

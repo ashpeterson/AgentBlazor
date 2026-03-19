@@ -515,7 +515,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
         }
     }
 
-    private static IEnumerable<TreeItemData<T>> GetItemDataRecursive(IEnumerable<TreeItemData<T>>? items)
+    private static IEnumerable<TreeItemData<T>> GetItemDataRecursive(IEnumerable<ITreeItemData<T>>? items)
     {
         if (items is null)
         {
@@ -524,14 +524,17 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
         foreach (var item in items)
         {
-            yield return item;
+            if (item is TreeItemData<T> treeItem)
+            {
+                yield return treeItem;
+            }
 
             if (item.Children is null)
             {
                 continue;
             }
 
-            foreach (var child in GetItemDataRecursive(item.Children.OfType<TreeItemData<T>>()))
+            foreach (var child in GetItemDataRecursive(item.Children))
             {
                 yield return child;
             }

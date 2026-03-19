@@ -1,0 +1,273 @@
+@page "/demo/workflows/supplier-compliance"
+@layout DemoLayout
+@using AgentBlazor.Demo.Services
+@implements IDisposable
+
+<PageTitle>Supplier Compliance Workflow</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
+        <MudText Typo="Typo.h5">Supplier compliance workflow with semantic capabilities</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This page is the new demo direction: the agent is not replacing grid clicks. It can identify at-risk suppliers,
+            explain the risk signals, and prepare a remediation draft over the current workflow state.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try prompts like <code>show suppliers likely to fail compliance review</code>,
+            <code>explain why these suppliers are at risk</code>, or
+            <code>prepare a remediation draft for the highlighted suppliers</code>.
+        </MudText>
+
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                Phase: @GetWorkflowPhase()
+            </MudChip>
+            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                Focused suppliers: @Workflow.HighlightedSupplierIds.Count
+            </MudChip>
+            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                Approval boundary: @(Workflow.CurrentDraft is null ? "not reached" : "draft ready")
+            </MudChip>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => FocusAtRiskAsync(30))">
+                Highlight 30-day risk
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ExplainFocusedAsync">
+                Explain current focus
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareDraftAsync">
+                Prepare remediation draft
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
+                Reset view
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="7">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <div>
+                            <MudText Typo="Typo.h6">Focused supplier grid</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                The grid stays native. Semantic capabilities shape the current focus and remediation path.
+                            </MudText>
+                        </div>
+                        <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                            Review window: @Workflow.CurrentReviewWindowDays days
+                        </MudChip>
+                    </MudStack>
+
+                    <AgentDataGrid TItem="SupplierComplianceRow"
+                                   AgentId="supplier-compliance-grid"
+                                   Items="@Workflow.VisibleSuppliers"
+                                   Dense="true"
+                                   Hover="true"
+                                   Bordered="true"
+                                   Striped="true"
+                                   RowsPerPage="5"
+                                   RowKeyProperty="Id">
+                        <Columns>
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="string" Property="x => x.Id" Title="ID" />
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="string" Property="x => x.Name" Title="Supplier" />
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="string" Property="x => x.Country" Title="Country" />
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="string" Property="x => x.RiskTier" Title="Risk" />
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="int" Property="x => x.CertificateExpiryDays" Title="Cert Expiry" />
+                            <PropertyColumn T="SupplierComplianceRow" TProperty="int" Property="x => x.AuditAgeDays" Title="Audit Age" />
+                            <TemplateColumn T="SupplierComplianceRow" Title="Signals">
+                                <CellTemplate>
+                                    <MudStack Spacing="1">
+                                        @if (Workflow.IsHighlighted(context.Item.Id))
+                                        {
+                                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                                                In current focus
+                                            </MudChip>
+                                        }
+                                        <MudText Typo="Typo.caption">@Workflow.DescribeSignals(context.Item)</MudText>
+                                    </MudStack>
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                    </AgentDataGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="5">
+                <MudStack Spacing="2">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Workflow state</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            The page stays deterministic while the agent compresses the multi-step review flow.
+                        </MudText>
+
+                        <MudList T="string" Dense="true" Class="mb-2">
+                            <MudListItem T="string">Current phase: @GetWorkflowPhase()</MudListItem>
+                            <MudListItem T="string">Focused suppliers: @Workflow.HighlightedSupplierIds.Count</MudListItem>
+                            <MudListItem T="string">Review window: @Workflow.CurrentReviewWindowDays days</MudListItem>
+                            <MudListItem T="string">Draft actions: @(Workflow.CurrentDraft?.Actions.Count ?? 0)</MudListItem>
+                        </MudList>
+
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                            Next step: @GetNextStepSummary()
+                        </MudAlert>
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Workflow insight</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            Current semantic explanation of the highlighted supplier set.
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="white-space: pre-line;">
+                            @(string.IsNullOrWhiteSpace(Workflow.LatestInsight)
+                                ? "Run the at-risk capability to populate the workflow explanation."
+                                : Workflow.LatestInsight)
+                        </MudText>
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Remediation draft</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            Approval-gated draft actions prepared from the current focus.
+                        </MudText>
+
+                        @if (Workflow.CurrentDraft is { } draft)
+                        {
+                            <MudText Typo="Typo.subtitle2">@draft.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="d-block mb-2">
+                                Suppliers: @string.Join(", ", draft.SupplierIds)
+                            </MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var action in draft.Actions)
+                                {
+                                    <MudListItem T="string">@action</MudListItem>
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">No remediation draft has been prepared yet.</MudText>
+                        }
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <AgentDialog AgentId="supplier-remediation-dialog"
+                 Visible="@Workflow.IsRemediationDialogOpen"
+                 VisibleChanged="OnDraftVisibilityChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Supplier remediation draft</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (Workflow.CurrentDraft is { } draft)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    This draft is the approval boundary for the current highlighted suppliers.
+                </MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-3">
+                    Suppliers: @string.Join(", ", draft.SupplierIds)
+                </MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var action in draft.Actions)
+                    {
+                        <MudListItem T="string">@action</MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">No remediation draft is active.</MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDraftAsync">
+                Close draft
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
+</div>
+
+@code {
+    [Inject] private SupplierComplianceWorkflowService Workflow { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        Workflow.Changed += HandleWorkflowChanged;
+    }
+
+    private Task FocusAtRiskAsync(int days)
+    {
+        Workflow.FocusAtRiskSuppliers(days);
+        return Task.CompletedTask;
+    }
+
+    private Task ExplainFocusedAsync()
+    {
+        Workflow.ExplainFocusedSuppliers();
+        return Task.CompletedTask;
+    }
+
+    private Task PrepareDraftAsync()
+    {
+        if (Workflow.HighlightedSupplierIds.Any())
+        {
+            Workflow.PrepareRemediationDraft();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ResetAsync()
+    {
+        Workflow.Reset();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseDraftAsync()
+    {
+        Workflow.SetRemediationDialogVisible(false);
+        return Task.CompletedTask;
+    }
+
+    private Task OnDraftVisibilityChanged(bool visible)
+    {
+        Workflow.SetRemediationDialogVisible(visible);
+        return Task.CompletedTask;
+    }
+
+    private string GetWorkflowPhase() =>
+        Workflow.CurrentDraft is not null
+            ? "Draft prepared"
+            : Workflow.HighlightedSupplierIds.Count > 0
+                ? "Suppliers in focus"
+                : "Awaiting analysis";
+
+    private string GetNextStepSummary()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return Workflow.IsRemediationDialogOpen
+                ? "Review the draft actions in the dialog and decide whether to approve the remediation batch."
+                : "Open or review the remediation draft before approving any mutating follow-up.";
+        }
+
+        if (Workflow.HighlightedSupplierIds.Count > 0)
+        {
+            return string.IsNullOrWhiteSpace(Workflow.LatestInsight)
+                ? "Ask the agent to explain why the current suppliers are at risk, then prepare the remediation draft."
+                : "Prepare a remediation draft for the highlighted suppliers when you are ready to cross the approval boundary.";
+        }
+
+        return "Start by identifying at-risk suppliers, then use the explanation and draft steps to complete the workflow.";
+    }
+
+    private void HandleWorkflowChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+    }
+}

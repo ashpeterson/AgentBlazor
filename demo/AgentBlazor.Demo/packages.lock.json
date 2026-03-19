@@ -32,9 +32,9 @@
       },
       "MudBlazor": {
         "type": "Direct",
-        "requested": "[8.15.0, )",
-        "resolved": "8.15.0",
-        "contentHash": "iOJEnQ6tYGQPfPJaUazyC8H6pcczgaMX7vhUzrJPpB0WqEXNozwMfSzoOe2/JZmVWJcUfYZgKBeBU2Z27XY7Sw=="
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "sXE0gH+yuJe4bkfz0EqFI9LV+9M0ofMoyVUIWohtx1ofXNhV5fsjl/3NBsTzjQsU5y4qdOyBGedybpT1zL5C5g=="
       },
       "Azure.Core": {
         "type": "Transitive",
@@ -225,7 +225,7 @@
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )",
           "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )",
-          "MudBlazor": "[8.15.0, )"
+          "MudBlazor": "[9.0.0, )"
         }
       },
       "agentblazor.core": {

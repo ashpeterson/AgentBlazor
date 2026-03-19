@@ -138,7 +138,7 @@ public class AgentForm : MudForm, IAgentControllable, IDisposable
     {
         EnsureModel();
         RestoreValues(_initialValues);
-        ResetValidation();
+        await ResetValidationAsync();
         ResetTouched();
         await ValidationChanged.InvokeAsync(false);
         await RequestComponentRefreshAsync();

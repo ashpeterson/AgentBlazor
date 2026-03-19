@@ -2,7 +2,9 @@
 @using AgentBlazor.Core.Components
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Interfaces
-@inject IAgentRuntime AgentRuntime
+@inject IAgentRuntimeAdapter RuntimeAdapter
+@inject IServiceProvider ServiceProvider
+@inject IAgentExecutionScopeAccessor ExecutionScopeAccessor
 
 <section class="ab-generative-surface @CssClass" aria-label="Generated UI surface">
     @if (Document is null)
@@ -239,7 +241,8 @@
                 ActionId: action.Id,
                 Prompt: action.Prompt,
                 Payload: new Dictionary<string, object?>(invocationPayload, StringComparer.OrdinalIgnoreCase));
-            var response = await AgentRuntime.RunTurnAsync(new AgentTurnRequest(
+            using var executionScope = ExecutionScopeAccessor.Push(ServiceProvider);
+            var response = await RuntimeAdapter.RunTurnAsync(new AgentTurnRequest(
                 action.Prompt ?? string.Empty,
                 AgentName,
                 SessionId: EffectiveSessionId,

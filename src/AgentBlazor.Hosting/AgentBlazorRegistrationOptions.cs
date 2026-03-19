@@ -15,6 +15,7 @@ namespace AgentBlazor;
 public sealed class AgentBlazorRegistrationOptions
 {
     private Action<IServiceCollection>? _providerRegistration;
+    private Action<IServiceCollection>? _runtimeAdapterRegistration;
     private Action<IServiceCollection>? _serviceRegistration;
     private Action<AgentBlazorOptions>? _optionsConfiguration;
     private Action<AgentBlazorBuilder>? _builderConfiguration;
@@ -23,8 +24,10 @@ public sealed class AgentBlazorRegistrationOptions
     private readonly List<Func<IServiceCollection, IServiceCollection>> _mcpRegistrations = [];
     private readonly List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>> _middlewares = [];
 
+    [Obsolete("Default-agent naming on AgentBlazorRegistrationOptions is a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
     public string? AgentName { get; set; }
 
+    [Obsolete("Default-agent description on AgentBlazorRegistrationOptions is a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
     public string? AgentDescription { get; set; }
 
     /// <summary>
@@ -34,12 +37,14 @@ public sealed class AgentBlazorRegistrationOptions
     /// Use this only for context the agent cannot infer, such as named chart data sources
     /// or a one-line description of the app's purpose.
     /// </summary>
+    [Obsolete("Default-agent instructions on AgentBlazorRegistrationOptions are a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
     public string? AgentInstructions { get; set; }
 
     /// <summary>
     /// Reads agent instructions from a file instead of inlining them in Program.cs.
     /// Path is resolved relative to the current directory (the app content root).
     /// </summary>
+    [Obsolete("UseInstructionsFile configures the legacy default-agent path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) and load instructions explicitly.", false)]
     public void UseInstructionsFile(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -53,6 +58,14 @@ public sealed class AgentBlazorRegistrationOptions
         _providerRegistration = services => services.AddOpenAIProvider(model, apiKey);
     }
 
+    public void UseOpenAI(string apiKey, string model, string endpoint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        _providerRegistration = services => services.AddOpenAIProvider(model, apiKey, endpoint);
+    }
+
     public void UseAzureOpenAI(string endpoint, string deploymentName, string? apiKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
@@ -63,6 +76,25 @@ public sealed class AgentBlazorRegistrationOptions
             : services => services.AddAzureOpenAIProvider(endpoint, deploymentName, apiKey);
     }
 
+    public void UseOriginAI(
+        string endpoint,
+        string apiKey,
+        string tenantInfo = "origin-ai",
+        string chatSource = "agentblazor",
+        string? systemPrompt = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantInfo);
+
+        _providerRegistration = services => services.AddOriginAIProvider(
+            endpoint,
+            apiKey,
+            tenantInfo,
+            chatSource,
+            systemPrompt);
+    }
+
     public void UseOllama(
         string model,
         string endpoint = "http://127.0.0.1:11434/v1",
@@ -71,6 +103,35 @@ public sealed class AgentBlazorRegistrationOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
         _providerRegistration = services => services.AddOllamaProvider(model, endpoint, apiKey);
+    }
+
+    /// <summary>
+    /// Registers a custom runtime adapter. This is the preferred long-term integration seam.
+    /// If supplied, AgentBlazor UI/hosting surfaces will use this adapter instead of depending
+    /// directly on the legacy built-in runtime implementation.
+    /// </summary>
+    public void UseRuntimeAdapter<TAdapter>()
+        where TAdapter : class, IAgentRuntimeAdapter
+    {
+        _runtimeAdapterRegistration = services => services.AddSingleton<IAgentRuntimeAdapter, TAdapter>();
+    }
+
+    /// <summary>
+    /// Registers a custom runtime adapter from a factory.
+    /// </summary>
+    public void UseRuntimeAdapter(Func<IServiceProvider, IAgentRuntimeAdapter> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _runtimeAdapterRegistration = services => services.AddSingleton(factory);
+    }
+
+    /// <summary>
+    /// Registers the lightweight chat-client-backed runtime adapter. This is the first adapter-first
+    /// integration path and avoids depending on the legacy built-in planner/runtime stack.
+    /// </summary>
+    public void UseChatClientRuntimeAdapter()
+    {
+        UseRuntimeAdapter<AgentBlazor.Core.Runtime.Adapters.ChatClientRuntimeAdapter>();
     }
 
     /// <summary>
@@ -98,6 +159,7 @@ public sealed class AgentBlazorRegistrationOptions
     /// Adds an assembly to the list scanned at startup for [Route] pages (used for intent→route and planner).
     /// If never called, the entry assembly is scanned by default.
     /// </summary>
+    [Obsolete("AddAssemblyToScan feeds the legacy default-agent/planner path. Prefer explicit agent registration and capability projection.", false)]
     public void AddAssemblyToScan(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
@@ -195,18 +257,19 @@ public sealed class AgentBlazorRegistrationOptions
 
     internal void ApplyProvider(IServiceCollection services)
     {
-        if (_providerRegistration is null)
+        if (_providerRegistration is null && _runtimeAdapterRegistration is null)
         {
             // Emit console warning at startup — easier to spot than buried logs
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine();
             Console.WriteLine("╔═══════════════════════════════════════════════════════════════════════════════╗");
-            Console.WriteLine("║  AgentBlazor Warning: No AI provider configured.                             ║");
+            Console.WriteLine("║  AgentBlazor Warning: No AI provider or runtime adapter configured.          ║");
             Console.WriteLine("║                                                                               ║");
             Console.WriteLine("║  Add one of the following to your AddAgentBlazor() call:                     ║");
             Console.WriteLine("║    options.UseOpenAI(apiKey, \"gpt-4o-mini\");                                  ║");
             Console.WriteLine("║    options.UseAzureOpenAI(endpoint, deploymentName);                         ║");
             Console.WriteLine("║    options.UseOllama(\"llama3.2\");  // Free, runs locally                      ║");
+            Console.WriteLine("║    options.UseRuntimeAdapter<TAdapter>();                                    ║");
             Console.WriteLine("║                                                                               ║");
             Console.WriteLine("║  The chat will show an error until a provider is configured.                 ║");
             Console.WriteLine("╚═══════════════════════════════════════════════════════════════════════════════╝");
@@ -215,6 +278,7 @@ public sealed class AgentBlazorRegistrationOptions
         }
 
         _providerRegistration?.Invoke(services);
+        _runtimeAdapterRegistration?.Invoke(services);
         _serviceRegistration?.Invoke(services);
 
         // Register accumulated service tools
@@ -304,6 +368,7 @@ public sealed class AgentBlazorRegistrationOptions
 
     internal void ApplyOptions(AgentBlazorOptions options)
     {
+#pragma warning disable CS0618 // Legacy default-agent surface remains wired here for compatibility.
         options.DefaultAgent.Enabled = true;
 
         var assembliesToScan = _agentPageAssemblies.Count > 0
@@ -333,6 +398,7 @@ public sealed class AgentBlazorRegistrationOptions
         {
             options.LicensedTier = _licensedTier.Value;
         }
+#pragma warning restore CS0618
 
         _optionsConfiguration?.Invoke(options);
     }

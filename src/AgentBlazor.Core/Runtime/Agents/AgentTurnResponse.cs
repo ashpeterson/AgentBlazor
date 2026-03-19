@@ -1,5 +1,6 @@
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Execution;
 
 namespace AgentBlazor.Core.Runtime.Agents;
 
@@ -14,10 +15,12 @@ public sealed record AgentTurnResponse(
     public bool RequiresApproval { get; init; }
     public IReadOnlyList<PendingApproval> PendingApprovals { get; init; } = [];
     public AgentUiDocument? GeneratedUi { get; init; }
+    public AgentExecutionPlan? ExecutionPlan { get; init; }
 }
 
 public sealed record PendingApproval(
     string ComponentId,
     string ActionId,
     string Description,
-    IReadOnlyDictionary<string, object?> Parameters);
+    IReadOnlyDictionary<string, object?> Parameters,
+    AgentPolicyDecision? PolicyDecision = null);

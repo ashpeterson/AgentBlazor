@@ -1,5 +1,6 @@
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Execution;
 
 namespace AgentBlazor.Core.Runtime.Conversation;
 
@@ -34,6 +35,11 @@ public sealed record ConversationTurn
     public IReadOnlyList<ComponentActionExecutionResult> ExecutionResults { get; init; } = [];
 
     /// <summary>
+    /// Normalized execution plan for this turn, when available.
+    /// </summary>
+    public AgentExecutionPlan? ExecutionPlan { get; init; }
+
+    /// <summary>
     /// Optional generated UI document returned for this turn.
     /// </summary>
     public AgentUiDocument? GeneratedUi { get; init; }
@@ -42,13 +48,30 @@ public sealed record ConversationTurn
     /// Whether any actions were successfully executed.
     /// </summary>
     public bool HasSuccessfulActions =>
-        ExecutionResults.Any(static r => r.Succeeded);
+        ExecutionPlan?.Steps.Any(static step => step.Status is AgentExecutionStepStatus.Completed) is true
+            || ExecutionResults.Any(static r => r.Succeeded);
 
     /// <summary>
     /// Creates a summary of this turn suitable for inclusion in prompts.
     /// </summary>
     public string Summarize()
     {
+        if (ExecutionPlan?.Steps.Count > 0)
+        {
+            var completed = ExecutionPlan.Steps
+                .Where(static step => step.Status is AgentExecutionStepStatus.Completed)
+                .ToArray();
+
+            if (completed.Length > 0)
+            {
+                var completedActions = string.Join(", ", completed
+                    .Select(static step => $"{step.TargetId}.{step.ActionId}")
+                    .Take(3));
+
+                return $"Executed {completed.Length} step(s): {completedActions}";
+            }
+        }
+
         if (ExecutionResults.Count == 0)
         {
             return AgentResponse.Length > 100
@@ -136,11 +159,24 @@ public sealed record ConversationHistory
         get
         {
             var lastSuccessful = Turns
+                .SelectMany(static t =>
+                    t.ExecutionPlan?.Steps
+                        .Where(static step => step.Status is AgentExecutionStepStatus.Completed)
+                        .Select(static step => (step.TargetId, step.ActionId))
+                    ?? Enumerable.Empty<(string TargetId, string ActionId)>())
+                .LastOrDefault();
+
+            if (lastSuccessful != default)
+            {
+                return lastSuccessful;
+            }
+
+            var lastSuccessfulResult = Turns
                 .SelectMany(static t => t.ExecutionResults)
                 .LastOrDefault(static r => r.Succeeded);
 
-            return lastSuccessful is not null
-                ? (lastSuccessful.ComponentId, lastSuccessful.ActionId)
+            return lastSuccessfulResult is not null
+                ? (lastSuccessfulResult.ComponentId, lastSuccessfulResult.ActionId)
                 : null;
         }
     }

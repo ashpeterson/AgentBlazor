@@ -19,6 +19,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<DojoWorkspaceService>();
 builder.Services.AddScoped<DemoFileWorkflowService>();
+builder.Services.AddScoped<SupplierComplianceWorkflowService>();
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
 builder.Services.AddHttpClient("demo-remote-storage");
 builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
@@ -38,6 +39,10 @@ var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OLLAMA_API_KEY");
 var workflowConnectionString = builder.Configuration.GetConnectionString("DemoWorkflow")
     ?? "Data Source=agentblazor-demo.db";
+var sharedAgentInstructionsPath = Path.Combine(builder.Environment.ContentRootPath, "agent-instructions.txt");
+var sharedAgentInstructions = File.Exists(sharedAgentInstructionsPath)
+    ? File.ReadAllText(sharedAgentInstructionsPath)
+    : null;
 
 builder.Services.AddDbContextFactory<DemoWorkflowDbContext>(options =>
     options.UseSqlite(workflowConnectionString));
@@ -45,8 +50,6 @@ builder.Services.AddSingleton<DemoWorkflowDatabaseSeeder>();
 
 builder.Services.AddAgentBlazor(options =>
 {
-    options.UseInstructionsFile("agent-instructions.txt");
-
     if (!string.IsNullOrWhiteSpace(openAiApiKey))
     {
         options.UseOpenAI(openAiApiKey, openAiModel);
@@ -70,10 +73,15 @@ builder.Services.AddAgentBlazor(options =>
     {
         agentBuilder.EnablePromptTracing();
         agentBuilder.AddRuntimeEventSubscriber<DojoRuntimeEventSubscriber>();
+        agentBuilder.AddCapability<SupplierComplianceCapabilities>();
 
         agentBuilder.AddAgent("Dojo Workspace Agent", agent =>
         {
             agent.WithDescription("Focused on the three-pillar dojo workspace.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
             agent.WithAllowedComponents("DojoIncident");
             agent.WithMetadata("route_prefixes", "/demo/dojo");
         });
@@ -81,6 +89,10 @@ builder.Services.AddAgentBlazor(options =>
         agentBuilder.AddAgent("Supplier Analyst Agent", agent =>
         {
             agent.WithDescription("Focused on data-centric component exploration and selection-style controls.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
             agent.WithAllowedComponents("AgentDataGrid", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentSelect", "AgentAutocomplete");
             agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/datagrid,/demo/components/select,/demo/components/autocomplete,/demo/components/date-picker,/demo/components/date-range-picker,/demo/components/tree-view");
         });
@@ -88,8 +100,23 @@ builder.Services.AddAgentBlazor(options =>
         agentBuilder.AddAgent("Workflow Orchestrator Agent", agent =>
         {
             agent.WithDescription("Focused on form/dialog/command orchestration across the component explorer.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
             agent.WithAllowedComponents("AgentStepper", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentTreeView", "AgentCommandBar", "AgentFileUpload");
             agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/form,/demo/components/dialog,/demo/components/tabs,/demo/components/stepper,/demo/components/command-bar,/demo/components/file-upload,/demo/components/attribute-based");
+        });
+
+        agentBuilder.AddAgent("Supplier Compliance Agent", agent =>
+        {
+            agent.WithDescription("Focused on supplier risk review, explanation, and remediation preparation.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/supplier-compliance");
         });
     });
 });

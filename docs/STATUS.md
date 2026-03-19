@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-16
+Last updated: 2026-03-18
 
 ## Current Product Shape
 
@@ -15,6 +15,13 @@ The current story is no longer "many unrelated demo routes". It is:
 1. learn the platform on the landing page
 2. understand the patterns in the Dojo
 3. inspect the reusable components in the components explorer
+
+The runtime realignment is now materially underway:
+
+- the external runtime adapter path is the default when a chat client/provider is present
+- semantic capabilities are now a first-class authoring surface in code
+- normalized execution, approval, policy, and context-freshness contracts now exist and are consumed by the adapter path
+- supplier-compliance workflow validation now exists as focused integration proof, not only demo wiring
 
 ## Shipped and Working
 
@@ -241,13 +248,11 @@ Coverage includes:
 
 ## What Needs Doing Next
 
-1. Keep expanding parity proof depth for the remaining weaker surfaces, especially richer `TreeView` variants, more complex `DataGrid` screens, and additional composed workflow variants.
-2. Decide and document the long-term role of `AgentCommandBar` as the intentional non-Mud special case in an otherwise Mud-compatible component story.
-3. Build the next product-level gap, not another compatibility reset:
-   - durable paid intelligence
-   - deeper hosted/open-ended controls if that product line continues
-4. Keep strengthening prompt determinism and observability on focused component routes.
-5. Expand declarative adapter coverage while keeping `AgentUiDocument` as the native rendering model.
+1. Keep removing planner-era compatibility plumbing now that the adapter-backed runtime path is the default.
+2. Narrow and deprecate remaining legacy runtime-first surfaces, especially `AgentBlazor.DefaultAgent`.
+3. Tighten the workflow-first UX around execution plans, approvals, and results so the supplier-compliance scenario becomes the primary story.
+4. Only after that, expand workflow-first proof into broader production-style scenarios.
+5. Continue parity depth where needed, but stop treating primitive component-control coverage as the main product measure.
 
 ## Reference Docs
 
@@ -257,3 +262,4 @@ Coverage includes:
 - NuGet prerelease checklist: `docs/nuget-prerelease-checklist.md`
 - GitHub Packages private preview: `docs/github-packages-private-preview.md`
 - Tier model: `docs/pricing-tiers.md`
+- Runtime realignment plan: `docs/runtime-realignment-plan.md`

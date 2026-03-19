@@ -1,6 +1,6 @@
 # AgentBlazor Architecture
 
-Last updated: 2026-03-16
+Last updated: 2026-03-18
 
 ## Purpose
 
@@ -93,7 +93,13 @@ Owns LLM provider registration only:
 
 ### AgentBlazor.DefaultAgent
 
-Owns default agent descriptor plumbing for the built-in component-aware agent.
+Legacy compatibility package for default agent descriptor plumbing.
+
+Current status:
+
+- legacy only
+- explicit agent registration and runtime-adapter-backed capability projection are the preferred path
+- the package remains only to preserve older setup flows during migration
 
 ### AgentBlazor.Licensing
 

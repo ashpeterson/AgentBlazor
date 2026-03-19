@@ -9,13 +9,15 @@
 @implements IDisposable
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Core.Runtime.Components
+@using AgentBlazor.Core.Runtime.Conversation
 @using AgentBlazor.Core.Runtime.Discovery
 @using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Execution
 @using AgentBlazor.Runtime
 @using Microsoft.Extensions.Options
 @using Microsoft.JSInterop
 @inject IAgentRegistry AgentRegistry
-@inject IAgentRuntime AgentRuntime
+@inject IAgentRuntimeAdapter RuntimeAdapter
 @inject IAgentDeferredActionEvents DeferredActionEvents
 @inject IConversationStore ConversationStore
 @inject IAgentComponentRegistry ComponentRegistry
@@ -26,6 +28,8 @@
 @inject IAdaptiveSuggestionService SuggestionService
 @inject IProactiveInsightService ProactiveInsightService
 @inject IOptions<AgentBlazorOptions> AgentBlazorOptionsAccessor
+@inject IServiceProvider ServiceProvider
+@inject IAgentExecutionScopeAccessor ExecutionScopeAccessor
 
 <ErrorBoundary @ref="_errorBoundary">
     <ChildContent>
@@ -108,6 +112,11 @@
                         <div class="ab-chat-surface__item-text">@item.Text</div>
                     }
 
+                    @if (TryGetPlanSummary(item, out var planSummary))
+                    {
+                        <div class="ab-chat-surface__plan-summary">@planSummary</div>
+                    }
+
                     @if (item.ActivityMessages.Count > 0)
                     {
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
@@ -130,32 +139,22 @@
                         </ul>
                     }
 
-                    @if (item.PlannedActions.Count > 0)
+                    @if (GetDisplayStepLabels(item).Count > 0)
                     {
                         <ul class="ab-chat-surface__actions" aria-label="Planned actions">
-                            @foreach (var action in item.PlannedActions)
+                            @foreach (var step in GetDisplayStepLabels(item))
                             {
-                                <li>@action.ComponentId.@action.ActionId</li>
+                                <li>@step</li>
                             }
                         </ul>
                     }
 
-                    @if (item.ExecutionResults.Count > 0)
+                    @if (GetDisplayResultTexts(item).Count > 0)
                     {
                         <ul class="ab-chat-surface__results" aria-label="Results">
-                            @foreach (var result in item.ExecutionResults)
+                            @foreach (var resultText in GetDisplayResultTexts(item))
                             {
-                                var ctx = BuildResultRenderContext(item, result);
-                                var fragments = ActionRenderRegistry.TryGet(result.ComponentId, result.ActionId);
-                                var fragment = fragments?.Resolve(ctx.Status);
-                                if (fragment is not null)
-                                {
-                                    <li>@fragment(ctx)</li>
-                                }
-                                else
-                                {
-                                    <li>@result.Message</li>
-                                }
+                                <li>@resultText</li>
                             }
                         </ul>
                     }
@@ -258,16 +257,22 @@
                 <article class="ab-chat-surface__item ab-chat-surface__item--approval" aria-label="Approval required">
                     <div class="ab-chat-surface__item-role">Approval Required</div>
                     <div class="ab-chat-surface__item-text">The following actions require your approval:</div>
+                    <div class="ab-chat-surface__plan-summary">@BuildApprovalSummary(_pendingApprovals)</div>
                     <ul class="ab-chat-surface__approval-list">
                         @foreach (var approval in _pendingApprovals)
                         {
                             <li>
-                                <strong>@approval.ComponentId.@approval.ActionId</strong>
+                                <strong>@GetApprovalDisplayTitle(approval)</strong>
+                                <div class="ab-chat-surface__approval-params">@approval.ComponentId.@approval.ActionId</div>
+                                @if (!string.IsNullOrWhiteSpace(approval.PolicySummary))
+                                {
+                                    <div class="ab-chat-surface__approval-params">@approval.PolicySummary</div>
+                                }
                                 @if (approval.Parameters.Count > 0)
                                 {
-                                    <span class="ab-chat-surface__approval-params">
+                                    <div class="ab-chat-surface__approval-params">
                                         (@string.Join(", ", approval.Parameters.Select(p => $"{p.Key}={p.Value}")))
-                                    </span>
+                                    </div>
                                 }
                             </li>
                         }
@@ -993,10 +998,20 @@
 
     private async Task<StreamTurnOutcome> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
     {
-        if (AgentRuntime is not IAgentRuntimeStreaming streamingRuntime)
+        using var executionScope = ExecutionScopeAccessor.Push(ServiceProvider);
+
+        if (!RuntimeAdapter.SupportsStreaming)
         {
-            var immediateResponse = await AgentRuntime.RunTurnAsync(request);
-            return new StreamTurnOutcome(immediateResponse, ClarificationQuestion: null, PendingApprovals: [], RunId: null);
+            var immediateResponse = await RuntimeAdapter.RunTurnAsync(request);
+            return new StreamTurnOutcome(
+                immediateResponse,
+                ClarificationQuestion: immediateResponse.RequiresClarification
+                    ? immediateResponse.ClarificationQuestion
+                    : null,
+                PendingApprovals: immediateResponse.RequiresApproval
+                    ? immediateResponse.PendingApprovals
+                    : [],
+                RunId: null);
         }
 
         _streamingResponseText = string.Empty;
@@ -1009,7 +1024,7 @@
         AgentTurnResponse? finalResponse = null;
         string? clarificationQuestion = null;
         var pendingApprovals = new List<PendingApproval>();
-        await foreach (var streamEvent in streamingRuntime.RunTurnStreamingAsync(request))
+        await foreach (var streamEvent in RuntimeAdapter.RunTurnStreamingAsync(request))
         {
             if (string.IsNullOrWhiteSpace(_activeRunId) &&
                 !string.IsNullOrWhiteSpace(streamEvent.RunId))
@@ -1162,8 +1177,10 @@
             ?? throw new InvalidOperationException("Streaming completed without a final response.");
         return new StreamTurnOutcome(
             response,
-            clarificationQuestion,
-            pendingApprovals,
+            clarificationQuestion ?? (response.RequiresClarification ? response.ClarificationQuestion : null),
+            pendingApprovals.Count > 0
+                ? pendingApprovals
+                : (response.RequiresApproval ? response.PendingApprovals : []),
             _activeRunId);
     }
 
@@ -1180,44 +1197,7 @@
             _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
         }
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
-
-        if (!string.IsNullOrWhiteSpace(turnOutcome.ClarificationQuestion))
-        {
-            _pendingApprovals.Clear();
-            _pendingClarification = new PendingClarificationInfo(turnOutcome.ClarificationQuestion, sourceMessage);
-            _agentState = AgentState.WaitingForClarification;
-            return;
-        }
-
-        if (turnOutcome.PendingApprovals.Count > 0)
-        {
-            _pendingClarification = null;
-            SetPendingApprovals(turnOutcome.PendingApprovals);
-            _agentState = AgentState.WaitingForApproval;
-            return;
-        }
-
-        if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
-        {
-            _pendingApprovals.Clear();
-            _pendingClarification = new PendingClarificationInfo(
-                response.ClarificationQuestion,
-                sourceMessage);
-            _agentState = AgentState.WaitingForClarification;
-            return;
-        }
-
-        if (response.RequiresApproval && response.PendingApprovals.Count > 0)
-        {
-            _pendingClarification = null;
-            SetPendingApprovals(response.PendingApprovals);
-            _agentState = AgentState.WaitingForApproval;
-            return;
-        }
-
-        _pendingClarification = null;
-        _pendingApprovals.Clear();
-        _agentState = AgentState.Idle;
+        ApplyInteractionState(sourceMessage, turnOutcome.ClarificationQuestion, turnOutcome.PendingApprovals);
     }
 
     private void SetPendingApprovals(IReadOnlyList<PendingApproval> approvals)
@@ -1228,7 +1208,37 @@
                 approval.ComponentId,
                 approval.ActionId,
                 approval.Description,
-                approval.Parameters)));
+                approval.Parameters,
+                approval.PolicyDecision,
+                approval.PolicyDecision is null
+                    ? null
+                    : BuildApprovalPolicySummary(approval.PolicyDecision))));
+    }
+
+    private void ApplyInteractionState(
+        string sourceMessage,
+        string? clarificationQuestion,
+        IReadOnlyList<PendingApproval> approvals)
+    {
+        if (!string.IsNullOrWhiteSpace(clarificationQuestion))
+        {
+            _pendingApprovals.Clear();
+            _pendingClarification = new PendingClarificationInfo(clarificationQuestion, sourceMessage);
+            _agentState = AgentState.WaitingForClarification;
+            return;
+        }
+
+        if (approvals.Count > 0)
+        {
+            _pendingClarification = null;
+            SetPendingApprovals(approvals);
+            _agentState = AgentState.WaitingForApproval;
+            return;
+        }
+
+        _pendingClarification = null;
+        _pendingApprovals.Clear();
+        _agentState = AgentState.Idle;
     }
 
     private void HandleDeferredActionCompleted(DeferredComponentActionEvent actionEvent)
@@ -1479,6 +1489,32 @@
             : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
     }
 
+    private static string FormatExecutionStepActivity(AgentExecutionStep step)
+    {
+        var label = step.RequiresApproval
+            ? "Approval"
+            : step.Kind switch
+            {
+                AgentExecutionStepKind.SemanticCapability => "Capability",
+                AgentExecutionStepKind.ServiceTool => "Tool",
+                AgentExecutionStepKind.GeneratedUiTool => "UI Block",
+                _ => "UI"
+            };
+
+        return $"{label} {step.TargetId}.{step.ActionId}";
+    }
+
+    private static ActionStatus MapStepStatus(AgentExecutionStepStatus status) =>
+        status switch
+        {
+            AgentExecutionStepStatus.Completed => ActionStatus.Complete,
+            AgentExecutionStepStatus.Failed => ActionStatus.Failed,
+            AgentExecutionStepStatus.Blocked => ActionStatus.Failed,
+            AgentExecutionStepStatus.NeedsClarification => ActionStatus.Failed,
+            AgentExecutionStepStatus.ApprovalRequired => ActionStatus.InProgress,
+            _ => ActionStatus.InProgress
+        };
+
     private IDictionary<string, string>? CreateRequestContext(IReadOnlyDictionary<string, string>? additional = null)
     {
         Dictionary<string, string>? context = new(StringComparer.OrdinalIgnoreCase);
@@ -1672,25 +1708,10 @@
     {
         _timeline.Add(ChatTimelineItem.Agent(response));
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
-
-        if (response.RequiresClarification && !string.IsNullOrWhiteSpace(response.ClarificationQuestion))
-        {
-            _pendingApprovals.Clear();
-            _pendingClarification = new PendingClarificationInfo(response.ClarificationQuestion, response.ResponseText);
-            _agentState = AgentState.WaitingForClarification;
-        }
-        else if (response.RequiresApproval && response.PendingApprovals.Count > 0)
-        {
-            _pendingClarification = null;
-            SetPendingApprovals(response.PendingApprovals);
-            _agentState = AgentState.WaitingForApproval;
-        }
-        else
-        {
-            _pendingClarification = null;
-            _pendingApprovals.Clear();
-            _agentState = AgentState.Idle;
-        }
+        ApplyInteractionState(
+            response.ResponseText,
+            response.RequiresClarification ? response.ClarificationQuestion : null,
+            response.RequiresApproval ? response.PendingApprovals : []);
 
         _scrollRequested = true;
         return InvokeAsync(StateHasChanged);
@@ -1762,13 +1783,37 @@
                     "assistant",
                     roleLabel,
                     turn.AgentResponse,
-                    BuildActivityMessages(turn.ExecutionResults),
+                    BuildActivityMessages(turn),
                     turn.PlannedActions,
                     turn.ExecutionResults,
+                    turn.ExecutionPlan,
                     GeneratedUi: turn.GeneratedUi,
                     RunId: null));
             }
         }
+    }
+
+    private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
+        ConversationTurn turn)
+    {
+        if (turn.ExecutionPlan?.Steps.Count > 0)
+        {
+            return turn.ExecutionPlan.Steps
+                .Select(step => new ActivityMessage(
+                    BuildActivityKey(step.TargetId, step.ActionId),
+                    string.IsNullOrWhiteSpace(step.Message)
+                        ? FormatExecutionStepActivity(step)
+                        : $"{FormatExecutionStepActivity(step)}: {step.Message}",
+                    step.Status is not AgentExecutionStepStatus.Failed and not AgentExecutionStepStatus.Blocked,
+                    step.TargetId,
+                    step.ActionId,
+                    MapStepStatus(step.Status),
+                    step.Arguments,
+                    Result: step.Message))
+                .ToArray();
+        }
+
+        return BuildActivityMessages(turn.ExecutionResults);
     }
 
     private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
@@ -1797,6 +1842,189 @@
         }
 
         return messages;
+    }
+
+    private static IReadOnlyList<string> GetDisplayStepLabels(ChatTimelineItem item)
+    {
+        if (item.ExecutionPlan?.Steps.Count > 0)
+        {
+            return item.ExecutionPlan.Steps
+                .Select(FormatExecutionStepLabel)
+                .ToArray();
+        }
+
+        if (item.PlannedActions.Count == 0)
+        {
+            return [];
+        }
+
+        return item.PlannedActions
+            .Select(static action => $"{action.ComponentId}.{action.ActionId}")
+            .ToArray();
+    }
+
+    private static bool TryGetPlanSummary(ChatTimelineItem item, out string summary)
+    {
+        if (item.ExecutionPlan is { Steps.Count: > 0 } plan)
+        {
+            summary = BuildExecutionPlanSummary(plan);
+            return true;
+        }
+
+        if (item.PlannedActions.Count > 0)
+        {
+            summary = item.PlannedActions.Count == 1
+                ? "Plan: 1 action."
+                : $"Plan: {item.PlannedActions.Count} actions.";
+            return true;
+        }
+
+        summary = string.Empty;
+        return false;
+    }
+
+    private static string BuildExecutionPlanSummary(AgentExecutionPlan plan)
+    {
+        var approvalCount = plan.Steps.Count(static step => step.RequiresApproval);
+        var mutationCount = plan.Steps.Count(static step =>
+            step.PolicyDecision.RiskClass is not AgentRiskClass.ReadOnly);
+
+        var parts = new List<string>
+        {
+            plan.Steps.Count == 1
+                ? "Plan: 1 step"
+                : $"Plan: {plan.Steps.Count} steps"
+        };
+
+        if (mutationCount > 0)
+        {
+            parts.Add(mutationCount == 1 ? "1 mutating" : $"{mutationCount} mutating");
+        }
+
+        if (approvalCount > 0)
+        {
+            parts.Add(approvalCount == 1 ? "1 approval" : $"{approvalCount} approvals");
+        }
+
+        if (!string.IsNullOrWhiteSpace(plan.Context.Route))
+        {
+            parts.Add($"route {plan.Context.Route}");
+        }
+
+        parts.Add($"context {plan.Context.Freshness.ToString().ToLowerInvariant()}");
+        return string.Join(" • ", parts);
+    }
+
+    private static string BuildApprovalSummary(IReadOnlyList<PendingApprovalInfo> approvals)
+    {
+        if (approvals.Count == 0)
+        {
+            return "No approvals pending.";
+        }
+
+        var highestRisk = approvals
+            .Select(static approval => approval.PolicyDecision?.RiskClass ?? AgentRiskClass.Unknown)
+            .Max();
+
+        var riskSummary = highestRisk switch
+        {
+            AgentRiskClass.SensitiveMutation => "highest risk: sensitive mutation",
+            AgentRiskClass.SignificantMutation => "highest risk: significant mutation",
+            AgentRiskClass.LowRiskMutation => "highest risk: low-risk mutation",
+            AgentRiskClass.ReadOnly => "read-only approval",
+            AgentRiskClass.RestrictedAction => "restricted action",
+            _ => null
+        };
+
+        var baseSummary = approvals.Count == 1
+            ? "1 step is waiting for approval."
+            : $"{approvals.Count} steps are waiting for approval.";
+
+        return string.IsNullOrWhiteSpace(riskSummary)
+            ? baseSummary
+            : $"{baseSummary} {riskSummary}.";
+    }
+
+    private static string GetApprovalDisplayTitle(PendingApprovalInfo approval) =>
+        string.IsNullOrWhiteSpace(approval.Description)
+            ? $"{approval.ComponentId}.{approval.ActionId}"
+            : approval.Description;
+
+    private static string BuildApprovalPolicySummary(AgentPolicyDecision policyDecision)
+    {
+        var parts = new List<string>(2)
+        {
+            policyDecision.RiskClass switch
+            {
+                AgentRiskClass.ReadOnly => "read-only",
+                AgentRiskClass.LowRiskMutation => "low-risk mutation",
+                AgentRiskClass.SignificantMutation => "significant mutation",
+                AgentRiskClass.SensitiveMutation => "sensitive mutation",
+                AgentRiskClass.RestrictedAction => "restricted action",
+                _ => "unknown risk"
+            },
+            policyDecision.ApprovalMode switch
+            {
+                AgentApprovalMode.InlineConfirm => "inline confirm",
+                AgentApprovalMode.ExplicitPlanApproval => "plan approval",
+                AgentApprovalMode.StepApproval => "step approval",
+                AgentApprovalMode.PolicyDenied => "policy denied",
+                _ => "no approval mode"
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(policyDecision.Reason))
+        {
+            parts.Add(policyDecision.Reason);
+        }
+
+        return string.Join(" • ", parts);
+    }
+
+    private static string FormatExecutionStepLabel(AgentExecutionStep step)
+    {
+        var prefix = step.RequiresApproval
+            ? "Approve"
+            : step.Kind switch
+            {
+                AgentExecutionStepKind.SemanticCapability => "Capability",
+                AgentExecutionStepKind.ServiceTool => "Tool",
+                AgentExecutionStepKind.GeneratedUiTool => "UI Block",
+                _ => "UI"
+            };
+
+        var status = step.Status switch
+        {
+            AgentExecutionStepStatus.ApprovalRequired => "awaiting approval",
+            AgentExecutionStepStatus.Completed => "done",
+            AgentExecutionStepStatus.NeedsClarification => "needs clarification",
+            AgentExecutionStepStatus.Blocked => "blocked",
+            AgentExecutionStepStatus.Failed => "failed",
+            _ => "planned"
+        };
+
+        return $"{prefix}: {step.TargetId}.{step.ActionId} ({status})";
+    }
+
+    private static IReadOnlyList<string> GetDisplayResultTexts(ChatTimelineItem item)
+    {
+        if (item.ExecutionPlan?.Steps.Count > 0)
+        {
+            return item.ExecutionPlan.Steps
+                .Where(static step => !string.IsNullOrWhiteSpace(step.Message))
+                .Select(static step => step.Message!)
+                .ToArray();
+        }
+
+        if (item.ExecutionResults.Count == 0)
+        {
+            return [];
+        }
+
+        return item.ExecutionResults
+            .Where(static result => !string.IsNullOrWhiteSpace(result.Message))
+            .Select(static result => result.Message)
+            .ToArray();
     }
 
     // ── Slash Command Discovery ─────────────────────────────────────────────
@@ -2351,12 +2579,13 @@
         IReadOnlyList<ActivityMessage> ActivityMessages,
         IReadOnlyList<PlannedComponentAction> PlannedActions,
         IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
+        AgentExecutionPlan? ExecutionPlan,
         AgentUiDocument? GeneratedUi,
         string? RunId,
         bool IsProactive = false)
     {
         public static ChatTimelineItem User(string text) =>
-            new("user", "User", text, [], [], [], null, null);
+            new("user", "User", text, [], [], [], null, null, null);
 
         public static ChatTimelineItem Agent(
             AgentTurnResponse response,
@@ -2369,14 +2598,15 @@
                 activityMessages ?? [],
                 response.PlannedActions,
                 response.ExecutionResults,
+                response.ExecutionPlan,
                 response.GeneratedUi,
                 runId);
 
         public static ChatTimelineItem Proactive(string agentName, string insight) =>
-            new("assistant", agentName, insight, [], [], [], null, null, IsProactive: true);
+            new("assistant", agentName, insight, [], [], [], null, null, null, IsProactive: true);
 
         public static ChatTimelineItem Activity(string text, string? runId = null) =>
-            new("activity", "Activity", text, [], [], [], null, runId);
+            new("activity", "Activity", text, [], [], [], null, null, runId);
     }
 
     private sealed record ActivityMessage(
@@ -2397,7 +2627,13 @@
 
     private sealed record PendingHandoffRequest(string FromAgent, string ToAgent, string? TargetRoute);
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);
-    private sealed record PendingApprovalInfo(string ComponentId, string ActionId, string Description, IReadOnlyDictionary<string, object?> Parameters);
+    private sealed record PendingApprovalInfo(
+        string ComponentId,
+        string ActionId,
+        string Description,
+        IReadOnlyDictionary<string, object?> Parameters,
+        AgentPolicyDecision? PolicyDecision,
+        string? PolicySummary);
 
     /// <summary>Pre-fills the prompt input with the given text.</summary>
     public Task InjectAsync(string prompt)

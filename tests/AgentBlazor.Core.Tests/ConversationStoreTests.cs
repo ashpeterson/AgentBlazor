@@ -1,5 +1,6 @@
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
+using AgentBlazor.Execution;
 using AgentBlazor.Options;
 using MsOptions = Microsoft.Extensions.Options.Options;
 
@@ -119,6 +120,20 @@ public class ConversationStoreTests
         var timestamp = DateTime.UtcNow;
         var plannedActions = new List<PlannedComponentAction>();
         var executionResults = new List<ComponentActionExecutionResult>();
+        var executionPlan = new AgentExecutionPlan(
+            "agent",
+            new AgentExecutionContext("session-1", "run-1"),
+            [
+                new AgentExecutionStep(
+                    "step-1",
+                    0,
+                    AgentExecutionStepKind.SemanticCapability,
+                    "suppliers",
+                    "show_at_risk",
+                    AgentExecutionStepStatus.Completed,
+                    false,
+                    new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None))
+            ]);
 
         var turn = new ConversationTurn
         {
@@ -126,7 +141,8 @@ public class ConversationStoreTests
             UserMessage = "Test message",
             AgentResponse = "Test response",
             PlannedActions = plannedActions,
-            ExecutionResults = executionResults
+            ExecutionResults = executionResults,
+            ExecutionPlan = executionPlan
         };
 
         Assert.Equal(timestamp, turn.Timestamp);
@@ -134,6 +150,43 @@ public class ConversationStoreTests
         Assert.Equal("Test response", turn.AgentResponse);
         Assert.Same(plannedActions, turn.PlannedActions);
         Assert.Same(executionResults, turn.ExecutionResults);
+        Assert.Same(executionPlan, turn.ExecutionPlan);
+    }
+
+    [Fact]
+    public void ConversationTurn_Summarize_PrefersExecutionPlan()
+    {
+        var turn = new ConversationTurn
+        {
+            Timestamp = DateTime.UtcNow,
+            UserMessage = "Find at-risk suppliers",
+            AgentResponse = "Done",
+            ExecutionPlan = new AgentExecutionPlan(
+                "agent",
+                new AgentExecutionContext("session-1", "run-1"),
+                [
+                    new AgentExecutionStep(
+                        "step-1",
+                        0,
+                        AgentExecutionStepKind.SemanticCapability,
+                        "suppliers",
+                        "show_at_risk",
+                        AgentExecutionStepStatus.Completed,
+                        false,
+                        new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None)),
+                    new AgentExecutionStep(
+                        "step-2",
+                        1,
+                        AgentExecutionStepKind.UiAction,
+                        "AgentDataGrid",
+                        "highlight_rows",
+                        AgentExecutionStepStatus.Completed,
+                        false,
+                        new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None))
+                ])
+        };
+
+        Assert.Equal("Executed 2 step(s): suppliers.show_at_risk, AgentDataGrid.highlight_rows", turn.Summarize());
     }
 
     [Fact]

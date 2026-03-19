@@ -1,5 +1,7 @@
 using AgentBlazor.Agents;
+using AgentBlazor.App;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.State;
@@ -47,6 +49,48 @@ public sealed class AgentBlazorBuilder
     }
 
     /// <summary>
+    /// Registers a semantic capability class that can be projected into the runtime adapter path.
+    /// Capability classes should be annotated with <c>[AgentCapability]</c> and expose
+    /// public <c>[AgentAction]</c>-decorated methods.
+    /// </summary>
+    public AgentBlazorBuilder AddCapability<TCapability>()
+        where TCapability : class
+    {
+        return AddCapability(typeof(TCapability));
+    }
+
+    /// <summary>
+    /// Registers a semantic capability type by <see cref="Type"/>.
+    /// </summary>
+    public AgentBlazorBuilder AddCapability(Type capabilityType)
+    {
+        ArgumentNullException.ThrowIfNull(capabilityType);
+
+        if (!capabilityType.IsClass || capabilityType.IsAbstract)
+        {
+            throw new ArgumentException(
+                $"Capability type '{capabilityType.FullName}' must be a concrete class.",
+                nameof(capabilityType));
+        }
+
+        if (capabilityType.GetCustomAttributes(typeof(AgentCapabilityAttribute), inherit: false).Length == 0)
+        {
+            throw new ArgumentException(
+                $"Capability type '{capabilityType.FullName}' must be annotated with [AgentCapability].",
+                nameof(capabilityType));
+        }
+
+        if (!_store.CapabilityTypes.Contains(capabilityType))
+        {
+            _store.CapabilityTypes.Add(capabilityType);
+        }
+
+        Services.TryAddTransient(capabilityType, capabilityType);
+
+        return this;
+    }
+
+    /// <summary>
     /// Enables prompt tracing for observability and debugging.
     /// When enabled, all prompt requests are traced through the pipeline with timing and results.
     /// </summary>
@@ -81,6 +125,49 @@ public sealed class AgentBlazorBuilder
         ArgumentNullException.ThrowIfNull(subscriber);
         Services.AddSingleton(subscriber);
         Services.AddSingleton<IAgentRuntimeEventSubscriber>(subscriber);
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default runtime adapter with a custom implementation.
+    /// This is the preferred seam for integrating external orchestration runtimes.
+    /// </summary>
+    public AgentBlazorBuilder UseRuntimeAdapter<TAdapter>()
+        where TAdapter : class, IAgentRuntimeAdapter
+    {
+        Services.RemoveAll<IAgentRuntimeAdapter>();
+        Services.AddSingleton<IAgentRuntimeAdapter, TAdapter>();
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default runtime adapter with a factory-backed implementation.
+    /// </summary>
+    public AgentBlazorBuilder UseRuntimeAdapter(Func<IServiceProvider, IAgentRuntimeAdapter> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        Services.RemoveAll<IAgentRuntimeAdapter>();
+        Services.AddSingleton(factory);
+        return this;
+    }
+
+    /// <summary>
+    /// Uses the lightweight chat-client-backed runtime adapter rather than the legacy built-in planner/runtime.
+    /// </summary>
+    public AgentBlazorBuilder UseChatClientRuntimeAdapter()
+    {
+        return UseRuntimeAdapter<ChatClientRuntimeAdapter>();
+    }
+
+    /// <summary>
+    /// Uses the legacy built-in planner/runtime adapter explicitly.
+    /// This is intended as a compatibility switch during the adapter-first migration.
+    /// </summary>
+    public AgentBlazorBuilder UseLegacyRuntimeAdapter()
+    {
+        Services.RemoveAll<IAgentRuntimeAdapter>();
+        Services.AddSingleton<IAgentRuntimeAdapter>(sp =>
+            new LegacyAgentRuntimeAdapter(sp.GetRequiredService<IAgentRuntime>()));
         return this;
     }
 

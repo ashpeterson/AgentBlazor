@@ -179,6 +179,7 @@
     protected override void OnInitialized()
     {
         WidgetState.Changed += OnWidgetStateChanged;
+        WidgetState.Close();
     }
 
     public void Dispose()
