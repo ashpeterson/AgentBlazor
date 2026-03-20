@@ -263,7 +263,14 @@
                         {
                             <li>
                                 <strong>@GetApprovalDisplayTitle(approval)</strong>
-                                <div class="ab-chat-surface__approval-params">@approval.ComponentId.@approval.ActionId</div>
+                                @if (!string.IsNullOrWhiteSpace(approval.StepLabel))
+                                {
+                                    <div class="ab-chat-surface__approval-params">@approval.StepLabel</div>
+                                }
+                                else
+                                {
+                                    <div class="ab-chat-surface__approval-params">@approval.ComponentId.@approval.ActionId</div>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(approval.PolicySummary))
                                 {
                                     <div class="ab-chat-surface__approval-params">@approval.PolicySummary</div>
@@ -273,6 +280,15 @@
                                     <div class="ab-chat-surface__approval-params">
                                         (@string.Join(", ", approval.Parameters.Select(p => $"{p.Key}={p.Value}")))
                                     </div>
+                                }
+                                @if (approval.NarrativeLines.Count > 0)
+                                {
+                                    <ul class="ab-chat-surface__results" aria-label="Approval details">
+                                        @foreach (var narrativeLine in approval.NarrativeLines)
+                                        {
+                                            <li>@narrativeLine</li>
+                                        }
+                                    </ul>
                                 }
                             </li>
                         }
@@ -1197,14 +1213,26 @@
             _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
         }
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
-        ApplyInteractionState(sourceMessage, turnOutcome.ClarificationQuestion, turnOutcome.PendingApprovals);
+        ApplyInteractionState(
+            sourceMessage,
+            turnOutcome.ClarificationQuestion,
+            turnOutcome.PendingApprovals,
+            turnOutcome.Response.ExecutionPlan);
     }
 
-    private void SetPendingApprovals(IReadOnlyList<PendingApproval> approvals)
+    private void SetPendingApprovals(
+        IReadOnlyList<PendingApproval> approvals,
+        AgentExecutionPlan? executionPlan = null)
     {
         _pendingApprovals.Clear();
-        _pendingApprovals.AddRange(approvals.Select(static approval =>
-            new PendingApprovalInfo(
+        _pendingApprovals.AddRange(approvals.Select(approval =>
+        {
+            var step = ExecutionPlanNarrativeFormatter.FindStep(
+                executionPlan,
+                approval.ComponentId,
+                approval.ActionId);
+
+            return new PendingApprovalInfo(
                 approval.ComponentId,
                 approval.ActionId,
                 approval.Description,
@@ -1212,13 +1240,25 @@
                 approval.PolicyDecision,
                 approval.PolicyDecision is null
                     ? null
-                    : BuildApprovalPolicySummary(approval.PolicyDecision))));
+                    : BuildApprovalPolicySummary(approval.PolicyDecision),
+                ExecutionPlanNarrativeFormatter.TryGetApprovalStepLabel(
+                    executionPlan,
+                    approval.ComponentId,
+                    approval.ActionId,
+                    out var stepLabel)
+                    ? stepLabel
+                    : null,
+                step is null
+                    ? []
+                    : ExecutionStepNarrativeFormatter.BuildResultTexts(step));
+        }));
     }
 
     private void ApplyInteractionState(
         string sourceMessage,
         string? clarificationQuestion,
-        IReadOnlyList<PendingApproval> approvals)
+        IReadOnlyList<PendingApproval> approvals,
+        AgentExecutionPlan? executionPlan = null)
     {
         if (!string.IsNullOrWhiteSpace(clarificationQuestion))
         {
@@ -1231,7 +1271,7 @@
         if (approvals.Count > 0)
         {
             _pendingClarification = null;
-            SetPendingApprovals(approvals);
+            SetPendingApprovals(approvals, executionPlan);
             _agentState = AgentState.WaitingForApproval;
             return;
         }
@@ -1418,7 +1458,7 @@
         ComponentActionExecutionResult result)
     {
         var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
-        var args = FindActionArguments(item.PlannedActions, result.ComponentId, result.ActionId);
+        var args = FindActionArguments(item.LegacyPlannedActions, result.ComponentId, result.ActionId);
         return new ActionRenderContext(
             result.ComponentId,
             result.ActionId,
@@ -1784,8 +1824,8 @@
                     roleLabel,
                     turn.AgentResponse,
                     BuildActivityMessages(turn),
-                    turn.PlannedActions,
-                    turn.ExecutionResults,
+                    turn.LegacyPlannedActions,
+                    turn.LegacyExecutionResults,
                     turn.ExecutionPlan,
                     GeneratedUi: turn.GeneratedUi,
                     RunId: null));
@@ -1813,7 +1853,7 @@
                 .ToArray();
         }
 
-        return BuildActivityMessages(turn.ExecutionResults);
+        return BuildActivityMessages(turn.LegacyExecutionResults);
     }
 
     private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
@@ -1845,183 +1885,39 @@
     }
 
     private static IReadOnlyList<string> GetDisplayStepLabels(ChatTimelineItem item)
-    {
-        if (item.ExecutionPlan?.Steps.Count > 0)
-        {
-            return item.ExecutionPlan.Steps
-                .Select(FormatExecutionStepLabel)
-                .ToArray();
-        }
-
-        if (item.PlannedActions.Count == 0)
-        {
-            return [];
-        }
-
-        return item.PlannedActions
-            .Select(static action => $"{action.ComponentId}.{action.ActionId}")
-            .ToArray();
-    }
+        => ExecutionPlanNarrativeFormatter.BuildStepLabels(item.ExecutionPlan, item.LegacyPlannedActions);
 
     private static bool TryGetPlanSummary(ChatTimelineItem item, out string summary)
-    {
-        if (item.ExecutionPlan is { Steps.Count: > 0 } plan)
-        {
-            summary = BuildExecutionPlanSummary(plan);
-            return true;
-        }
-
-        if (item.PlannedActions.Count > 0)
-        {
-            summary = item.PlannedActions.Count == 1
-                ? "Plan: 1 action."
-                : $"Plan: {item.PlannedActions.Count} actions.";
-            return true;
-        }
-
-        summary = string.Empty;
-        return false;
-    }
-
-    private static string BuildExecutionPlanSummary(AgentExecutionPlan plan)
-    {
-        var approvalCount = plan.Steps.Count(static step => step.RequiresApproval);
-        var mutationCount = plan.Steps.Count(static step =>
-            step.PolicyDecision.RiskClass is not AgentRiskClass.ReadOnly);
-
-        var parts = new List<string>
-        {
-            plan.Steps.Count == 1
-                ? "Plan: 1 step"
-                : $"Plan: {plan.Steps.Count} steps"
-        };
-
-        if (mutationCount > 0)
-        {
-            parts.Add(mutationCount == 1 ? "1 mutating" : $"{mutationCount} mutating");
-        }
-
-        if (approvalCount > 0)
-        {
-            parts.Add(approvalCount == 1 ? "1 approval" : $"{approvalCount} approvals");
-        }
-
-        if (!string.IsNullOrWhiteSpace(plan.Context.Route))
-        {
-            parts.Add($"route {plan.Context.Route}");
-        }
-
-        parts.Add($"context {plan.Context.Freshness.ToString().ToLowerInvariant()}");
-        return string.Join(" • ", parts);
-    }
+        => ExecutionPlanNarrativeFormatter.TryBuildPlanSummary(item.ExecutionPlan, item.LegacyPlannedActions, out summary);
 
     private static string BuildApprovalSummary(IReadOnlyList<PendingApprovalInfo> approvals)
-    {
-        if (approvals.Count == 0)
-        {
-            return "No approvals pending.";
-        }
-
-        var highestRisk = approvals
-            .Select(static approval => approval.PolicyDecision?.RiskClass ?? AgentRiskClass.Unknown)
-            .Max();
-
-        var riskSummary = highestRisk switch
-        {
-            AgentRiskClass.SensitiveMutation => "highest risk: sensitive mutation",
-            AgentRiskClass.SignificantMutation => "highest risk: significant mutation",
-            AgentRiskClass.LowRiskMutation => "highest risk: low-risk mutation",
-            AgentRiskClass.ReadOnly => "read-only approval",
-            AgentRiskClass.RestrictedAction => "restricted action",
-            _ => null
-        };
-
-        var baseSummary = approvals.Count == 1
-            ? "1 step is waiting for approval."
-            : $"{approvals.Count} steps are waiting for approval.";
-
-        return string.IsNullOrWhiteSpace(riskSummary)
-            ? baseSummary
-            : $"{baseSummary} {riskSummary}.";
-    }
+        => ExecutionPlanNarrativeFormatter.BuildApprovalSummary(
+            approvals.Select(static approval => approval.PolicyDecision));
 
     private static string GetApprovalDisplayTitle(PendingApprovalInfo approval) =>
-        string.IsNullOrWhiteSpace(approval.Description)
-            ? $"{approval.ComponentId}.{approval.ActionId}"
-            : approval.Description;
+        ExecutionPlanNarrativeFormatter.BuildApprovalDisplayTitle(
+            approval.ComponentId,
+            approval.ActionId,
+            approval.Description);
 
-    private static string BuildApprovalPolicySummary(AgentPolicyDecision policyDecision)
-    {
-        var parts = new List<string>(2)
-        {
-            policyDecision.RiskClass switch
-            {
-                AgentRiskClass.ReadOnly => "read-only",
-                AgentRiskClass.LowRiskMutation => "low-risk mutation",
-                AgentRiskClass.SignificantMutation => "significant mutation",
-                AgentRiskClass.SensitiveMutation => "sensitive mutation",
-                AgentRiskClass.RestrictedAction => "restricted action",
-                _ => "unknown risk"
-            },
-            policyDecision.ApprovalMode switch
-            {
-                AgentApprovalMode.InlineConfirm => "inline confirm",
-                AgentApprovalMode.ExplicitPlanApproval => "plan approval",
-                AgentApprovalMode.StepApproval => "step approval",
-                AgentApprovalMode.PolicyDenied => "policy denied",
-                _ => "no approval mode"
-            }
-        };
-
-        if (!string.IsNullOrWhiteSpace(policyDecision.Reason))
-        {
-            parts.Add(policyDecision.Reason);
-        }
-
-        return string.Join(" • ", parts);
-    }
-
-    private static string FormatExecutionStepLabel(AgentExecutionStep step)
-    {
-        var prefix = step.RequiresApproval
-            ? "Approve"
-            : step.Kind switch
-            {
-                AgentExecutionStepKind.SemanticCapability => "Capability",
-                AgentExecutionStepKind.ServiceTool => "Tool",
-                AgentExecutionStepKind.GeneratedUiTool => "UI Block",
-                _ => "UI"
-            };
-
-        var status = step.Status switch
-        {
-            AgentExecutionStepStatus.ApprovalRequired => "awaiting approval",
-            AgentExecutionStepStatus.Completed => "done",
-            AgentExecutionStepStatus.NeedsClarification => "needs clarification",
-            AgentExecutionStepStatus.Blocked => "blocked",
-            AgentExecutionStepStatus.Failed => "failed",
-            _ => "planned"
-        };
-
-        return $"{prefix}: {step.TargetId}.{step.ActionId} ({status})";
-    }
+    private static string BuildApprovalPolicySummary(AgentPolicyDecision policyDecision) =>
+        ExecutionPlanNarrativeFormatter.BuildApprovalPolicySummary(policyDecision);
 
     private static IReadOnlyList<string> GetDisplayResultTexts(ChatTimelineItem item)
     {
         if (item.ExecutionPlan?.Steps.Count > 0)
         {
             return item.ExecutionPlan.Steps
-                .Where(static step => !string.IsNullOrWhiteSpace(step.Message))
-                .Select(static step => step.Message!)
+                .SelectMany(ExecutionStepNarrativeFormatter.BuildResultTexts)
                 .ToArray();
         }
 
-        if (item.ExecutionResults.Count == 0)
+        if (item.LegacyExecutionResults.Count == 0)
         {
             return [];
         }
 
-        return item.ExecutionResults
+        return item.LegacyExecutionResults
             .Where(static result => !string.IsNullOrWhiteSpace(result.Message))
             .Select(static result => result.Message)
             .ToArray();
@@ -2540,9 +2436,13 @@
     {
         try
         {
-            var activitySummaries = turnOutcome.Response.ExecutionResults
-                .Select(r => $"{r.ComponentId}.{r.ActionId}")
-                .ToList();
+            var activitySummaries = turnOutcome.Response.ExecutionPlan?.Steps.Count > 0
+                ? turnOutcome.Response.ExecutionPlan.Steps
+                    .Select(static step => $"{step.TargetId}.{step.ActionId}")
+                    .ToList()
+                : turnOutcome.Response.LegacyExecutionResults
+                    .Select(r => $"{r.ComponentId}.{r.ActionId}")
+                    .ToList();
 
             if (activitySummaries.Count == 0)
                 return;
@@ -2577,8 +2477,8 @@
         string RoleLabel,
         string Text,
         IReadOnlyList<ActivityMessage> ActivityMessages,
-        IReadOnlyList<PlannedComponentAction> PlannedActions,
-        IReadOnlyList<ComponentActionExecutionResult> ExecutionResults,
+        IReadOnlyList<PlannedComponentAction> LegacyPlannedActions,
+        IReadOnlyList<ComponentActionExecutionResult> LegacyExecutionResults,
         AgentExecutionPlan? ExecutionPlan,
         AgentUiDocument? GeneratedUi,
         string? RunId,
@@ -2596,8 +2496,8 @@
                 response.AgentName,
                 response.ResponseText,
                 activityMessages ?? [],
-                response.PlannedActions,
-                response.ExecutionResults,
+                response.LegacyPlannedActions,
+                response.LegacyExecutionResults,
                 response.ExecutionPlan,
                 response.GeneratedUi,
                 runId);
@@ -2633,7 +2533,9 @@
         string Description,
         IReadOnlyDictionary<string, object?> Parameters,
         AgentPolicyDecision? PolicyDecision,
-        string? PolicySummary);
+        string? PolicySummary,
+        string? StepLabel,
+        IReadOnlyList<string> NarrativeLines);
 
     /// <summary>Pre-fills the prompt input with the given text.</summary>
     public Task InjectAsync(string prompt)

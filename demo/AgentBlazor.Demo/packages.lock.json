@@ -4,9 +4,9 @@
     "net10.0": {
       "Microsoft.AspNetCore.App.Internal.Assets": {
         "type": "Direct",
-        "requested": "[10.0.4, )",
-        "resolved": "10.0.4",
-        "contentHash": "M942X5Vy726SlvFBuoAC4cDczEMlPAFt1mmyFlrkw/QcpdVwVU0DkF4P9JabxX6eWNm9RvaYZHe25FN7oXoxpQ=="
+        "requested": "[10.0.5, )",
+        "resolved": "10.0.5",
+        "contentHash": "Oxw9Ps1/nd6c/EMCAI13AeJFEqXezAvCEOshMjUWmL7LeGirHJNzytR2e/3jINYg0j2TmPvNUowGHf+gp8zDSQ=="
       },
       "Microsoft.EntityFrameworkCore": {
         "type": "Direct",
@@ -235,17 +235,10 @@
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )"
         }
       },
-      "agentblazor.defaultagent": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )"
-        }
-      },
       "agentblazor.hosting": {
         "type": "Project",
         "dependencies": {
           "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.DefaultAgent": "[1.0.0, )",
           "AgentBlazor.Licensing": "[1.0.0, )",
           "AgentBlazor.ProviderAdapters": "[1.0.0, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"

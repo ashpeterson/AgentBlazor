@@ -20,6 +20,12 @@ internal sealed class DojoWorkspaceEntity
 
     public bool Vegetarian { get; set; }
 
+    public bool BudgetFriendly { get; set; }
+
+    public bool OnePotMeal { get; set; }
+
+    public bool Vegan { get; set; }
+
     public DateTime? LastSavedUtc { get; set; }
 
     public DateTime CreatedUtc { get; set; }

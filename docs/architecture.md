@@ -1,6 +1,6 @@
 # AgentBlazor Architecture
 
-Last updated: 2026-03-18
+Last updated: 2026-03-19
 
 ## Purpose
 
@@ -20,7 +20,6 @@ src/
   AgentBlazor.Core
   AgentBlazor.Hosting
   AgentBlazor.ProviderAdapters
-  AgentBlazor.DefaultAgent
   AgentBlazor.Licensing
 
 demo/
@@ -83,6 +82,11 @@ Owns app startup and protocol/endpoint wiring:
 - dev tools and paid-service registration
 - host integration for ASP.NET / Blazor apps
 
+Current status:
+
+- hosting no longer needs a direct compile-time dependency on the removed `AgentBlazor.DefaultAgent` package
+- legacy default-agent compatibility now lives only through the remaining Core/Hosting option surface
+
 ### AgentBlazor.ProviderAdapters
 
 Owns LLM provider registration only:
@@ -90,16 +94,6 @@ Owns LLM provider registration only:
 - OpenAI
 - Azure OpenAI
 - Ollama
-
-### AgentBlazor.DefaultAgent
-
-Legacy compatibility package for default agent descriptor plumbing.
-
-Current status:
-
-- legacy only
-- explicit agent registration and runtime-adapter-backed capability projection are the preferred path
-- the package remains only to preserve older setup flows during migration
 
 ### AgentBlazor.Licensing
 
@@ -114,10 +108,10 @@ Owns entitlement primitives:
 Current compile-time direction:
 
 - `AgentBlazor.Core -> AgentBlazor.Licensing`
-- `AgentBlazor.Hosting -> AgentBlazor.Core`, `AgentBlazor.ProviderAdapters`, `AgentBlazor.DefaultAgent`, `AgentBlazor.Licensing`
+- `AgentBlazor.Hosting -> AgentBlazor.Core`, `AgentBlazor.ProviderAdapters`, `AgentBlazor.Licensing`
 - `AgentBlazor.Components -> AgentBlazor.Core`, `AgentBlazor.Hosting`
 
-This keeps runtime decisions out of the UI layer and keeps provider-specific code out of Core.
+This keeps runtime decisions out of the UI layer, keeps provider-specific code out of Core, and reduces legacy-package coupling in hosting.
 
 ## Runtime Pipeline
 
@@ -305,7 +299,7 @@ The repository now proves the current drop-in story through:
 Current proof areas include:
 
 - isolated component parity pages for forms, grids, dialogs, choice inputs, file upload, date pickers, workflow navigation, and hierarchy navigation
-- one broader composed workflow page that mounts several Mud-backed `Agent*` components together on the same screen
+- multiple broader workflow pages that mount several Mud-backed `Agent*` components together on the same screen, including supplier-compliance, file-audit, and recipe-release flows with blocked and approval-gated branches
 
 ## Current Architectural Gaps
 
@@ -400,7 +394,7 @@ Do not:
 - persistent paid intelligence is incomplete
 - declarative interoperability is useful but still a subset implementation
 - open-ended hosted-app support is present as a demo pattern but not yet deeply productized
-- some component demos still need richer workflow depth
+- some component demos still need richer workflow depth, even though the current showcase now includes multiple cross-surface workflow proofs
 
 ## Reference Docs
 

@@ -66,7 +66,10 @@ internal static class RuntimeExecutionPlans
                 RequiresApproval: approval is not null,
                 PolicyDecision: RuntimeTrustDecisions.BuildPolicyDecision(action.ComponentId, action.ActionId, approval is not null),
                 Arguments: action.Arguments,
-                Message: approval?.Description ?? result?.Message));
+                Message: approval?.Description ?? result?.Message,
+                Outputs: null,
+                Warnings: null,
+                NextActions: null));
         }
 
         return new AgentExecutionPlan(

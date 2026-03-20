@@ -172,6 +172,22 @@ public sealed class AgentBlazorBuilder
     }
 
     /// <summary>
+    /// Re-enables legacy implicit fallback to the built-in default agent when multiple agents are registered.
+    /// Prefer explicit agent targeting instead of this compatibility switch.
+    /// </summary>
+    public AgentBlazorBuilder UseLegacyDefaultAgentFallback()
+    {
+        Services.Configure<AgentBlazorOptions>(options =>
+        {
+#pragma warning disable CS0618
+            options.DefaultAgent.Enabled = true;
+            options.DefaultAgent.PreferAsImplicitFallback = true;
+#pragma warning restore CS0618
+        });
+        return this;
+    }
+
+    /// <summary>
     /// Replaces the default conversation store with a custom implementation.
     /// </summary>
     public AgentBlazorBuilder UseConversationStore<TStore>()

@@ -55,18 +55,47 @@ internal sealed class SupplierComplianceCapabilities(SupplierComplianceWorkflowS
         }
 
         var summary = workflow.PrepareRemediationDraft();
-        return Task.FromResult(CapabilityResult.Success(summary) with
+        var resultFactory = workflow.LatestDraftBlockers.Count > 0
+            ? CapabilityResult.Blocked(summary)
+            : CapabilityResult.Success(summary);
+
+        return Task.FromResult(resultFactory with
         {
             Outputs = new Dictionary<string, object?>
             {
                 ["draftTitle"] = workflow.CurrentDraft?.Title,
                 ["draftSupplierIds"] = workflow.CurrentDraft?.SupplierIds.ToArray(),
-                ["draftActionCount"] = workflow.CurrentDraft?.Actions.Count ?? 0
+                ["draftActionCount"] = workflow.CurrentDraft?.Actions.Count ?? 0,
+                ["draftBlockers"] = workflow.LatestDraftBlockers.ToArray()
+            },
+            NextActions =
+            workflow.LatestDraftBlockers.Count > 0
+                ? [
+                    "Apply the supplier recovery playbook for the highlighted suppliers",
+                    "Prepare the remediation draft again once the blockers are cleared"
+                ]
+                : [
+                    "Review the remediation draft",
+                    "Approve the remediation draft"
+                ]
+        });
+    }
+
+    [AgentAction("Apply the supplier recovery playbook for the highlighted suppliers", ActionId = "apply_supplier_recovery_playbook")]
+    public Task<CapabilityResult> ApplySupplierRecoveryPlaybookAsync()
+    {
+        var summary = workflow.ApplyRecoveryPlaybook();
+        return Task.FromResult(CapabilityResult.Success(summary) with
+        {
+            Outputs = new Dictionary<string, object?>
+            {
+                ["recoveredSupplierIds"] = workflow.RecoveredSupplierIds.ToArray(),
+                ["remainingBlockerCount"] = workflow.LatestDraftBlockers.Count
             },
             NextActions =
             [
-                "Review the remediation draft",
-                "Approve the remediation draft"
+                "Prepare the remediation draft again for the highlighted suppliers",
+                "Review the remaining supplier signals before approving the remediation batch"
             ]
         });
     }
@@ -91,6 +120,8 @@ internal sealed class SupplierComplianceWorkflowService
     ];
 
     private readonly HashSet<string> _highlightedSupplierIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _recoveredSupplierIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _latestDraftBlockers = [];
 
     public event Action? Changed;
 
@@ -102,6 +133,8 @@ internal sealed class SupplierComplianceWorkflowService
 
     public bool IsRemediationDialogOpen { get; private set; }
 
+    public IReadOnlyList<string> LatestDraftBlockers => _latestDraftBlockers.ToArray();
+
     public IReadOnlyList<SupplierComplianceRow> VisibleSuppliers =>
         _suppliers
             .Where(static supplier => true)
@@ -112,11 +145,15 @@ internal sealed class SupplierComplianceWorkflowService
 
     public IReadOnlyCollection<string> HighlightedSupplierIds => _highlightedSupplierIds.ToArray();
 
+    public IReadOnlyCollection<string> RecoveredSupplierIds => _recoveredSupplierIds.ToArray();
+
     public string FocusAtRiskSuppliers(int days)
     {
         CurrentReviewWindowDays = days <= 0 ? 30 : days;
         ShowOnlyHighlighted = true;
         _highlightedSupplierIds.Clear();
+        _recoveredSupplierIds.Clear();
+        _latestDraftBlockers.Clear();
 
         foreach (var supplier in _suppliers.Where(s => IsAtRisk(s, CurrentReviewWindowDays)))
         {
@@ -153,12 +190,52 @@ internal sealed class SupplierComplianceWorkflowService
             .Where(supplier => _highlightedSupplierIds.Contains(supplier.Id))
             .ToArray();
 
+        _latestDraftBlockers.Clear();
+        foreach (var blocker in BuildDraftBlockers(targetedSuppliers))
+        {
+            _latestDraftBlockers.Add(blocker);
+        }
+
+        if (_latestDraftBlockers.Count > 0)
+        {
+            CurrentDraft = null;
+            IsRemediationDialogOpen = false;
+            LatestInsight = $"Remediation draft is blocked: {_latestDraftBlockers[0]}";
+            NotifyChanged();
+            return LatestInsight;
+        }
+
         CurrentDraft = new SupplierRemediationDraft(
             "Prepare remediation batch",
             targetedSuppliers.Select(static supplier => supplier.Id).ToArray(),
             targetedSuppliers.SelectMany(BuildDraftActions).ToArray());
         IsRemediationDialogOpen = true;
         LatestInsight = $"Prepared a remediation draft for {targetedSuppliers.Length} highlighted suppliers.";
+        NotifyChanged();
+        return LatestInsight;
+    }
+
+    public string ApplyRecoveryPlaybook()
+    {
+        var targetedSuppliers = _suppliers
+            .Where(supplier => _highlightedSupplierIds.Contains(supplier.Id))
+            .ToArray();
+        var recoverableSuppliers = targetedSuppliers
+            .Where(IsDraftBlockedSupplier)
+            .ToArray();
+
+        foreach (var supplier in recoverableSuppliers)
+        {
+            _recoveredSupplierIds.Add(supplier.Id);
+        }
+
+        _latestDraftBlockers.Clear();
+        CurrentDraft = null;
+        IsRemediationDialogOpen = false;
+
+        LatestInsight = recoverableSuppliers.Length == 0
+            ? "The supplier recovery playbook found no severe remediation blockers to clear."
+            : $"Applied the supplier recovery playbook for {recoverableSuppliers.Length} highlighted suppliers so remediation drafting can proceed.";
         NotifyChanged();
         return LatestInsight;
     }
@@ -177,6 +254,8 @@ internal sealed class SupplierComplianceWorkflowService
         IsRemediationDialogOpen = false;
         ShowOnlyHighlighted = false;
         _highlightedSupplierIds.Clear();
+        _recoveredSupplierIds.Clear();
+        _latestDraftBlockers.Clear();
         NotifyChanged();
     }
 
@@ -197,7 +276,7 @@ internal sealed class SupplierComplianceWorkflowService
         || supplier.MissingIsoEvidence
         || supplier.MissedLastAudit;
 
-    private static IReadOnlyList<string> GetRiskSignals(SupplierComplianceRow supplier, int days)
+    private IReadOnlyList<string> GetRiskSignals(SupplierComplianceRow supplier, int days)
     {
         var reasons = new List<string>();
 
@@ -226,6 +305,11 @@ internal sealed class SupplierComplianceWorkflowService
             reasons.Add("last scheduled audit was missed");
         }
 
+        if (_recoveredSupplierIds.Contains(supplier.Id))
+        {
+            reasons.Add("supplier recovery playbook has staged remediation prerequisites");
+        }
+
         return reasons;
     }
 
@@ -244,6 +328,28 @@ internal sealed class SupplierComplianceWorkflowService
             $"{supplier.Name}: {string.Join("; ", GetRiskSignals(supplier, CurrentReviewWindowDays))}");
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private IEnumerable<string> BuildDraftBlockers(IEnumerable<SupplierComplianceRow> suppliers)
+    {
+        foreach (var supplier in suppliers)
+        {
+            if (_recoveredSupplierIds.Contains(supplier.Id))
+            {
+                continue;
+            }
+
+            if (IsDraftBlockedSupplier(supplier))
+            {
+                yield return $"{supplier.Name} still has unresolved severe signals that require the recovery playbook before remediation drafting.";
+            }
+        }
+    }
+
+    private static bool IsDraftBlockedSupplier(SupplierComplianceRow supplier)
+    {
+        return (supplier.MissingIsoEvidence && supplier.MissedLastAudit)
+            || supplier.OpenRemediationActions >= 4;
     }
 
     private static IEnumerable<string> BuildDraftActions(SupplierComplianceRow supplier)

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Execution;
 using AgentBlazor.Options;
 using Microsoft.Extensions.Options;
 
@@ -202,6 +203,33 @@ internal sealed class PromptTraceBuilder
     }
 
     /// <summary>
+    /// Records planning from a normalized execution plan.
+    /// </summary>
+    public PromptTraceBuilder RecordPlanning(
+        AgentExecutionPlan executionPlan,
+        int toolCount = 0)
+    {
+        if (!IsEnabled) return this;
+
+        var tracedActions = executionPlan.Steps.Select(step => new PromptTracePlannedAction
+        {
+            ComponentId = step.TargetId,
+            ActionId = step.ActionId,
+            Reason = step.Message ?? $"{step.Kind} step",
+            Arguments = _options.CaptureActionArguments ? step.Arguments : null
+        }).ToArray();
+
+        _planning = new PromptTracePlanning
+        {
+            PlannedActions = tracedActions,
+            Duration = _stageStopwatch.Elapsed,
+            ToolCount = toolCount
+        };
+
+        return this;
+    }
+
+    /// <summary>
     /// Records execution results.
     /// </summary>
     public PromptTraceBuilder RecordExecution(
@@ -228,6 +256,34 @@ internal sealed class PromptTraceBuilder
             TotalDuration = _stageStopwatch.Elapsed,
             SuccessCount = results.Count(r => r.Succeeded),
             FailureCount = results.Count(r => !r.Succeeded)
+        };
+
+        return this;
+    }
+
+    /// <summary>
+    /// Records execution results from a normalized execution plan.
+    /// </summary>
+    public PromptTraceBuilder RecordExecution(AgentExecutionPlan executionPlan)
+    {
+        if (!IsEnabled) return this;
+
+        var tracedResults = executionPlan.Steps.Select(step => new PromptTraceExecutionResult
+        {
+            ComponentId = step.TargetId,
+            ActionId = step.ActionId,
+            Succeeded = step.Status is AgentExecutionStepStatus.Completed,
+            Outcome = MapOutcome(step.Status),
+            Message = step.Message ?? string.Empty,
+            Duration = TimeSpan.Zero
+        }).ToArray();
+
+        _execution = new PromptTraceExecution
+        {
+            Results = tracedResults,
+            TotalDuration = _stageStopwatch.Elapsed,
+            SuccessCount = tracedResults.Count(static result => result.Succeeded),
+            FailureCount = tracedResults.Count(static result => !result.Succeeded)
         };
 
         return this;
@@ -335,4 +391,15 @@ internal sealed class PromptTraceBuilder
         var guid = Guid.NewGuid().ToString("N")[..12];
         return $"trace_{timestamp}_{guid}";
     }
+
+    private static ActionOutcome MapOutcome(AgentExecutionStepStatus status)
+        => status switch
+        {
+            AgentExecutionStepStatus.Completed => ActionOutcome.Applied,
+            AgentExecutionStepStatus.ApprovalRequired => ActionOutcome.Blocked,
+            AgentExecutionStepStatus.NeedsClarification => ActionOutcome.NeedsClarification,
+            AgentExecutionStepStatus.Blocked => ActionOutcome.Blocked,
+            AgentExecutionStepStatus.Failed => ActionOutcome.Failed,
+            _ => ActionOutcome.Queued
+        };
 }

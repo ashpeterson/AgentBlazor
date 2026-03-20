@@ -154,7 +154,7 @@ internal sealed record PromptTraceResolution
 }
 
 /// <summary>
-/// Represents a single planned action in the planning stage.
+/// Represents a single planned step in the planning stage.
 /// </summary>
 internal sealed record PromptTracePlannedAction
 {
@@ -169,25 +169,30 @@ internal sealed record PromptTracePlannedAction
     public required string ActionId { get; init; }
 
     /// <summary>
-    /// Reason for planning this action.
+    /// Reason for planning this step.
     /// </summary>
     public required string Reason { get; init; }
 
     /// <summary>
-    /// Arguments for the action.
+    /// Arguments for the step.
     /// </summary>
     public IReadOnlyDictionary<string, object?>? Arguments { get; init; }
 }
 
 /// <summary>
-/// Represents the action planning stage of the trace.
+/// Represents the planning stage of the trace.
 /// </summary>
 internal sealed record PromptTracePlanning
 {
     /// <summary>
-    /// All actions planned for execution.
+    /// All steps planned for execution.
     /// </summary>
     public required IReadOnlyList<PromptTracePlannedAction> PlannedActions { get; init; }
+
+    /// <summary>
+    /// Normalized workflow-step view over the planned actions.
+    /// </summary>
+    public IReadOnlyList<PromptTracePlannedAction> WorkflowSteps => PlannedActions;
 
     /// <summary>
     /// Time taken for planning.
@@ -245,6 +250,11 @@ internal sealed record PromptTraceExecution
     /// All execution results.
     /// </summary>
     public required IReadOnlyList<PromptTraceExecutionResult> Results { get; init; }
+
+    /// <summary>
+    /// Normalized workflow-step execution view over the recorded results.
+    /// </summary>
+    public IReadOnlyList<PromptTraceExecutionResult> ExecutionSteps => Results;
 
     /// <summary>
     /// Total time for all executions.

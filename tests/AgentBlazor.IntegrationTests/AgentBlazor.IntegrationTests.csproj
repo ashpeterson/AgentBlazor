@@ -26,7 +26,6 @@
     <ProjectReference Include="..\..\demo\AgentBlazor.Demo\AgentBlazor.Demo.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.Core\AgentBlazor.Core.csproj" />
-    <ProjectReference Include="..\..\src\AgentBlazor.DefaultAgent\AgentBlazor.DefaultAgent.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.Components\AgentBlazor.Components.csproj" />
     <ProjectReference Include="..\..\src\AgentBlazor.ProviderAdapters\AgentBlazor.ProviderAdapters.csproj" />
   </ItemGroup>

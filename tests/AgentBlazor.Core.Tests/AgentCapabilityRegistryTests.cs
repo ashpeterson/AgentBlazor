@@ -1,5 +1,6 @@
 using AgentBlazor.App;
 using AgentBlazor.Attributes;
+using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -146,6 +147,35 @@ public class AgentCapabilityRegistryTests
         Assert.Equal(["SUP-1", "SUP-2"], supplierIds);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_BindsContextScopedParametersWithoutProjectingThem()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<CapabilityRecorder>();
+        services.AddAgentBlazorServices()
+            .AddCapability<ContextCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+        var recorder = provider.GetRequiredService<CapabilityRecorder>();
+
+        var capability = Assert.Single(registry.GetCapabilities(provider));
+        var action = Assert.Single(capability.Actions);
+        Assert.Empty(action.Parameters);
+        Assert.DoesNotContain("agentblazor.session_id", action.InputSchema, StringComparison.OrdinalIgnoreCase);
+
+        var result = await registry.ExecuteAsync(
+            "context_scoped.capture_session",
+            new Dictionary<string, object?>
+            {
+                [AgentRuntimeContextKeys.SessionId] = "ctx-123"
+            },
+            provider);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("ctx-123", recorder.LastSessionId);
+    }
+
     [AgentCapability(
         "supplier_compliance",
         Name = "Supplier Compliance",
@@ -186,6 +216,18 @@ public class AgentCapabilityRegistryTests
         private bool CanPrepareRemediation() => gate.CanPrepare;
     }
 
+    [AgentCapability("context_scoped", Name = "Context Scoped", Category = "Workflow")]
+    public sealed class ContextCapabilities(CapabilityRecorder recorder)
+    {
+        [AgentAction("Capture the current session", ActionId = "capture_session")]
+        public CapabilityResult CaptureSessionAsync(
+            [AgentParam(ContextKey = AgentRuntimeContextKeys.SessionId)] string sessionId)
+        {
+            recorder.LastSessionId = sessionId;
+            return CapabilityResult.Success($"Captured {sessionId}.");
+        }
+    }
+
     public sealed class CapabilityGate
     {
         public bool CanPrepare { get; set; }
@@ -196,5 +238,7 @@ public class AgentCapabilityRegistryTests
         public int LastDays { get; set; }
 
         public string[]? LastPreparedSupplierIds { get; set; }
+
+        public string? LastSessionId { get; set; }
     }
 }

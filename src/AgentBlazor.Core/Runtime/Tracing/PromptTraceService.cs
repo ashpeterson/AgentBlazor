@@ -229,16 +229,23 @@ internal sealed class PromptTraceService : IPromptTraceService
             // Planning
             if (trace.Planning is not null)
             {
-                sb.AppendLine("#### Planning");
+                sb.AppendLine("#### Workflow Planning");
                 sb.AppendLine();
-                sb.AppendLine($"- **Tool Count:** {trace.Planning.ToolCount}");
-                sb.AppendLine($"- **Planned Actions:** {trace.Planning.PlannedActions.Count}");
+                sb.AppendLine($"- **Available Tools:** {trace.Planning.ToolCount}");
+                sb.AppendLine($"- **Planned Workflow Steps:** {trace.Planning.WorkflowSteps.Count}");
                 sb.AppendLine($"- **Duration:** {trace.Planning.Duration.TotalMilliseconds:F1}ms");
                 sb.AppendLine();
 
-                foreach (var action in trace.Planning.PlannedActions)
+                for (var index = 0; index < trace.Planning.WorkflowSteps.Count; index++)
                 {
-                    sb.AppendLine($"  - `{action.ComponentId}.{action.ActionId}` - {action.Reason}");
+                    var action = trace.Planning.WorkflowSteps[index];
+                    sb.AppendLine($"  - **Step {index + 1}:** `{FormatStepTarget(action.ComponentId, action.ActionId)}`");
+                    sb.AppendLine($"    Reason: {action.Reason}");
+                    if (action.Arguments?.Count > 0)
+                    {
+                        var args = string.Join(", ", action.Arguments.Select(static kvp => $"{kvp.Key}={kvp.Value}"));
+                        sb.AppendLine($"    Arguments: {args}");
+                    }
                 }
                 sb.AppendLine();
             }
@@ -246,18 +253,18 @@ internal sealed class PromptTraceService : IPromptTraceService
             // Execution
             if (trace.Execution is not null)
             {
-                sb.AppendLine("#### Execution");
+                sb.AppendLine("#### Workflow Execution");
                 sb.AppendLine();
-                sb.AppendLine($"| Component | Action | Result | Message | Duration |");
-                sb.AppendLine($"|-----------|--------|--------|---------|----------|");
-                foreach (var result in trace.Execution.Results)
+                sb.AppendLine($"| Step | Outcome | Message | Duration |");
+                sb.AppendLine($"|------|---------|---------|----------|");
+                foreach (var result in trace.Execution.ExecutionSteps)
                 {
-                    var status = result.Succeeded ? "OK" : "FAIL";
+                    var status = FormatExecutionOutcome(result);
                     var msg = result.Message.Length > 50 ? $"{result.Message[..50]}..." : result.Message;
-                    sb.AppendLine($"| {result.ComponentId} | {result.ActionId} | {status} | {msg} | {result.Duration.TotalMilliseconds:F1}ms |");
+                    sb.AppendLine($"| {FormatStepTarget(result.ComponentId, result.ActionId)} | {status} | {msg} | {result.Duration.TotalMilliseconds:F1}ms |");
                 }
                 sb.AppendLine();
-                sb.AppendLine($"**Total Duration:** {trace.Execution.TotalDuration.TotalMilliseconds:F1}ms | **Success:** {trace.Execution.SuccessCount} | **Failure:** {trace.Execution.FailureCount}");
+                sb.AppendLine($"**Total Duration:** {trace.Execution.TotalDuration.TotalMilliseconds:F1}ms | **Completed:** {trace.Execution.SuccessCount} | **Failed/Blocked:** {trace.Execution.FailureCount}");
                 sb.AppendLine();
             }
 
@@ -289,4 +296,19 @@ internal sealed class PromptTraceService : IPromptTraceService
 
         return sb.ToString();
     }
+
+    private static string FormatStepTarget(string componentId, string actionId)
+        => $"{componentId}.{actionId}";
+
+    private static string FormatExecutionOutcome(PromptTraceExecutionResult result)
+        => result.Succeeded
+            ? "Completed"
+            : result.Outcome switch
+            {
+                ActionOutcome.Blocked => "Blocked",
+                ActionOutcome.NeedsClarification => "Needs clarification",
+                ActionOutcome.Queued => "Queued",
+                ActionOutcome.Failed => "Failed",
+                _ => "Failed"
+            };
 }

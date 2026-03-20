@@ -49,6 +49,9 @@ internal sealed class DojoWorkspaceService(IDbContextFactory<DemoWorkflowDbConte
         workspace.LowCarb = recipe.LowCarb;
         workspace.Spicy = recipe.Spicy;
         workspace.Vegetarian = recipe.Vegetarian;
+        workspace.BudgetFriendly = recipe.BudgetFriendly;
+        workspace.OnePotMeal = recipe.OnePotMeal;
+        workspace.Vegan = recipe.Vegan;
         workspace.LastSavedUtc = DateTime.UtcNow;
         workspace.UpdatedUtc = DateTime.UtcNow;
 
@@ -226,6 +229,9 @@ internal sealed class DojoWorkspaceService(IDbContextFactory<DemoWorkflowDbConte
             LowCarb = true,
             Spicy = false,
             Vegetarian = true,
+            BudgetFriendly = true,
+            OnePotMeal = false,
+            Vegan = false,
             LastSavedUtc = null,
             CreatedUtc = now,
             UpdatedUtc = now
@@ -356,7 +362,10 @@ internal sealed class DojoWorkspaceService(IDbContextFactory<DemoWorkflowDbConte
                 HighProtein = workspace.HighProtein,
                 LowCarb = workspace.LowCarb,
                 Spicy = workspace.Spicy,
-                Vegetarian = workspace.Vegetarian
+                Vegetarian = workspace.Vegetarian,
+                BudgetFriendly = workspace.BudgetFriendly,
+                OnePotMeal = workspace.OnePotMeal,
+                Vegan = workspace.Vegan
             },
             Ingredients: ingredients,
             Steps: steps,

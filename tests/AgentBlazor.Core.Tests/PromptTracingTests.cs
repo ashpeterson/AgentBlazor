@@ -21,7 +21,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -39,7 +41,8 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -57,7 +60,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -78,7 +83,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -111,7 +118,9 @@ public class PromptTracingTests
             }));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -123,8 +132,8 @@ public class PromptTracingTests
         var trace = Assert.Single(traces);
 
         Assert.NotNull(trace.Planning);
-        Assert.NotEmpty(trace.Planning.PlannedActions);
-        Assert.Contains(trace.Planning.PlannedActions, action =>
+        Assert.NotEmpty(trace.Planning.WorkflowSteps);
+        Assert.Contains(trace.Planning.WorkflowSteps, action =>
             string.Equals(action.ComponentId, "AgentDataGrid", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(action.ActionId, "filter", StringComparison.OrdinalIgnoreCase));
     }
@@ -136,7 +145,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -148,8 +159,8 @@ public class PromptTracingTests
         var trace = Assert.Single(traces);
 
         Assert.NotNull(trace.Execution);
-        Assert.NotEmpty(trace.Execution.Results);
-        Assert.Contains(trace.Execution.Results, result =>
+        Assert.NotEmpty(trace.Execution.ExecutionSteps);
+        Assert.Contains(trace.Execution.ExecutionSteps, result =>
             string.Equals(result.ComponentId, "AgentDialog", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(result.ActionId, "open", StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
@@ -162,7 +173,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -191,7 +204,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient(toolName, arguments));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
         using var provider = services.BuildServiceProvider();
@@ -204,12 +219,12 @@ public class PromptTracingTests
         var trace = Assert.Single(traces);
 
         Assert.NotNull(trace.Planning);
-        Assert.Contains(trace.Planning.PlannedActions, action =>
+        Assert.Contains(trace.Planning.WorkflowSteps, action =>
             string.Equals(action.ComponentId, expectedComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(action.ActionId, expectedActionId, StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(trace.Execution);
-        Assert.Contains(trace.Execution.Results, result =>
+        Assert.Contains(trace.Execution.ExecutionSteps, result =>
             string.Equals(result.ComponentId, expectedComponentId, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(result.ActionId, expectedActionId, StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
@@ -327,7 +342,9 @@ public class PromptTracingTests
         var services = new ServiceCollection();
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -355,7 +372,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -368,6 +387,9 @@ public class PromptTracingTests
         Assert.Contains("# Prompt Trace Report", report);
         Assert.Contains("## Summary Statistics", report);
         Assert.Contains("## Trace Details", report);
+        Assert.Contains("#### Workflow Planning", report);
+        Assert.Contains("#### Workflow Execution", report);
+        Assert.Contains("Planned Workflow Steps", report);
         Assert.Contains("open dialog", report);
     }
 
@@ -378,7 +400,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -399,7 +423,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
         services.AddSingleton<TracingFailingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingFailingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -424,7 +450,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -445,7 +473,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -467,7 +497,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -492,7 +524,9 @@ public class PromptTracingTests
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -524,7 +558,9 @@ public class PromptTracingTests
         newServices.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         newServices.AddSingleton(provider.GetRequiredService<IPromptTraceStore>());
         newServices.AddSingleton(provider.GetRequiredService<IPromptTraceService>());
-        newServices.AddAgentBlazorServices().EnablePromptTracing();
+        newServices.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         var newProvider = newServices.BuildServiceProvider();
         return newProvider.GetRequiredService<IAgentRuntime>();

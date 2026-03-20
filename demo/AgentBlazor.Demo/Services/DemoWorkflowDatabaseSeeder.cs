@@ -1,4 +1,5 @@
 using AgentBlazor.Demo.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgentBlazor.Demo.Services;
@@ -29,6 +30,9 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
                 LowCarb INTEGER NOT NULL,
                 Spicy INTEGER NOT NULL,
                 Vegetarian INTEGER NOT NULL,
+                BudgetFriendly INTEGER NOT NULL DEFAULT 0,
+                OnePotMeal INTEGER NOT NULL DEFAULT 0,
+                Vegan INTEGER NOT NULL DEFAULT 0,
                 LastSavedUtc TEXT NULL,
                 CreatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
                 UpdatedUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
@@ -38,6 +42,9 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
         await db.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS IX_dojo_workspaces_SessionKey ON dojo_workspaces (SessionKey);",
             cancellationToken);
+        await TryAddColumnAsync(db, "dojo_workspaces", "BudgetFriendly INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        await TryAddColumnAsync(db, "dojo_workspaces", "OnePotMeal INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        await TryAddColumnAsync(db, "dojo_workspaces", "Vegan INTEGER NOT NULL DEFAULT 0", cancellationToken);
 
         await db.Database.ExecuteSqlRawAsync(
             """
@@ -165,5 +172,40 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
         await db.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_demo_file_workflow_jobs_SessionKey_UpdatedUtc ON demo_file_workflow_jobs (SessionKey, UpdatedUtc);",
             cancellationToken);
+    }
+
+    private static async Task TryAddColumnAsync(
+        DemoWorkflowDbContext db,
+        string tableName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                BuildAddColumnSql(tableName, columnDefinition),
+                cancellationToken);
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 1 &&
+                                         ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private static string BuildAddColumnSql(string tableName, string columnDefinition)
+    {
+        return (tableName, columnDefinition) switch
+        {
+            ("dojo_workspaces", "BudgetFriendly INTEGER NOT NULL DEFAULT 0")
+                => "ALTER TABLE dojo_workspaces ADD COLUMN BudgetFriendly INTEGER NOT NULL DEFAULT 0;",
+            ("dojo_workspaces", "OnePotMeal INTEGER NOT NULL DEFAULT 0")
+                => "ALTER TABLE dojo_workspaces ADD COLUMN OnePotMeal INTEGER NOT NULL DEFAULT 0;",
+            ("dojo_workspaces", "Vegan INTEGER NOT NULL DEFAULT 0")
+                => "ALTER TABLE dojo_workspaces ADD COLUMN Vegan INTEGER NOT NULL DEFAULT 0;",
+            _ => throw new InvalidOperationException($"Unsupported schema migration column '{tableName}.{columnDefinition}'.")
+        };
     }
 }

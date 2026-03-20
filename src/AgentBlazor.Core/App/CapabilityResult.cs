@@ -9,6 +9,8 @@ public sealed record CapabilityResult(string Summary)
 {
     public bool Succeeded { get; init; } = true;
 
+    public bool IsBlocked { get; init; }
+
     public bool RequiresClarification { get; init; }
 
     public string? ClarificationQuestion { get; init; }
@@ -27,6 +29,12 @@ public sealed record CapabilityResult(string Summary)
     public static CapabilityResult Failure(string summary) => new(summary)
     {
         Succeeded = false
+    };
+
+    public static CapabilityResult Blocked(string summary) => new(summary)
+    {
+        Succeeded = false,
+        IsBlocked = true
     };
 
     public static CapabilityResult NeedsClarification(string question) => new("Clarification required.")

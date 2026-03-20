@@ -22,7 +22,7 @@
                    href="/demo/components"
                    aria-current="@(IsOverviewRoute ? "page" : null)">
                     <span>Overview</span>
-                    <small>Choose a component, then drive it with the chat bubble.</small>
+                    <small>Use the component explorer as a reference surface after the workflow hub.</small>
                 </a>
 
                 @foreach (var entry in _componentEntries)
@@ -90,12 +90,12 @@
 
                 <div class="components-page__overview-grid">
                     <div class="components-page__mini-card">
-                        <strong>Agentic components</strong>
-                        <span>Use the catalog on the left to test one built-in component at a time with a clean live example.</span>
+                        <strong>Component reference surface</strong>
+                        <span>Use the catalog on the left to inspect one built-in component at a time after the workflow story is clear.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Capability Dojo</strong>
-                        <span>Open the Dojo to see controlled, declarative, and open-ended patterns composed into one workspace.</span>
+                        <strong>Workflow hub first</strong>
+                        <span>Start in the workflow hub for semantic, approval-aware flows, then come here to inspect reusable component contracts.</span>
                     </div>
                     <div class="components-page__mini-card">
                         <strong>Custom component path</strong>
@@ -213,7 +213,7 @@
                 {
                     <AgentNavMenu AgentId="components-nav-menu" Dense="true">
                         <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-                        <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Capability Dojo</MudNavLink>
+                        <MudNavLink Href="/demo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">Workflow Hub</MudNavLink>
                         <MudNavLink Href="/demo/components/file-upload" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.UploadFile">File Upload</MudNavLink>
                     </AgentNavMenu>
                 }

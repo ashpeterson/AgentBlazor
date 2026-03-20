@@ -147,6 +147,7 @@ public static class AgentBlazorServiceCollectionExtensions
         AgentBlazorOptions options,
         AgentBlazorConfigurationStore store)
     {
+#pragma warning disable CS0618
         var catalog = options.DefaultAgent.ComponentCatalogMode == ComponentCatalogMode.AllShippedComponents
             ? DefaultShippedComponents.CreateCatalog()
             : new ComponentCapabilityCatalog();
@@ -172,6 +173,7 @@ public static class AgentBlazorServiceCollectionExtensions
             configureCatalog(builder);
         }
 
+#pragma warning restore CS0618
         return catalog;
     }
 
@@ -182,6 +184,7 @@ public static class AgentBlazorServiceCollectionExtensions
     {
         var registry = new InMemoryAgentRegistry();
 
+#pragma warning disable CS0618
         if (options.DefaultAgent.Enabled)
         {
             var allowedComponents = options.DefaultAgent.AllowedComponents.Count > 0
@@ -199,6 +202,7 @@ public static class AgentBlazorServiceCollectionExtensions
                 AllowedActions = options.DefaultAgent.AllowedActions.ToHashSet(StringComparer.OrdinalIgnoreCase)
             });
         }
+#pragma warning restore CS0618
 
         foreach (var registration in store.AgentRegistrations)
         {

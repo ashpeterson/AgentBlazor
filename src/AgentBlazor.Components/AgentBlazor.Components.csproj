@@ -19,6 +19,7 @@
 
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AgentBlazor.Components.Tests" />
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 

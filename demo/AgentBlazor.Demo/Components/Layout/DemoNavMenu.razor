@@ -3,11 +3,23 @@
 
 <AgentNavMenu AgentId="demo-nav" Dense="true">
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Capability Dojo</MudNavLink>
-    <MudNavLink Href="/demo/workflows/supplier-compliance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RuleFolder">Supplier Compliance Workflow</MudNavLink>
+    <MudNavLink Href="/demo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.SpaceDashboard">Workflow Hub</MudNavLink>
+
+    <MudNavGroup Title="Workflow Showcases" Icon="@Icons.Material.Filled.AutoAwesomeMotion" @bind-Expanded="_workflowExpanded">
+        <MudNavLink Href="/demo/workflows/supplier-compliance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RuleFolder">Supplier Compliance Workflow</MudNavLink>
+        <MudNavLink Href="/demo/workflows/file-audit-bundle" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory2">File Audit Bundle Workflow</MudNavLink>
+        <MudNavLink Href="/demo/workflows/recipe-release" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MenuBook">Recipe Release Workflow</MudNavLink>
+        <MudNavLink Href="/demo/workflows/incident-escalation" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CrisisAlert">Incident Escalation Workflow</MudNavLink>
+        <MudNavLink Href="/demo/workflows/response-orchestration" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">Response Orchestration Workflow</MudNavLink>
+        <MudNavLink Href="/demo/workflows/release-dossier" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Release Dossier Workflow</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Reference Surfaces" Icon="@Icons.Material.Filled.BuildCircle" @bind-Expanded="_referenceExpanded">
+        <MudNavLink Href="/demo/dojo" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AutoFixHigh">Capability Dojo</MudNavLink>
+        <MudNavLink Href="/demo/components" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewAgenda">Component Overview</MudNavLink>
+    </MudNavGroup>
 
     <MudNavGroup Title="Agentic Components" Icon="@Icons.Material.Filled.Widgets" @bind-Expanded="_componentsExpanded">
-        <MudNavLink Href="/demo/components" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewAgenda">Overview</MudNavLink>
         <MudNavLink Href="/demo/components/datagrid" Match="NavLinkMatch.Prefix">AgentDataGrid</MudNavLink>
         <MudNavLink Href="/demo/components/form" Match="NavLinkMatch.Prefix">AgentForm</MudNavLink>
         <MudNavLink Href="/demo/components/dialog" Match="NavLinkMatch.Prefix">AgentDialog</MudNavLink>
@@ -35,5 +47,7 @@
 </AgentNavMenu>
 
 @code {
-    private bool _componentsExpanded = true;
+    private bool _workflowExpanded = true;
+    private bool _referenceExpanded;
+    private bool _componentsExpanded;
 }

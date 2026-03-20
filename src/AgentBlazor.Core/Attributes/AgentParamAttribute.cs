@@ -36,4 +36,10 @@ public sealed class AgentParamAttribute : Attribute
     /// Example: "asc,desc" or "high,medium,low"
     /// </summary>
     public string? AllowedValues { get; set; }
+
+    /// <summary>
+    /// Optional runtime context key to bind instead of expecting model-supplied arguments.
+    /// Context-bound parameters are omitted from projected input schemas.
+    /// </summary>
+    public string? ContextKey { get; set; }
 }

@@ -2,6 +2,7 @@
 @layout DemoLayout
 @using AgentBlazor.Demo.Services
 @implements IDisposable
+@inject NavigationManager NavigationManager
 
 <PageTitle>Supplier Compliance Workflow</PageTitle>
 
@@ -17,7 +18,20 @@
             Try prompts like <code>show suppliers likely to fail compliance review</code>,
             <code>explain why these suppliers are at risk</code>, or
             <code>prepare a remediation draft for the highlighted suppliers</code>.
+            If drafting is blocked, try <code>apply the supplier recovery playbook</code>.
         </MudText>
+
+        @if (IsResponseOrchestrationHandoff)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Opened from response orchestration. This live supplier surface is carrying the current workflow session and focus.
+            </MudAlert>
+            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
+                Current orchestration contribution: @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
+                    ? "clear severe supplier blockers, then return once the remediation draft is ready."
+                    : "confirm supplier focus and prepare the remediation draft so the response packet can advance.")
+            </MudAlert>
+        }
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
@@ -25,6 +39,9 @@
             </MudChip>
             <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
                 Focused suppliers: @Workflow.HighlightedSupplierIds.Count
+            </MudChip>
+            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
+                Recovery staged: @Workflow.RecoveredSupplierIds.Count
             </MudChip>
             <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
                 Approval boundary: @(Workflow.CurrentDraft is null ? "not reached" : "draft ready")
@@ -38,9 +55,18 @@
             <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareDraftAsync">
                 Prepare remediation draft
             </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryPlaybookAsync">
+                Apply Recovery Playbook
+            </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
                 Reset view
             </MudButton>
+            @if (!string.IsNullOrWhiteSpace(ReturnTo))
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ReturnToWorkflowAsync">
+                    Return to orchestration
+                </MudButton>
+            }
         </MudStack>
     </MudPaper>
 
@@ -96,35 +122,27 @@
 
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
-                    <MudPaper Class="pa-4" Outlined="true">
-                        <MudText Typo="Typo.h6">Workflow state</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            The page stays deterministic while the agent compresses the multi-step review flow.
-                        </MudText>
-
-                        <MudList T="string" Dense="true" Class="mb-2">
-                            <MudListItem T="string">Current phase: @GetWorkflowPhase()</MudListItem>
-                            <MudListItem T="string">Focused suppliers: @Workflow.HighlightedSupplierIds.Count</MudListItem>
-                            <MudListItem T="string">Review window: @Workflow.CurrentReviewWindowDays days</MudListItem>
-                            <MudListItem T="string">Draft actions: @(Workflow.CurrentDraft?.Actions.Count ?? 0)</MudListItem>
-                        </MudList>
-
-                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                            Next step: @GetNextStepSummary()
-                        </MudAlert>
-                    </MudPaper>
-
-                    <MudPaper Class="pa-4" Outlined="true">
-                        <MudText Typo="Typo.h6">Workflow insight</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                            Current semantic explanation of the highlighted supplier set.
-                        </MudText>
-                        <MudText Typo="Typo.body2" Style="white-space: pre-line;">
-                            @(string.IsNullOrWhiteSpace(Workflow.LatestInsight)
-                                ? "Run the at-risk capability to populate the workflow explanation."
-                                : Workflow.LatestInsight)
-                        </MudText>
-                    </MudPaper>
+                    <WorkflowDecisionSupport Title="Decision support"
+                                             Description="The page stays deterministic while the workflow surface explains the current phase, approval boundary, and recommended next actions."
+                                             PhaseLabel="@GetWorkflowPhase()"
+                                             ApprovalBoundarySummary="@(Workflow.CurrentDraft is null ? "not reached" : "draft ready")"
+                                             NextStepSummary="@GetNextStepSummary()"
+                                             OutcomeTitle="Workflow insight"
+                                             OutcomeSummary="@GetOutcomeSummary()"
+                                             OutcomeSeverity="@GetOutcomeSeverity()"
+                                             BlockerSummary="Resolve these blockers before preparing a remediation draft."
+                                             Blockers="@GetBlockers()"
+                                             Warnings="@GetWarnings()"
+                                             NextActions="@GetRecommendedActions()">
+                        <SummaryContent>
+                            <MudList T="string" Dense="true" Class="mb-0">
+                                <MudListItem T="string">Focused suppliers: @Workflow.HighlightedSupplierIds.Count</MudListItem>
+                                <MudListItem T="string">Review window: @Workflow.CurrentReviewWindowDays days</MudListItem>
+                                <MudListItem T="string">Recovery staged: @Workflow.RecoveredSupplierIds.Count</MudListItem>
+                                <MudListItem T="string">Draft actions: @(Workflow.CurrentDraft?.Actions.Count ?? 0)</MudListItem>
+                            </MudList>
+                        </SummaryContent>
+                    </WorkflowDecisionSupport>
 
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Remediation draft</MudText>
@@ -192,10 +210,22 @@
 
 @code {
     [Inject] private SupplierComplianceWorkflowService Workflow { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+    [SupplyParameterFromQuery(Name = "focus")] public string? Focus { get; set; }
+    [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
+
+    private string? _lastAppliedHandoffKey;
+    private bool IsResponseOrchestrationHandoff => string.Equals(Source, "response-orchestration", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
         Workflow.Changed += HandleWorkflowChanged;
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        ApplyRouteHandoff();
+        return Task.CompletedTask;
     }
 
     private Task FocusAtRiskAsync(int days)
@@ -220,9 +250,25 @@
         return Task.CompletedTask;
     }
 
+    private Task ApplyRecoveryPlaybookAsync()
+    {
+        Workflow.ApplyRecoveryPlaybook();
+        return Task.CompletedTask;
+    }
+
     private Task ResetAsync()
     {
         Workflow.Reset();
+        return Task.CompletedTask;
+    }
+
+    private Task ReturnToWorkflowAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            NavigationManager.NavigateTo(BuildReturnUri());
+        }
+
         return Task.CompletedTask;
     }
 
@@ -241,9 +287,13 @@
     private string GetWorkflowPhase() =>
         Workflow.CurrentDraft is not null
             ? "Draft prepared"
-            : Workflow.HighlightedSupplierIds.Count > 0
-                ? "Suppliers in focus"
-                : "Awaiting analysis";
+            : Workflow.LatestDraftBlockers.Count > 0
+                ? "Recovery required"
+                : Workflow.RecoveredSupplierIds.Count > 0
+                    ? "Recovery staged"
+                    : Workflow.HighlightedSupplierIds.Count > 0
+                        ? "Suppliers in focus"
+                        : "Awaiting analysis";
 
     private string GetNextStepSummary()
     {
@@ -254,6 +304,11 @@
                 : "Open or review the remediation draft before approving any mutating follow-up.";
         }
 
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return "Apply the supplier recovery playbook to clear the severe compliance blockers, then prepare the remediation draft again.";
+        }
+
         if (Workflow.HighlightedSupplierIds.Count > 0)
         {
             return string.IsNullOrWhiteSpace(Workflow.LatestInsight)
@@ -262,6 +317,162 @@
         }
 
         return "Start by identifying at-risk suppliers, then use the explanation and draft steps to complete the workflow.";
+    }
+
+    private string GetOutcomeSummary() =>
+        string.IsNullOrWhiteSpace(Workflow.LatestInsight)
+            ? "Run the at-risk capability to populate the workflow explanation."
+            : Workflow.LatestInsight!;
+
+    private Severity GetOutcomeSeverity()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return Severity.Success;
+        }
+
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return Severity.Warning;
+        }
+
+        return Workflow.HighlightedSupplierIds.Count > 0
+            ? Severity.Info
+            : Severity.Normal;
+    }
+
+    private IReadOnlyList<string> GetBlockers()
+    {
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return Workflow.LatestDraftBlockers;
+        }
+
+        return Workflow.HighlightedSupplierIds.Count == 0
+            ? ["No suppliers are currently in focus for remediation."]
+            : [];
+    }
+
+    private IReadOnlyList<string> GetWarnings()
+    {
+        var warnings = new List<string>();
+
+        if (Workflow.HighlightedSupplierIds.Count > 0 && string.IsNullOrWhiteSpace(Workflow.LatestInsight))
+        {
+            warnings.Add("The focused suppliers have not been explained yet, so the operator still lacks the semantic rationale for the current set.");
+        }
+
+        if (Workflow.HighlightedSupplierIds.Count > 0 && Workflow.CurrentDraft is null)
+        {
+            warnings.Add("The workflow has not crossed the approval boundary yet because no remediation draft has been prepared.");
+        }
+
+        if (Workflow.RecoveredSupplierIds.Count > 0 && Workflow.CurrentDraft is null)
+        {
+            warnings.Add("Recovery prerequisites have been staged, but the remediation draft still needs to be prepared.");
+        }
+
+        return warnings;
+    }
+
+    private IReadOnlyList<string> GetRecommendedActions()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return
+            [
+                Workflow.IsRemediationDialogOpen
+                    ? "Review the remediation draft actions in the dialog"
+                    : "Reopen the remediation draft dialog",
+                "Decide whether to approve the remediation batch"
+            ];
+        }
+
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return
+            [
+                "Apply the supplier recovery playbook for the highlighted suppliers",
+                "Prepare the remediation draft again once the blockers are cleared"
+            ];
+        }
+
+        if (Workflow.HighlightedSupplierIds.Count > 0)
+        {
+            return
+            [
+                string.IsNullOrWhiteSpace(Workflow.LatestInsight)
+                    ? "Explain why the current suppliers are at risk"
+                    : "Prepare a remediation draft for the highlighted suppliers",
+                "Review the approval boundary before mutating follow-up work"
+            ];
+        }
+
+        return
+        [
+            "Identify at-risk suppliers for the current review window",
+            "Use the explanation and draft steps to complete the workflow"
+        ];
+    }
+
+    private void ApplyRouteHandoff()
+    {
+        if (!IsResponseOrchestrationHandoff)
+        {
+            return;
+        }
+
+        var handoffKey = $"{Source}|{Focus}|{ReturnTo}";
+        if (string.Equals(handoffKey, _lastAppliedHandoffKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastAppliedHandoffKey = handoffKey;
+
+        switch (Focus?.Trim().ToLowerInvariant())
+        {
+            case "recovery":
+                Workflow.FocusAtRiskSuppliers(30);
+                Workflow.ExplainFocusedSuppliers();
+                Workflow.PrepareRemediationDraft();
+                break;
+            case "remediation":
+                Workflow.FocusAtRiskSuppliers(30);
+                Workflow.ExplainFocusedSuppliers();
+                break;
+            default:
+                Workflow.FocusAtRiskSuppliers(30);
+                break;
+        }
+    }
+
+    private string BuildReturnUri()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            return "/demo/workflows/response-orchestration";
+        }
+
+        var separator = ReturnTo.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{ReturnTo}{separator}returnedFrom=supplier&returnState={Uri.EscapeDataString(GetReturnState())}";
+    }
+
+    private string GetReturnState()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return "draft-ready";
+        }
+
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return "recovery";
+        }
+
+        return Workflow.HighlightedSupplierIds.Count > 0
+            ? "focused"
+            : "idle";
     }
 
     private void HandleWorkflowChanged() => InvokeAsync(StateHasChanged);

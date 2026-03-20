@@ -1,0 +1,469 @@
+@page "/demo/workflows/incident-escalation"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Demo.Services
+@implements IDisposable
+@inject IAgentComponentRegistry ComponentRegistry
+@inject IncidentEscalationWorkflowService Workflow
+@inject NavigationManager NavigationManager
+
+<PageTitle>Incident Escalation Workflow</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
+        <MudText Typo="Typo.h5">Incident escalation workflow with semantic capabilities</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This workflow proves a different shape from the grid-first demos: the host keeps tree, tab, stepper,
+            command, and dialog surfaces native while the agent compresses triage, evidence review, and escalation prep.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try prompts like <code>summarize the current incident triage workflow</code>,
+            <code>focus this workflow on evidence review</code>, or
+            <code>prepare an escalation brief for the current incident</code>.
+            After that, try <code>submit the current escalation brief to the review board</code> to hit the recovery branch.
+        </MudText>
+
+        @if (IsResponseOrchestrationHandoff)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Opened from response orchestration. This live incident surface is carrying the current workflow session and handoff focus.
+            </MudAlert>
+            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
+                Current orchestration contribution: @(Focus?.Equals("escalation", StringComparison.OrdinalIgnoreCase) == true
+                    ? "finalize the escalation brief so the response packet can be prepared."
+                    : "clear triage and evidence blockers, then return once the incident is escalation-ready.")
+            </MudAlert>
+        }
+
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                Phase: @GetWorkflowPhase()
+            </MudChip>
+            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                Selected node: @Workflow.Snapshot.SelectedNodeId
+            </MudChip>
+            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
+                Active tab: @GetActiveTabLabel()
+            </MudChip>
+            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                Handoff: @Workflow.Snapshot.Incident.EscalationStatus
+            </MudChip>
+            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                Approval boundaries: brief preparation and handoff submission
+            </MudChip>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="FocusEvidenceReviewAsync">
+                Focus Evidence Review
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AssignOwnerAsync">
+                Assign Owner
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="CompleteEvidenceReviewAsync">
+                Complete Evidence Review
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareEscalationBriefAsync">
+                Prepare Escalation Brief
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="SubmitEscalationHandoffAsync">
+                Submit Handoff
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryPlaybookAsync">
+                Apply Recovery Playbook
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="ResetAsync">
+                Reset Workflow
+            </MudButton>
+            @if (!string.IsNullOrWhiteSpace(ReturnTo))
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ReturnToWorkflowAsync">
+                    Return to orchestration
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="7">
+                <MudStack Spacing="2">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Workflow navigation state</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            Semantic workflow actions can move the tree focus, active tab, and current step together instead of asking the user to manipulate them separately.
+                        </MudText>
+
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" lg="4">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Case map</MudText>
+                                <AgentTreeView T="string"
+                                               AgentId="incident-escalation-tree"
+                                               NodeIds="@_treeNodeIds"
+                                               SelectedNodeId="@Workflow.Snapshot.SelectedNodeId"
+                                               SelectedNodeIdChanged="OnSelectedNodeChanged"
+                                               ExpandedNodeIds="@Workflow.Snapshot.ExpandedNodeIds"
+                                               ExpandedNodeIdsChanged="OnExpandedNodesChanged" />
+                            </MudItem>
+                            <MudItem xs="12" lg="8">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Current workstream</MudText>
+                                <AgentTabs AgentId="incident-escalation-tabs"
+                                           ActivePanelIndex="@Workflow.Snapshot.ActiveTabIndex"
+                                           ActivePanelIndexChanged="OnActiveTabIndexChanged">
+                                    <MudTabPanel Text="Summary">
+                                        <MudText Typo="Typo.body2"><strong>Incident:</strong> @Workflow.Snapshot.Incident.Title</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Severity:</strong> @Workflow.Snapshot.Incident.Severity</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Owner:</strong> @(Workflow.Snapshot.Incident.AssignedOwner ?? "Unassigned")</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Region:</strong> @Workflow.Snapshot.Incident.Region</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Escalation status:</strong> @Workflow.Snapshot.Incident.EscalationStatus</MudText>
+                                    </MudTabPanel>
+                                    <MudTabPanel Text="Evidence">
+                                        <MudText Typo="Typo.body2"><strong>Status:</strong> @Workflow.Snapshot.Incident.EvidenceStatus</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Missing items:</strong> @Workflow.Snapshot.Incident.MissingEvidenceCount</MudText>
+                                        <MudText Typo="Typo.body2">Use the semantic workflow to move into escalation only after this gap is closed.</MudText>
+                                    </MudTabPanel>
+                                    <MudTabPanel Text="Timeline">
+                                        <MudList T="string" Dense="true">
+                                            @foreach (var entry in Workflow.Snapshot.TimelineEntries.TakeLast(4).Reverse())
+                                            {
+                                                <MudListItem T="string">@($"{entry.TimestampUtc.ToLocalTime():HH:mm:ss} • {entry.Message}")</MudListItem>
+                                            }
+                                        </MudList>
+                                    </MudTabPanel>
+                                    <MudTabPanel Text="Escalation">
+                                        @if (Workflow.CurrentBrief is { } brief)
+                                        {
+                                            <MudText Typo="Typo.body2"><strong>@brief.Title</strong></MudText>
+                                            <MudText Typo="Typo.body2">@brief.Summary</MudText>
+                                            <MudText Typo="Typo.caption">Recipients: @string.Join(", ", brief.TargetRecipients)</MudText>
+                                            <MudText Typo="Typo.caption" Class="d-block mt-2">
+                                                Communications acknowledgement:
+                                                @(Workflow.Snapshot.Incident.CommunicationsLeadConfirmed ? "captured" : "still required")
+                                            </MudText>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body2">No escalation brief has been prepared yet.</MudText>
+                                        }
+                                    </MudTabPanel>
+                                </AgentTabs>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Escalation phases</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            The stepper remains host-owned. Semantic actions can advance the workflow when the underlying state is ready.
+                        </MudText>
+
+                        <AgentStepper AgentId="incident-escalation-stepper"
+                                      CurrentStepIndex="@Workflow.Snapshot.CurrentStepIndex"
+                                      CurrentStepIndexChanged="OnCurrentStepChanged">
+                            <MudStep Title="Intake">
+                                <MudText Typo="Typo.body2">Confirm severity, reporter, and owner assignment.</MudText>
+                            </MudStep>
+                            <MudStep Title="Evidence Review">
+                                <MudText Typo="Typo.body2">Close evidence gaps and confirm the regulated-surface impact.</MudText>
+                            </MudStep>
+                            <MudStep Title="Escalation">
+                                <MudText Typo="Typo.body2">Prepare and review the escalation brief before handoff.</MudText>
+                            </MudStep>
+                        </AgentStepper>
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+
+            <MudItem xs="12" xl="5">
+                <MudStack Spacing="2">
+                    <WorkflowDecisionSupport Title="Decision support"
+                                             Description="This workflow should explain blockers, owner assignment, evidence status, and the escalation approval boundary without relying on the chat transcript."
+                                             PhaseLabel="@GetWorkflowPhase()"
+                                             ApprovalBoundarySummary="escalation brief preparation"
+                                             NextStepSummary="@GetNextStepSummary()"
+                                             OutcomeTitle="Escalation narrative"
+                                             OutcomeSummary="@GetOutcomeSummary()"
+                                             OutcomeSeverity="@GetOutcomeSeverity()"
+                                             BlockerSummary="Resolve these blockers before requesting the escalation brief."
+                                             Blockers="@GetBlockers()"
+                                             Warnings="@GetWarnings()"
+                                             NextActions="@GetRecommendedActions()">
+                        <SummaryContent>
+                            <MudList T="string" Dense="true" Class="mb-0">
+                                <MudListItem T="string">Owner: @(Workflow.Snapshot.Incident.AssignedOwner ?? "Unassigned")</MudListItem>
+                                <MudListItem T="string">Evidence status: @Workflow.Snapshot.Incident.EvidenceStatus</MudListItem>
+                                <MudListItem T="string">Missing evidence: @Workflow.Snapshot.Incident.MissingEvidenceCount</MudListItem>
+                                <MudListItem T="string">Escalation status: @Workflow.Snapshot.Incident.EscalationStatus</MudListItem>
+                                <MudListItem T="string">Communications acknowledgement: @(Workflow.Snapshot.Incident.CommunicationsLeadConfirmed ? "Captured" : "Pending")</MudListItem>
+                                <MudListItem T="string">Last command: @(Workflow.Snapshot.LastCommand ?? "(none)")</MudListItem>
+                            </MudList>
+                        </SummaryContent>
+                    </WorkflowDecisionSupport>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Workflow commands</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            These host commands are still available as deterministic fallback primitives, but the semantic workflow should remain the main path.
+                        </MudText>
+
+                        <AgentCommandBar AgentId="incident-escalation-command-bar"
+                                         Commands="@Workflow.Snapshot.Commands"
+                                         CommandInvoked="OnCommandInvoked" />
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Watchlist signals</MudText>
+                        <MudList T="string" Dense="true">
+                            @foreach (var signal in Workflow.Snapshot.Incident.WatchlistReasons)
+                            {
+                                <MudListItem T="string">@signal</MudListItem>
+                            }
+                        </MudList>
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <AgentDialog AgentId="incident-escalation-dialog"
+                 Visible="@Workflow.IsEscalationDialogOpen"
+                 VisibleChanged="OnEscalationDialogVisibilityChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Incident escalation brief</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (Workflow.CurrentBrief is { } brief)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">@brief.Summary</MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-3">
+                    Recipients: @string.Join(", ", brief.TargetRecipients)
+                </MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var item in brief.ChecklistItems)
+                    {
+                        <MudListItem T="string">@item</MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">No escalation brief is active.</MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseEscalationBriefAsync">
+                Close brief
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<string> _treeNodeIds = ["overview", "evidence", "timeline", "escalation"];
+    private static readonly string[] _tabLabels = ["Summary", "Evidence", "Timeline", "Escalation"];
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+    [SupplyParameterFromQuery(Name = "focus")] public string? Focus { get; set; }
+    [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
+
+    private string? _lastAppliedHandoffKey;
+    private bool IsResponseOrchestrationHandoff => string.Equals(Source, "response-orchestration", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Workflow.Changed += HandleWorkflowChanged;
+        await Workflow.LoadAsync(ComponentRegistry.SessionId);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ApplyRouteHandoffAsync();
+    }
+
+    private Task FocusEvidenceReviewAsync()
+        => Workflow.FocusEvidenceReviewAsync(ComponentRegistry.SessionId);
+
+    private Task AssignOwnerAsync()
+        => Workflow.AssignTriageOwnerAsync(ComponentRegistry.SessionId);
+
+    private Task CompleteEvidenceReviewAsync()
+        => Workflow.CompleteEvidenceReviewAsync(ComponentRegistry.SessionId);
+
+    private Task PrepareEscalationBriefAsync()
+        => Workflow.PrepareEscalationBriefAsync(ComponentRegistry.SessionId);
+
+    private Task SubmitEscalationHandoffAsync()
+        => Workflow.SubmitEscalationHandoffAsync(ComponentRegistry.SessionId);
+
+    private Task ApplyRecoveryPlaybookAsync()
+        => Workflow.ApplyRecoveryPlaybookAsync(ComponentRegistry.SessionId);
+
+    private Task ResetAsync()
+    {
+        Workflow.Reset();
+        return Task.CompletedTask;
+    }
+
+    private Task ReturnToWorkflowAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            NavigationManager.NavigateTo(BuildReturnUri());
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task OnCommandInvoked(string command)
+        => Workflow.ExecuteCommandAsync(ComponentRegistry.SessionId, command);
+
+    private Task OnSelectedNodeChanged(string? nodeId)
+        => Workflow.SetSelectedNodeAsync(ComponentRegistry.SessionId, nodeId);
+
+    private Task OnExpandedNodesChanged(IReadOnlyCollection<string> nodeIds)
+        => Workflow.SetExpandedNodesAsync(ComponentRegistry.SessionId, nodeIds);
+
+    private Task OnActiveTabIndexChanged(int index)
+        => Workflow.SetActiveTabIndexAsync(ComponentRegistry.SessionId, index);
+
+    private Task OnCurrentStepChanged(int index)
+        => Workflow.SetCurrentStepIndexAsync(ComponentRegistry.SessionId, index);
+
+    private Task OnEscalationDialogVisibilityChanged(bool visible)
+        => Workflow.SetEscalationDialogVisibleAsync(ComponentRegistry.SessionId, visible);
+
+    private Task CloseEscalationBriefAsync()
+        => Workflow.SetEscalationDialogVisibleAsync(ComponentRegistry.SessionId, false);
+
+    private string GetWorkflowPhase() =>
+        Workflow.Snapshot.Incident.EscalationStatus == "Submitted"
+            ? "Handoff submitted"
+            : Workflow.Snapshot.Incident.EscalationStatus == "Recovery required"
+                ? "Recovery required"
+                : Workflow.CurrentBrief is not null
+                    ? "Escalation brief prepared"
+                    : Workflow.Snapshot.CurrentStepIndex switch
+                    {
+                        2 => "Ready for escalation",
+                        1 => "Evidence review",
+                        _ => "Initial triage"
+                    };
+
+    private string GetActiveTabLabel() => _tabLabels[Math.Clamp(Workflow.Snapshot.ActiveTabIndex, 0, _tabLabels.Length - 1)];
+
+    private string GetNextStepSummary()
+    {
+        if (Workflow.CurrentBrief is not null)
+        {
+            if (!Workflow.Snapshot.Incident.CommunicationsLeadConfirmed)
+            {
+                return "Apply the recovery playbook to capture communications acknowledgement, then resubmit the handoff.";
+            }
+
+            return Workflow.IsEscalationDialogOpen
+                ? "Review the escalation brief in the dialog, then decide whether to approve the board handoff."
+                : "Reopen the escalation brief or submit the review-board handoff.";
+        }
+
+        if (GetBlockers().Count > 0)
+        {
+            return "Resolve the owner and evidence blockers before requesting the escalation brief.";
+        }
+
+        return "Prepare the escalation brief once the workflow is ready to cross the approval boundary.";
+    }
+
+    private string GetOutcomeSummary() =>
+        Workflow.LatestResult?.Summary
+        ?? Workflow.LatestNarrative
+        ?? "Run the incident triage summary to populate the current workflow narrative.";
+
+    private Severity GetOutcomeSeverity()
+    {
+        if (Workflow.LatestResult?.IsBlocked == true)
+        {
+            return Severity.Warning;
+        }
+
+        return Workflow.CurrentBrief is not null
+            ? Severity.Success
+            : Severity.Info;
+    }
+
+    private IReadOnlyList<string> GetBlockers() =>
+        Workflow.LatestResult?.IsBlocked == true
+            ? Workflow.LatestResult.Outputs?.TryGetValue("blockers", out var blockers) == true && blockers is string[] blockerArray
+                ? blockerArray
+                : []
+            : [];
+
+    private IReadOnlyList<string> GetWarnings() => Workflow.LatestResult?.Warnings ?? [];
+
+    private IReadOnlyList<string> GetRecommendedActions() => Workflow.LatestResult?.NextActions ?? [];
+
+    private void HandleWorkflowChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task ApplyRouteHandoffAsync()
+    {
+        if (!IsResponseOrchestrationHandoff)
+        {
+            return;
+        }
+
+        var handoffKey = $"{Source}|{Focus}|{ReturnTo}";
+        if (string.Equals(handoffKey, _lastAppliedHandoffKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastAppliedHandoffKey = handoffKey;
+        await Workflow.LoadAsync(ComponentRegistry.SessionId);
+
+        switch (Focus?.Trim().ToLowerInvariant())
+        {
+            case "escalation":
+                await Workflow.SetSelectedNodeAsync(ComponentRegistry.SessionId, "escalation");
+                await Workflow.SetExpandedNodesAsync(ComponentRegistry.SessionId, _treeNodeIds);
+                await Workflow.SetActiveTabIndexAsync(ComponentRegistry.SessionId, 3);
+                await Workflow.SetCurrentStepIndexAsync(ComponentRegistry.SessionId, 2);
+                break;
+            case "evidence":
+                await Workflow.FocusEvidenceReviewAsync(ComponentRegistry.SessionId);
+                break;
+            default:
+                await Workflow.SetSelectedNodeAsync(ComponentRegistry.SessionId, "overview");
+                await Workflow.SetActiveTabIndexAsync(ComponentRegistry.SessionId, 0);
+                await Workflow.SetCurrentStepIndexAsync(ComponentRegistry.SessionId, 0);
+                break;
+        }
+    }
+
+    private string BuildReturnUri()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            return "/demo/workflows/response-orchestration";
+        }
+
+        var separator = ReturnTo.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{ReturnTo}{separator}returnedFrom=incident&returnState={Uri.EscapeDataString(GetReturnState())}";
+    }
+
+    private string GetReturnState()
+    {
+        if (Workflow.CurrentBrief is not null)
+        {
+            return "escalation";
+        }
+
+        if (Workflow.Snapshot.Incident.MissingEvidenceCount > 0)
+        {
+            return "evidence";
+        }
+
+        return "triage";
+    }
+
+    public void Dispose()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+    }
+}

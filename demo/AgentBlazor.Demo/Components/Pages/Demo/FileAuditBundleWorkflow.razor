@@ -1,0 +1,560 @@
+@page "/demo/workflows/file-audit-bundle"
+@layout DemoLayout
+@using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Demo.Services
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+@inject IAgentComponentRegistry ComponentRegistry
+@inject DemoFileWorkflowService Workflow
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>File Audit Bundle Workflow</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
+        <MudText Typo="Typo.h5">File audit bundle workflow with semantic capabilities</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This workflow combines file selection, upload policy, remote handoff, and token verification into a single
+            approval-aware flow. The agent is compressing the workflow, not replacing file-upload clicks.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try prompts like <code>summarize the current file workflow</code>,
+            <code>switch this workflow to remote mode</code>, or
+            <code>prepare an audit-ready remote bundle for the current files</code>.
+            If the handoff is rejected, try <code>apply the file audit recovery playbook</code>.
+        </MudText>
+
+        @if (IsResponseOrchestrationHandoff)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Opened from response orchestration. This live evidence surface is carrying the current workflow session and target bundle state.
+            </MudAlert>
+            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
+                Current orchestration contribution: @(Focus?.Equals("verification", StringComparison.OrdinalIgnoreCase) == true
+                    ? "finish token verification so the response packet can rely on verified evidence."
+                    : "move the bundle into remote-ready state and clear any rejected-file blockers before returning.")
+            </MudAlert>
+        }
+
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                Phase: @GetWorkflowPhase()
+            </MudChip>
+            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                Files: @_snapshot.Files.Count
+            </MudChip>
+            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
+                Upload mode: @_snapshot.UploadMode
+            </MudChip>
+            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                Approval boundary: remote bundle preparation
+            </MudChip>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SwitchToRemoteModeAsync">
+                Switch to Remote
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="RunRemoteHandoffAsync">
+                Run Handoff
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="ValidateTokensAsync">
+                Validate Tokens
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryPlaybookAsync">
+                Apply Recovery Playbook
+            </MudButton>
+            @if (!string.IsNullOrWhiteSpace(ReturnTo))
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ReturnToWorkflowAsync">
+                    Return to orchestration
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="7">
+                <MudStack Spacing="2">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Attached files</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            The host still owns the upload surface. The semantic workflow uses this state to decide what to hand off and verify.
+                        </MudText>
+
+                        <AgentFileUpload T="IReadOnlyList<IBrowserFile>"
+                                         AgentId="file-audit-upload"
+                                         FileNames="@_snapshot.Files"
+                                         FileNamesChanged="OnFilesChanged" />
+
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                            Current mode: @_snapshot.UploadMode. Remote mode turns file names into auditable handoff tokens.
+                        </MudAlert>
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                            <div>
+                                <MudText Typo="Typo.h6">Workflow commands</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Deterministic fallback primitives remain visible, but the workflow capability is the primary path.
+                                </MudText>
+                            </div>
+                        </MudStack>
+
+                        <AgentCommandBar AgentId="file-audit-command-bar"
+                                         Commands="@_commands"
+                                         CommandInvoked="OnCommandInvoked" />
+
+                        <MudText Typo="Typo.caption" Class="mt-2">Last command: @_lastCommand</MudText>
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+
+            <MudItem xs="12" xl="5">
+                <MudStack Spacing="2">
+                    <WorkflowDecisionSupport Title="Decision support"
+                                             Description="The workflow surface should explain whether the bundle is still local-only, partially blocked, or already verified without relying on the chat transcript."
+                                             PhaseLabel="@GetWorkflowPhase()"
+                                             ApprovalBoundarySummary="remote bundle preparation"
+                                             NextStepSummary="@GetNextStepSummary()"
+                                             OutcomeTitle="Outcome summary"
+                                             OutcomeSummary="@GetOutcomeSummary()"
+                                             OutcomeSeverity="@GetOutcomeSeverity()"
+                                             BlockerSummary="Resolve these blockers before requesting an audit-ready bundle."
+                                             Blockers="@GetBlockers()"
+                                             Warnings="@GetWarnings()"
+                                             NextActions="@GetRecommendedActions()">
+                        <SummaryContent>
+                            <MudList T="string" Dense="true" Class="mb-0">
+                                <MudListItem T="string">Attached files: @_snapshot.Files.Count</MudListItem>
+                                <MudListItem T="string">Latest jobs tracked: @_snapshot.Jobs.Count</MudListItem>
+                                <MudListItem T="string">Latest events tracked: @_snapshot.Events.Count</MudListItem>
+                                <MudListItem T="string">Upload mode: @_snapshot.UploadMode</MudListItem>
+                                <MudListItem T="string">Recovered files: @GetRecoveredFileCount()</MudListItem>
+                            </MudList>
+                        </SummaryContent>
+                    </WorkflowDecisionSupport>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Recent events</MudText>
+                        @if (_snapshot.Events.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2">No workflow events yet.</MudText>
+                        }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var fileEvent in _snapshot.Events.Take(6))
+                                {
+                                    <MudListItem T="string">
+                                        @($"{fileEvent.TimestampUtc.ToLocalTime():HH:mm:ss} • {fileEvent.EventType} • {fileEvent.Message}")
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudPaper>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Recent jobs</MudText>
+                        @if (_snapshot.Jobs.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2">No remote jobs have run yet.</MudText>
+                        }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var job in _snapshot.Jobs.Take(6))
+                                {
+                                    <MudListItem T="string">
+                                        <MudChip T="string" Size="Size.Small" Color="@MapJobStatusColor(job.Status)" Variant="Variant.Filled">
+                                            @job.Status
+                                        </MudChip>
+                                        <span class="ml-2">@($"{job.FileName} • {job.Operation} • {job.Message}")</span>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </section>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<string> _commands =
+    [
+        "show_local_upload_policy",
+        "show_remote_upload_policy",
+        "sync_remote_handoff",
+        "validate_remote_tokens",
+        "create_audit_bundle"
+    ];
+
+    private DemoFileWorkflowSnapshot _snapshot = new([], "Local", [], []);
+    private string _lastCommand = "(none)";
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+    [SupplyParameterFromQuery(Name = "focus")] public string? Focus { get; set; }
+    [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
+
+    private string? _lastAppliedHandoffKey;
+    private bool IsResponseOrchestrationHandoff => string.Equals(Source, "response-orchestration", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Workflow.Changed += HandleWorkflowChanged;
+        await RefreshSnapshotAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ApplyRouteHandoffAsync();
+    }
+
+    private async Task OnFilesChanged(IReadOnlyList<string> files)
+    {
+        _snapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, files, _snapshot.UploadMode);
+    }
+
+    private async Task OnCommandInvoked(string command)
+    {
+        _lastCommand = command;
+
+        _snapshot = command switch
+        {
+            "show_local_upload_policy" => await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Local"),
+            "show_remote_upload_policy" => await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote"),
+            "sync_remote_handoff" => await Workflow.RunRemoteHandoffAsync(ComponentRegistry.SessionId),
+            "validate_remote_tokens" => await Workflow.ValidateRemoteTokensAsync(ComponentRegistry.SessionId),
+            "create_audit_bundle" => await PrepareAuditBundleAsync(),
+            _ => await Workflow.GetOrCreateAsync(ComponentRegistry.SessionId, _snapshot.UploadMode)
+        };
+    }
+
+    private async Task SwitchToRemoteModeAsync()
+    {
+        _snapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote");
+        Snackbar.Add("Workflow switched to Remote mode.", Severity.Info);
+    }
+
+    private async Task RunRemoteHandoffAsync()
+    {
+        _snapshot = await Workflow.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+        _lastCommand = "sync_remote_handoff";
+        Snackbar.Add("Remote handoff executed.", Severity.Info);
+    }
+
+    private async Task ValidateTokensAsync()
+    {
+        _snapshot = await Workflow.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+        _lastCommand = "validate_remote_tokens";
+        Snackbar.Add("Remote token validation completed.", Severity.Info);
+    }
+
+    private async Task ApplyRecoveryPlaybookAsync()
+    {
+        _snapshot = await Workflow.ApplyRecoveryPlaybookAsync(ComponentRegistry.SessionId);
+        _lastCommand = "apply_audit_recovery_playbook";
+        Snackbar.Add("Applied the file audit recovery playbook.", Severity.Success);
+    }
+
+    private Task ReturnToWorkflowAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            NavigationManager.NavigateTo(BuildReturnUri());
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task<DemoFileWorkflowSnapshot> PrepareAuditBundleAsync()
+    {
+        var remoteSnapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote");
+        var handoffSnapshot = await Workflow.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+        _ = remoteSnapshot;
+        var validatedSnapshot = await Workflow.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+        _ = handoffSnapshot;
+        Snackbar.Add("Prepared an audit-ready remote bundle.", Severity.Success);
+        return validatedSnapshot;
+    }
+
+    private async Task RefreshSnapshotAsync()
+    {
+        _snapshot = await Workflow.GetOrCreateAsync(ComponentRegistry.SessionId, _snapshot.UploadMode);
+        StateHasChanged();
+    }
+
+    private void HandleWorkflowChanged(string sessionId)
+    {
+        if (!string.Equals(sessionId, ComponentRegistry.SessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _ = InvokeAsync(RefreshSnapshotAsync);
+    }
+
+    private async Task ApplyRouteHandoffAsync()
+    {
+        if (!IsResponseOrchestrationHandoff)
+        {
+            return;
+        }
+
+        var handoffKey = $"{Source}|{Focus}|{ReturnTo}";
+        if (string.Equals(handoffKey, _lastAppliedHandoffKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastAppliedHandoffKey = handoffKey;
+        _snapshot = await Workflow.GetOrCreateAsync(ComponentRegistry.SessionId, _snapshot.UploadMode);
+
+        switch (Focus?.Trim().ToLowerInvariant())
+        {
+            case "verification":
+                _snapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote");
+                _snapshot = await Workflow.ValidateRemoteTokensAsync(ComponentRegistry.SessionId);
+                _lastCommand = "validate_remote_tokens";
+                break;
+            case "handoff":
+                _snapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote");
+                _snapshot = await Workflow.RunRemoteHandoffAsync(ComponentRegistry.SessionId);
+                _lastCommand = "sync_remote_handoff";
+                break;
+            default:
+                _snapshot = await Workflow.SyncFilesAsync(ComponentRegistry.SessionId, _snapshot.Files, "Remote");
+                _lastCommand = "show_remote_upload_policy";
+                break;
+        }
+    }
+
+    private string BuildReturnUri()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            return "/demo/workflows/response-orchestration";
+        }
+
+        var separator = ReturnTo.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{ReturnTo}{separator}returnedFrom=file&returnState={Uri.EscapeDataString(GetReturnState())}";
+    }
+
+    private string GetReturnState()
+    {
+        var latestJob = GetLatestJob();
+        if (latestJob is not null && string.Equals(latestJob.Status, "Verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return "verification";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "handoff";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "recovery";
+        }
+
+        return string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase)
+            ? "remote-bundle"
+            : "local";
+    }
+
+    private string GetWorkflowPhase()
+    {
+        var latestJob = GetLatestJob();
+        if (latestJob is not null && string.Equals(latestJob.Status, "Verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Bundle verified";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Handoff completed";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Recovery required";
+        }
+
+        return string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase)
+            ? "Ready for remote bundle"
+            : "Awaiting remote mode";
+    }
+
+    private string GetNextStepSummary()
+    {
+        if (!string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Switch the workflow to Remote mode before preparing an audit-ready bundle.";
+        }
+
+        var latestJob = GetLatestJob();
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Review the verified tokens and export or hand off the audit evidence package.";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Validate the remote tokens so the workflow can confirm the audit bundle is usable.";
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Apply the recovery playbook to replace rejected files, then prepare the audit-ready bundle again.";
+        }
+
+        return "Prepare the audit-ready remote bundle to hand off files and validate their storage tokens.";
+    }
+
+    private static Color MapJobStatusColor(string status) =>
+        status switch
+        {
+            "Completed" => Color.Success,
+            "Verified" => Color.Success,
+            "Failed" => Color.Error,
+            "InProgress" => Color.Warning,
+            _ => Color.Default
+        };
+
+    private Severity GetOutcomeSeverity()
+    {
+        var latestJob = GetLatestJob();
+        if (latestJob is not null && string.Equals(latestJob.Status, "Verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return Severity.Success;
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return Severity.Warning;
+        }
+
+        return string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase)
+            ? Severity.Info
+            : Severity.Normal;
+    }
+
+    private string GetOutcomeSummary()
+    {
+        var latestJob = GetLatestJob();
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Remote processing is blocked. Latest issue: {latestJob.Message}";
+        }
+
+        var verifiedCount = _snapshot.Jobs.Count(job => string.Equals(job.Status, "Verified", StringComparison.OrdinalIgnoreCase));
+        if (verifiedCount > 0)
+        {
+            return $"Audit bundle verification is complete with {verifiedCount} verified token check(s).";
+        }
+
+        if (string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The workflow is remote-ready but still needs handoff and validation to produce an audit-ready bundle.";
+        }
+
+        return "The workflow is still local-only. Switch to Remote mode before asking for an audit-ready bundle.";
+    }
+
+    private IReadOnlyList<string> GetBlockers()
+    {
+        var blockers = new List<string>();
+
+        if (_snapshot.Files.Count == 0)
+        {
+            blockers.Add("No files are attached to the workflow yet.");
+        }
+
+        return blockers;
+    }
+
+    private IReadOnlyList<string> GetWarnings()
+    {
+        var warnings = new List<string>();
+
+        if (!string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add("The workflow is still in Local mode, so remote handoff and validation cannot complete yet.");
+        }
+
+        warnings.AddRange(_snapshot.Jobs
+            .Where(job => string.Equals(job.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+            .Take(3)
+            .Select(job => $"{job.FileName}: {job.Message}"));
+
+        return warnings;
+    }
+
+    private IReadOnlyList<string> GetRecommendedActions()
+    {
+        if (_snapshot.Files.Count == 0)
+        {
+            return
+            [
+                "Attach one or more files to the workflow",
+                "Switch to remote mode and prepare the audit-ready bundle again"
+            ];
+        }
+
+        if (!string.Equals(_snapshot.UploadMode, "Remote", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Switch the workflow to Remote mode",
+                "Prepare the audit-ready bundle after the mode change"
+            ];
+        }
+
+        var latestJob = GetLatestJob();
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Verified", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Review the verified tokens",
+                "Export or hand off the audit evidence package"
+            ];
+        }
+
+        if (latestJob is not null && string.Equals(latestJob.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Apply the file audit recovery playbook",
+                "Prepare the audit-ready bundle again after the replacement files are in place"
+            ];
+        }
+
+        return
+        [
+            "Prepare the audit-ready remote bundle",
+            "Review the latest handoff and validation events"
+        ];
+    }
+
+    private DemoFileWorkflowJob? GetLatestJob()
+    {
+        return _snapshot.Jobs
+            .OrderByDescending(job => job.UpdatedUtc)
+            .FirstOrDefault();
+    }
+
+    private int GetRecoveredFileCount()
+    {
+        return _snapshot.Files.Count(file => file.Contains("-recovered", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void Dispose()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+    }
+}

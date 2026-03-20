@@ -7,6 +7,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Routing;
+using AgentBlazor.Execution;
 using AgentBlazor.Licensing;
 using AgentBlazor.Runtime;
 using AgentBlazor.Services;
@@ -25,7 +26,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentchatwidget_open_widget"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -34,13 +35,8 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the widget"));
 
         Assert.Equal(1, executor.CallCount);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, "AgentChatWidget", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, "open_widget", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, "AgentChatWidget", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, "open_widget", StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasPlannedStep(response, "AgentChatWidget", "open_widget"));
+        Assert.True(HasExecutionOutcome(response, "AgentChatWidget", "open_widget", succeeded: true));
     }
 
     [Fact]
@@ -57,7 +53,7 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CapturingPlannedActionExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -86,7 +82,7 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -95,9 +91,10 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk"));
 
         Assert.Equal(1, executor.CallCount);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId));
     }
 
     [Fact(Skip = "Deprecated: Auto-appending filter after navigation is no longer supported. LLM should output complete plans.")]
@@ -112,16 +109,17 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me my highest risk supplier"));
 
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId));
     }
 
     [Fact(Skip = "Deprecated: Auto-appending filter after navigation is no longer supported. LLM should output complete plans.")]
@@ -134,18 +132,19 @@ public class AgentRuntimeIntegrationTests
             {
                 ["uri"] = "/suppliers"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
 
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded &&
-            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
+            succeeded: true,
+            messageContains: "Queued"));
         Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -162,18 +161,19 @@ public class AgentRuntimeIntegrationTests
                 ["value"] = "High",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
 
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded &&
-            result.Message.Contains("Queued", StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId,
+            succeeded: true,
+            messageContains: "Queued"));
         Assert.DoesNotContain("Which column should I filter", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
@@ -186,18 +186,19 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
         services.AddSingleton<MissingParameterExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingParameterExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("sort from highest to lowest"));
 
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
-            !result.Succeeded &&
-            result.Message.Contains("requires 'column' parameter", StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridSortActionId,
+            succeeded: false,
+            messageContains: "requires 'column' parameter"));
 
         Assert.Equal("Which column should I sort by?", response.ResponseText);
     }
@@ -209,7 +210,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -219,9 +220,10 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.False(response.RequiresApproval);
-        Assert.DoesNotContain(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.False(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId));
     }
 
     [Fact]
@@ -230,7 +232,7 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -238,9 +240,10 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("save and submit the form"));
 
         Assert.True(response.RequiresApproval);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId));
     }
 
     [Fact]
@@ -256,7 +259,7 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -285,7 +288,7 @@ public class AgentRuntimeIntegrationTests
             "What are the details of the recipe you want to set (e.g., Title, Minutes, Difficulty)?"));
         services.AddSingleton<CapturingPlannedActionExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -327,7 +330,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
         services.AddSingleton<MissingNavigationTargetExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -344,18 +347,19 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
         services.AddSingleton<MissingNavigationTargetThenSuccessExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetThenSuccessExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
 
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded &&
-            result.Message.Contains("/supplier-onboarding", StringComparison.OrdinalIgnoreCase));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
+            succeeded: true,
+            messageContains: "/supplier-onboarding"));
     }
 
     [Fact(Skip = "Deprecated: Auto-appending entity filter after navigation is no longer supported. LLM should output complete plans.")]
@@ -370,20 +374,20 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CapturingPlannedActionExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to supplier SUP-006"));
 
-        var continuation = Assert.Single(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DataGridFilterActionId, StringComparison.OrdinalIgnoreCase));
+        var continuationArguments = AssertPlannedStepArguments(
+            response,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridFilterActionId);
 
-        Assert.NotNull(continuation.Arguments);
-        Assert.Equal("SUP-006", continuation.Arguments["value"]?.ToString());
-        Assert.Equal("eq", continuation.Arguments["operator"]?.ToString());
+        Assert.Equal("SUP-006", continuationArguments["value"]?.ToString());
+        Assert.Equal("eq", continuationArguments["operator"]?.ToString());
     }
 
     [Fact(Skip = "Deprecated: Multi-turn clarification with parameter recovery requires conversation state management not implemented in deterministic runtime.")]
@@ -393,7 +397,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
         services.AddSingleton<SortNeedsColumnExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<SortNeedsColumnExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -411,10 +415,11 @@ public class AgentRuntimeIntegrationTests
             Context: context));
 
         Assert.Contains("Which column should I sort by?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(second.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDataGridComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DataGridSortActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasExecutionOutcome(
+            second,
+            AgentComponentCapabilityProfile.AgentDataGridComponentId,
+            AgentComponentCapabilityProfile.DataGridSortActionId,
+            succeeded: true));
         Assert.Equal(2, executor.CallCount);
         Assert.Equal("RiskScore", executor.LastColumn);
         Assert.Equal("desc", executor.LastDirection);
@@ -429,7 +434,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddSingleton<CapturingTelemetrySink>();
         services.AddSingleton<IAgentBlazorTelemetrySink>(sp => sp.GetRequiredService<CapturingTelemetrySink>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -443,8 +448,8 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal(AgentBlazorTelemetrySources.Runtime, started.Source);
         Assert.Equal("AgentBlazor UI Agent", started.AgentName);
         Assert.Equal(AgentBlazorRunOutcome.Succeeded, finished.Outcome);
-        Assert.Equal(response.PlannedActions.Count, finished.PlannedActionCount);
-        Assert.Equal(response.ExecutionResults.Count, finished.ExecutionResultCount);
+        Assert.Equal(GetPlannedStepCount(response), finished.PlannedActionCount);
+        Assert.Equal(GetExecutionOutcomeCount(response), finished.ExecutionResultCount);
     }
 
     [Fact]
@@ -456,7 +461,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddSingleton<CapturingRuntimeEventSubscriber>();
         services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -482,7 +487,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ThrowingChatClient("Simulated planner failure."));
         services.AddSingleton<CapturingRuntimeEventSubscriber>();
         services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -506,7 +511,7 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<CapturingInstructionChatClient>();
         services.AddSingleton<IChatClient>(sp => sp.GetRequiredService<CapturingInstructionChatClient>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -536,7 +541,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new JsonDirectiveThenTextChatClient("agentblazor_agentdialog_open"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -545,13 +550,15 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
 
         Assert.Equal(1, executor.CallCount);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
+            succeeded: true));
     }
 
     [Fact]
@@ -563,7 +570,7 @@ public class AgentRuntimeIntegrationTests
             """{"uri":"/suppliers"}"""));
         services.AddSingleton<CapturingPlannedActionExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -576,10 +583,11 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal(AgentComponentCapabilityProfile.NavigationNavigateToActionId, action.ActionId);
         Assert.NotNull(action.Arguments);
         Assert.Equal("/suppliers", action.Arguments["uri"]?.ToString());
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentNavMenuComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.NavigationNavigateToActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
+            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
+            succeeded: true));
     }
 
     [Fact]
@@ -590,7 +598,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("policy-agent", agent =>
             {
                 agent.WithAllowedComponents("AgentChatWidget");
@@ -606,11 +614,8 @@ public class AgentRuntimeIntegrationTests
             AgentName: "policy-agent"));
 
         Assert.Equal(0, executor.CallCount);
-        Assert.Empty(response.PlannedActions);
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, "AgentChatWidget", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, "open_widget", StringComparison.OrdinalIgnoreCase) &&
-            !result.Succeeded);
+        Assert.Equal(0, GetPlannedStepCount(response));
+        Assert.True(HasExecutionOutcome(response, "AgentChatWidget", "open_widget", succeeded: false));
         Assert.Contains("not available", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -622,7 +627,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("risk-only-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDataGridComponentId);
@@ -641,16 +646,18 @@ public class AgentRuntimeIntegrationTests
             AgentName: "risk-only-agent"));
 
         Assert.Equal(1, executor.CallCount);
-        Assert.Contains(defaultRouteResponse.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasExecutionOutcome(
+            defaultRouteResponse,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
+            succeeded: true));
 
-        Assert.Empty(riskRouteResponse.PlannedActions);
-        Assert.Contains(riskRouteResponse.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
-            !result.Succeeded);
+        Assert.Equal(0, GetPlannedStepCount(riskRouteResponse));
+        Assert.True(HasExecutionOutcome(
+            riskRouteResponse,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
+            succeeded: false));
         Assert.Contains("not available", riskRouteResponse.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -660,7 +667,7 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("Dojo Workspace Agent", agent =>
             {
                 agent.WithAllowedComponents("AgentDialog");
@@ -693,7 +700,7 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("Dojo Workspace Agent", agent =>
             {
                 agent.WithAllowedComponents("AgentDialog");
@@ -722,7 +729,7 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
             .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
 
@@ -751,7 +758,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IAgentInspectorStore>(inspectorStore);
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
             .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
 
@@ -787,7 +794,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("policy-empty-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDialogComponentId);
@@ -807,8 +814,8 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal(0, chatClient.CallCount);
         Assert.Contains("No allowed component actions are available for this agent policy", response.ResponseText, StringComparison.Ordinal);
         Assert.Contains("Filtered actions:", response.ResponseText, StringComparison.Ordinal);
-        Assert.Empty(response.PlannedActions);
-        Assert.Empty(response.ExecutionResults);
+        Assert.Equal(0, GetPlannedStepCount(response));
+        Assert.Equal(0, GetExecutionOutcomeCount(response));
     }
 
     [Fact]
@@ -818,7 +825,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_confirm"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -827,10 +834,11 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("confirm the dialog"));
 
         Assert.Equal(0, executor.CallCount);
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogConfirmActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Message.Contains("Approval required", StringComparison.Ordinal));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogConfirmActionId,
+            messageContains: "Approval required"));
     }
 
     [Fact]
@@ -841,7 +849,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -850,10 +858,11 @@ public class AgentRuntimeIntegrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("submit the form"));
 
         Assert.Equal(0, executor.CallCount);
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Message.Contains("Approval required", StringComparison.Ordinal));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId,
+            messageContains: "Approval required"));
     }
 
     [Fact]
@@ -863,7 +872,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_confirm"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -877,8 +886,11 @@ public class AgentRuntimeIntegrationTests
             }));
 
         Assert.Equal(1, executor.CallCount);
-        Assert.DoesNotContain(response.ExecutionResults, static result =>
-            result.Message.Contains("Approval required", StringComparison.Ordinal));
+        Assert.False(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogConfirmActionId,
+            messageContains: "Approval required"));
     }
 
     [Fact]
@@ -889,7 +901,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -905,10 +917,11 @@ public class AgentRuntimeIntegrationTests
         // Executor may be called multiple times due to how the planner collects tool calls
         // and how the runtime processes the plan. The key assertion is that the action succeeded.
         Assert.True(executor.CallCount >= 1, "Executor should be called at least once");
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId,
+            succeeded: true));
     }
 
     [Fact]
@@ -920,7 +933,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("premium-submit-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentFormComponentId);
@@ -940,13 +953,15 @@ public class AgentRuntimeIntegrationTests
             }));
 
         Assert.True(executor.CallCount >= 1, "Executor should be called at least once");
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentFormComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.FormSubmitActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentFormComponentId,
+            AgentComponentCapabilityProfile.FormSubmitActionId,
+            succeeded: true));
     }
 
     [Fact(Skip = "Custom assembly tools are not yet supported in DeterministicAgentRuntime.")]
@@ -962,7 +977,7 @@ public class AgentRuntimeIntegrationTests
                 ["supplierId"] = "acme"
             }));
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("custom-tools-agent", agent =>
             {
                 agent.WithToolsFromAssembly(typeof(RuntimeCustomTools).Assembly);
@@ -995,7 +1010,7 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices()
+            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
             .AddAgent("mixed-tools-agent", agent =>
             {
                 agent.WithToolsFromAssembly(typeof(RuntimeCustomTools).Assembly);
@@ -1012,13 +1027,15 @@ public class AgentRuntimeIntegrationTests
         Assert.Equal(1, RuntimeCustomTools.CallCount);
         Assert.Equal("acme", RuntimeCustomTools.LastSupplierId);
         Assert.Equal(1, executor.CallCount);
-        Assert.Contains(response.PlannedActions, static action =>
-            string.Equals(action.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(action.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(response.ExecutionResults, static result =>
-            string.Equals(result.ComponentId, AgentComponentCapabilityProfile.AgentDialogComponentId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(result.ActionId, AgentComponentCapabilityProfile.DialogOpenActionId, StringComparison.OrdinalIgnoreCase) &&
-            result.Succeeded);
+        Assert.True(HasPlannedStep(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId));
+        Assert.True(HasExecutionOutcome(
+            response,
+            AgentComponentCapabilityProfile.AgentDialogComponentId,
+            AgentComponentCapabilityProfile.DialogOpenActionId,
+            succeeded: true));
     }
 
     public static class RuntimeCustomTools
@@ -1128,6 +1145,76 @@ public class AgentRuntimeIntegrationTests
         componentId = resolvedComponentId;
         actionId = resolvedActionId;
         return true;
+    }
+
+    private static bool HasPlannedStep(AgentTurnResponse response, string componentId, string actionId)
+        => response.ExecutionPlan?.Steps.Any(step =>
+               string.Equals(step.TargetId, componentId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(step.ActionId, actionId, StringComparison.OrdinalIgnoreCase)) is true
+           || response.LegacyPlannedActions.Any(action =>
+               string.Equals(action.ComponentId, componentId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasExecutionOutcome(
+        AgentTurnResponse response,
+        string componentId,
+        string actionId,
+        bool? succeeded = null,
+        string? messageContains = null)
+    {
+        static bool MatchesStatus(AgentExecutionStepStatus status, bool? expectedSucceeded)
+            => expectedSucceeded switch
+            {
+                true => status is AgentExecutionStepStatus.Completed,
+                false => status is not AgentExecutionStepStatus.Completed,
+                _ => true
+            };
+
+        if (response.ExecutionPlan?.Steps.Count > 0)
+        {
+            return response.ExecutionPlan.Steps.Any(step =>
+                string.Equals(step.TargetId, componentId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(step.ActionId, actionId, StringComparison.OrdinalIgnoreCase) &&
+                MatchesStatus(step.Status, succeeded) &&
+                (messageContains is null || step.Message?.Contains(messageContains, StringComparison.OrdinalIgnoreCase) is true));
+        }
+
+        return response.LegacyExecutionResults.Any(result =>
+            string.Equals(result.ComponentId, componentId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, actionId, StringComparison.OrdinalIgnoreCase) &&
+            (succeeded is null || result.Succeeded == succeeded.Value) &&
+            (messageContains is null || result.Message.Contains(messageContains, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static int GetPlannedStepCount(AgentTurnResponse response)
+        => response.ExecutionPlan?.Steps.Count ?? response.LegacyPlannedActions.Count;
+
+    private static int GetExecutionOutcomeCount(AgentTurnResponse response)
+        => response.ExecutionPlan?.Steps.Count ?? response.LegacyExecutionResults.Count;
+
+    private static IReadOnlyDictionary<string, object?> AssertPlannedStepArguments(
+        AgentTurnResponse response,
+        string componentId,
+        string actionId)
+    {
+        var stepArguments = response.ExecutionPlan?.Steps
+            .SingleOrDefault(step =>
+                string.Equals(step.TargetId, componentId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(step.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+            ?.Arguments;
+
+        if (stepArguments is { Count: > 0 })
+        {
+            return stepArguments;
+        }
+
+        var legacyArguments = response.LegacyPlannedActions
+            .Single(action =>
+                string.Equals(action.ComponentId, componentId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(action.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+            .Arguments;
+
+        return Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(legacyArguments);
     }
 
     private sealed class ToolThenTextChatClient(string functionName, IDictionary<string, object?>? arguments = null) : IChatClient
@@ -1750,3 +1837,4 @@ public class AgentRuntimeIntegrationTests
         }
     }
 }
+

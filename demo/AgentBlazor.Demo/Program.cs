@@ -19,7 +19,11 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<DojoWorkspaceService>();
 builder.Services.AddScoped<DemoFileWorkflowService>();
+builder.Services.AddScoped<DojoRecipeReleaseWorkflowService>();
+builder.Services.AddScoped<IncidentEscalationWorkflowService>();
 builder.Services.AddScoped<SupplierComplianceWorkflowService>();
+builder.Services.AddScoped<ResponseOrchestrationWorkflowService>();
+builder.Services.AddScoped<ReleaseDossierWorkflowService>();
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
 builder.Services.AddHttpClient("demo-remote-storage");
 builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
@@ -73,7 +77,21 @@ builder.Services.AddAgentBlazor(options =>
     {
         agentBuilder.EnablePromptTracing();
         agentBuilder.AddRuntimeEventSubscriber<DojoRuntimeEventSubscriber>();
+        agentBuilder.AddCapability<DemoFileWorkflowCapabilities>();
+        agentBuilder.AddCapability<DojoRecipeReleaseCapabilities>();
+        agentBuilder.AddCapability<IncidentEscalationCapabilities>();
         agentBuilder.AddCapability<SupplierComplianceCapabilities>();
+        agentBuilder.AddCapability<ResponseOrchestrationCapabilities>();
+        agentBuilder.AddCapability<ReleaseDossierCapabilities>();
+
+        agentBuilder.AddAgent("Workflow Hub Agent", agent =>
+        {
+            agent.WithDescription("Focused on routing users toward the right semantic workflow showcase and explaining the workflow-first product story.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+        });
 
         agentBuilder.AddAgent("Dojo Workspace Agent", agent =>
         {
@@ -88,7 +106,7 @@ builder.Services.AddAgentBlazor(options =>
 
         agentBuilder.AddAgent("Supplier Analyst Agent", agent =>
         {
-            agent.WithDescription("Focused on data-centric component exploration and selection-style controls.");
+            agent.WithDescription("Focused on the component reference surface for data-centric controls and selection patterns.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
             {
                 agent.WithInstructions(sharedAgentInstructions);
@@ -99,7 +117,7 @@ builder.Services.AddAgentBlazor(options =>
 
         agentBuilder.AddAgent("Workflow Orchestrator Agent", agent =>
         {
-            agent.WithDescription("Focused on form/dialog/command orchestration across the component explorer.");
+            agent.WithDescription("Focused on the component reference surface for form, dialog, command, and file workflow primitives.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
             {
                 agent.WithInstructions(sharedAgentInstructions);
@@ -110,13 +128,68 @@ builder.Services.AddAgentBlazor(options =>
 
         agentBuilder.AddAgent("Supplier Compliance Agent", agent =>
         {
-            agent.WithDescription("Focused on supplier risk review, explanation, and remediation preparation.");
+            agent.WithDescription("Focused on supplier risk review, explanation, recovery-playbook guidance, and remediation preparation.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
             {
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
             agent.WithMetadata("route_prefixes", "/demo/workflows/supplier-compliance");
+        });
+
+        agentBuilder.AddAgent("File Workflow Agent", agent =>
+        {
+            agent.WithDescription("Focused on file audit bundles, remote handoff, and token verification workflows.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentFileUpload", "AgentCommandBar");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/file-audit-bundle");
+        });
+
+        agentBuilder.AddAgent("Recipe Release Agent", agent =>
+        {
+            agent.WithDescription("Focused on dojo recipe readiness, release blockers, recovery-playbook guidance, and publish-ready draft preparation.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentForm", "AgentDataGrid", "AgentDialog");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/recipe-release");
+        });
+
+        agentBuilder.AddAgent("Incident Escalation Agent", agent =>
+        {
+            agent.WithDescription("Focused on incident triage, evidence review, escalation brief preparation, and recovery from blocked review-board handoffs.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentTreeView", "AgentTabs", "AgentStepper", "AgentCommandBar", "AgentDialog");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/incident-escalation");
+        });
+
+        agentBuilder.AddAgent("Response Orchestration Agent", agent =>
+        {
+            agent.WithDescription("Focused on cross-system orchestration across supplier risk, audit evidence, and incident escalation, including guided subsystem-stage advancement before operational handoff.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentDialog");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/response-orchestration");
+        });
+
+        agentBuilder.AddAgent("Release Dossier Agent", agent =>
+        {
+            agent.WithDescription("Focused on recipe release readiness and audit evidence orchestration before release dossier handoff.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentDialog");
+            agent.WithMetadata("route_prefixes", "/demo/workflows/release-dossier");
         });
     });
 });

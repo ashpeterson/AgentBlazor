@@ -1,0 +1,606 @@
+@page "/demo/workflows/recipe-release"
+@layout DemoLayout
+@using AgentBlazor.Components
+@using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Demo.Services
+@implements IDisposable
+@inject IAgentComponentRegistry ComponentRegistry
+@inject DojoRecipeReleaseWorkflowService Workflow
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Recipe Release Workflow</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
+        <MudText Typo="Typo.h5">Dojo recipe release workflow with semantic capabilities</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            This workflow shows the app-layer story more clearly: the host keeps a recipe editor, ingredient grid, and
+            release dialog, while the agent assesses readiness, explains blockers, and prepares a publish-ready draft.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+            Try prompts like <code>assess the current dojo recipe for release readiness</code>,
+            <code>prepare a publish-ready release draft</code>, or
+            <code>explain why this recipe release is blocked</code>.
+            After a blocker appears, try <code>apply the recipe release recovery playbook</code>.
+        </MudText>
+
+        @if (IsReleaseDossierHandoff)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+                Opened from release dossier orchestration. This live recipe surface is carrying the current workflow session and release focus.
+            </MudAlert>
+            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
+                Current orchestration contribution: @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
+                    ? "clear recipe blockers, then return once the publish-ready draft can be prepared."
+                    : "confirm release readiness and prepare the publish-ready draft so the dossier can advance.")
+            </MudAlert>
+        }
+
+        @if (Snapshot is not null)
+        {
+            <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                    Phase: @GetWorkflowPhase()
+                </MudChip>
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                    Ingredients: @Snapshot.Ingredients.Count
+                </MudChip>
+                <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
+                    Steps: @Snapshot.Steps.Count
+                </MudChip>
+                <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                    Approval boundary: release draft preparation
+                </MudChip>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AssessReleaseAsync">
+                    Assess Readiness
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareReleaseDraftAsync">
+                    Prepare Release Draft
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryPlaybookAsync">
+                    Apply Recovery Playbook
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="TriggerVeganConflictAsync">
+                    Trigger Vegan Conflict
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ClearVeganClaimAsync">
+                    Clear Vegan Claim
+                </MudButton>
+                @if (!string.IsNullOrWhiteSpace(ReturnTo))
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ReturnToWorkflowAsync">
+                        Return to orchestration
+                    </MudButton>
+                }
+            </MudStack>
+        }
+    </MudPaper>
+
+    @if (Snapshot is null)
+    {
+        <section class="demo-doc-page__section">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.body1">Loading dojo recipe workspace...</MudText>
+            </MudPaper>
+        </section>
+    }
+    else
+    {
+        <section class="demo-doc-page__section">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" xl="7">
+                    <MudStack Spacing="2">
+                        <MudPaper Class="pa-4" Outlined="true">
+                            <MudText Typo="Typo.h6">Recipe metadata</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                The form remains native and deterministic. Semantic capabilities consume this state to assess or block release work.
+                            </MudText>
+
+                            <AgentForm AgentId="recipe-release-form"
+                                       FormName="recipe-release-form"
+                                       Model="@Snapshot.Recipe">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="7">
+                                        <MudTextField T="string"
+                                                      Label="Recipe Title"
+                                                      For="@(() => Snapshot.Recipe.Title)"
+                                                      @bind-Value="Snapshot.Recipe.Title" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="5">
+                                        <MudNumericField T="int"
+                                                         Label="Minutes"
+                                                         For="@(() => Snapshot.Recipe.Minutes)"
+                                                         Immediate="true"
+                                                         Min="5"
+                                                         Max="180"
+                                                         @bind-Value="Snapshot.Recipe.Minutes" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudSelect T="string"
+                                                   Label="Difficulty"
+                                                   For="@(() => Snapshot.Recipe.Difficulty)"
+                                                   @bind-Value="Snapshot.Recipe.Difficulty">
+                                            <MudSelectItem T="string" Value="@("Beginner")">Beginner</MudSelectItem>
+                                            <MudSelectItem T="string" Value="@("Intermediate")">Intermediate</MudSelectItem>
+                                            <MudSelectItem T="string" Value="@("Advanced")">Advanced</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="12" md="6" Class="d-flex flex-column justify-center">
+                                        <MudSwitch T="bool" Label="High protein" @bind-Value="Snapshot.Recipe.HighProtein" />
+                                        <MudSwitch T="bool" Label="Low carb" @bind-Value="Snapshot.Recipe.LowCarb" />
+                                        <MudSwitch T="bool" Label="Vegetarian" @bind-Value="Snapshot.Recipe.Vegetarian" />
+                                        <MudSwitch T="bool" Label="Vegan" @bind-Value="Snapshot.Recipe.Vegan" />
+                                        <MudSwitch T="bool" Label="Budget friendly" @bind-Value="Snapshot.Recipe.BudgetFriendly" />
+                                        <MudSwitch T="bool" Label="One pot meal" @bind-Value="Snapshot.Recipe.OnePotMeal" />
+                                        <MudSwitch T="bool" Label="Spicy" @bind-Value="Snapshot.Recipe.Spicy" />
+                                    </MudItem>
+                                </MudGrid>
+                            </AgentForm>
+
+                            <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-3">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveRecipeAsync">
+                                    Save Metadata
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetWorkflowUi">
+                                    Reset Workflow State
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudPaper Class="pa-4" Outlined="true">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                                <div>
+                                    <MudText Typo="Typo.h6">Ingredient grid</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        The release workflow uses deterministic ingredient state instead of replacing grid-level filtering.
+                                    </MudText>
+                                </div>
+                                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                                    Tags: @string.Join(", ", GetTagSummary())
+                                </MudChip>
+                            </MudStack>
+
+                            <AgentDataGrid TItem="DojoIngredientRow"
+                                           AgentId="recipe-release-ingredients"
+                                           Items="@Snapshot.Ingredients"
+                                           Dense="true"
+                                           Hover="true"
+                                           Bordered="true"
+                                           Striped="true"
+                                           RowsPerPage="5"
+                                           RowKeyProperty="IngredientId">
+                                <Columns>
+                                    <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.IngredientId" Title="ID" />
+                                    <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Name" Title="Ingredient" />
+                                    <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Amount" Title="Amount" />
+                                    <TemplateColumn T="DojoIngredientRow" Title="Flags">
+                                        <CellTemplate>
+                                            <MudStack Spacing="1">
+                                                @if (context.Item.Optional)
+                                                {
+                                                    <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Outlined">
+                                                        Optional
+                                                    </MudChip>
+                                                }
+                                                @if (Snapshot.Recipe.Vegan && IsNonVeganIngredient(context.Item.Name))
+                                                {
+                                                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">
+                                                        Conflicts with vegan claim
+                                                    </MudChip>
+                                                }
+                                            </MudStack>
+                                        </CellTemplate>
+                                    </TemplateColumn>
+                                    <PropertyColumn T="DojoIngredientRow" TProperty="string" Property="x => x.Notes" Title="Notes" />
+                                </Columns>
+                            </AgentDataGrid>
+                        </MudPaper>
+                    </MudStack>
+                </MudItem>
+
+                <MudItem xs="12" xl="5">
+                    <MudStack Spacing="2">
+                        <WorkflowDecisionSupport Title="Decision support"
+                                                 Description="The workflow should show readiness, blockers, approval boundary, and recommended follow-up actions without relying on the chat transcript."
+                                                 PhaseLabel="@GetWorkflowPhase()"
+                                                 ApprovalBoundarySummary="release draft preparation"
+                                                 NextStepSummary="@GetNextStepSummary()"
+                                                 OutcomeTitle="Readiness narrative"
+                                                 OutcomeSummary="@GetOutcomeSummary()"
+                                                 OutcomeSeverity="@GetOutcomeSeverity()"
+                                                 BlockerSummary="Blockers must be resolved before a release draft can be approved."
+                                                 Blockers="@GetBlockers()"
+                                                 Warnings="@GetWarnings()"
+                                                 NextActions="@GetRecommendedActions()">
+                            <SummaryContent>
+                                <MudList T="string" Dense="true" Class="mb-0">
+                                <MudListItem T="string">Release dialog: @(Workflow.IsReleaseDialogOpen ? "open" : "closed")</MudListItem>
+                                <MudListItem T="string">Ingredients: @Snapshot.Ingredients.Count</MudListItem>
+                                <MudListItem T="string">Steps: @Snapshot.Steps.Count</MudListItem>
+                                <MudListItem T="string">Vegan claim: @(Snapshot.Recipe.Vegan ? "Enabled" : "Disabled")</MudListItem>
+                                <MudListItem T="string">Last saved: @(Snapshot.LastSavedUtc?.ToLocalTime().ToString("HH:mm:ss") ?? "not yet saved")</MudListItem>
+                            </MudList>
+                        </SummaryContent>
+                        </WorkflowDecisionSupport>
+
+                        <MudPaper Class="pa-4" Outlined="true">
+                            <MudText Typo="Typo.h6">Preparation steps</MudText>
+                            <MudList T="string" Dense="true">
+                                @for (var i = 0; i < Snapshot.Steps.Count; i++)
+                                {
+                                    <MudListItem T="string">@($"{i + 1}. {Snapshot.Steps[i]}")</MudListItem>
+                                }
+                            </MudList>
+                        </MudPaper>
+
+                        <MudPaper Class="pa-4" Outlined="true">
+                            <MudText Typo="Typo.h6">Release draft</MudText>
+                            @if (Workflow.CurrentDraft is { } draft)
+                            {
+                                <MudText Typo="Typo.subtitle2">@draft.Title</MudText>
+                                <MudText Typo="Typo.caption" Class="d-block mb-2">
+                                    Tags: @string.Join(", ", draft.Tags)
+                                </MudText>
+                                <MudList T="string" Dense="true">
+                                    @foreach (var item in draft.ChecklistItems)
+                                    {
+                                        <MudListItem T="string">@item</MudListItem>
+                                    }
+                                </MudList>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2">No release draft is active yet.</MudText>
+                            }
+                        </MudPaper>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </section>
+    }
+
+    <AgentDialog AgentId="recipe-release-dialog"
+                 Visible="@Workflow.IsReleaseDialogOpen"
+                 VisibleChanged="OnReleaseDialogVisibilityChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Recipe release draft</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (Workflow.CurrentDraft is { } draft)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">@draft.Summary</MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-3">
+                    Tags: @string.Join(", ", draft.Tags)
+                </MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var item in draft.ChecklistItems)
+                    {
+                        <MudListItem T="string">@item</MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">No release draft is active.</MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseReleaseDraftAsync">
+                Close draft
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
+</div>
+
+@code {
+    private static readonly string[] _nonVeganIngredients =
+    [
+        "butter",
+        "cheese",
+        "cream",
+        "egg",
+        "eggs",
+        "honey",
+        "milk",
+        "yogurt"
+    ];
+
+    private DojoWorkspaceSnapshot? Snapshot => Workflow.Snapshot;
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+    [SupplyParameterFromQuery(Name = "focus")] public string? Focus { get; set; }
+    [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
+
+    private string? _lastAppliedHandoffKey;
+    private bool IsReleaseDossierHandoff => string.Equals(Source, "release-dossier", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Workflow.Changed += HandleWorkflowChanged;
+        await Workflow.LoadAsync(ComponentRegistry.SessionId);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ApplyRouteHandoffAsync();
+    }
+
+    private async Task SaveRecipeAsync()
+    {
+        if (Snapshot is null)
+        {
+            return;
+        }
+
+        await Workflow.SaveRecipeAsync(Snapshot.Recipe);
+        Snackbar.Add("Recipe metadata saved.", Severity.Success);
+    }
+
+    private async Task AssessReleaseAsync()
+    {
+        var result = await Workflow.AssessReleaseReadinessAsync(ComponentRegistry.SessionId);
+        Snackbar.Add(result.Summary, result.IsBlocked ? Severity.Warning : Severity.Info);
+    }
+
+    private async Task PrepareReleaseDraftAsync()
+    {
+        var result = await Workflow.PrepareReleaseDraftAsync(ComponentRegistry.SessionId);
+        Snackbar.Add(
+            result.Summary,
+            result.IsBlocked ? Severity.Warning : Severity.Success);
+    }
+
+    private async Task ApplyRecoveryPlaybookAsync()
+    {
+        var result = await Workflow.ApplyReleaseRecoveryPlaybookAsync(ComponentRegistry.SessionId);
+        Snackbar.Add(
+            result.Summary,
+            result.IsBlocked ? Severity.Warning : Severity.Success);
+    }
+
+    private async Task TriggerVeganConflictAsync()
+    {
+        if (Snapshot is null)
+        {
+            return;
+        }
+
+        Snapshot.Recipe.Vegan = true;
+        Snapshot.Recipe.Vegetarian = true;
+        await Workflow.SaveRecipeAsync(Snapshot.Recipe);
+        Snackbar.Add("The recipe is now marked vegan, which should block release until the ingredient list matches.", Severity.Warning);
+    }
+
+    private async Task ClearVeganClaimAsync()
+    {
+        if (Snapshot is null)
+        {
+            return;
+        }
+
+        Snapshot.Recipe.Vegan = false;
+        await Workflow.SaveRecipeAsync(Snapshot.Recipe);
+        Snackbar.Add("Cleared the vegan claim.", Severity.Info);
+    }
+
+    private Task CloseReleaseDraftAsync()
+    {
+        Workflow.SetReleaseDialogVisible(false);
+        return Task.CompletedTask;
+    }
+
+    private Task OnReleaseDialogVisibilityChanged(bool visible)
+    {
+        Workflow.SetReleaseDialogVisible(visible);
+        return Task.CompletedTask;
+    }
+
+    private void ResetWorkflowUi()
+    {
+        Workflow.ResetTransientState();
+        Snackbar.Add("Recipe release workflow state reset.", Severity.Info);
+    }
+
+    private Task ReturnToWorkflowAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            NavigationManager.NavigateTo(BuildReturnUri());
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static bool IsNonVeganIngredient(string ingredientName)
+    {
+        return _nonVeganIngredients.Any(keyword =>
+            ingredientName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IReadOnlyList<string> GetTagSummary()
+    {
+        if (Snapshot is null)
+        {
+            return [];
+        }
+
+        var tags = new List<string>();
+        if (Snapshot.Recipe.HighProtein) tags.Add("High protein");
+        if (Snapshot.Recipe.LowCarb) tags.Add("Low carb");
+        if (Snapshot.Recipe.Vegetarian) tags.Add("Vegetarian");
+        if (Snapshot.Recipe.Vegan) tags.Add("Vegan");
+        if (Snapshot.Recipe.BudgetFriendly) tags.Add("Budget friendly");
+        if (Snapshot.Recipe.OnePotMeal) tags.Add("One pot");
+        if (Snapshot.Recipe.Spicy) tags.Add("Spicy");
+        return tags.Count == 0 ? ["Everyday cooking"] : tags;
+    }
+
+    private string GetWorkflowPhase()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return "Draft prepared";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Blocked";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("recovery", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Recovery applied";
+        }
+
+        return string.IsNullOrWhiteSpace(Workflow.LatestAssessment)
+            ? "Awaiting readiness assessment"
+            : "Assessed";
+    }
+
+    private string GetNextStepSummary()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return Workflow.IsReleaseDialogOpen
+                ? "Review the release checklist and decide whether to approve the publish-ready draft."
+                : "Reopen the draft dialog to review the publish checklist.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Resolve the blocked recipe metadata or ingredient mismatch, then re-run the readiness assessment.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("recovery", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Prepare the release draft again now that the recovery playbook has cleared the automatic blocker.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment))
+        {
+            return "Prepare the release draft when you are ready to cross the approval boundary.";
+        }
+
+        return "Assess release readiness first so the workflow can explain whether the recipe is blocked or ready.";
+    }
+
+    private Severity GetOutcomeSeverity()
+    {
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return Severity.Warning;
+        }
+
+        if (Workflow.CurrentDraft is not null)
+        {
+            return Severity.Success;
+        }
+
+        return Severity.Info;
+    }
+
+    private string GetOutcomeSummary()
+    {
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment))
+        {
+            return Workflow.LatestAssessment;
+        }
+
+        return "Run the readiness assessment to explain whether the recipe is release-ready or blocked.";
+    }
+
+    private IReadOnlyList<string> GetBlockers()
+    {
+        if (Workflow.LatestResult?.Outputs is null ||
+            !Workflow.LatestResult.Outputs.TryGetValue("blockers", out var blockersValue) ||
+            blockersValue is not string[] blockers)
+        {
+            return [];
+        }
+
+        return blockers;
+    }
+
+    private IReadOnlyList<string> GetWarnings()
+    {
+        return Workflow.LatestResult?.Warnings ?? [];
+    }
+
+    private IReadOnlyList<string> GetRecommendedActions()
+    {
+        return Workflow.LatestResult?.NextActions ?? [GetNextStepSummary()];
+    }
+
+    private void HandleWorkflowChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ApplyRouteHandoffAsync()
+    {
+        if (!IsReleaseDossierHandoff)
+        {
+            return;
+        }
+
+        var handoffKey = $"{Source}|{Focus}|{ReturnTo}";
+        if (string.Equals(handoffKey, _lastAppliedHandoffKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastAppliedHandoffKey = handoffKey;
+        await Workflow.LoadAsync(ComponentRegistry.SessionId);
+
+        switch (Focus?.Trim().ToLowerInvariant())
+        {
+            case "recovery":
+                await TriggerVeganConflictAsync();
+                await Workflow.AssessReleaseReadinessAsync(ComponentRegistry.SessionId);
+                break;
+            case "draft":
+                await Workflow.AssessReleaseReadinessAsync(ComponentRegistry.SessionId);
+                break;
+            default:
+                await Workflow.AssessReleaseReadinessAsync(ComponentRegistry.SessionId);
+                break;
+        }
+    }
+
+    private string BuildReturnUri()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnTo))
+        {
+            return "/demo/workflows/release-dossier";
+        }
+
+        var separator = ReturnTo.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{ReturnTo}{separator}returnedFrom=recipe&returnState={Uri.EscapeDataString(GetReturnState())}";
+    }
+
+    private string GetReturnState()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return "draft-ready";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Workflow.LatestAssessment) &&
+            Workflow.LatestAssessment.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "recovery";
+        }
+
+        return string.IsNullOrWhiteSpace(Workflow.LatestAssessment)
+            ? "idle"
+            : "assessed";
+    }
+
+    public void Dispose()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+    }
+}

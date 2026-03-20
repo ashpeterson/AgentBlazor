@@ -4,7 +4,10 @@ namespace AgentBlazor.Options;
 
 public sealed class DefaultAgentOptions
 {
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
+
+    [Obsolete("Prefer explicit agent targeting. This flag only preserves legacy default-agent implicit fallback behavior.", false)]
+    public bool PreferAsImplicitFallback { get; set; }
 
     public string Name { get; set; } = "AgentBlazor UI Agent";
 

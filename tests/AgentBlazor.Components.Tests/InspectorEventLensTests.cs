@@ -109,7 +109,7 @@ public class InspectorEventLensTests
         var groups = InspectorEventLens.GroupByPhase(events);
 
         Assert.Equal(["planning", "validation", "execution", "stream"], groups.Select(static g => g.Phase).ToArray());
-        Assert.Equal("Planning", groups[0].Label);
+        Assert.Equal("Workflow Planning", groups[0].Label);
         Assert.Single(groups[0].Events);
     }
 }

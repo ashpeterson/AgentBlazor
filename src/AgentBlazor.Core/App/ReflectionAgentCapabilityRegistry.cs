@@ -195,6 +195,11 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
             }
 
             var attribute = parameter.GetCustomAttribute<AgentParamAttribute>();
+            if (!string.IsNullOrWhiteSpace(attribute?.ContextKey))
+            {
+                continue;
+            }
+
             result.Add(new AgentCapabilityParameterDescriptor(
                 parameter.Name ?? $"param{result.Count}",
                 GetTypeLabel(parameter.ParameterType),
@@ -226,9 +231,15 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
                 continue;
             }
 
-            var key = parameter.Name ?? string.Empty;
+            var key = ResolveArgumentKey(parameter, parameterAttribute);
             if (!TryGetArgValue(arguments, key, parameter.ParameterType, out var value))
             {
+                if (!string.IsNullOrWhiteSpace(parameterAttribute?.ContextKey))
+                {
+                    return CapabilityResult.Failure(
+                        $"Required runtime context '{parameterAttribute.ContextKey}' is missing for capability action '{info.ActionId}'.");
+                }
+
                 if (IsParameterRequired(parameter, parameterAttribute))
                 {
                     return CapabilityResult.NeedsClarification(
@@ -330,7 +341,9 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
     private static string BuildInputSchema(MethodInfo method)
     {
         var parameters = method.GetParameters()
-            .Where(static parameter => parameter.ParameterType != typeof(CancellationToken))
+            .Where(static parameter =>
+                parameter.ParameterType != typeof(CancellationToken) &&
+                string.IsNullOrWhiteSpace(parameter.GetCustomAttribute<AgentParamAttribute>()?.ContextKey))
             .ToArray();
 
         var properties = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
@@ -397,6 +410,16 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         }
 
         return Enum.GetNames(parameterType);
+    }
+
+    private static string ResolveArgumentKey(ParameterInfo parameter, AgentParamAttribute? attribute)
+    {
+        if (!string.IsNullOrWhiteSpace(attribute?.ContextKey))
+        {
+            return attribute.ContextKey;
+        }
+
+        return parameter.Name ?? string.Empty;
     }
 
     private static string ResolveActionName(MethodInfo method)

@@ -148,9 +148,11 @@ public class ConversationStoreTests
         Assert.Equal(timestamp, turn.Timestamp);
         Assert.Equal("Test message", turn.UserMessage);
         Assert.Equal("Test response", turn.AgentResponse);
-        Assert.Same(plannedActions, turn.PlannedActions);
-        Assert.Same(executionResults, turn.ExecutionResults);
         Assert.Same(executionPlan, turn.ExecutionPlan);
+        Assert.True(turn.HasNormalizedExecutionPlan);
+        Assert.False(turn.UsesLegacyCompatibilityPayload);
+        Assert.Empty(turn.LegacyPlannedActions);
+        Assert.Empty(turn.LegacyExecutionResults);
     }
 
     [Fact]
@@ -187,6 +189,33 @@ public class ConversationStoreTests
         };
 
         Assert.Equal("Executed 2 step(s): suppliers.show_at_risk, AgentDataGrid.highlight_rows", turn.Summarize());
+    }
+
+    [Fact]
+    public void ConversationTurn_UsesLegacyCompatibilityPayload_WhenExecutionPlanIsMissing()
+    {
+        var plannedActions = new List<PlannedComponentAction>
+        {
+            new("AgentGrid", "filter", "desc", new Dictionary<string, object?>())
+        };
+        var executionResults = new List<ComponentActionExecutionResult>
+        {
+            new("AgentGrid", "filter", ActionOutcome.Applied, "Applied.")
+        };
+
+        var turn = new ConversationTurn
+        {
+            Timestamp = DateTime.UtcNow,
+            UserMessage = "Filter the grid",
+            AgentResponse = "Done",
+            PlannedActions = plannedActions,
+            ExecutionResults = executionResults
+        };
+
+        Assert.False(turn.HasNormalizedExecutionPlan);
+        Assert.True(turn.UsesLegacyCompatibilityPayload);
+        Assert.Same(plannedActions, turn.LegacyPlannedActions);
+        Assert.Same(executionResults, turn.LegacyExecutionResults);
     }
 
     [Fact]

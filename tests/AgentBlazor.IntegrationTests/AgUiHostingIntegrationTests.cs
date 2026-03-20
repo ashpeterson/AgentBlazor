@@ -127,8 +127,10 @@ public class AgUiHostingIntegrationTests
             tier: AgentBlazorTier.Paid,
             configureOptions: options =>
             {
+#pragma warning disable CS0618
                 options.DefaultAgent.AllowedComponents.Add("AgentForm");
                 options.DefaultAgent.AllowedActions.Add("AgentForm.submit");
+#pragma warning restore CS0618
             });
         try
         {
@@ -371,6 +373,7 @@ public class AgUiHostingIntegrationTests
             ConfigureDefaultAgent(options);
             configureOptions?.Invoke(options);
         })
+            .UseLegacyDefaultAgentFallback()
             .UseLegacyRuntimeAdapter();
 
         builder.Services.AddAgentBlazorHosting();
@@ -386,7 +389,8 @@ public class AgUiHostingIntegrationTests
     private static async Task<WebApplication> CreateAppWithControlRuntimeAsync(ControlStreamingRuntime runtime)
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent);
+        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
+            .UseLegacyDefaultAgentFallback();
         builder.Services.AddSingleton(runtime);
         builder.Services.AddSingleton<IAgentRuntime>(static sp => sp.GetRequiredService<ControlStreamingRuntime>());
         builder.Services.AddAgentBlazorHosting();
@@ -417,7 +421,8 @@ public class AgUiHostingIntegrationTests
     private static async Task<WebApplication> CreateAppWithStreamingRuntimeAsync()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent);
+        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
+            .UseLegacyDefaultAgentFallback();
         builder.Services.AddSingleton<StubStreamingRuntime>();
         builder.Services.AddSingleton<IAgentRuntime>(static sp => sp.GetRequiredService<StubStreamingRuntime>());
         builder.Services.AddAgentBlazorHosting();
@@ -432,11 +437,13 @@ public class AgUiHostingIntegrationTests
 
     private static void ConfigureDefaultAgent(AgentBlazorOptions options)
     {
+#pragma warning disable CS0618
         options.DefaultAgent.AllowedComponents.Clear();
         options.DefaultAgent.AllowedActions.Clear();
         options.DefaultAgent.AllowedComponents.Add("AgentForm");
         options.DefaultAgent.AllowedActions.Add("AgentForm.submit");
         options.DefaultAgent.AllowedActions.Add("AgentForm.validate");
+#pragma warning restore CS0618
     }
 
     private static HttpClient CreateClient(WebApplication app)

@@ -995,7 +995,10 @@ public sealed class ChatClientRuntimeAdapter(
                 MapCapabilityStatus(capabilityResult),
                 capabilityResult.RequiresClarification
                     ? capabilityResult.ClarificationQuestion ?? capabilityResult.Summary
-                    : capabilityResult.Summary);
+                    : capabilityResult.Summary,
+                outputs: capabilityResult.Outputs,
+                warnings: capabilityResult.Warnings,
+                nextActions: capabilityResult.NextActions);
         }
         turnState?.AddStreamEvent(new AgentTurnStreamEvent
         {
@@ -1196,6 +1199,8 @@ public sealed class ChatClientRuntimeAdapter(
         var message = result.ClarificationQuestion ?? result.Summary;
         var outcome = result.RequiresClarification
             ? ActionOutcome.NeedsClarification
+            : result.IsBlocked
+                ? ActionOutcome.Blocked
             : result.Succeeded
                 ? ActionOutcome.Applied
                 : ActionOutcome.Failed;
@@ -1212,6 +1217,11 @@ public sealed class ChatClientRuntimeAdapter(
         if (result.RequiresClarification)
         {
             return AgentExecutionStepStatus.NeedsClarification;
+        }
+
+        if (result.IsBlocked)
+        {
+            return AgentExecutionStepStatus.Blocked;
         }
 
         return result.Succeeded
@@ -1320,14 +1330,12 @@ public sealed class ChatClientRuntimeAdapter(
             return null;
         }
 
-        if (_agentRegistry.TryGet(_options.Value.DefaultAgent.Name, out var configuredDefault))
-        {
-            return configuredDefault;
-        }
-
-        return _agentRegistry.GetAll()
-            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        return RuntimeTurnPreflight.ResolveImplicitFallbackAgent(
+            _agentRegistry.GetAll(),
+#pragma warning disable CS0618
+            _options.Value.DefaultAgent.Name,
+            _options.Value.DefaultAgent.PreferAsImplicitFallback);
+#pragma warning restore CS0618
     }
 
     private string BuildSessionKey(string agentName, AgentTurnRequest request)
@@ -1346,9 +1354,11 @@ public sealed class ChatClientRuntimeAdapter(
             return registration.Instructions;
         }
 
+#pragma warning disable CS0618
         return string.IsNullOrWhiteSpace(_options.Value.DefaultAgent.Instructions)
             ? null
             : _options.Value.DefaultAgent.Instructions;
+#pragma warning restore CS0618
     }
 
     private async Task<AgentTurnResponse> BuildNoAgentResponseAsync(
@@ -1400,12 +1410,19 @@ public sealed class ChatClientRuntimeAdapter(
             request.Context?.TryGetValue(AgentRuntimeContextKeys.ContextVersion, out var contextVersion) == true ? contextVersion : null,
             turnState.GetExecutionSteps());
         var executionResults = turnState.GetExecutionResults();
+        var responseExecutionResults = executionPlan.Steps.Count > 0
+            ? []
+            : executionResults;
+        var clarificationQuestion = executionPlan.Steps
+            .FirstOrDefault(static step => step.Status is AgentExecutionStepStatus.NeedsClarification)?
+            .Message;
         return RuntimeTurnResponses.Build(
             agentName,
             RuntimePlanResponses.BuildExecutionResponseText(responseText, executionResults),
             executionPlan.Steps.Count > 0 ? [] : turnState.GetPlannedActions(),
-            executionResults,
+            responseExecutionResults,
             generatedUi: BuildGeneratedUi(turnState),
+            clarificationQuestion: clarificationQuestion,
             pendingApprovals: turnState.GetPendingApprovals(),
             requiresApproval: turnState.RequiresApproval,
             executionPlan: executionPlan);
@@ -1496,6 +1513,46 @@ public sealed class ChatClientRuntimeAdapter(
             return;
         }
 
+        var executionSteps = turnState.GetExecutionSteps()
+            .Where(static step =>
+                step.Status is AgentExecutionStepStatus.Completed &&
+                step.Kind is AgentExecutionStepKind.SemanticCapability or AgentExecutionStepKind.UiAction)
+            .ToArray();
+
+        if (executionSteps.Length > 0)
+        {
+            var semanticSteps = executionSteps
+                .Where(static step => step.Kind is AgentExecutionStepKind.SemanticCapability)
+                .ToArray();
+            var stepsToRecord = semanticSteps.Length > 0
+                ? semanticSteps
+                : executionSteps;
+
+            foreach (var step in stepsToRecord)
+            {
+                try
+                {
+                    await _actionHistoryStore.RecordAsync(new ActionHistoryEntry(
+                        SessionId: request.GetEffectiveSessionId(),
+                        UserId: request.GetEffectiveUserId(),
+                        Timestamp: DateTimeOffset.UtcNow,
+                        UserMessage: request.UserMessage,
+                        ActionId: step.ActionId,
+                        AgentId: step.TargetId,
+                        Args: step.Arguments ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _loggerFactory?
+                        .CreateLogger<ChatClientRuntimeAdapter>()
+                        .LogWarning(ex, "Failed to record action history for {ActionId}", step.ActionId);
+                }
+            }
+
+            return;
+        }
+
         var successfulResults = turnState.GetExecutionResults()
             .Where(static result => result.Succeeded)
             .ToArray();
@@ -1547,22 +1604,42 @@ public sealed class ChatClientRuntimeAdapter(
         var plannedActions = turnState.GetPlannedActions();
         var generatedUiToolCalls = turnState.GetGeneratedUiToolCalls();
         var executionResults = turnState.GetExecutionResults();
+        var executionPlan = response.ExecutionPlan;
+        var firstStep = executionPlan?.Steps.FirstOrDefault();
         var firstAction = plannedActions.FirstOrDefault();
-        var primaryIntent = plannedActions.Count > 0
-            ? "tool_execution"
-            : generatedUiToolCalls.Count > 0
-                ? "generated_ui"
-                : "chat";
+        var primaryIntent = firstStep is not null
+            ? firstStep.Kind switch
+            {
+                AgentExecutionStepKind.SemanticCapability => "semantic_capability",
+                AgentExecutionStepKind.GeneratedUiTool => "generated_ui",
+                AgentExecutionStepKind.ServiceTool => "service_tool",
+                _ => "tool_execution"
+            }
+            : plannedActions.Count > 0
+                ? "tool_execution"
+                : generatedUiToolCalls.Count > 0
+                    ? "generated_ui"
+                    : "chat";
 
-        traceBuilder
-            .RecordClassification(
-                method: "runtime_adapter",
-                primaryIntent: primaryIntent,
-                confidence: 1.0f,
-                targetComponentId: firstAction?.ComponentId,
-                targetActionId: firstAction?.ActionId)
-            .RecordPlanning(plannedActions, plannedActions.Count + generatedUiToolCalls.Count)
-            .RecordExecution(executionResults);
+        traceBuilder.RecordClassification(
+            method: "runtime_adapter",
+            primaryIntent: primaryIntent,
+            confidence: 1.0f,
+            targetComponentId: firstStep?.TargetId ?? firstAction?.ComponentId,
+            targetActionId: firstStep?.ActionId ?? firstAction?.ActionId);
+
+        if (executionPlan?.Steps.Count > 0)
+        {
+            traceBuilder
+                .RecordPlanning(executionPlan, executionPlan.Steps.Count + generatedUiToolCalls.Count)
+                .RecordExecution(executionPlan);
+        }
+        else
+        {
+            traceBuilder
+                .RecordPlanning(plannedActions, plannedActions.Count + generatedUiToolCalls.Count)
+                .RecordExecution(executionResults);
+        }
 
         if (turnState.HasFailures)
         {
@@ -1643,6 +1720,7 @@ public sealed class ChatClientRuntimeAdapter(
                 rawPlanResponse: null,
                 events: BuildInspectorEvents(request, response, turnState),
                 executionResults: turnState.GetExecutionResults(),
+                executionPlan: response?.ExecutionPlan,
                 succeeded: succeeded,
                 errorMessage: errorMessage));
         }
@@ -1678,14 +1756,51 @@ public sealed class ChatClientRuntimeAdapter(
                 $"{handoffFrom} -> {handoffTo}"));
         }
 
-        foreach (var action in turnState.GetPlannedActions())
+        var executionPlan = response?.ExecutionPlan;
+        if (executionPlan?.Steps.Count > 0)
         {
-            events.Add(new InspectorEvent(
-                DateTimeOffset.UtcNow,
-                "PlannedAction",
-                action.ComponentId,
-                action.ActionId,
-                SerializeInspectorPayload(action.Arguments)));
+            foreach (var step in executionPlan.Steps)
+            {
+                events.Add(new InspectorEvent(
+                    DateTimeOffset.UtcNow,
+                    "PlannedStep",
+                    step.TargetId,
+                    step.ActionId,
+                    SerializeInspectorPayload(new
+                    {
+                        step.Kind,
+                        step.Arguments,
+                        step.PolicyDecision,
+                        step.Message
+                    })));
+
+                if (step.RequiresApproval)
+                {
+                    events.Add(new InspectorEvent(
+                        DateTimeOffset.UtcNow,
+                        "ApprovalRequired",
+                        step.TargetId,
+                        step.ActionId,
+                        SerializeInspectorPayload(new
+                        {
+                            step.PolicyDecision,
+                            step.Arguments,
+                            step.Message
+                        })));
+                }
+            }
+        }
+        else
+        {
+            foreach (var action in turnState.GetPlannedActions())
+            {
+                events.Add(new InspectorEvent(
+                    DateTimeOffset.UtcNow,
+                    "PlannedAction",
+                    action.ComponentId,
+                    action.ActionId,
+                    SerializeInspectorPayload(action.Arguments)));
+            }
         }
 
         foreach (var toolCall in turnState.GetGeneratedUiToolCalls())
@@ -1698,14 +1813,17 @@ public sealed class ChatClientRuntimeAdapter(
                 SerializeInspectorPayload(toolCall.Arguments)));
         }
 
-        foreach (var approval in turnState.GetPendingApprovals())
+        if (executionPlan?.Steps.Count is not > 0)
         {
-            events.Add(new InspectorEvent(
-                DateTimeOffset.UtcNow,
-                "ApprovalRequired",
-                approval.ComponentId,
-                approval.ActionId,
-                SerializeInspectorPayload(approval.Parameters)));
+            foreach (var approval in turnState.GetPendingApprovals())
+            {
+                events.Add(new InspectorEvent(
+                    DateTimeOffset.UtcNow,
+                    "ApprovalRequired",
+                    approval.ComponentId,
+                    approval.ActionId,
+                    SerializeInspectorPayload(approval.Parameters)));
+            }
         }
 
         if (response is not null)
@@ -1888,7 +2006,10 @@ public sealed class ChatClientRuntimeAdapter(
             AgentExecutionStepStatus status,
             string? message = null,
             bool? requiresApproval = null,
-            AgentPolicyDecision? policyDecision = null)
+            AgentPolicyDecision? policyDecision = null,
+            IReadOnlyDictionary<string, object?>? outputs = null,
+            IReadOnlyList<string>? warnings = null,
+            IReadOnlyList<string>? nextActions = null)
         {
             lock (_gate)
             {
@@ -1904,7 +2025,10 @@ public sealed class ChatClientRuntimeAdapter(
                     Status = status,
                     RequiresApproval = requiresApproval ?? current.RequiresApproval,
                     PolicyDecision = policyDecision ?? current.PolicyDecision,
-                    Message = message ?? current.Message
+                    Message = message ?? current.Message,
+                    Outputs = outputs ?? current.Outputs,
+                    Warnings = warnings ?? current.Warnings,
+                    NextActions = nextActions ?? current.NextActions
                 };
             }
         }
@@ -2011,7 +2135,10 @@ public sealed class ChatClientRuntimeAdapter(
                 RequiresApproval: requiresApproval,
                 PolicyDecision: policyDecision,
                 Arguments: arguments,
-                Message: null);
+                Message: null,
+                Outputs: null,
+                Warnings: null,
+                NextActions: null);
         }
     }
 

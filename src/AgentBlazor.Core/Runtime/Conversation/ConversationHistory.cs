@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Components;
 using AgentBlazor.Execution;
@@ -27,17 +28,42 @@ public sealed record ConversationTurn
     /// <summary>
     /// Actions that were planned during this turn.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public IReadOnlyList<PlannedComponentAction> PlannedActions { get; init; } = [];
 
     /// <summary>
     /// Results of executing the planned actions.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public IReadOnlyList<ComponentActionExecutionResult> ExecutionResults { get; init; } = [];
 
     /// <summary>
     /// Normalized execution plan for this turn, when available.
     /// </summary>
     public AgentExecutionPlan? ExecutionPlan { get; init; }
+
+    /// <summary>
+    /// Whether this turn has normalized execution-step data.
+    /// </summary>
+    public bool HasNormalizedExecutionPlan => ExecutionPlan?.Steps.Count > 0;
+
+    /// <summary>
+    /// Whether this turn still depends on planner-era compatibility payloads.
+    /// </summary>
+    public bool UsesLegacyCompatibilityPayload => !HasNormalizedExecutionPlan &&
+        (PlannedActions.Count > 0 || ExecutionResults.Count > 0);
+
+    /// <summary>
+    /// Legacy planned-action payload, only meaningful when <see cref="ExecutionPlan"/> is absent.
+    /// </summary>
+    public IReadOnlyList<PlannedComponentAction> LegacyPlannedActions =>
+        HasNormalizedExecutionPlan ? [] : PlannedActions;
+
+    /// <summary>
+    /// Legacy execution-result payload, only meaningful when <see cref="ExecutionPlan"/> is absent.
+    /// </summary>
+    public IReadOnlyList<ComponentActionExecutionResult> LegacyExecutionResults =>
+        HasNormalizedExecutionPlan ? [] : ExecutionResults;
 
     /// <summary>
     /// Optional generated UI document returned for this turn.
@@ -49,7 +75,7 @@ public sealed record ConversationTurn
     /// </summary>
     public bool HasSuccessfulActions =>
         ExecutionPlan?.Steps.Any(static step => step.Status is AgentExecutionStepStatus.Completed) is true
-            || ExecutionResults.Any(static r => r.Succeeded);
+            || LegacyExecutionResults.Any(static r => r.Succeeded);
 
     /// <summary>
     /// Creates a summary of this turn suitable for inclusion in prompts.
@@ -72,15 +98,15 @@ public sealed record ConversationTurn
             }
         }
 
-        if (ExecutionResults.Count == 0)
+        if (LegacyExecutionResults.Count == 0)
         {
             return AgentResponse.Length > 100
                 ? $"{AgentResponse[..100]}..."
                 : AgentResponse;
         }
 
-        var successful = ExecutionResults.Count(static r => r.Succeeded);
-        var actions = string.Join(", ", ExecutionResults
+        var successful = LegacyExecutionResults.Count(static r => r.Succeeded);
+        var actions = string.Join(", ", LegacyExecutionResults
             .Where(static r => r.Succeeded)
             .Select(static r => $"{r.ComponentId}.{r.ActionId}")
             .Take(3));
@@ -172,7 +198,7 @@ public sealed record ConversationHistory
             }
 
             var lastSuccessfulResult = Turns
-                .SelectMany(static t => t.ExecutionResults)
+                .SelectMany(static t => t.LegacyExecutionResults)
                 .LastOrDefault(static r => r.Succeeded);
 
             return lastSuccessfulResult is not null

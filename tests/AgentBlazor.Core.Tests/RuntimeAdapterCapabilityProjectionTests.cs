@@ -7,6 +7,8 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Core.Runtime.Tracing;
+using AgentBlazor.Core.Paid;
 using AgentBlazor.Execution;
 using AgentBlazor.Services;
 using Microsoft.Extensions.AI;
@@ -104,12 +106,9 @@ public class RuntimeAdapterCapabilityProjectionTests
             }));
 
         Assert.Equal(21, recorder.LastDays);
-        Assert.Empty(response.PlannedActions);
-
-        var execution = Assert.Single(response.ExecutionResults);
-        Assert.Equal("supplier_compliance", execution.ComponentId);
-        Assert.Equal("show_at_risk_suppliers", execution.ActionId);
-        Assert.Equal("Prepared a 21-day at-risk supplier review.", execution.Message);
+        Assert.False(response.UsesLegacyCompatibilityPayload);
+        Assert.Empty(response.LegacyPlannedActions);
+        Assert.Empty(response.LegacyExecutionResults);
         Assert.Equal("capability-invoked", response.ResponseText);
         Assert.NotNull(response.ExecutionPlan);
         var plan = response.ExecutionPlan!;
@@ -123,8 +122,115 @@ public class RuntimeAdapterCapabilityProjectionTests
         Assert.Equal(AgentExecutionStepStatus.Completed, step.Status);
         Assert.Equal("supplier_compliance", step.TargetId);
         Assert.Equal("show_at_risk_suppliers", step.ActionId);
+        Assert.Equal("Prepared a 21-day at-risk supplier review.", step.Message);
         Assert.Equal(AgentApprovalMode.None, step.PolicyDecision.ApprovalMode);
         Assert.Equal(AgentRiskClass.ReadOnly, step.PolicyDecision.RiskClass);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_RecordsSemanticCapabilityHistory_FromExecutionPlan()
+    {
+        var services = new ServiceCollection();
+        var historyStore = new InMemoryActionHistoryStore();
+
+        services.AddSingleton(historyStore);
+        services.AddSingleton<IActionHistoryStore>(historyStore);
+        services.AddSingleton<CapabilityInvokingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<CapabilityInvokingChatClient>());
+        services.AddSingleton(new CapabilityRecorder());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<SupplierCapabilities>()
+            .AddAgent("supplier-agent", agent =>
+            {
+                agent.WithAllowedActions("supplier_compliance.show_at_risk_suppliers");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        _ = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show at-risk suppliers",
+            AgentName: "supplier-agent",
+            SessionId: "capability-history",
+            UserId: "user-42"));
+
+        var history = await historyStore.GetRecentAsync("capability-history");
+        var entry = Assert.Single(history);
+        Assert.Equal("user-42", entry.UserId);
+        Assert.Equal("Show at-risk suppliers", entry.UserMessage);
+        Assert.Equal("show_at_risk_suppliers", entry.ActionId);
+        Assert.Equal("supplier_compliance", entry.AgentId);
+        Assert.Equal(21, entry.Args["days"]);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_StoresPromptTrace_FromNormalizedSemanticExecutionPlan()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<CapabilityInvokingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<CapabilityInvokingChatClient>());
+        services.AddSingleton(new CapabilityRecorder());
+        services.AddAgentBlazorServices()
+            .EnablePromptTracing()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<SupplierCapabilities>()
+            .AddAgent("supplier-agent", agent =>
+            {
+                agent.WithAllowedActions("supplier_compliance.show_at_risk_suppliers");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var traceStore = provider.GetRequiredService<IPromptTraceStore>();
+
+        _ = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show at-risk suppliers",
+            AgentName: "supplier-agent",
+            SessionId: "capability-trace"));
+
+        var trace = Assert.Single(await traceStore.GetBySessionAsync("capability-trace", 1));
+        Assert.NotNull(trace.Classification);
+        Assert.Equal("semantic_capability", trace.Classification!.PrimaryIntent);
+        Assert.NotNull(trace.Planning);
+        Assert.Contains(trace.Planning!.WorkflowSteps, action =>
+            string.Equals(action.ComponentId, "supplier_compliance", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(action.ActionId, "show_at_risk_suppliers", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(trace.Execution);
+        Assert.Contains(trace.Execution!.ExecutionSteps, result =>
+            string.Equals(result.ComponentId, "supplier_compliance", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(result.ActionId, "show_at_risk_suppliers", StringComparison.OrdinalIgnoreCase) &&
+            result.Succeeded);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_MapsBlockedCapabilityResult_ToBlockedExecutionStep()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<BlockingCapabilityChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<BlockingCapabilityChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<BlockingCapabilities>()
+            .AddAgent("blocking-agent", agent =>
+            {
+                agent.WithAllowedActions("recipe_release.prepare_release_draft");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Prepare the recipe release draft",
+            AgentName: "blocking-agent",
+            SessionId: "blocked-capability"));
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Blocked, step.Status);
+        Assert.Contains("blocked", step.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [AgentCapability(
@@ -147,6 +253,16 @@ public class RuntimeAdapterCapabilityProjectionTests
     public sealed class CapabilityRecorder
     {
         public int LastDays { get; set; }
+    }
+
+    [AgentCapability("recipe_release", Name = "Recipe Release", Description = "Release workflow checks.")]
+    public sealed class BlockingCapabilities
+    {
+        [AgentAction("Prepare a release draft", ActionId = "prepare_release_draft")]
+        public CapabilityResult PrepareReleaseDraft()
+        {
+            return CapabilityResult.Blocked("Release is blocked because the recipe metadata conflicts with the ingredient list.");
+        }
     }
 
     private sealed class CapabilityToolCatalogChatClient : IChatClient
@@ -204,6 +320,43 @@ public class RuntimeAdapterCapabilityProjectionTests
             }), cancellationToken);
 
             return new ChatResponse(new ChatMessage(ChatRole.Assistant, "capability-invoked"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class BlockingCapabilityChatClient : IChatClient
+    {
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    function.Name.Contains("capability_recipe_release_prepare_release_draft", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+            await tool.InvokeAsync(new AIFunctionArguments(), cancellationToken);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "blocked-capability-invoked"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

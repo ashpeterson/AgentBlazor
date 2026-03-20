@@ -7,6 +7,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Tracing;
+using AgentBlazor.Execution;
 using AgentBlazor.Licensing;
 using AgentBlazor.Runtime;
 using AgentBlazor.Services;
@@ -118,7 +119,9 @@ public class ComponentMockingReportTests
         {
             var services = new ServiceCollection();
             services.AddSingleton<IChatClient>(new ScenarioToolChatClient(scenario.ToolName, scenario.Arguments));
-            services.AddAgentBlazorServices().EnablePromptTracing();
+            services.AddAgentBlazorServices()
+                .UseLegacyDefaultAgentFallback()
+                .EnablePromptTracing();
             services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
             using var provider = services.BuildServiceProvider();
@@ -145,8 +148,10 @@ public class ComponentMockingReportTests
             {
                 Prompt = scenario.Prompt,
                 ToolName = scenario.ToolName,
-                PlannedActions = response.PlannedActions.ToList(),
-                ExecutionResults = response.ExecutionResults.ToList(),
+                ExecutionPlan = response.ExecutionPlan,
+                UsesLegacyCompatibilityPayload = response.UsesLegacyCompatibilityPayload,
+                LegacyPlannedActions = response.LegacyPlannedActions.ToList(),
+                LegacyExecutionResults = response.LegacyExecutionResults.ToList(),
                 ResponseText = response.ResponseText,
                 Trace = trace
             });
@@ -157,9 +162,11 @@ public class ComponentMockingReportTests
         _output.WriteLine(report);
 
         // Verify most scenarios succeeded (some edge cases may fail due to parameter normalization)
-        var successCount = results.Count(r => r.ExecutionResults.Any(er => er.Succeeded));
+        var successCount = results.Count(static r => r.HasSuccessfulExecution);
         Assert.True(successCount >= 10, $"Expected at least 10 successful scenarios, got {successCount}");
-        Assert.All(results, r => Assert.NotEmpty(r.PlannedActions));
+        Assert.All(results, static r => Assert.True(
+            r.HasPlannedSteps,
+            "Expected normalized plan steps or legacy planned actions."));
     }
 
     private static string GenerateReport(
@@ -178,7 +185,7 @@ public class ComponentMockingReportTests
         sb.AppendLine();
         sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine($"Total Scenarios: {results.Count}");
-        sb.AppendLine($"Successful: {results.Count(r => r.ExecutionResults.Any(er => er.Succeeded))}");
+        sb.AppendLine($"Successful: {results.Count(static r => r.HasSuccessfulExecution)}");
         sb.AppendLine();
 
         sb.AppendLine("───────────────────────────────────────────────────────────────────────────────");
@@ -189,7 +196,7 @@ public class ComponentMockingReportTests
         int scenarioNum = 1;
         foreach (var result in results)
         {
-            var outcome = result.ExecutionResults.Any(er => er.Succeeded) ? "SUCCESS" : "FAILED";
+            var outcome = result.HasSuccessfulExecution ? "SUCCESS" : "FAILED";
             var outcomeIcon = outcome == "SUCCESS" ? "[OK]" : "[FAIL]";
 
             sb.AppendLine($"┌─ Scenario {scenarioNum}: {outcomeIcon}");
@@ -198,29 +205,28 @@ public class ComponentMockingReportTests
             sb.AppendLine($"│  Tool:       {result.ToolName}");
             sb.AppendLine($"│");
 
-            if (result.PlannedActions.Count > 0)
+            if (result.HasPlannedSteps)
             {
-                sb.AppendLine($"│  Planned Actions:");
-                foreach (var action in result.PlannedActions)
+                sb.AppendLine($"│  Planned Steps:");
+                foreach (var line in result.GetPlannedStepLines())
                 {
-                    sb.AppendLine($"│    - {action.ComponentId}.{action.ActionId}");
-                    if (action.Arguments?.Count > 0)
-                    {
-                        foreach (var arg in action.Arguments)
-                        {
-                            sb.AppendLine($"│        {arg.Key}: {arg.Value}");
-                        }
-                    }
+                    sb.AppendLine($"│    - {line}");
+                }
+            }
+            else if (result.UsesLegacyCompatibilityPayload && result.LegacyPlannedActions.Count > 0)
+            {
+                sb.AppendLine($"│  Legacy Planned Actions:");
+                foreach (var line in result.GetLegacyPlannedActionLines())
+                {
+                    sb.AppendLine($"│    - {line}");
                 }
             }
 
             sb.AppendLine($"│");
             sb.AppendLine($"│  Execution Results:");
-            foreach (var exec in result.ExecutionResults)
+            foreach (var line in result.GetExecutionOutcomeLines())
             {
-                var status = exec.Succeeded ? "OK" : "FAIL";
-                sb.AppendLine($"│    [{status}] {exec.ComponentId}.{exec.ActionId}");
-                sb.AppendLine($"│         Message: {exec.Message}");
+                sb.AppendLine($"│    {line}");
             }
 
             if (result.Trace?.Response != null)
@@ -296,10 +302,9 @@ public class ComponentMockingReportTests
         foreach (var result in results)
         {
             var promptTrunc = result.Prompt.Length > 44 ? result.Prompt[..41] + "..." : result.Prompt.PadRight(44);
-            var firstExec = result.ExecutionResults.FirstOrDefault();
-            var component = firstExec?.ComponentId ?? "N/A";
-            var action = firstExec?.ActionId ?? "N/A";
-            var status = firstExec?.Succeeded == true ? "SUCCESS" : "FAILED";
+            var component = result.GetPrimaryTargetId();
+            var action = result.GetPrimaryActionId();
+            var status = result.HasSuccessfulExecution ? "SUCCESS" : "FAILED";
 
             sb.AppendLine($"| {scenarioNum,1} | {promptTrunc} | {component,-11} | {action,-13} | {status,-7} |");
             scenarioNum++;
@@ -324,10 +329,96 @@ public class ComponentMockingReportTests
     {
         public required string Prompt { get; init; }
         public required string ToolName { get; init; }
-        public required List<PlannedComponentAction> PlannedActions { get; init; }
-        public required List<ComponentActionExecutionResult> ExecutionResults { get; init; }
+        public AgentExecutionPlan? ExecutionPlan { get; init; }
+        public bool UsesLegacyCompatibilityPayload { get; init; }
+        public required List<PlannedComponentAction> LegacyPlannedActions { get; init; }
+        public required List<ComponentActionExecutionResult> LegacyExecutionResults { get; init; }
         public required string ResponseText { get; init; }
         public PromptTrace? Trace { get; init; }
+
+        public bool HasPlannedSteps =>
+            ExecutionPlan?.Steps.Count > 0 || LegacyPlannedActions.Count > 0;
+
+        public bool HasSuccessfulExecution =>
+            ExecutionPlan?.Steps.Any(static step => step.Status is AgentExecutionStepStatus.Completed) is true ||
+            LegacyExecutionResults.Any(static result => result.Succeeded);
+
+        public IEnumerable<string> GetPlannedStepLines()
+        {
+            if (ExecutionPlan?.Steps.Count > 0)
+            {
+                foreach (var step in ExecutionPlan.Steps)
+                {
+                    yield return $"{step.TargetId}.{step.ActionId} [{step.Status}]";
+                    if (step.Arguments?.Count > 0)
+                    {
+                        foreach (var arg in step.Arguments)
+                        {
+                            yield return $"    {arg.Key}: {arg.Value}";
+                        }
+                    }
+                }
+
+                yield break;
+            }
+
+            foreach (var line in GetLegacyPlannedActionLines())
+            {
+                yield return line;
+            }
+        }
+
+        public IEnumerable<string> GetLegacyPlannedActionLines()
+        {
+            foreach (var action in LegacyPlannedActions)
+            {
+                yield return $"{action.ComponentId}.{action.ActionId}";
+                if (action.Arguments?.Count > 0)
+                {
+                    foreach (var arg in action.Arguments)
+                    {
+                        yield return $"    {arg.Key}: {arg.Value}";
+                    }
+                }
+            }
+        }
+
+        public IEnumerable<string> GetExecutionOutcomeLines()
+        {
+            if (ExecutionPlan?.Steps.Count > 0)
+            {
+                foreach (var step in ExecutionPlan.Steps)
+                {
+                    var status = step.Status is AgentExecutionStepStatus.Completed ? "OK" : "FAIL";
+                    yield return $"[{status}] {step.TargetId}.{step.ActionId}";
+                    if (!string.IsNullOrWhiteSpace(step.Message))
+                    {
+                        yield return $"     Message: {step.Message}";
+                    }
+                }
+
+                yield break;
+            }
+
+            foreach (var exec in LegacyExecutionResults)
+            {
+                var status = exec.Succeeded ? "OK" : "FAIL";
+                yield return $"[{status}] {exec.ComponentId}.{exec.ActionId}";
+                yield return $"     Message: {exec.Message}";
+            }
+        }
+
+        public string GetPrimaryTargetId() =>
+            ExecutionPlan?.Steps.FirstOrDefault()?.TargetId ??
+            LegacyExecutionResults.FirstOrDefault()?.ComponentId ??
+            LegacyPlannedActions.FirstOrDefault()?.ComponentId ??
+            "N/A";
+
+        public string GetPrimaryActionId() =>
+            ExecutionPlan?.Steps.FirstOrDefault()?.ActionId ??
+            LegacyExecutionResults.FirstOrDefault()?.ActionId ??
+            LegacyPlannedActions.FirstOrDefault()?.ActionId ??
+            "N/A";
     }
 
     #endregion

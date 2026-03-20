@@ -1,3 +1,4 @@
+using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Licensing;
 
@@ -93,5 +94,28 @@ internal static class RuntimeTurnPreflight
             $"No allowed {actionLabel} are available for this agent policy.\n\n" +
             $"Current tier: {effectiveTier}\n" +
             $"Filtered actions: {summary}";
+    }
+
+    public static AgentRegistration? ResolveImplicitFallbackAgent(
+        IEnumerable<AgentRegistration> registrations,
+        string defaultAgentName,
+        bool preferLegacyDefaultFallback)
+    {
+        var orderedAgents = registrations
+            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var configuredDefault = orderedAgents.FirstOrDefault(agent =>
+            string.Equals(agent.Name, defaultAgentName, StringComparison.OrdinalIgnoreCase));
+
+        if (preferLegacyDefaultFallback && configuredDefault is not null)
+        {
+            return configuredDefault;
+        }
+
+        var nonDefault = orderedAgents.FirstOrDefault(agent =>
+            !string.Equals(agent.Name, defaultAgentName, StringComparison.OrdinalIgnoreCase));
+
+        return nonDefault ?? configuredDefault;
     }
 }

@@ -1,3 +1,5 @@
+using AgentBlazor.Execution;
+
 namespace AgentBlazor.Core.Paid;
 
 public sealed record InspectorRunRecord(
@@ -10,7 +12,8 @@ public sealed record InspectorRunRecord(
     string? RawPlanResponse,
     IReadOnlyList<InspectorEvent> Events,
     bool Succeeded,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    AgentExecutionPlan? ExecutionPlan = null);
 
 public sealed record InspectorEvent(
     DateTimeOffset Timestamp,

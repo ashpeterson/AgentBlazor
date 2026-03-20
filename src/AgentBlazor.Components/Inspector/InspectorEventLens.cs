@@ -225,9 +225,9 @@ public static class InspectorEventLens
     {
         return phase.ToLowerInvariant() switch
         {
-            "planning" => "Planning",
-            "validation" => "Validation",
-            "execution" => "Execution",
+            "planning" => "Workflow Planning",
+            "validation" => "Approval and Validation",
+            "execution" => "Workflow Execution",
             "state" => "State",
             "handoff" => "Handoff",
             "stream" => "Stream",

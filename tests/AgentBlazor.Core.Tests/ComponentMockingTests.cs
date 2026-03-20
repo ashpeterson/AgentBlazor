@@ -34,7 +34,7 @@ public class ComponentMockingTests
                 ["value"] = "High",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -67,7 +67,7 @@ public class ComponentMockingTests
                 ["direction"] = "desc",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -98,7 +98,7 @@ public class ComponentMockingTests
                 ["page"] = 3,
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
         using var provider = services.BuildServiceProvider();
@@ -128,7 +128,7 @@ public class ComponentMockingTests
             {
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -157,7 +157,7 @@ public class ComponentMockingTests
             {
                 ["target"] = "confirm-dialog"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -188,7 +188,7 @@ public class ComponentMockingTests
             {
                 ["target"] = "confirm-dialog"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -217,7 +217,7 @@ public class ComponentMockingTests
                 ["value"] = "Northwind Traders",
                 ["target"] = "supplier-form"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -240,7 +240,7 @@ public class ComponentMockingTests
         var mockForm = new MockForm("supplier-form");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MultiFieldFormChatClient());
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -272,7 +272,7 @@ public class ComponentMockingTests
                 ["uri"] = "/suppliers",
                 ["target"] = "main-nav"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -300,7 +300,7 @@ public class ComponentMockingTests
             {
                 ["index"] = 2
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -309,9 +309,13 @@ public class ComponentMockingTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("switch to the third tab"));
 
         // Assert - action was planned
-        Assert.Contains(response.PlannedActions, a =>
-            string.Equals(a.ComponentId, "AgentTabs", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(a.ActionId, "switch_tab", StringComparison.OrdinalIgnoreCase));
+        Assert.True(
+            response.ExecutionPlan?.Steps.Any(step =>
+                string.Equals(step.TargetId, "AgentTabs", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(step.ActionId, "switch_tab", StringComparison.OrdinalIgnoreCase)) is true ||
+            response.LegacyPlannedActions.Any(a =>
+                string.Equals(a.ComponentId, "AgentTabs", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.ActionId, "switch_tab", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -331,7 +335,7 @@ public class ComponentMockingTests
                 ["operator"] = "eq",
                 ["value"] = "Active"
             }));
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -363,7 +367,9 @@ public class ComponentMockingTests
                 ["value"] = "Electronics",
                 ["target"] = "traced-grid"
             }));
-        services.AddAgentBlazorServices().EnablePromptTracing();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback()
+            .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();

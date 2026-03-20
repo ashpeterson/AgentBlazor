@@ -25,7 +25,7 @@ namespace AgentBlazor.Core.Tests;
 public class ServiceRegistrationTests
 {
     [Fact]
-    public void AddAgentBlazorServices_RegistersBuiltInDefaultAgent()
+    public void AddAgentBlazorServices_DoesNotRegisterBuiltInDefaultAgentByDefault()
     {
         var services = new ServiceCollection();
 
@@ -42,7 +42,10 @@ public class ServiceRegistrationTests
         Assert.Equal("gpt-4o-mini", options.Provider.Model);
 
         var registry = provider.GetRequiredService<IAgentRegistry>();
-        Assert.True(registry.TryGet("AgentBlazor UI Agent", out _));
+#pragma warning disable CS0618
+        Assert.False(options.DefaultAgent.Enabled);
+#pragma warning restore CS0618
+        Assert.False(registry.TryGet("AgentBlazor UI Agent", out _));
 
         var runtime = provider.GetRequiredService<IAgentRuntime>();
         Assert.NotNull(runtime);
@@ -106,7 +109,8 @@ public class ServiceRegistrationTests
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
         services.AddAgentBlazorServices()
-            .UseChatClientRuntimeAdapter();
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
 
         await using var provider = services.BuildServiceProvider();
 
@@ -134,7 +138,8 @@ public class ServiceRegistrationTests
         services.AddSingleton<StreamingRecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<StreamingRecordingChatClient>());
         services.AddAgentBlazorServices()
-            .UseChatClientRuntimeAdapter();
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
 
         await using var provider = services.BuildServiceProvider();
 
@@ -197,19 +202,61 @@ public class ServiceRegistrationTests
             AgentName: "grid-agent",
             SessionId: "session-tools"));
 
-        Assert.Empty(response.PlannedActions);
-        Assert.Single(response.ExecutionResults);
+        Assert.False(response.UsesLegacyCompatibilityPayload);
+        Assert.Empty(response.LegacyPlannedActions);
+        Assert.Empty(response.LegacyExecutionResults);
         Assert.False(response.RequiresApproval);
         var plannedStep = Assert.Single(response.ExecutionPlan!.Steps);
         Assert.Equal("AgentGrid", plannedStep.TargetId);
         Assert.Equal("filter", plannedStep.ActionId);
+        Assert.Equal("filter-applied", plannedStep.Message);
 
         var executed = Assert.Single(executor.ExecutedActions);
         Assert.Equal("AgentGrid", executed.ComponentId);
         Assert.Equal("filter", executed.ActionId);
         Assert.Equal("Risk", executed.Arguments!["column"]);
         Assert.Equal("High", executed.Arguments["value"]);
-        Assert.Contains(response.ExecutionResults, static result => result.Message == "filter-applied");
+        Assert.Equal("filter-applied", plannedStep.Message);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_PrefersExplicitAgents_OverBuiltInDefaultFallback()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("Workflow Agent", agent => agent.WithAllowedComponents("AgentDialog"));
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "hello",
+            SessionId: "implicit-explicit-agent"));
+
+        Assert.Equal("Workflow Agent", response.AgentName);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_UsesLegacyDefaultFallback_WhenEnabledExplicitly()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .UseLegacyDefaultAgentFallback();
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "hello",
+            SessionId: "legacy-default-agent"));
+
+        Assert.Equal("AgentBlazor UI Agent", response.AgentName);
     }
 
     [Fact]
@@ -221,7 +268,8 @@ public class ServiceRegistrationTests
         services.AddSingleton<MutableServiceToolRegistry>();
         services.AddSingleton<IAgentServiceToolRegistry>(static sp => sp.GetRequiredService<MutableServiceToolRegistry>());
         services.AddAgentBlazorServices()
-            .UseChatClientRuntimeAdapter();
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("tool-agent");
 
         await using var provider = services.BuildServiceProvider();
 
@@ -389,7 +437,8 @@ public class ServiceRegistrationTests
         services.AddSingleton<ToolCatalogRecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ToolCatalogRecordingChatClient>());
         services.AddAgentBlazorServices()
-            .UseChatClientRuntimeAdapter();
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("ui-agent");
 
         await using var provider = services.BuildServiceProvider();
 
@@ -423,7 +472,8 @@ public class ServiceRegistrationTests
         services.AddSingleton<GeneratedUiToolInvokingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<GeneratedUiToolInvokingChatClient>());
         services.AddAgentBlazorServices()
-            .UseChatClientRuntimeAdapter();
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("ui-agent");
 
         await using var provider = services.BuildServiceProvider();
 
@@ -496,9 +546,11 @@ public class ServiceRegistrationTests
                 "Apply the drafted changes",
                 new Dictionary<string, object?>())));
 
-        var blocked = Assert.Single(response.ExecutionResults);
-        Assert.Equal(ActionOutcome.Blocked, blocked.Outcome);
-        Assert.Equal("AgentForm", blocked.ComponentId);
+        Assert.False(response.UsesLegacyCompatibilityPayload);
+        Assert.Empty(response.LegacyExecutionResults);
+        var blocked = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Blocked, blocked.Status);
+        Assert.Equal("AgentForm", blocked.TargetId);
         Assert.Equal("submit", blocked.ActionId);
         Assert.Empty(executor.ExecutedActions);
         Assert.Equal("Explicit submit intent is required before submitting a generated form action.", blocked.Message);
@@ -675,11 +727,11 @@ public class ServiceRegistrationTests
 
         var trace = Assert.Single(await traceStore.GetBySessionAsync("trace-session", 1));
         Assert.NotNull(trace.Planning);
-        Assert.Contains(trace.Planning.PlannedActions, action =>
+        Assert.Contains(trace.Planning.WorkflowSteps, action =>
             string.Equals(action.ComponentId, "AgentGrid", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(action.ActionId, "filter", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(trace.Execution);
-        Assert.Contains(trace.Execution.Results, result =>
+        Assert.Contains(trace.Execution.ExecutionSteps, result =>
             string.Equals(result.ComponentId, "AgentGrid", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(result.ActionId, "filter", StringComparison.OrdinalIgnoreCase) &&
             result.Succeeded);
@@ -693,7 +745,12 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options => options.DefaultAgent.Enabled = false)
+        services.AddAgentBlazorServices(options =>
+            {
+#pragma warning disable CS0618
+                options.DefaultAgent.Enabled = false;
+#pragma warning restore CS0618
+            })
             .UseChatClientRuntimeAdapter();
 
         await using var provider = services.BuildServiceProvider();
@@ -716,7 +773,12 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options => options.DefaultAgent.Enabled = false)
+        services.AddAgentBlazorServices(options =>
+            {
+#pragma warning disable CS0618
+                options.DefaultAgent.Enabled = false;
+#pragma warning restore CS0618
+            })
             .UseChatClientRuntimeAdapter();
 
         await using var provider = services.BuildServiceProvider();
@@ -751,7 +813,12 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options => options.DefaultAgent.Enabled = false)
+        services.AddAgentBlazorServices(options =>
+            {
+#pragma warning disable CS0618
+                options.DefaultAgent.Enabled = false;
+#pragma warning restore CS0618
+            })
             .UseChatClientRuntimeAdapter()
             .AddAgent("restricted-agent", agent =>
             {
@@ -780,7 +847,12 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options => options.DefaultAgent.Enabled = false)
+        services.AddAgentBlazorServices(options =>
+            {
+#pragma warning disable CS0618
+                options.DefaultAgent.Enabled = false;
+#pragma warning restore CS0618
+            })
             .UseChatClientRuntimeAdapter()
             .AddAgent("restricted-agent", agent =>
             {
@@ -857,9 +929,9 @@ public class ServiceRegistrationTests
         Assert.True(response.RequiresClarification);
         Assert.Equal("Which risk level should I use?", response.ClarificationQuestion);
         Assert.Equal("Which risk level should I use?", response.ResponseText);
-        Assert.Contains(response.ExecutionResults, static result =>
-            result.Outcome is ActionOutcome.NeedsClarification &&
-            result.Message == "Which risk level should I use?");
+        var clarificationStep = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.NeedsClarification, clarificationStep.Status);
+        Assert.Equal("Which risk level should I use?", clarificationStep.Message);
     }
 
     [Fact]
@@ -960,8 +1032,9 @@ public class ServiceRegistrationTests
 
         Assert.True(response.RequiresApproval);
         Assert.Single(response.PendingApprovals);
-        Assert.Empty(response.PlannedActions);
-        Assert.Empty(response.ExecutionResults);
+        Assert.False(response.UsesLegacyCompatibilityPayload);
+        Assert.Empty(response.LegacyPlannedActions);
+        Assert.Empty(response.LegacyExecutionResults);
         Assert.Empty(executor.ExecutedActions);
         var plannedStep = Assert.Single(response.ExecutionPlan!.Steps);
         Assert.Equal("AgentForm", plannedStep.TargetId);
@@ -980,7 +1053,8 @@ public class ServiceRegistrationTests
     public void AgentComponentRegistry_RegisterAndUnregister_Works()
     {
         var services = new ServiceCollection();
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -1065,7 +1139,9 @@ public class ServiceRegistrationTests
         services
             .AddAgentBlazorServices(options =>
             {
+#pragma warning disable CS0618
                 options.DefaultAgent.ComponentCatalogMode = ComponentCatalogMode.WhitelistOnly;
+#pragma warning restore CS0618
             })
             .UseAgentCapabilityPreset(AgentCapabilityPreset.Minimal);
 
@@ -1094,7 +1170,9 @@ public class ServiceRegistrationTests
         services
             .AddAgentBlazorServices(options =>
             {
+#pragma warning disable CS0618
                 options.DefaultAgent.ComponentCatalogMode = ComponentCatalogMode.WhitelistOnly;
+#pragma warning restore CS0618
             })
             .UseAgentCapabilityPreset(AgentCapabilityPreset.Minimal)
             .ConfigureComponentCatalog(catalog => catalog.AddComponent(
@@ -1225,7 +1303,8 @@ public class ServiceRegistrationTests
     public async Task Runtime_RequiresFrameworkProvider_WhenNotConfigured()
     {
         var services = new ServiceCollection();
-        services.AddAgentBlazorServices();
+        services.AddAgentBlazorServices()
+            .UseLegacyDefaultAgentFallback();
 
         using var provider = services.BuildServiceProvider();
         var runtime = provider.GetRequiredService<IAgentRuntime>();
@@ -1233,7 +1312,7 @@ public class ServiceRegistrationTests
         var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the chat widget"));
 
         Assert.Contains("No AI provider configured", response.ResponseText, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(response.PlannedActions);
+        Assert.Empty(response.LegacyPlannedActions);
     }
 
     [Fact]

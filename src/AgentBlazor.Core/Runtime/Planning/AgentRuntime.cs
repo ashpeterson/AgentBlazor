@@ -441,12 +441,12 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             return null;
         }
 
-        if (_agentRegistry.TryGet(_options.Value.DefaultAgent.Name, out var configuredDefault))
-            return configuredDefault;
-
-        return _agentRegistry.GetAll()
-            .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        return RuntimeTurnPreflight.ResolveImplicitFallbackAgent(
+            _agentRegistry.GetAll(),
+#pragma warning disable CS0618
+            _options.Value.DefaultAgent.Name,
+            _options.Value.DefaultAgent.PreferAsImplicitFallback);
+#pragma warning restore CS0618
     }
 
     private bool TryResolveNamedAgent(string? candidateName, out AgentRegistration registration)
@@ -1531,6 +1531,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
         DateTimeOffset startedAt,
         ActionPlan? plan,
         IReadOnlyList<AgentBlazor.Core.Runtime.Components.ComponentActionExecutionResult> executionResults,
+        AgentTurnResponse? response,
         IReadOnlyList<AgentBlazor.Core.Paid.InspectorEvent> events,
         bool succeeded,
         string? errorMessage)
@@ -1548,6 +1549,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
                 plan?.RawResponse,
                 events,
                 executionResults,
+                response?.ExecutionPlan,
                 succeeded,
                 errorMessage));
         }
@@ -3077,6 +3079,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             inspectorStartedAt,
             inspectorPlan,
             executionResults: [],
+            response: null,
             events: inspectorEvents,
             succeeded: false,
             errorMessage: "Run canceled.");
@@ -3107,6 +3110,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             inspectorStartedAt,
             inspectorPlan,
             executionResults: [],
+            response: null,
             events: inspectorEvents,
             succeeded: false,
             errorMessage: exception.Message);
@@ -3223,6 +3227,7 @@ internal sealed class AgentRuntime : IAgentRuntime, IAgentRuntimeStreaming
             terminalTurn.InspectorStartedAt,
             terminalTurn.InspectorPlan,
             executionResults,
+            response,
             recordedEvents,
             succeeded,
             errorMessage);

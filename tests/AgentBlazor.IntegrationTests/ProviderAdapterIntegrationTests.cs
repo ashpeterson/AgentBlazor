@@ -12,7 +12,7 @@ namespace AgentBlazor.IntegrationTests;
 public class ProviderAdapterIntegrationTests
 {
     [Fact]
-    public void AddAgentBlazor_RegistersRuntimeAndHosting_WithSensibleDefaults()
+    public void AddAgentBlazor_RegistersRuntimeAndHosting_WithoutImplicitDefaultAgent()
     {
         var services = new ServiceCollection();
 
@@ -22,9 +22,33 @@ public class ProviderAdapterIntegrationTests
         var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
         var runtime = provider.GetRequiredService<IAgentRuntime>();
 
+#pragma warning disable CS0618
+        Assert.False(options.DefaultAgent.Enabled);
+#pragma warning restore CS0618
+        Assert.Empty(options.AssembliesToScan);
+        Assert.NotNull(runtime);
+    }
+
+    [Fact]
+    public void AddAgentBlazor_WithLegacyDefaultAgentCompatibility_RegistersBuiltInDefaultAgent()
+    {
+        var services = new ServiceCollection();
+
+        AgentBlazorServiceExtensions.AddAgentBlazor(services, options =>
+        {
+#pragma warning disable CS0618
+            options.UseLegacyDefaultAgentCompatibility();
+#pragma warning restore CS0618
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+
+#pragma warning disable CS0618
         Assert.True(options.DefaultAgent.Enabled);
         Assert.Equal("AgentBlazor UI Agent", options.DefaultAgent.Name);
-        Assert.NotNull(runtime);
+#pragma warning restore CS0618
+        Assert.NotEmpty(options.AssembliesToScan);
     }
 
     [Fact]

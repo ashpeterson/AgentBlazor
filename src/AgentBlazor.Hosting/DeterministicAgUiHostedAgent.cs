@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using AgentBlazor.Agents;
+using AgentBlazor.Execution;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -264,12 +265,10 @@ internal sealed class DeterministicAgUiHostedAgent(
                 throw;
             }
 
-            yield return CreateTextUpdate(
-                invocation.RunId,
-                $"{invocation.RunId}:assistant:1",
-                nonStreamingResponse.ResponseText,
-                DateTimeOffset.UtcNow,
-                nonStreamingResponse.AgentName);
+            foreach (var update in CreateNonStreamingUpdates(invocation.RunId, nonStreamingResponse))
+            {
+                yield return update;
+            }
 
             await TrackRunEventAsync(CreateRunEvent(
                 nonStreamingResponse.AgentName,
@@ -383,15 +382,25 @@ internal sealed class DeterministicAgUiHostedAgent(
             return requested;
         }
 
-        if (_agentRegistry.TryGet(_options.Value.DefaultAgent.Name, out var configuredDefault))
+        var orderedAgents = _agentRegistry.GetAll()
+            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+#pragma warning disable CS0618
+        var configuredDefault = orderedAgents.FirstOrDefault(agent =>
+            string.Equals(agent.Name, _options.Value.DefaultAgent.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (_options.Value.DefaultAgent.PreferAsImplicitFallback && configuredDefault is not null)
         {
             return configuredDefault;
         }
+#pragma warning restore CS0618
 
-        return _agentRegistry.GetAll()
-            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault()
-            ?? new AgentRegistration
+#pragma warning disable CS0618
+        return orderedAgents.FirstOrDefault(agent =>
+                   !string.Equals(agent.Name, _options.Value.DefaultAgent.Name, StringComparison.OrdinalIgnoreCase))
+#pragma warning restore CS0618
+               ?? configuredDefault
+               ?? new AgentRegistration
             {
                 Name = "AgentBlazor UI Agent",
                 Description = "Deterministic AgentBlazor AG-UI hosted agent."
@@ -734,6 +743,264 @@ internal sealed class DeterministicAgUiHostedAgent(
         };
     }
 
+    private static IEnumerable<AgentResponseUpdate> CreateNonStreamingUpdates(
+        string runId,
+        AgentTurnResponse response)
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var sequence = 0;
+        var mappingState = new MappingState(runId);
+        var emittedStepStates = false;
+
+        if (response.ExecutionPlan?.Steps.Count > 0)
+        {
+            foreach (var step in response.ExecutionPlan.Steps.OrderBy(static step => step.Order))
+            {
+                emittedStepStates = true;
+
+                var stepPayload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "step_started",
+                    ["stepIndex"] = step.Order
+                };
+                var plannedAction = ToPlannedAction(step);
+                if (plannedAction is not null)
+                {
+                    stepPayload["plannedAction"] = CreatePlannedActionPayload(plannedAction);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    runId,
+                    $"{runId}:state:{++sequence}",
+                    stepPayload,
+                    timestamp);
+
+                if (plannedAction is not null)
+                {
+                    var pending = mappingState.StartToolCall(step.Order, plannedAction, step.Arguments);
+                    if (pending is not null)
+                    {
+                        yield return CreateToolCallUpdate(runId, pending, timestamp, response.AgentName);
+                    }
+
+                    yield return CreateStateSnapshotUpdate(
+                        runId,
+                        $"{runId}:state:{++sequence}",
+                        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["kind"] = "tool_call_end",
+                            ["stepIndex"] = step.Order,
+                            ["plannedAction"] = CreatePlannedActionPayload(plannedAction)
+                        },
+                        timestamp);
+
+                    var executionResult = ToExecutionResult(step);
+                    if (pending is not null && executionResult is not null)
+                    {
+                        yield return CreateToolResultUpdate(runId, pending.CallId, executionResult, timestamp);
+                    }
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    runId,
+                    $"{runId}:state:{++sequence}",
+                    new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["kind"] = "step_finished",
+                        ["stepIndex"] = step.Order,
+                        ["succeeded"] = step.Status is AgentExecutionStepStatus.Completed,
+                        ["executionResult"] = ToExecutionResult(step) is { } result
+                            ? CreateExecutionResultPayload(result)
+                            : null
+                    },
+                    timestamp);
+            }
+        }
+        else if (response.LegacyPlannedActions.Count > 0)
+        {
+            foreach (var pair in EnumerateLegacyStepPairs(response))
+            {
+                emittedStepStates = true;
+                var plannedAction = pair.PlannedAction;
+
+                yield return CreateStateSnapshotUpdate(
+                    runId,
+                    $"{runId}:state:{++sequence}",
+                    new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["kind"] = "step_started",
+                        ["stepIndex"] = pair.StepIndex,
+                        ["plannedAction"] = CreatePlannedActionPayload(plannedAction)
+                    },
+                    timestamp);
+
+                var pending = mappingState.StartToolCall(pair.StepIndex, plannedAction, plannedAction.Arguments);
+                if (pending is not null)
+                {
+                    yield return CreateToolCallUpdate(runId, pending, timestamp, response.AgentName);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    runId,
+                    $"{runId}:state:{++sequence}",
+                    new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["kind"] = "tool_call_end",
+                        ["stepIndex"] = pair.StepIndex,
+                        ["plannedAction"] = CreatePlannedActionPayload(plannedAction)
+                    },
+                    timestamp);
+
+                if (pending is not null && pair.ExecutionResult is not null)
+                {
+                    yield return CreateToolResultUpdate(runId, pending.CallId, pair.ExecutionResult, timestamp);
+                }
+
+                yield return CreateStateSnapshotUpdate(
+                    runId,
+                    $"{runId}:state:{++sequence}",
+                    new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["kind"] = "step_finished",
+                        ["stepIndex"] = pair.StepIndex,
+                        ["succeeded"] = pair.ExecutionResult?.Succeeded ?? false,
+                        ["executionResult"] = pair.ExecutionResult is not null
+                            ? CreateExecutionResultPayload(pair.ExecutionResult)
+                            : null
+                    },
+                    timestamp);
+            }
+        }
+
+        if (response.PendingApprovals.Count > 0)
+        {
+            emittedStepStates = true;
+            yield return CreateStateSnapshotUpdate(
+                runId,
+                $"{runId}:state:{++sequence}",
+                CreateApprovalRequiredPayload(response.PendingApprovals),
+                timestamp);
+        }
+        else if (response.RequiresApproval)
+        {
+            emittedStepStates = true;
+            yield return CreateStateSnapshotUpdate(
+                runId,
+                $"{runId}:state:{++sequence}",
+                new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "approval_required",
+                    ["pendingApprovals"] = Array.Empty<object>()
+                },
+                timestamp);
+        }
+
+        if (!emittedStepStates && response.ExecutionPlan?.Context is { } context)
+        {
+            yield return CreateStateSnapshotUpdate(
+                runId,
+                $"{runId}:state:{++sequence}",
+                new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kind"] = "shared_state_snapshot",
+                    ["state"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["runId"] = context.RunId,
+                        ["sessionId"] = context.SessionId,
+                        ["route"] = context.Route,
+                        ["freshness"] = context.Freshness.ToString()
+                    }
+                },
+                timestamp);
+        }
+
+        yield return CreateTextUpdate(
+            runId,
+            $"{runId}:assistant:1",
+            response.ResponseText,
+            timestamp,
+            response.AgentName);
+    }
+
+    private static Dictionary<string, object?> CreateApprovalRequiredPayload(
+        IReadOnlyList<PendingApproval> pendingApprovals)
+    {
+        var approvals = pendingApprovals
+            .Select(static pending => (object?)new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["componentId"] = pending.ComponentId,
+                ["actionId"] = pending.ActionId,
+                ["description"] = pending.Description,
+                ["policyDecision"] = pending.PolicyDecision is null
+                    ? null
+                    : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["allowed"] = pending.PolicyDecision.Allowed,
+                        ["riskClass"] = pending.PolicyDecision.RiskClass.ToString(),
+                        ["approvalMode"] = pending.PolicyDecision.ApprovalMode.ToString(),
+                        ["reason"] = pending.PolicyDecision.Reason
+                    }
+            })
+            .ToArray();
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["kind"] = "approval_required",
+            ["pendingApprovals"] = approvals
+        };
+    }
+
+    private static PlannedComponentAction? ToPlannedAction(AgentExecutionStep step)
+    {
+        if (string.IsNullOrWhiteSpace(step.TargetId) || string.IsNullOrWhiteSpace(step.ActionId))
+        {
+            return null;
+        }
+
+        return new PlannedComponentAction(
+            step.TargetId,
+            step.ActionId,
+            $"{step.TargetId}.{step.ActionId}",
+            step.Arguments);
+    }
+
+    private static ComponentActionExecutionResult? ToExecutionResult(AgentExecutionStep step)
+    {
+        if (string.IsNullOrWhiteSpace(step.TargetId) || string.IsNullOrWhiteSpace(step.ActionId))
+        {
+            return null;
+        }
+
+        var outcome = step.Status switch
+        {
+            AgentExecutionStepStatus.Completed => ActionOutcome.Applied,
+            AgentExecutionStepStatus.ApprovalRequired => ActionOutcome.Failed,
+            AgentExecutionStepStatus.NeedsClarification => ActionOutcome.Failed,
+            AgentExecutionStepStatus.Blocked => ActionOutcome.Failed,
+            AgentExecutionStepStatus.Failed => ActionOutcome.Failed,
+            _ => ActionOutcome.Failed
+        };
+
+        return new ComponentActionExecutionResult(
+            step.TargetId,
+            step.ActionId,
+            outcome,
+            step.Message ?? $"{step.TargetId}.{step.ActionId} {step.Status}.");
+    }
+
+    private static IEnumerable<LegacyStepPair> EnumerateLegacyStepPairs(AgentTurnResponse response)
+    {
+        for (var index = 0; index < response.LegacyPlannedActions.Count; index++)
+        {
+            var plannedAction = response.LegacyPlannedActions[index];
+            var executionResult = response.LegacyExecutionResults.FirstOrDefault(result =>
+                string.Equals(result.ComponentId, plannedAction.ComponentId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(result.ActionId, plannedAction.ActionId, StringComparison.OrdinalIgnoreCase));
+
+            yield return new LegacyStepPair(index, plannedAction, executionResult);
+        }
+    }
+
     private static Dictionary<string, object?> CreateExecutionResultPayload(ComponentActionExecutionResult executionResult)
     {
         return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -1060,7 +1327,7 @@ internal sealed class DeterministicAgUiHostedAgent(
             {
                 ["agentblazor_requires_clarification"] = response.RequiresClarification,
                 ["agentblazor_requires_approval"] = response.RequiresApproval,
-                ["agentblazor_execution_step_count"] = response.ExecutionPlan?.Steps.Count ?? response.PlannedActions.Count,
+                ["agentblazor_execution_step_count"] = response.ExecutionPlan?.Steps.Count ?? response.LegacyPlannedActions.Count,
                 ["agentblazor_context_freshness"] = response.ExecutionPlan?.Context.Freshness.ToString()
             }
         };
@@ -1279,6 +1546,11 @@ internal sealed class DeterministicAgUiHostedAgent(
 
         public Dictionary<string, object?> Arguments { get; } = arguments;
     }
+
+    private sealed record LegacyStepPair(
+        int StepIndex,
+        PlannedComponentAction PlannedAction,
+        ComponentActionExecutionResult? ExecutionResult);
 
     private sealed class HostedAgentSession : AgentSession
     {

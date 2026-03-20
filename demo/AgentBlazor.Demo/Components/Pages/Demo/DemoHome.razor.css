@@ -18,6 +18,14 @@
     background: rgba(10, 16, 30, 0.68);
 }
 
+.demo-overview__card--featured {
+    border-color: rgba(255, 190, 92, 0.22);
+    background:
+        radial-gradient(circle at top right, rgba(255, 190, 92, 0.12), transparent 28%),
+        linear-gradient(145deg, rgba(18, 28, 47, 0.9), rgba(9, 15, 28, 0.94));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
 .demo-overview__panel {
     padding: 0.95rem;
     border-radius: 0.9rem;

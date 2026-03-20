@@ -6,55 +6,164 @@
 
 <div class="demo-overview">
     <MudPaper Elevation="1" Class="demo-overview__hero">
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Focused Demo Surface</MudChip>
-        <MudText Typo="Typo.h4" Class="mt-3 mb-1">AgentBlazor Dojo + Component Explorer</MudText>
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Workflow-First Showcase</MudChip>
+        <MudText Typo="Typo.h4" Class="mt-3 mb-1">AgentBlazor Operational Workflow Hub</MudText>
         <MudText Typo="Typo.body1" Color="Color.Secondary">
-            The demo is now intentionally reduced to a CopilotKit-style dojo workspace and a MudBlazor-style component explorer,
-            with side-by-side compatibility proofs and a dedicated attribute-based parity example.
+            The primary story is no longer prompt-driven clicking. This hub now leads with production-style semantic workflows
+            that combine explanation, approval boundaries, deterministic UI execution, and blocked/failure handling.
         </MudText>
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/dojo">
-                Open Dojo
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/supplier-compliance">
+                Open Supplier Workflow
             </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/components">
-                Open Components
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/file-audit-bundle">
+                Open File Workflow
             </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Warning" Href="/demo/workflows/supplier-compliance">
-                Workflow Showcase
+            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/workflows/recipe-release">
+                Recipe Release Workflow
             </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/components/attribute-based">
-                Attribute-Based Example
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/demo/workflows/incident-escalation">
+                Incident Escalation Workflow
             </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Success" Href="/demo/components/parity/form">
-                Compatibility Proofs
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/demo/workflows/response-orchestration">
+                Response Orchestration Workflow
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/demo/workflows/release-dossier">
+                Release Dossier Workflow
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Warning" Href="/demo/dojo">
+                Open Dojo Reference
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Success" Href="/demo/components">
+                Open Component Reference
             </MudButton>
         </MudStack>
     </MudPaper>
 
     <MudGrid Spacing="2" Class="mt-2">
+        <MudItem xs="12">
+            <MudPaper Class="demo-overview__card demo-overview__card--featured">
+                <MudStack Row="true" Wrap="Wrap.Wrap" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="2">
+                    <div>
+                        <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">Featured Production Path</MudChip>
+                        <MudText Typo="Typo.h5" Class="mt-3 mb-1">Response Orchestration Workflow</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Secondary">
+                            This is the strongest current demo proof. It coordinates supplier remediation, audit evidence, and incident escalation across live workflow surfaces before one approval-gated response packet handoff.
+                        </MudText>
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration">
+                        Open Cross-System Workflow
+                    </MudButton>
+                </MudStack>
+
+                <MudGrid Spacing="2" Class="mt-3">
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Outlined="true" Class="pa-3 h-100">
+                            <MudText Typo="Typo.subtitle2">1. Supplier state</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Focus at-risk suppliers, explain severe blockers, and recover before drafting remediation.</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Outlined="true" Class="pa-3 h-100">
+                            <MudText Typo="Typo.subtitle2">2. File evidence</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Move evidence into remote mode, recover rejected files, and verify tokens for handoff.</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Outlined="true" Class="pa-3 h-100">
+                            <MudText Typo="Typo.subtitle2">3. Incident escalation</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Assign triage, complete evidence review, recover blocked handoff, and prepare the brief.</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" lg="3">
+                        <MudPaper Outlined="true" Class="pa-3 h-100">
+                            <MudText Typo="Typo.subtitle2">4. Unified packet</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Prepare one approval-gated response packet only after the live subsystem surfaces are aligned.</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
         <MudItem xs="12" md="6">
             <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">Dojo</MudText>
+                <MudText Typo="Typo.subtitle1">Supplier Compliance Workflow</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Single-canvas workspace intended for assistant-led edits and approvals.
+                    Multi-signal supplier risk review with explanation-first analysis, highlight state, remediation preparation,
+                    and approval-gated next actions.
                 </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Crosses grid, explanation, and remediation draft phases instead of replacing a single filter click.</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="6">
             <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">Components</MudText>
+                <MudText Typo="Typo.subtitle1">File Audit Bundle Workflow</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Expandable component catalog covering all currently shipped wrappers.
+                    Approval-aware remote handoff and token verification workflow over live upload state, including a blocked branch
+                    when remote processing fails.
                 </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Shows trust scaffolding around file-heavy operations rather than treating uploads as a chat-controlled primitive.</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="6">
             <MudPaper Class="demo-overview__card">
-                <MudText Typo="Typo.subtitle1">Workflow Showcase</MudText>
+                <MudText Typo="Typo.subtitle1">Recipe Release Workflow</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Production-style supplier compliance workflow driven by semantic capabilities, explanations, and approval-gated drafts.
+                    Dojo-backed recipe readiness and publish-draft workflow with a real blocked branch for conflicting metadata.
                 </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Shows decision support, blockers, and publish-readiness analysis before any mutating release step is taken.</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="demo-overview__card">
+                <MudText Typo="Typo.subtitle1">Incident Escalation Workflow</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Tree, tab, stepper, command, and dialog orchestration for triage and escalation, with blocked and approval-gated escalation paths.
+                </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Shows the agent compressing a multi-surface operational workflow instead of just controlling one component at a time.</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="demo-overview__card">
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">New Production Path</MudChip>
+                <MudText Typo="Typo.subtitle1" Class="mt-2">Release Dossier Workflow</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Cross-system release coordination across recipe readiness and audit evidence with guided live-surface handoffs and one approval-gated release dossier.
+                </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Shows a second production-style orchestration story so response handling is not the only cross-system proof in the demo.</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="demo-overview__card">
+                <MudText Typo="Typo.subtitle1">Response Orchestration Workflow</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Cross-system operational response across supplier risk, audit evidence, and incident escalation with one approval-gated handoff packet.
+                </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Why it matters</MudText>
+                <MudText Typo="Typo.body2">Shows the app layer coordinating multiple subsystems instead of treating each workflow route as an isolated island.</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="demo-overview__card">
+                <MudText Typo="Typo.subtitle1">Reference Surfaces</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    The dojo and component explorer remain available as supporting references for wrappers, parity, and low-level execution behavior.
+                </MudText>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">What changed</MudText>
+                <MudText Typo="Typo.body2">They are supporting proof now, not the headline experience.</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>

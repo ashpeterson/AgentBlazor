@@ -5,8 +5,8 @@
         <div class="landing-getstarted__header">
             <h2 class="landing-getstarted__title">Explore AgentBlazor in 3 Stops</h2>
             <p class="landing-getstarted__subtitle">
-                The landing page gives the product overview, the Dojo explains the patterns,
-                and Agentic Components shows the reusable building blocks you can drop into a Blazor app.
+                The landing page gives the product overview, the workflow hub proves the product story,
+                and the dojo/components surfaces act as supporting references for patterns and reusable building blocks.
             </p>
         </div>
 
@@ -30,24 +30,24 @@
             <article class="landing-step">
                 <div class="landing-step__number">2</div>
                 <div class="landing-step__content">
-                    <h3 class="landing-step__title">Open the Capability Dojo</h3>
+                    <h3 class="landing-step__title">Open the Workflow Hub</h3>
                     <p class="landing-step__desc">
-                        Walk through controlled, declarative, and open-ended agentic UI in one focused workspace.
-                        This is where you validate how the runtime, prompts, inspector, and host-owned UI fit together.
+                        Lead with the product proof: semantic workflows that combine explanation, approvals,
+                        deterministic UI execution, and blocked/failure handling in one place.
                     </p>
                     <div class="landing-step__code">
                         <div class="landing-step__code-header">
                             <span>What you’ll see</span>
                         </div>
-                        <pre><code>Controlled: prebuilt Blazor UI + deterministic actions
-Declarative: AgentUiDocument + A2UI/Open-JSON-UI imports
-Open-ended: sandboxed hosted app surfaces inside Blazor</code></pre>
+                        <pre><code>Supplier compliance: analysis, explanation, remediation draft
+File audit bundle: remote handoff, verification, blocked branch
+Recipe release: readiness, blockers, approval-gated publish draft</code></pre>
                     </div>
-                    <MudButton Href="/demo/dojo"
+                    <MudButton Href="/demo"
                                Variant="Variant.Filled"
                                Color="Color.Primary"
                                EndIcon="@Icons.Material.Filled.ArrowForward">
-                        Open Capability Dojo
+                        Open Workflow Hub
                     </MudButton>
                 </div>
             </article>
@@ -55,21 +55,26 @@ Open-ended: sandboxed hosted app surfaces inside Blazor</code></pre>
             <article class="landing-step">
                 <div class="landing-step__number">3</div>
                 <div class="landing-step__content">
-                    <h3 class="landing-step__title">Browse Agentic Components</h3>
+                    <h3 class="landing-step__title">Use the Dojo and Components as References</h3>
                     <p class="landing-step__desc">
-                        Open the component catalog to inspect the drop-in primitives: data grids, forms, dialogs,
-                        navigation, dates, commands, uploads, and the attribute-based extension path.
+                        Once the workflow story is clear, use the dojo to inspect control patterns and the component
+                        catalog to inspect the drop-in primitives you can ship in your own Blazor app.
                     </p>
                     <div class="landing-step__code">
                         <div class="landing-step__code-header">
-                            <span>Drop-in shape</span>
+                            <span>Reference surfaces</span>
                         </div>
-                        <pre><code>&lt;AgentDataGrid AgentId="records-grid" Items="@@records" /&gt;
-&lt;AgentForm AgentId="review-form" Model="@@model" /&gt;
-&lt;AgentChatSurface Title="Assistant" /&gt;</code></pre>
+                        <pre><code>Dojo: controlled, declarative, and open-ended patterns
+Components: grids, forms, dialogs, navigation, uploads
+Parity: MudBlazor baselines beside Agent wrappers</code></pre>
                     </div>
-                    <MudButton Href="/demo/components"
+                    <MudButton Href="/demo/dojo"
                                Variant="Variant.Outlined"
+                               EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Open Capability Dojo
+                    </MudButton>
+                    <MudButton Href="/demo/components"
+                               Variant="Variant.Text"
                                EndIcon="@Icons.Material.Filled.ArrowForward">
                         Browse Agentic Components
                     </MudButton>
@@ -78,15 +83,21 @@ Open-ended: sandboxed hosted app surfaces inside Blazor</code></pre>
         </div>
 
         <div class="landing-getstarted__cta">
-            <MudButton Href="/demo/dojo"
+            <MudButton Href="/demo"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Large"
                        EndIcon="@Icons.Material.Filled.PlayArrow">
-                Start with the Dojo
+                Start with the Workflow Hub
+            </MudButton>
+            <MudButton Href="/demo/dojo"
+                       Variant="Variant.Outlined"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.AutoFixHigh">
+                Open Capability Dojo
             </MudButton>
             <MudButton Href="/demo/components"
-                       Variant="Variant.Outlined"
+                       Variant="Variant.Text"
                        Size="Size.Large"
                        StartIcon="@Icons.Material.Filled.Widgets">
                 Open Agentic Components

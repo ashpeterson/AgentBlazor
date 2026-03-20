@@ -3,6 +3,7 @@
 @using AgentBlazor.Core.Runtime.Components
 @using AgentBlazor.Core.Runtime.Discovery
 @using AgentBlazor.Core.Runtime.Interfaces
+@using AgentBlazor.Components.Chat
 @using AgentBlazor.Components.Inspector
 @using System.Text.Json
 @using Microsoft.JSInterop
@@ -127,6 +128,10 @@
                                         <span class="ab-inspector__run-handoff">@handoffSummary</span>
                                     }
                                 }
+                                @if (TryGetRunPlanSummary(run, out var runPlanSummary))
+                                {
+                                    <span class="ab-inspector__run-handoff">@runPlanSummary</span>
+                                }
                             </li>
                         }
                     </ul>
@@ -157,20 +162,37 @@
                             <span class="ab-inspector__summary-chip">Chain: @selectedChainId.Value</span>
                         }
                         <span class="ab-inspector__summary-chip">Events: @_selectedRun.Events.Count</span>
-                        <span class="ab-inspector__summary-chip">Planned: @CountEvents("PlannedAction")</span>
-                        <span class="ab-inspector__summary-chip">Approvals: @CountEvents("ApprovalRequired")</span>
+                        <span class="ab-inspector__summary-chip">Planned: @GetPlannedStepCount()</span>
+                        <span class="ab-inspector__summary-chip">Approvals: @GetApprovalStepCount()</span>
                         <span class="ab-inspector__summary-chip">State Deltas: @CountEvents("StateDelta")</span>
                         <span class="ab-inspector__summary-chip">Handoffs: @CountEvents("AgentHandoff")</span>
                         <span class="ab-inspector__summary-chip">Stream: @CountStreamEvents()</span>
-                        <span class="ab-inspector__summary-chip">Planning: @CountEventsByPhase("planning")</span>
-                        <span class="ab-inspector__summary-chip">Validation: @CountEventsByPhase("validation")</span>
-                        <span class="ab-inspector__summary-chip">Execution: @CountEventsByPhase("execution")</span>
+                        <span class="ab-inspector__summary-chip">@InspectorEventLens.GetPhaseLabel("planning"): @CountEventsByPhase("planning")</span>
+                        <span class="ab-inspector__summary-chip">@InspectorEventLens.GetPhaseLabel("validation"): @CountEventsByPhase("validation")</span>
+                        <span class="ab-inspector__summary-chip">@InspectorEventLens.GetPhaseLabel("execution"): @CountEventsByPhase("execution")</span>
                         <span class="ab-inspector__summary-chip">Result: @(_selectedRun.Succeeded ? "Success" : "Error")</span>
+                        @if (TryGetRunPlanSummary(_selectedRun, out var selectedRunPlanSummary))
+                        {
+                            <span class="ab-inspector__summary-chip">@selectedRunPlanSummary</span>
+                        }
+                        @if (TryGetRunApprovalSummary(_selectedRun, out var selectedRunApprovalSummary))
+                        {
+                            <span class="ab-inspector__summary-chip">@selectedRunApprovalSummary</span>
+                        }
                         @if (durationMs.HasValue)
                         {
                             <span class="ab-inspector__summary-chip">Duration: @durationMs.Value.ToString("F0")ms</span>
                         }
                     </div>
+                    @if (GetRunStepLabels(_selectedRun).Count > 0)
+                    {
+                        <div class="ab-inspector__run-summary">
+                            @foreach (var stepLabel in GetRunStepLabels(_selectedRun))
+                            {
+                                <span class="ab-inspector__summary-chip">@stepLabel</span>
+                            }
+                        </div>
+                    }
                     <div class="ab-inspector__event-toolbar">
                         <input class="ab-inspector__event-search"
                                type="text"
@@ -591,10 +613,52 @@ else
         return _selectedRun.Events.Count(ev => string.Equals(ev.Kind, kind, StringComparison.OrdinalIgnoreCase));
     }
 
+    private int GetPlannedStepCount()
+    {
+        if (_selectedRun?.ExecutionPlan?.Steps.Count > 0)
+        {
+            return _selectedRun.ExecutionPlan.Steps.Count;
+        }
+
+        return CountEvents("PlannedStep") + CountEvents("PlannedAction");
+    }
+
+    private int GetApprovalStepCount()
+    {
+        if (_selectedRun?.ExecutionPlan?.Steps.Count > 0)
+        {
+            return _selectedRun.ExecutionPlan.Steps.Count(static step => step.RequiresApproval);
+        }
+
+        return CountEvents("ApprovalRequired");
+    }
+
     private static int CountRunEvents(InspectorRunRecord run, string kind)
     {
         return run.Events.Count(ev => string.Equals(ev.Kind, kind, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool TryGetRunPlanSummary(InspectorRunRecord run, out string summary)
+        => ExecutionPlanNarrativeFormatter.TryBuildPlanSummary(run.ExecutionPlan, [], out summary);
+
+    private static bool TryGetRunApprovalSummary(InspectorRunRecord run, out string summary)
+    {
+        if (run.ExecutionPlan?.Steps.Count > 0)
+        {
+            summary = ExecutionPlanNarrativeFormatter.BuildApprovalSummary(
+                run.ExecutionPlan.Steps
+                    .Where(static step => step.RequiresApproval)
+                    .Select(static step => step.PolicyDecision));
+
+            return !string.Equals(summary, "No approvals pending.", StringComparison.Ordinal);
+        }
+
+        summary = string.Empty;
+        return false;
+    }
+
+    private static IReadOnlyList<string> GetRunStepLabels(InspectorRunRecord run)
+        => ExecutionPlanNarrativeFormatter.BuildStepLabels(run.ExecutionPlan, []);
 
     private static string? GetRunHandoffSummary(InspectorRunRecord run)
     {

@@ -108,6 +108,15 @@
                             }
                         </ul>
                     }
+                    @if (GetDisplayResultTexts(item).Count > 0)
+                    {
+                        <ul class="ab-chat-bar__activity-list">
+                            @foreach (var resultText in GetDisplayResultTexts(item))
+                            {
+                                <li>@resultText</li>
+                            }
+                        </ul>
+                    }
                 </article>
             }
 
@@ -347,7 +356,7 @@
             _timeline.Add(new ChatBarTimelineItem(
                 "assistant",
                 response.ResponseText,
-                response.PlannedActions,
+                response.LegacyPlannedActions,
                 response.ExecutionPlan,
                 activityMessages,
                 runId));
@@ -859,7 +868,7 @@
                 _timeline.Add(new ChatBarTimelineItem(
                     "assistant",
                     turn.AgentResponse,
-                    turn.PlannedActions,
+                    turn.LegacyPlannedActions,
                     turn.ExecutionPlan,
                     BuildActivityMessages(turn),
                     null));
@@ -904,7 +913,7 @@
                 .ToArray();
         }
 
-        return BuildActivityMessages(turn.ExecutionResults, turn.PlannedActions);
+        return BuildActivityMessages(turn.LegacyExecutionResults, turn.LegacyPlannedActions);
     }
 
     private static IReadOnlyList<ActivityMessage> BuildActivityMessages(
@@ -927,7 +936,7 @@
                 .ToArray();
         }
 
-        return BuildActivityMessages(response.ExecutionResults, response.PlannedActions);
+        return BuildActivityMessages(response.LegacyExecutionResults, response.LegacyPlannedActions);
     }
 
     private static string FormatExecutionStepActivity(AgentExecutionStep step)
@@ -986,64 +995,10 @@
         };
 
     private static IReadOnlyList<string> GetDisplayStepChips(ChatBarTimelineItem item)
-    {
-        if (item.ExecutionPlan?.Steps.Count > 0)
-        {
-            return item.ExecutionPlan.Steps
-                .Select(static step => $"{step.TargetId}.{step.ActionId}")
-                .ToArray();
-        }
-
-        if (item.PlannedActions.Count == 0)
-        {
-            return [];
-        }
-
-        return item.PlannedActions
-            .Select(static action => $"{action.ComponentId}.{action.ActionId}")
-            .ToArray();
-    }
+        => ExecutionPlanNarrativeFormatter.BuildStepLabels(item.ExecutionPlan, item.LegacyPlannedActions);
 
     private static bool TryGetPlanSummary(ChatBarTimelineItem item, out string summary)
-    {
-        if (item.ExecutionPlan is { Steps.Count: > 0 } plan)
-        {
-            var approvalCount = plan.Steps.Count(static step => step.RequiresApproval);
-            var mutationCount = plan.Steps.Count(static step =>
-                step.PolicyDecision.RiskClass is not AgentRiskClass.ReadOnly);
-
-            var parts = new List<string>
-            {
-                plan.Steps.Count == 1
-                    ? "Plan: 1 step"
-                    : $"Plan: {plan.Steps.Count} steps"
-            };
-
-            if (mutationCount > 0)
-            {
-                parts.Add(mutationCount == 1 ? "1 mutating" : $"{mutationCount} mutating");
-            }
-
-            if (approvalCount > 0)
-            {
-                parts.Add(approvalCount == 1 ? "1 approval" : $"{approvalCount} approvals");
-            }
-
-            summary = string.Join(" • ", parts);
-            return true;
-        }
-
-        if (item.PlannedActions.Count > 0)
-        {
-            summary = item.PlannedActions.Count == 1
-                ? "Plan: 1 action."
-                : $"Plan: {item.PlannedActions.Count} actions.";
-            return true;
-        }
-
-        summary = string.Empty;
-        return false;
-    }
+        => ExecutionPlanNarrativeFormatter.TryBuildPlanSummary(item.ExecutionPlan, item.LegacyPlannedActions, out summary);
 
     private static string GetRoleLabel(string role) =>
         role switch
@@ -1053,10 +1008,22 @@
             _ => "Agent"
         };
 
+    private static IReadOnlyList<string> GetDisplayResultTexts(ChatBarTimelineItem item)
+    {
+        if (item.ExecutionPlan?.Steps.Count > 0)
+        {
+            return item.ExecutionPlan.Steps
+                .SelectMany(ExecutionStepNarrativeFormatter.BuildResultTexts)
+                .ToArray();
+        }
+
+        return [];
+    }
+
     private sealed record ChatBarTimelineItem(
         string Role,
         string Text,
-        IReadOnlyList<PlannedComponentAction> PlannedActions,
+        IReadOnlyList<PlannedComponentAction> LegacyPlannedActions,
         AgentExecutionPlan? ExecutionPlan,
         IReadOnlyList<ActivityMessage> ActivityMessages,
         string? RunId);

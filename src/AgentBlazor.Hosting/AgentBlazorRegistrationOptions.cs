@@ -23,6 +23,7 @@ public sealed class AgentBlazorRegistrationOptions
     private readonly List<AgentServiceTool> _serviceTools = [];
     private readonly List<Func<IServiceCollection, IServiceCollection>> _mcpRegistrations = [];
     private readonly List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>> _middlewares = [];
+    private bool _legacyDefaultAgentCompatibilityEnabled;
 
     [Obsolete("Default-agent naming on AgentBlazorRegistrationOptions is a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
     public string? AgentName { get; set; }
@@ -48,7 +49,14 @@ public sealed class AgentBlazorRegistrationOptions
     public void UseInstructionsFile(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        _legacyDefaultAgentCompatibilityEnabled = true;
         AgentInstructions = File.ReadAllText(path);
+    }
+
+    [Obsolete("Legacy default-agent compatibility should only be used for migration. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
+    public void UseLegacyDefaultAgentCompatibility()
+    {
+        _legacyDefaultAgentCompatibilityEnabled = true;
     }
 
     public void UseOpenAI(string apiKey, string model = "gpt-4o-mini")
@@ -163,6 +171,7 @@ public sealed class AgentBlazorRegistrationOptions
     public void AddAssemblyToScan(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
+        _legacyDefaultAgentCompatibilityEnabled = true;
         _agentPageAssemblies.Add(assembly);
     }
 
@@ -369,29 +378,39 @@ public sealed class AgentBlazorRegistrationOptions
     internal void ApplyOptions(AgentBlazorOptions options)
     {
 #pragma warning disable CS0618 // Legacy default-agent surface remains wired here for compatibility.
-        options.DefaultAgent.Enabled = true;
-
-        var assembliesToScan = _agentPageAssemblies.Count > 0
-            ? _agentPageAssemblies
-            : GetDefaultAgentPageAssemblies();
-        foreach (var assembly in assembliesToScan)
+        var useLegacyDefaultAgentCompatibility =
+            _legacyDefaultAgentCompatibilityEnabled ||
+            !string.IsNullOrWhiteSpace(AgentName) ||
+            !string.IsNullOrWhiteSpace(AgentDescription) ||
+            !string.IsNullOrWhiteSpace(AgentInstructions) ||
+            _agentPageAssemblies.Count > 0;
+        if (useLegacyDefaultAgentCompatibility)
         {
-            options.AssembliesToScan.Add(assembly);
-        }
+            options.DefaultAgent.Enabled = true;
+            options.DefaultAgent.PreferAsImplicitFallback = true;
 
-        if (!string.IsNullOrWhiteSpace(AgentName))
-        {
-            options.DefaultAgent.Name = AgentName;
-        }
+            var assembliesToScan = _agentPageAssemblies.Count > 0
+                ? _agentPageAssemblies
+                : GetDefaultAgentPageAssemblies();
+            foreach (var assembly in assembliesToScan)
+            {
+                options.AssembliesToScan.Add(assembly);
+            }
 
-        if (!string.IsNullOrWhiteSpace(AgentDescription))
-        {
-            options.DefaultAgent.Description = AgentDescription;
-        }
+            if (!string.IsNullOrWhiteSpace(AgentName))
+            {
+                options.DefaultAgent.Name = AgentName;
+            }
 
-        if (!string.IsNullOrWhiteSpace(AgentInstructions))
-        {
-            options.DefaultAgent.Instructions = AgentInstructions;
+            if (!string.IsNullOrWhiteSpace(AgentDescription))
+            {
+                options.DefaultAgent.Description = AgentDescription;
+            }
+
+            if (!string.IsNullOrWhiteSpace(AgentInstructions))
+            {
+                options.DefaultAgent.Instructions = AgentInstructions;
+            }
         }
 
         if (_licensedTier.HasValue)

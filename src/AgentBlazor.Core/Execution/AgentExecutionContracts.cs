@@ -37,7 +37,10 @@ public sealed record AgentExecutionStep(
     bool RequiresApproval,
     AgentPolicyDecision PolicyDecision,
     IReadOnlyDictionary<string, object?>? Arguments = null,
-    string? Message = null);
+    string? Message = null,
+    IReadOnlyDictionary<string, object?>? Outputs = null,
+    IReadOnlyList<string>? Warnings = null,
+    IReadOnlyList<string>? NextActions = null);
 
 public sealed record AgentExecutionPlan(
     string AgentName,

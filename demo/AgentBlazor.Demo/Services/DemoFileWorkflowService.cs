@@ -15,6 +15,8 @@ internal sealed class DemoFileWorkflowService(
         "risk-summary-q1.pdf"
     ];
 
+    public event Action<string>? Changed;
+
     private readonly DemoRemoteStorageOptions _remoteStorageOptions = remoteStorageOptions.Value;
 
     public async Task<DemoFileWorkflowSnapshot> GetOrCreateAsync(
@@ -24,6 +26,7 @@ internal sealed class DemoFileWorkflowService(
     {
         var normalizedSessionKey = NormalizeSessionKey(sessionKey);
         var normalizedMode = NormalizeUploadMode(uploadMode);
+        var seeded = false;
 
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var existingFiles = await db.FileWorkflowFiles
@@ -33,6 +36,7 @@ internal sealed class DemoFileWorkflowService(
 
         if (existingFiles.Count == 0)
         {
+            seeded = true;
             var now = DateTime.UtcNow;
             foreach (var file in DefaultFiles)
             {
@@ -62,7 +66,12 @@ internal sealed class DemoFileWorkflowService(
                 .ToListAsync(cancellationToken);
         }
 
-        return await BuildSnapshotAsync(db, normalizedSessionKey, existingFiles, cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, existingFiles, cancellationToken);
+        if (seeded)
+        {
+            NotifyChanged(normalizedSessionKey);
+        }
+        return snapshot;
     }
 
     public async Task<DemoFileWorkflowSnapshot> SyncFilesAsync(
@@ -145,7 +154,9 @@ internal sealed class DemoFileWorkflowService(
             .Where(x => x.SessionKey == normalizedSessionKey)
             .OrderBy(x => x.FileName)
             .ToListAsync(cancellationToken);
-        return await BuildSnapshotAsync(db, normalizedSessionKey, persisted, cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, persisted, cancellationToken);
+        NotifyChanged(normalizedSessionKey);
+        return snapshot;
     }
 
     public async Task<DemoFileWorkflowSnapshot> RunRemoteHandoffAsync(
@@ -175,7 +186,9 @@ internal sealed class DemoFileWorkflowService(
                 Message = "Remote handoff skipped because no files are in Remote mode."
             });
             await db.SaveChangesAsync(cancellationToken);
-            return await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+            var skippedSnapshot = await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+            NotifyChanged(normalizedSessionKey);
+            return skippedSnapshot;
         }
 
         var startedAt = DateTime.UtcNow;
@@ -275,7 +288,9 @@ internal sealed class DemoFileWorkflowService(
             .Where(x => x.SessionKey == normalizedSessionKey)
             .OrderBy(x => x.FileName)
             .ToListAsync(cancellationToken);
-        return await BuildSnapshotAsync(db, normalizedSessionKey, persistedFiles, cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, persistedFiles, cancellationToken);
+        NotifyChanged(normalizedSessionKey);
+        return snapshot;
     }
 
     public async Task<DemoFileWorkflowSnapshot> ValidateRemoteTokensAsync(
@@ -305,7 +320,9 @@ internal sealed class DemoFileWorkflowService(
                 Message = "Token validation skipped because no files are in Remote mode."
             });
             await db.SaveChangesAsync(cancellationToken);
-            return await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+            var skippedSnapshot = await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+            NotifyChanged(normalizedSessionKey);
+            return skippedSnapshot;
         }
 
         var now = DateTime.UtcNow;
@@ -395,7 +412,9 @@ internal sealed class DemoFileWorkflowService(
             .Where(x => x.SessionKey == normalizedSessionKey)
             .OrderBy(x => x.FileName)
             .ToListAsync(cancellationToken);
-        return await BuildSnapshotAsync(db, normalizedSessionKey, persistedFiles, cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, persistedFiles, cancellationToken);
+        NotifyChanged(normalizedSessionKey);
+        return snapshot;
     }
 
     public async Task<DemoFileWorkflowSnapshot> RecordWorkflowEventAsync(
@@ -422,7 +441,70 @@ internal sealed class DemoFileWorkflowService(
             .Where(x => x.SessionKey == normalizedSessionKey)
             .OrderBy(x => x.FileName)
             .ToListAsync(cancellationToken);
-        return await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, files, cancellationToken);
+        NotifyChanged(normalizedSessionKey);
+        return snapshot;
+    }
+
+    public async Task<DemoFileWorkflowSnapshot> ApplyRecoveryPlaybookAsync(
+        string sessionKey,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedSessionKey = NormalizeSessionKey(sessionKey);
+        var now = DateTime.UtcNow;
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var files = await db.FileWorkflowFiles
+            .Where(x => x.SessionKey == normalizedSessionKey)
+            .OrderBy(x => x.FileName)
+            .ToListAsync(cancellationToken);
+
+        var recoveryApplied = false;
+        foreach (var file in files)
+        {
+            if (!file.FileName.Contains("-reject", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var recoveredName = file.FileName.Replace("-reject", "-recovered", StringComparison.OrdinalIgnoreCase);
+            db.FileWorkflowEvents.Add(new DemoFileWorkflowEventEntity
+            {
+                SessionKey = normalizedSessionKey,
+                TimestampUtc = now,
+                EventType = "RecoveryApplied",
+                FileName = recoveredName,
+                Message = $"Applied the recovery playbook and replaced rejected file '{file.FileName}' with '{recoveredName}'."
+            });
+
+            file.FileName = recoveredName;
+            file.StorageToken = null;
+            file.UploadMode = "Remote";
+            file.UpdatedUtc = now;
+            recoveryApplied = true;
+        }
+
+        if (!recoveryApplied)
+        {
+            db.FileWorkflowEvents.Add(new DemoFileWorkflowEventEntity
+            {
+                SessionKey = normalizedSessionKey,
+                TimestampUtc = now,
+                EventType = "RecoverySkipped",
+                FileName = "system",
+                Message = "Recovery playbook ran but found no rejected files to replace."
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var persistedFiles = await db.FileWorkflowFiles
+            .Where(x => x.SessionKey == normalizedSessionKey)
+            .OrderBy(x => x.FileName)
+            .ToListAsync(cancellationToken);
+        var snapshot = await BuildSnapshotAsync(db, normalizedSessionKey, persistedFiles, cancellationToken);
+        NotifyChanged(normalizedSessionKey);
+        return snapshot;
     }
 
     private int GetMaxAttempts()
@@ -491,6 +573,11 @@ internal sealed class DemoFileWorkflowService(
     private static string BuildJobId(string prefix)
     {
         return $"{prefix}-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}";
+    }
+
+    private void NotifyChanged(string sessionKey)
+    {
+        Changed?.Invoke(sessionKey);
     }
 
     private readonly record struct RetryContext<T>(
