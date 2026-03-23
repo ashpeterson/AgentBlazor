@@ -11,7 +11,6 @@ using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
-using AgentBlazor.Core.Runtime.Planning;
 using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Core.Runtime.Routing;
 using AgentBlazor.Core.Runtime.State;
@@ -49,9 +48,7 @@ public static class AgentBlazorServiceCollectionExtensions
             new ReflectionAgentCapabilityRegistry(
                 sp.GetRequiredService<AgentBlazorConfigurationStore>().CapabilityTypes));
         services.TryAddSingleton<IAgentRegistry>(sp => BuildAgentRegistry(
-            sp.GetRequiredService<IOptions<AgentBlazorOptions>>().Value,
-            sp.GetRequiredService<AgentBlazorConfigurationStore>(),
-            sp.GetRequiredService<IComponentCapabilityCatalog>()));
+            sp.GetRequiredService<AgentBlazorConfigurationStore>()));
 
         // Component action executors (specialized, kept for backwards compatibility)
         services.TryAddSingleton<IDataGridActionExecutor, NoOpDataGridActionExecutor>();
@@ -74,12 +71,6 @@ public static class AgentBlazorServiceCollectionExtensions
 
         services.TryAddSingleton<IAgentUiToolCatalog, DefaultAgentUiToolCatalog>();
 
-        // Legacy runtime: Plan (AgentPlanner) -> Validate -> Execute.
-        // Kept as a compatibility fallback while the adapter-first path becomes default.
-        services.TryAddSingleton<IStructuredActionPlanner, AgentPlanner>();
-        services.TryAddSingleton<IPlanValidator, PlanValidator>();
-        services.TryAddSingleton<IPlanExecutor, PlanExecutor>();
-        services.TryAddSingleton<IAgentRuntime, AgentRuntime>();
         services.TryAddSingleton<IAgentRuntimeAdapter>(sp =>
         {
             if (sp.GetService<IChatClient>() is not null)
@@ -87,7 +78,7 @@ public static class AgentBlazorServiceCollectionExtensions
                 return ActivatorUtilities.CreateInstance<ChatClientRuntimeAdapter>(sp);
             }
 
-            return new LegacyAgentRuntimeAdapter(sp.GetRequiredService<IAgentRuntime>());
+            return new NoProviderRuntimeAdapter();
         });
 
         services.TryAddSingleton<IAgentBlazorTelemetrySink, NoOpAgentBlazorTelemetrySink>();
@@ -178,31 +169,9 @@ public static class AgentBlazorServiceCollectionExtensions
     }
 
     private static IAgentRegistry BuildAgentRegistry(
-        AgentBlazorOptions options,
-        AgentBlazorConfigurationStore store,
-        IComponentCapabilityCatalog componentCatalog)
+        AgentBlazorConfigurationStore store)
     {
         var registry = new InMemoryAgentRegistry();
-
-#pragma warning disable CS0618
-        if (options.DefaultAgent.Enabled)
-        {
-            var allowedComponents = options.DefaultAgent.AllowedComponents.Count > 0
-                ? options.DefaultAgent.AllowedComponents.ToHashSet(StringComparer.OrdinalIgnoreCase)
-                : componentCatalog.GetComponents()
-                    .Select(static c => c.ComponentId)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            registry.AddOrUpdate(new AgentRegistration
-            {
-                Name = options.DefaultAgent.Name,
-                Description = options.DefaultAgent.Description,
-                Instructions = options.DefaultAgent.Instructions,
-                AllowedComponents = allowedComponents,
-                AllowedActions = options.DefaultAgent.AllowedActions.ToHashSet(StringComparer.OrdinalIgnoreCase)
-            });
-        }
-#pragma warning restore CS0618
 
         foreach (var registration in store.AgentRegistrations)
         {

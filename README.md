@@ -1,200 +1,167 @@
 # AgentBlazor
 
-A natural-language agent framework for Blazor Server apps. Add an AI assistant that can control your UI components in five minutes.
+Make your Blazor app agent-capable.
 
-## Features
+AgentBlazor is the Blazor-native execution and UX layer for agent workflows. It gives external or host-provided agents live app context, deterministic UI execution, approvals, and in-app workflow surfaces without turning your app into a chat-for-clicking gimmick.
 
-- **AgentDataGrid** - Filter, sort, select rows via natural language
-- **AgentTabs** - Switch tabs by name
-- **AgentDialog + AgentForm** - Open dialogs, fill and submit forms
-- **Generative UI** - Agent-generated charts, tables, and cards in chat
-- **Custom Components** - Add `[AgentAction]` / `[AgentReadable]` to any Blazor component
+## What It Is
 
-## Quick Start
+- Semantic workflow execution for Blazor apps
+- Live UI context and deterministic component actions
+- In-app chat, approvals, inspector, and workflow surfaces
+- A free path that is useful on day one
+- A paid path that gets smarter with use
 
-### 1. Install the package
+## What It Is Not
 
-```bash
-dotnet add package AgentBlazor
-```
+- A general-purpose .NET agent runtime
+- A replacement for your normal UI
+- A product built around primitive chat-driven clicking
 
-### 2. Register services in Program.cs
+## Fast Demo
 
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddAgentBlazor(options =>
-{
-    // OpenAI
-    options.UseOpenAI(
-        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: "gpt-4o-mini");
-
-    // — or Ollama (local, free) —
-    // options.UseOllama("llama3.2", "http://localhost:11434/v1");
-});
-
-var app = builder.Build();
-// ... middleware ...
-app.MapAgentBlazorEndpoints();
-app.Run();
-```
-
-### 3. Add assets to App.razor
-
-```html
-<!-- <head> -->
-<link rel="stylesheet" href="_content/AgentBlazor/agentblazor.css" />
-
-<!-- before </body> -->
-<script src="_content/AgentBlazor/agentblazor.js"></script>
-```
-
-### 4. Add the chat widget to your layout
-
-```razor
-<!-- MainLayout.razor -->
-<AgentChatWidget
-    Title="Assistant"
-    Placeholder="Ask me anything..."
-    EnableGeneratedUi="true"
-    Theme="@ChatTheme.Dark()"
-    Width="31rem"
-    Height="68vh" />
-```
-
-### 5. Use agent-controllable components
-
-```razor
-<AgentDataGrid TItem="SupplierRow"
-               AgentId="supplier-grid"
-               Items="@_suppliers"
-               RowKeyProperty="SupplierId"
-               Dense="true" Hover="true">
-    <Columns>
-        <PropertyColumn T="SupplierRow" TProperty="string"
-                        Property="x => x.SupplierName" Title="Supplier" />
-        <PropertyColumn T="SupplierRow" TProperty="int"
-                        Property="x => x.RiskScore" Title="Risk Score" />
-    </Columns>
-</AgentDataGrid>
-```
-
-Now prompts like these work automatically:
-- "filter to EMEA region"
-- "sort by risk score descending"
-- "select the highest-risk row"
-
-## Supported AI Providers
-
-| Provider | Configuration |
-|----------|---------------|
-| **OpenAI** | `options.UseOpenAI(apiKey, model)` |
-| **Azure OpenAI** | `options.UseAzureOpenAI(endpoint, deployment, apiKey)` |
-| **Ollama** | `options.UseOllama(model, endpoint)` - Free, runs locally |
-
-## Environment Variables
-
-Set your API key as an environment variable:
-
-```bash
-# OpenAI
-export OPENAI_API_KEY=sk-...
-
-# Azure OpenAI
-export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-export AZURE_OPENAI_API_KEY=...
-```
-
-## Custom Agent Components
-
-Add `AgentControllableComponentBase` + attributes to expose any component:
-
-```csharp
-[AgentComponent(AgentIdPrefix = "risk-counter")]
-public partial class RiskCounter : AgentControllableComponentBase
-{
-    private int _highRiskCount = 12;
-
-    [AgentReadable]
-    public int HighRiskCount => _highRiskCount;
-
-    [AgentAction]
-    public Task ClearHighRisk()
-    {
-        _highRiskCount = 0;
-        return RequestComponentRefreshAsync();
-    }
-}
-```
-
-Convention defaults:
-- `ComponentType` is inferred from class name (or `[AgentComponent(ComponentType = ...)]`).
-- `AgentId` is auto-generated (or fixed with `[AgentComponent(AgentId = ...)]`).
-- `[AgentAction]` id defaults to `snake_case` method name.
-- Non-nullable parameters are inferred as required.
-- Enum parameters automatically expose allowed values.
-- `[AgentParam]` is only needed for custom descriptions/constraints.
-
-## Form Auto-Generation
-
-Use `AgentFormPageBase<TModel>` for automatic form action generation:
-
-```razor
-@page "/my-form"
-@inherits AgentFormPageBase<MyFormModel>
-
-@code {
-    protected override string AgentIdValue => "my-form";
-    protected override string FormDisplayName => "My Form";
-}
-```
-
-The agent automatically gets a `fill_my_form` action with all model properties as parameters.
-
-## Demo
-
-Run the demo app:
+Run the demo:
 
 ```bash
 cd demo/AgentBlazor.Demo
 dotnet run
 ```
 
-Open the local demo and start with the current primary surfaces:
-- `/demo/dojo`
+Open the primary routes:
+
+- `/` for the product story
+- `/demo` for the workflow hub
+- `/demo/workflows/response-orchestration?reset=true` for the featured live demo
+- `/demo/workflows/release-dossier?reset=true` for the second orchestration proof
+
+Suggested prompts:
+
+- `Assess cross-system response readiness`
+- `Advance the next guided subsystem stage`
+- `Prepare the response packet`
+- `Prepare the release dossier`
+
+## Ship The Free Layer
+
+The free tier should be enough to prove value in a real app:
+
+- add the runtime and chat surface
+- register one explicit agent
+- expose one semantic workflow or capability
+- let the agent coordinate the app with deterministic execution
+
+### 1. Register AgentBlazor
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseOpenAI(
+        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+        model: "gpt-5.4-mini");
+});
+```
+
+### 2. Register An Agent And A Capability
+
+```csharp
+builder.Services.AddAgentBlazor()
+    .AddAgent("operations", agent =>
+    {
+        agent.WithDisplayName("Operations Agent");
+        agent.WithInstructions("Guide the operator through the workflow and explain each approval.");
+    })
+    .AddCapability<OperationsCapabilities>();
+```
+
+```csharp
+[AgentCapability("operations")]
+public sealed class OperationsCapabilities
+{
+    [AgentAction(
+        Name = "Prepare remediation draft",
+        RequiresApproval = true,
+        Category = "Operations")]
+    public Task<CapabilityResult> PrepareRemediationDraftAsync(Guid[] supplierIds)
+    {
+        // host-owned workflow logic here
+        throw new NotImplementedException();
+    }
+}
+```
+
+### 3. Add The Agent Surface
+
+```razor
+<AgentChatWidget
+    Title="Operations"
+    Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
+    Width="30rem"
+    Height="68vh" />
+```
+
+That gives you the free hook:
+
+- workflow chat
+- deterministic execution
+- approvals and execution visibility
+- live Blazor-native workflow UX
+
+## Why Teams Upgrade
+
+Free gets the workflow layer into the app.
+
+Paid should make the app better every week it is used:
+
+- action history
+- adaptive suggestions
+- proactive workflow prompts
+- memory-backed guidance over time
+
+Premium is the team layer:
+
+- governance
+- analytics
+- audit intelligence
+- deeper operational oversight
+
+## Current Product Story
+
+The strongest current proof is workflow-first:
+
+- response orchestration across supplier, evidence, and incident surfaces
+- release dossier orchestration across readiness and evidence
+- approval-gated execution with recovery paths
+- inspector, trace, and execution-plan visibility in the app
+
+Supporting references remain available:
+
 - `/demo/components`
-- `/demo/components/attribute-based`
-
-Current demo focus:
-- `Dojo` shows the product narrative: agentic chat, backend tool rendering, human-in-the-loop, generated UI, shared state, and predictive state updates.
-- `Components` shows the shipped wrapper surface in a docs-style explorer.
-- `Attribute-Based Example` shows the convention-first custom component pattern.
-
-Example prompts:
-- dojo: "make me a sandwich"
-- dojo: "set dojo example to shared-state"
-- dojo: "set dojo view to code"
-- components: "switch to the AgentDataGrid example"
-- components: "open the dialog example"
-- attribute-based example: "compare the attribute-based approach with wrappers"
-
-Legacy supplier/workflow URLs still exist as redirects, but they are no longer the main product story.
 
 ## Current Status
 
-As of 2026-03-16:
-- the repo is in a parity-foundation phase for a first real-project NuGet preview
-- high-surface `Agent*` components now inherit the corresponding MudBlazor components directly where feasible
-- the demo story is consolidated around Home -> Dojo -> Components
-- side-by-side compatibility proof routes exist for the shipped Mud-backed component set
-- component, core, integration, and Playwright coverage are in place for the current public demo flows
+As of 2026-03-20:
 
-Known gaps before calling the package broadly production-ready:
-- richer `MudDataGrid` proof for server-backed and heavily templated scenarios
-- deeper hierarchy proof for `AgentTreeView`
-- real-project validation in an external consumer app
-- `AgentFileUpload` agent actions operate on file names and host-owned workflow state; they do not synthesize real browser upload payloads
+- the adapter-first runtime path is the default path
+- semantic capabilities are a first-class authoring surface
+- normalized execution, approval, policy, and context-freshness contracts are in place
+- the old planner/runtime path is no longer the product center
+- the demo is now led by orchestration workflows instead of primitive component control
+
+The biggest remaining product gap is not UI execution. It is durable paid intelligence:
+
+- persistent action history
+- stronger cross-session memory
+- mature adaptive workflow guidance
+
+## Docs
+
+- [Status](docs/STATUS.md)
+- [Architecture](docs/architecture.md)
+- [Runtime Realignment Plan](docs/runtime-realignment-plan.md)
+- [Pricing Tiers](docs/pricing-tiers.md)
+- [MudBlazor Compatibility Roadmap](docs/mudblazor-compatibility-roadmap.md)
 
 ## License
 

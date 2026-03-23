@@ -38,7 +38,7 @@ public class RecipeReleaseWorkflowIntegrationTests
             using (scopeAccessor.Push(scope.ServiceProvider))
             {
                 response = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Assess the current dojo recipe for release readiness",
+                    "Assess the current recipe for release readiness",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -99,7 +99,7 @@ public class RecipeReleaseWorkflowIntegrationTests
             {
                 chatClient.SetNextTool("prepare_release_draft");
                 var approvalResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-blocked",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -111,7 +111,7 @@ public class RecipeReleaseWorkflowIntegrationTests
 
                 chatClient.SetNextTool("prepare_release_draft");
                 var blockedResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-blocked",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -161,7 +161,7 @@ public class RecipeReleaseWorkflowIntegrationTests
             {
                 chatClient.SetNextTool("prepare_release_draft");
                 var approvalResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-approval",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -176,7 +176,7 @@ public class RecipeReleaseWorkflowIntegrationTests
 
                 chatClient.SetNextTool("prepare_release_draft");
                 var approvedResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-approval",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -230,7 +230,7 @@ public class RecipeReleaseWorkflowIntegrationTests
             {
                 chatClient.SetNextTool("apply_release_recovery_playbook");
                 var recoveryResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Apply the recipe release recovery playbook for the current dojo recipe",
+                    "Apply the recipe release recovery playbook for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-recovery",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -245,7 +245,7 @@ public class RecipeReleaseWorkflowIntegrationTests
 
                 chatClient.SetNextTool("prepare_release_draft");
                 var approvalResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-recovery",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -257,7 +257,7 @@ public class RecipeReleaseWorkflowIntegrationTests
 
                 chatClient.SetNextTool("prepare_release_draft");
                 var approvedResponse = await adapter.RunTurnAsync(new AgentTurnRequest(
-                    "Prepare a publish-ready release draft for the current dojo recipe",
+                    "Prepare a publish-ready release draft for the current recipe",
                     AgentName: "Recipe Release Agent",
                     SessionId: "recipe-release-recovery",
                     Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

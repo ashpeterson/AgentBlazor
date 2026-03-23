@@ -1,45 +1,38 @@
 [
   {
-    "id": "dojo-shared-state-save",
-    "name": "Dojo Shared State Save",
-    "route": "/demo/dojo",
-    "prompt": "set dojo example to shared-state, set recipe title to Friday Brunch, and submit recipe form",
+    "id": "response-readiness-assess",
+    "name": "Response Readiness Assess",
+    "route": "/demo/workflows/response-orchestration?reset=true",
+    "prompt": "assess cross-system response readiness",
     "requiredBlockTypes": [],
-    "requiresActions": true,
+    "requiresActions": false,
     "minGeneratedBlocks": 0,
     "maxClarifications": 1,
     "maxDeferredRepeats": 2,
-    "expectedDbDelta": {
-      "dojo_run_notes": 1
-    }
+    "expectedDbDelta": {}
   },
   {
-    "id": "dojo-backend-tool-submit",
-    "name": "Dojo Backend Tool Submit",
-    "route": "/demo/dojo",
-    "prompt": "set dojo example to backend-tool-rendering, set action label to policy review, and submit the backend demo form",
+    "id": "response-advance-stage",
+    "name": "Response Advance Stage",
+    "route": "/demo/workflows/response-orchestration?reset=true",
+    "prompt": "advance the next guided subsystem stage",
     "requiredBlockTypes": [],
-    "requiresActions": true,
+    "requiresActions": false,
     "minGeneratedBlocks": 0,
     "maxClarifications": 1,
     "maxDeferredRepeats": 2,
-    "expectedDbDelta": {
-      "dojo_run_notes": 1
-    }
+    "expectedDbDelta": {}
   },
   {
-    "id": "dojo-predictive-state-confirm",
-    "name": "Dojo Predictive State Confirm",
-    "route": "/demo/dojo",
-    "prompt": "set dojo example to predictive-state, make all bold, and confirm document changes",
+    "id": "release-dossier-assess",
+    "name": "Release Dossier Assess",
+    "route": "/demo/workflows/release-dossier?reset=true",
+    "prompt": "assess release dossier readiness",
     "requiredBlockTypes": [],
-    "requiresActions": true,
+    "requiresActions": false,
     "minGeneratedBlocks": 0,
     "maxClarifications": 1,
     "maxDeferredRepeats": 2,
-    "maxApprovalInteractions": 2,
-    "expectedDbDelta": {
-      "dojo_run_notes": 1
-    }
+    "expectedDbDelta": {}
   }
 ]

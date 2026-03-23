@@ -35,10 +35,6 @@
                     </a>
                 }
 
-                <a class="components-page__catalog-link" href="/demo/components/attribute-based">
-                    <span>Custom Attribute-Based Component</span>
-                    <small>Use <code>AgentControllableComponentBase</code> for your own component contract.</small>
-                </a>
             </div>
         </nav>
     </aside>
@@ -98,12 +94,12 @@
                         <span>Start in the workflow hub for semantic, approval-aware flows, then come here to inspect reusable component contracts.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Custom component path</strong>
-                        <span>Move to the attribute-based example when you need your own Blazor component contract.</span>
+                        <strong>Talk first, inspect second</strong>
+                        <span>Use the chat bubble to drive the selected component and keep this explorer as proof of the deterministic UI layer.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Compatibility proofs</strong>
-                        <span><a href="/demo/components/parity/form">Open the form proof</a>, <a href="/demo/components/parity/datagrid">the data grid proof</a>, <a href="/demo/components/parity/dialog">the dialog proof</a>, <a href="/demo/components/parity/choice-inputs">the select and autocomplete proof</a>, <a href="/demo/components/parity/file-upload">the file upload proof</a>, <a href="/demo/components/parity/date-pickers">the date-picker proof</a>, <a href="/demo/components/parity/workflow-navigation">the tabs and stepper proof</a>, <a href="/demo/components/parity/hierarchy-navigation">the nav-menu and tree-view proof</a>, or <a href="/demo/components/parity/composed-workflow">the composed workflow proof</a> to validate the drop-in claim.</span>
+                        <strong>Keep it minimal</strong>
+                        <span>Use this page as a quick component kit, not as the opening act of the demo.</span>
                     </div>
                 </div>
             </section>
@@ -541,7 +537,7 @@
         new("datagrid", "AgentDataGrid", "/demo/components/datagrid", "Sort, filter, page, and focus grid rows with deterministic actions.", "components-datagrid", "DataGrid actions, current page, focused row, and visible columns.", "Sort and filter supplier records while keeping the grid native to Blazor.", ["sort suppliers by risk score descending", "filter region EMEA", "go to page 2", "clear filters"], ["filter", "sort", "go_to_page", "select_row", "clear_filters"]),
         new("form", "AgentForm", "/demo/components/form", "Validate, reset, and submit structured data through a host-owned MudForm surface.", "components-form", "Current field values, validation errors, and metadata for the host-owned form model.", "Keep the full MudForm surface while layering agent-driven validation and submission on top.", ["validate the form", "reset the form", "submit form"], ["validate", "reset", "submit"]),
         new("dialog", "AgentDialog", "/demo/components/dialog", "Open, confirm, and close dialogs while the host still owns the modal content.", "components-dialog", "Dialog visibility plus the currently mounted dialog content.", "Use deterministic dialog orchestration instead of free-form UI generation.", ["open dialog", "confirm dialog", "close dialog"], ["open", "confirm", "close"]),
-        new("nav-menu", "AgentNavMenu", "/demo/components/nav-menu", "Navigate between known routes from a host-defined navigation menu.", "components-nav-menu", "Current route and the menu destinations mounted in the explorer.", "Expose safe internal navigation actions from a Blazor navigation surface.", ["navigate to /demo/dojo", "navigate to /demo/components/file-upload"], ["navigate_to", "navigate_external"]),
+        new("nav-menu", "AgentNavMenu", "/demo/components/nav-menu", "Navigate between known routes from a host-defined navigation menu.", "components-nav-menu", "Current route and the menu destinations mounted in the explorer.", "Expose safe internal navigation actions from a Blazor navigation surface.", ["navigate to /demo", "navigate to /demo/components/file-upload"], ["navigate_to", "navigate_external"]),
         new("tabs", "AgentTabs", "/demo/components/tabs", "Switch between host-owned tabs without giving up component structure.", "components-tabs", "Active tab index and the available tab labels.", "Move around a multi-panel surface while keeping tab content native.", ["switch to policy tab", "switch to audit tab"], ["switch_tab"]),
         new("select", "AgentSelect", "/demo/components/select", "Set or clear a select value from a known option list.", "kit-country-select", "Current select value and the available options.", "Use deterministic option selection instead of text-only responses.", ["set country select value to Germany", "clear the select"], ["open", "set_value", "clear", "close"]),
         new("autocomplete", "AgentAutocomplete", "/demo/components/autocomplete", "Drive query text and option selection in an autocomplete surface.", "kit-supplier-autocomplete", "Current query, selected option, and available supplier matches.", "Let the agent refine search input without replacing the host component.", ["set supplier search query to Apex", "select option Apex Components"], ["set_query", "select_option", "clear"]),

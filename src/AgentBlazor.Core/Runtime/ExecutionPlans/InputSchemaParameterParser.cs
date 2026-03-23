@@ -1,4 +1,4 @@
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
 /// Parses legacy action input schema strings into planner-friendly parameters.

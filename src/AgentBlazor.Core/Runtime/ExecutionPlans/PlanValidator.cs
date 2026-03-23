@@ -1,10 +1,10 @@
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
 /// Validates action plans before execution.
 /// Performs deterministic validation and limited step normalization.
 /// </summary>
-internal sealed class PlanValidator : IPlanValidator
+internal sealed class PlanValidator
 {
     public PlanValidationResult Validate(ActionPlan plan, PlanValidationContext context)
     {

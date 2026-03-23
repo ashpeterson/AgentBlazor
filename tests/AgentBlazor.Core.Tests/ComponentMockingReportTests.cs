@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.Json;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -22,6 +21,7 @@ namespace AgentBlazor.Core.Tests;
 /// </summary>
 public class ComponentMockingReportTests
 {
+    private const string BuiltInAgentName = "AgentBlazor UI Agent";
     private readonly ITestOutputHelper _output;
 
     public ComponentMockingReportTests(ITestOutputHelper output)
@@ -43,11 +43,11 @@ public class ComponentMockingReportTests
         var testScenarios = new List<TestScenario>
         {
             // Navigation
-            new("Go to the suppliers page", "agentblazor_agentnavmenu_navigate_to",
+            new("Go to the suppliers page", "ui_agentnavmenu_navigate_to",
                 new Dictionary<string, object?> { ["uri"] = "/suppliers", ["agentId"] = "main-nav" }),
 
             // DataGrid - Filter
-            new("Filter suppliers where risk level is high", "agentblazor_agentdatagrid_filter",
+            new("Filter suppliers where risk level is high", "ui_agentdatagrid_filter",
                 new Dictionary<string, object?>
                 {
                     ["column"] = "RiskLevel",
@@ -57,7 +57,7 @@ public class ComponentMockingReportTests
                 }),
 
             // DataGrid - Sort
-            new("Sort by risk score descending", "agentblazor_agentdatagrid_sort",
+            new("Sort by risk score descending", "ui_agentdatagrid_sort",
                 new Dictionary<string, object?>
                 {
                     ["column"] = "RiskScore",
@@ -66,19 +66,19 @@ public class ComponentMockingReportTests
                 }),
 
             // DataGrid - Go to page
-            new("Go to page 3", "agentblazor_agentdatagrid_go_to_page",
+            new("Go to page 3", "ui_agentdatagrid_go_to_page",
                 new Dictionary<string, object?> { ["page"] = 3, ["agentId"] = "supplier-grid" }),
 
             // DataGrid - Select row
-            new("Select the first row", "agentblazor_agentdatagrid_select_row",
+            new("Select the first row", "ui_agentdatagrid_select_row",
                 new Dictionary<string, object?> { ["row_index"] = 0, ["agentId"] = "supplier-grid" }),
 
             // DataGrid - Clear filters
-            new("Clear all filters", "agentblazor_agentdatagrid_clear_filters",
+            new("Clear all filters", "ui_agentdatagrid_clear_filters",
                 new Dictionary<string, object?> { ["agentId"] = "supplier-grid" }),
 
             // Form - Set field
-            new("Set the supplier name to Northwind Traders", "agentblazor_agentform_set_field",
+            new("Set the supplier name to Northwind Traders", "ui_agentform_set_field",
                 new Dictionary<string, object?>
                 {
                     ["field"] = "supplierName",
@@ -87,7 +87,7 @@ public class ComponentMockingReportTests
                 }),
 
             // Form - Set another field
-            new("Set the contact email to contact@northwind.com", "agentblazor_agentform_set_field",
+            new("Set the contact email to contact@northwind.com", "ui_agentform_set_field",
                 new Dictionary<string, object?>
                 {
                     ["field"] = "contactEmail",
@@ -96,19 +96,19 @@ public class ComponentMockingReportTests
                 }),
 
             // Dialog - Open
-            new("Open the confirmation dialog", "agentblazor_agentdialog_open",
+            new("Open the confirmation dialog", "ui_agentdialog_open",
                 new Dictionary<string, object?> { ["agentId"] = "confirm-dialog" }),
 
             // Tabs - Switch
-            new("Switch to the security tab", "agentblazor_agenttabs_switch_tab",
+            new("Switch to the security tab", "ui_agenttabs_switch_tab",
                 new Dictionary<string, object?> { ["index"] = 2, ["agentId"] = "settings-tabs" }),
 
             // Dialog - Close
-            new("Close the dialog", "agentblazor_agentdialog_close",
+            new("Close the dialog", "ui_agentdialog_close",
                 new Dictionary<string, object?> { ["agentId"] = "confirm-dialog" }),
 
             // Navigation - Another page
-            new("Navigate to the dashboard", "agentblazor_agentnavmenu_navigate_to",
+            new("Navigate to the dashboard", "ui_agentnavmenu_navigate_to",
                 new Dictionary<string, object?> { ["uri"] = "/dashboard", ["agentId"] = "main-nav" }),
         };
 
@@ -120,7 +120,8 @@ public class ComponentMockingReportTests
             var services = new ServiceCollection();
             services.AddSingleton<IChatClient>(new ScenarioToolChatClient(scenario.ToolName, scenario.Arguments));
             services.AddAgentBlazorServices()
-                .UseLegacyDefaultAgentFallback()
+                .UseChatClientRuntimeAdapter()
+                .AddBuiltInUiAgent()
                 .EnablePromptTracing();
             services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
@@ -134,11 +135,11 @@ public class ComponentMockingReportTests
             registry.Register(mockNavMenu);
             registry.Register(mockTabs);
 
-            var runtime = provider.GetRequiredService<IAgentRuntime>();
+            var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
             var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
             // Execute the prompt
-            var response = await runtime.RunTurnAsync(new AgentTurnRequest(scenario.Prompt));
+            var response = await runtime.RunTurnAsync(new AgentTurnRequest(scenario.Prompt, AgentName: BuiltInAgentName));
 
             // Get the trace
             var traces = await traceStore.GetRecentAsync(1);
@@ -693,80 +694,21 @@ public class ComponentMockingReportTests
 
     #region Mock Chat Client
 
-    private static string BuildPlanJson(string toolName, IDictionary<string, object?> arguments)
-    {
-        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
-        {
-            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
-        }
-
-        var payload = new
-        {
-            message = $"Executing {componentId}.{actionId}",
-            actions = new[]
-            {
-                new
-                {
-                    agentId = componentId,
-                    action = actionId,
-                    args = arguments
-                }
-            },
-            needsClarification = false,
-            clarificationQuestion = (string?)null
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private static bool TryResolveToolName(
-        string toolName,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = string.Empty;
-        actionId = string.Empty;
-
-        return toolName.ToLowerInvariant() switch
-        {
-            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
-            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
-            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
-            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
-            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
-            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
-            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
-            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
-            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
-            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
-            _ => false
-        };
-    }
-
-    private static bool Resolve(
-        string resolvedComponentId,
-        string resolvedActionId,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = resolvedComponentId;
-        actionId = resolvedActionId;
-        return true;
-    }
-
     private sealed class ScenarioToolChatClient(string toolName, IDictionary<string, object?> arguments) : IChatClient
     {
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(
-                ChatRole.Assistant,
-                BuildPlanJson(toolName, arguments))));
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(function =>
+                    string.Equals(function.Name, toolName, StringComparison.OrdinalIgnoreCase)) ??
+                []);
+
+            await tool.InvokeAsync(new AIFunctionArguments(arguments), cancellationToken);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {toolName}"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -774,11 +716,8 @@ public class ComponentMockingReportTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(toolName, arguments));
-            await Task.CompletedTask;
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
@@ -787,3 +726,4 @@ public class ComponentMockingReportTests
 
     #endregion
 }
+

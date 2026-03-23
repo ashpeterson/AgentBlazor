@@ -1,6 +1,6 @@
 # AgentBlazor Runtime Realignment Plan
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Goal
 
@@ -287,8 +287,6 @@ These are still aligned with the new product shape.
 
 ### Refactor Behind the Runtime Adapter
 
-- `Runtime/Interfaces/IAgentRuntime`
-- `Runtime/Interfaces/IAgentRuntimeStreaming`
 - `Runtime/Interfaces/IAgentRuntimeEventSubscriber`
 - `Runtime/Middleware/*`
 - `Runtime/Conversation/*`
@@ -298,22 +296,22 @@ These are still aligned with the new product shape.
 - `Hosting/DeterministicAgUiHostedAgent`
 - provider registration entry points in `AgentBlazorRegistrationOptions`
 
-These should not disappear immediately.
-They should become adapter-facing seams so existing chat surfaces and host apps continue to work while the runtime is swapped underneath.
+These were the transition seams while the runtime was swapped underneath.
+The planner/runtime bridge itself is now gone; what remains here is adapter-facing middleware, conversation, state, and hosting support.
 
-### Mark as Legacy Immediately
+### Legacy Runtime Status
+
+The old planner/runtime center has now been removed:
 
 - `Runtime/Planning/AgentPlanner`
 - `Runtime/Planning/AgentRuntime`
 - `Runtime/Planning/PlanExecutor`
-- `Runtime/Planning/PlanValidator`
-- `Runtime/Planning/IActionPlanner`
-- `Runtime/Planning/IPlanExecutor`
-- `Runtime/Planning/IPlanValidator`
-- `AgentBlazor.DefaultAgent`
+- `Runtime/Adapters/LegacyAgentRuntimeAdapter`
+- `Runtime/Interfaces/IAgentRuntime`
+- `Runtime/Interfaces/IAgentRuntimeStreaming`
 
-These are the clearest expression of the old architecture.
-They should be marked legacy first, then reduced behind compatibility shims, then removed once the adapter path is complete.
+The remaining plan-oriented code is now limited to shared execution-plan models and helper utilities under `Runtime/ExecutionPlans`.
+That is naming/organization debt, not a second hidden runtime architecture.
 
 ### De-Emphasize Hard
 
@@ -323,10 +321,10 @@ They should be marked legacy first, then reduced behind compatibility shims, the
 
 ### Remove Once Replacement Lands
 
-- direct registrations of `AgentRuntime` as the default runtime implementation
+- completed: direct registrations of `AgentRuntime` as the default runtime implementation
 - `DeterministicAgUiHostedAgent` as the primary AG-UI bridge
 - planner-specific tests that are only proving bespoke orchestration behavior rather than app capability projection or UI execution
-- `AgentBlazor.DefaultAgent` package and its descriptor plumbing
+- completed: `AgentBlazor.DefaultAgent` package and its descriptor plumbing
 
 ## Cleanup Order
 
@@ -334,16 +332,16 @@ Do the cleanup in this order to avoid breaking the package surface all at once.
 
 ### 1. Freeze Legacy Runtime Surface
 
-- stop adding features to `Runtime/Planning/*`
-- mark planner/runtime services as legacy in docs and comments
-- stop expanding demo coverage for planner-specific behavior
+- completed: legacy planner/runtime services are no longer part of the product container
+- completed: planner/runtime services were isolated and then removed
+- completed: demo coverage is now adapter-first and workflow-first rather than planner-first
 
 ### 2. Introduce Replacement Seams
 
 - add a runtime adapter abstraction
 - make chat surfaces depend on the adapter
 - make hosting depend on the adapter
-- keep `IAgentRuntime` only as a temporary compatibility surface if needed
+- completed: the temporary `IAgentRuntime` compatibility surface has now been removed
 
 ### 3. Move Product Features Off the Old Runtime
 
@@ -501,8 +499,16 @@ This is a better proof than any single-component prompt demo.
 - `IAgentRuntimeAdapter` exists and chat/hosting surfaces now depend on it rather than directly on the legacy runtime.
 - `ChatClientRuntimeAdapter` exists as a real external-runtime-backed bridge over `ChatClientAgent` and `IChatClient`.
 - the external runtime adapter is now the default registration path whenever an `IChatClient` is present.
+- the normal `IAgentRuntimeAdapter` service registration no longer auto-falls back to the legacy planner adapter when no `IChatClient` is present, and the public `UseLegacyRuntimeAdapter()` switch has now been removed.
 - mounted UI actions, generated UI tools, service tools, and MCP tools can already be projected into the adapter path as runtime tools.
 - AG-UI hosting now runs through the adapter path.
+- the legacy planner/runtime bridge is now deleted entirely:
+  - `LegacyAgentRuntimeAdapter`
+  - `IAgentRuntime`
+  - `IAgentRuntimeStreaming`
+  - `AgentRuntime`
+  - `AgentPlanner`
+  - `PlanExecutor`
 - shared runtime shaping/persistence logic has been extracted from the legacy runtime into helper modules such as:
   - `RuntimeTurnPreflight`
   - `RuntimeCapabilityPolicy`
@@ -514,7 +520,6 @@ This is a better proof than any single-component prompt demo.
   - `RuntimePersistenceRecords`
   - `RuntimeConversationHistory`
   - `RuntimeTurnResponses`
-- `AgentRuntime` has been materially reduced and now uses scoped phase contexts instead of one large monolithic turn method.
 - persisted conversation turns now carry `ExecutionPlan`, and both chat surfaces hydrate history from the normalized execution model before falling back to planner-era action/result lists.
 - persisted conversation turns now canonicalize plan-backed adapter responses, dropping redundant planner-era action/result payloads when a normalized `ExecutionPlan` exists.
 - approval surfaces now render policy/risk intent in the chat UI rather than only raw `component.action` identifiers.
@@ -530,33 +535,30 @@ This is a better proof than any single-component prompt demo.
 - adapter-backed inspector runs and trace reporting now treat normalized execution steps as the canonical devtools shape, only falling back to legacy action/result payloads when no `ExecutionPlan` exists.
 - `AgentTurnResponse` and persisted `ConversationTurn` records now expose normalized-plan state explicitly and treat planner-era action/result lists as legacy compatibility payloads rather than the primary public execution model.
 - component-mocking/reporting test helpers now prefer normalized `ExecutionPlan` data and only fall back to legacy action/result payloads when the legacy runtime path returns no plan.
-- `AgentRuntimeIntegrationTests` now treat normalized execution-plan data as primary and explicitly opt into legacy default-agent fallback, making the integration suite consistent with the adapter-first/default-agent migration strategy.
+- `AgentRuntimeIntegrationTests` now run adapter-first for the normal deterministic path and use normalized execution-plan data as the primary model.
 - hosted AG-UI response metadata now uses normalized execution-step counts before falling back to legacy planned-action counts.
 - the workflow showcase pages now share a common decision-support surface for phase, approval boundary, next-step, outcome, blockers, warnings, and recommended follow-up actions instead of each page inventing its own status layout.
-- the shared demo layout now brands the `/demo` experience as a workflow hub and adjusts assistant guidance by route, so workflow routes no longer read like a dojo/component-control sandbox by default.
-- the component explorer overview and sample navigation now reinforce the workflow hub as the primary destination, with dojo/components positioned as supporting references rather than the default entry point.
+- the shared demo layout now brands the `/demo` experience as a workflow hub and adjusts assistant guidance by route, so workflow routes no longer read like a component-control sandbox by default.
+- the component explorer overview and sample navigation now reinforce the workflow hub as the primary destination, with the component kit positioned as a fallback reference rather than a default entry point.
 - the workflow hub and each workflow route now use route-specific assistant defaults and semantic-first prompt guidance, so workflow conversations lead with semantic capabilities and approval-aware next steps before lower-level component advice.
 - prompt tracing and report-style consumers now project normalized workflow-step views first, so reporting/devtools language no longer centers planner-era planned-action/result lists even though compatibility storage still exists underneath.
 - prompt-trace reports and inspector phase labels now use workflow-step language (`Workflow Planning`, `Approval and Validation`, `Workflow Execution`) so devtools no longer present normalized semantic runs through planner-era terminology.
 
 ### In Progress
 
-- `Core` is being narrowed, but the legacy planner/runtime stack still exists and still ships as the default compatibility path.
+- `Core` is being narrowed, and the old planner/runtime center is gone, but some helper DTOs and utility names still need cleanup to match the new execution-plan-first architecture cleanly.
 - the product story has been repositioned in docs, and the semantic capability authoring story is now real in code, but it still needs better host-authoring ergonomics and richer workflow examples.
 - the runtime cleanup has gone well, and normalized execution, policy, approval, and context-freshness contracts are now present, but they are not yet the only response shape across the whole framework.
 - workflow-first demos are now proven through focused integration tests, and the page-level workflow narrative is stronger; the showcase has started moving beyond isolated route demos into cross-system composition, but it still needs broader production-style depth before it fully replaces the old primitive-first story.
 - the showcase now includes multiple semantic workflow pages, including supplier compliance, file-audit bundling, recipe-release readiness, incident escalation, and response orchestration, with blocked, approval-gated, and recovery-driven branches covered in focused integration tests.
-- the demo shell is now being reshaped into a workflow-first hub so those scenarios become the default experience, while dojo/component pages move into a supporting-reference role.
+- the demo shell is now being reshaped into a workflow-first hub so those scenarios become the default experience, while the component pages move into a supporting-reference role.
 
 ### Not Done Yet
 
-- the normalized execution contracts are now consumed by the adapter, AG-UI surface, and chat UI, but older planner-era compatibility shapes still exist beside them.
+- the normalized execution contracts are now consumed by the adapter, AG-UI surface, and chat UI, but some older compatibility-shaped response/history data still exists beside them.
 - policy, approval, and context versioning are now explicit contracts, but they are not yet enforced or surfaced uniformly across all runtime paths and UI flows.
 - the package/module split in this document has not happened yet.
-- the old `AgentBlazor.DefaultAgent` package has been removed from the active solution, and default-agent compatibility now lives only in the remaining Core/Hosting option surface.
-- the remaining `AgentBlazorOptions.DefaultAgent` surface is now explicitly marked as legacy compatibility rather than looking like a normal first-class configuration path.
-- built-in default-agent behavior is no longer auto-registered on the normal service path, and the unified hosting path now requires explicit legacy opt-in unless obsolete default-agent fields are used.
-- the workflow-first demo/application layer from this plan is not built yet.
+- the remaining `AgentBlazorOptions.DefaultAgent` surface is explicitly marked as legacy component-catalog compatibility rather than a normal first-class configuration path.
 - workflow-first proof exists now, but it still needs broader production-style depth and richer end-to-end failure/approval storytelling before it can fully replace the old demo mix.
 
 ### Phase 1: Reposition
@@ -598,15 +600,14 @@ Status:
 
 Status:
 - underway
-- legacy runtime is now isolated behind `LegacyAgentRuntimeAdapter`
-- hosts/tests can now opt into that path explicitly through `UseLegacyRuntimeAdapter()`
-- `AgentRuntime` has been significantly reduced
+- the legacy runtime center has now been removed from the codebase entirely
+- the default adapter service path now returns an explicit no-provider response when no provider/runtime adapter is configured, instead of silently reusing a hidden planner runtime
 - adapter-backed responses now prefer normalized execution plans over legacy planned-action payloads
-- legacy default-agent fallback is now an explicit compatibility switch instead of silently outranking explicit agents
-- the built-in default agent is no longer auto-registered on the standard service path; it is now only enabled by the older hosting registration path or an explicit legacy-fallback opt-in
-- the remaining default-agent option surface is now explicitly obsolete to push host apps toward `AddAgent(...)` registration instead of silent fallback-era configuration
+- legacy default-agent fallback has been removed from normal runtime behavior
+- the built-in default agent is no longer auto-registered on the standard service path
+- the remaining default-agent option surface is now explicitly obsolete and narrowed to component-catalog compatibility, pushing host apps toward `AddAgent(...)` registration instead of fallback-era configuration
 - semantic capability workflows now cover successful, blocked, and approval-gated paths in focused integration tests across multiple demo workflows
-- old runtime-first pieces still exist, but they are no longer the primary path when a chat client/provider is present
+- the remaining naming debt is mostly helper-model placement under `Runtime/ExecutionPlans`, not a second runtime path
 
 ### Phase 3.5: Promote App-Layer Contracts
 
@@ -632,7 +633,7 @@ Status:
 
 Status:
 - started
-- `AgentBlazor.Demo` now includes supplier compliance, file-audit, recipe-release, incident-escalation, and response-orchestration workflow showcases that are driven by semantic capabilities rather than primitive component commands
+- `AgentBlazor.Demo` now includes supplier compliance, file-audit, recipe-release, incident-escalation, response-orchestration, and release-dossier workflow showcases that are driven by semantic capabilities rather than primitive component commands
 - focused integration tests now prove all five workflow paths through real prompts, scoped workflow state, and approval-gated semantic capability replay
 - the workflow pages now expose phase, approval-boundary, and next-step state directly
 - the workflow pages now share one normalized decision-support shell instead of separate bespoke state/outcome cards
@@ -650,7 +651,21 @@ Status:
 - the response-orchestration shell can now advance the next guided subsystem stage itself through a semantic orchestration action, so the production-style showcase is starting to prove shared-state coordination directly inside the orchestration surface rather than only navigation and summaries
 - the live supplier, file-audit, and incident workflow pages now explain their orchestration contribution directly when opened from the cross-system route, and the orchestration shell now keeps a visible activity trail, so the broader production-style showcase reads more like one coordinated app workflow instead of a workflow hub plus isolated pages
 - the showcase now includes a second broader orchestration route, `release-dossier`, which coordinates recipe release readiness and audit evidence into one approval-gated release dossier and brings the recipe-release workflow into the same live handoff/return pattern as the larger cross-system demos
-- the remaining gap is moving from the current five-route workflow hub toward an even broader production-style showcase
+- the workflow hub now includes an explicit suggested live-demo sequence and promotes the orchestration routes as featured live demos, so the workflow hub reads like a guided operator journey instead of a flat route catalog
+- the featured response-orchestration and release-dossier routes now anchor a much narrower workflow-first demo shell, making the broader showcase easier to present quickly and without the old route clutter
+- the public demo journey now removes the old Dojo, parity pages, redirects, and playbook route from the visible product story, keeping the workflow hub and the two orchestration routes as the main conversion path
+- the landing page and `/demo` hub now focus on a fast orchestration-first demo path with fresh-start launch links, so the product proof reads as a short live workflow story instead of a text-heavy catalog
+- `DefaultAgentOptions` is now explicitly hidden and marked legacy in code, and it no longer carries built-in agent registration/fallback flags
+- the public legacy default-agent registration entry points have now been removed, and the remaining planner-path tests that still need the built-in agent register it explicitly instead of relying on fallback helper APIs
+- implicit built-in default-agent registry registration and implicit runtime fallback are now removed from the normal runtime path; explicit agents, route targeting, and context targeting are the only non-legacy resolution modes
+- the normal service-registration path is now adapter-only; there is no `IAgentRuntime` registration path left in the product container
+- simpler provider and service-registration coverage now runs against `IAgentRuntimeAdapter` directly
+- `PromptTracingTests` now run adapter-first using real adapter tool invocation rather than planner-plan JSON, so prompt tracing is no longer part of the planner-removal blocker set
+- `ComponentMockingTests` and `ComponentMockingReportTests` now run adapter-first using real projected UI tool invocation rather than planner-plan JSON, so component-mocking coverage is no longer part of the planner-removal blocker set
+- adapter-backed turns now apply shared-state snapshot/delta context before execution, and `SharedStateStoreTests` now run adapter-first, so shared-state handling is no longer a planner-only behavior
+- the adapter now has an explicit opt-in legacy component-tool alias projection mode for compatibility experiments, but it stays off by default so normal adapter-backed tool projection remains normalized
+- `AgentRuntimeIntegrationTests` and `AgUiHostingIntegrationTests` now run adapter-first, including hosted reconnect/stop control coverage through adapter-native test doubles
+- the remaining gap is moving from the current workflow hub toward an even broader production-style showcase
 
 ### Phase 5: Proactive Insight
 
@@ -664,11 +679,11 @@ Status:
 
 ## Immediate Next Implementation Steps
 
-1. Keep broadening workflow-first proof without sliding back into primitive-control demos, especially by moving from the now broader orchestration showcase toward more realistic cross-screen and cross-system scenarios and richer orchestration-state progression across live surfaces.
-2. Continue narrowing the remaining legacy default-agent compatibility option surface now that the standalone package is gone and fallback is explicit.
-3. Push the same normalized execution/trust model further into any remaining showcase/detail surfaces so chat, approval prompts, workflow pages, and diagnostics keep converging on one product surface.
-4. Keep trimming the remaining planner-era compatibility payloads from trace/devtools and response models until normalized execution data is the canonical shape everywhere on the adapter path.
-5. Carry the same explicit compatibility story into the eventual package/module split so host migrations stay predictable.
+1. Keep broadening workflow-first proof without sliding back into primitive-control demos, especially by moving from the current orchestration showcase toward more realistic cross-screen and cross-system scenarios and richer orchestration-state progression across live surfaces.
+2. Push the same normalized execution/trust model further into any remaining showcase/detail surfaces so chat, approval prompts, workflow pages, and diagnostics keep converging on one product surface.
+3. Turn the workflow hub into a stronger demo journey with clearer featured routes, guided operator flow, fresh-start launch paths, and presentation polish that supports live demonstrations.
+4. Start the eventual package/module split only after the demo/product proof is strong enough that the package story follows the product story cleanly.
+5. Carry the same explicit compatibility story into that package/module split so host migrations stay predictable.
 
 ## Success Criteria
 

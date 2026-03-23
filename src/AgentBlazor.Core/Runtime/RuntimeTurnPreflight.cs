@@ -97,25 +97,10 @@ internal static class RuntimeTurnPreflight
     }
 
     public static AgentRegistration? ResolveImplicitFallbackAgent(
-        IEnumerable<AgentRegistration> registrations,
-        string defaultAgentName,
-        bool preferLegacyDefaultFallback)
+        IEnumerable<AgentRegistration> registrations)
     {
-        var orderedAgents = registrations
+        return registrations
             .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var configuredDefault = orderedAgents.FirstOrDefault(agent =>
-            string.Equals(agent.Name, defaultAgentName, StringComparison.OrdinalIgnoreCase));
-
-        if (preferLegacyDefaultFallback && configuredDefault is not null)
-        {
-            return configuredDefault;
-        }
-
-        var nonDefault = orderedAgents.FirstOrDefault(agent =>
-            !string.Equals(agent.Name, defaultAgentName, StringComparison.OrdinalIgnoreCase));
-
-        return nonDefault ?? configuredDefault;
+            .FirstOrDefault();
     }
 }

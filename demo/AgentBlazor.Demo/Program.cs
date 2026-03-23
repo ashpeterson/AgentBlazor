@@ -76,7 +76,6 @@ builder.Services.AddAgentBlazor(options =>
     options.ConfigureBuilder(agentBuilder =>
     {
         agentBuilder.EnablePromptTracing();
-        agentBuilder.AddRuntimeEventSubscriber<DojoRuntimeEventSubscriber>();
         agentBuilder.AddCapability<DemoFileWorkflowCapabilities>();
         agentBuilder.AddCapability<DojoRecipeReleaseCapabilities>();
         agentBuilder.AddCapability<IncidentEscalationCapabilities>();
@@ -91,17 +90,6 @@ builder.Services.AddAgentBlazor(options =>
             {
                 agent.WithInstructions(sharedAgentInstructions);
             }
-        });
-
-        agentBuilder.AddAgent("Dojo Workspace Agent", agent =>
-        {
-            agent.WithDescription("Focused on the three-pillar dojo workspace.");
-            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
-            {
-                agent.WithInstructions(sharedAgentInstructions);
-            }
-            agent.WithAllowedComponents("DojoIncident");
-            agent.WithMetadata("route_prefixes", "/demo/dojo");
         });
 
         agentBuilder.AddAgent("Supplier Analyst Agent", agent =>
@@ -123,7 +111,7 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentStepper", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentTreeView", "AgentCommandBar", "AgentFileUpload");
-            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/form,/demo/components/dialog,/demo/components/tabs,/demo/components/stepper,/demo/components/command-bar,/demo/components/file-upload,/demo/components/attribute-based");
+            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/form,/demo/components/dialog,/demo/components/tabs,/demo/components/stepper,/demo/components/command-bar,/demo/components/file-upload");
         });
 
         agentBuilder.AddAgent("Supplier Compliance Agent", agent =>
@@ -150,7 +138,7 @@ builder.Services.AddAgentBlazor(options =>
 
         agentBuilder.AddAgent("Recipe Release Agent", agent =>
         {
-            agent.WithDescription("Focused on dojo recipe readiness, release blockers, recovery-playbook guidance, and publish-ready draft preparation.");
+            agent.WithDescription("Focused on recipe readiness, release blockers, recovery-playbook guidance, and publish-ready draft preparation.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
             {
                 agent.WithInstructions(sharedAgentInstructions);

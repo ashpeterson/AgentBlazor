@@ -160,34 +160,6 @@ public sealed class AgentBlazorBuilder
     }
 
     /// <summary>
-    /// Uses the legacy built-in planner/runtime adapter explicitly.
-    /// This is intended as a compatibility switch during the adapter-first migration.
-    /// </summary>
-    public AgentBlazorBuilder UseLegacyRuntimeAdapter()
-    {
-        Services.RemoveAll<IAgentRuntimeAdapter>();
-        Services.AddSingleton<IAgentRuntimeAdapter>(sp =>
-            new LegacyAgentRuntimeAdapter(sp.GetRequiredService<IAgentRuntime>()));
-        return this;
-    }
-
-    /// <summary>
-    /// Re-enables legacy implicit fallback to the built-in default agent when multiple agents are registered.
-    /// Prefer explicit agent targeting instead of this compatibility switch.
-    /// </summary>
-    public AgentBlazorBuilder UseLegacyDefaultAgentFallback()
-    {
-        Services.Configure<AgentBlazorOptions>(options =>
-        {
-#pragma warning disable CS0618
-            options.DefaultAgent.Enabled = true;
-            options.DefaultAgent.PreferAsImplicitFallback = true;
-#pragma warning restore CS0618
-        });
-        return this;
-    }
-
-    /// <summary>
     /// Replaces the default conversation store with a custom implementation.
     /// </summary>
     public AgentBlazorBuilder UseConversationStore<TStore>()

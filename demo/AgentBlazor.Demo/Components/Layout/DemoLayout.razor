@@ -5,39 +5,16 @@
 @implements IDisposable
 @inject NavigationManager NavigationManager
 
-<MudThemeProvider Theme="_activeTheme" IsDarkMode="@(!IsDojoRoute)" />
+<MudThemeProvider Theme="_activeTheme" IsDarkMode="true" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<div class="demo-app @CurrentThemeCssClass @(IsDojoRoute ? "demo-app--dojo" : IsComponentsRoute ? "demo-app--components" : null)">
-    @if (!IsDojoRoute && !IsComponentsRoute)
-    {
-        <aside class="demo-app__sidebar">
-            <MudPaper Elevation="0" Class="demo-app__sidebar-card">
-                <a href="/demo" class="demo-app__sidebar-brand">
-                    <img src="logo.png" class="demo-app__sidebar-logo" alt="AgentBlazor" />
-                    <span class="demo-app__sidebar-brand-text">
-                        <strong>AgentBlazor</strong>
-                        <small>Workflow Hub</small>
-                    </span>
-                </a>
-
-                <p class="demo-app__sidebar-copy">
-                    Start with semantic workflow showcases. The dojo and component explorer remain supporting reference surfaces.
-                </p>
-
-                <DemoNavMenu />
-            </MudPaper>
-        </aside>
-    }
-
-    <main class="demo-app__main @(IsDojoRoute ? "demo-app__main--dojo" : IsComponentsRoute ? "demo-app__main--components" : null)">
-        @if (!IsDojoRoute)
+<div class="demo-app @CurrentThemeCssClass @(IsComponentsRoute ? "demo-app--components" : IsFocusedDemoRoute ? "demo-app--focused" : null)">
+    <main class="demo-app__main @(IsComponentsRoute ? "demo-app__main--components" : null)">
+        @if (IsComponentsRoute)
         {
-            @if (IsComponentsRoute)
-            {
-                <header class="demo-app__topbar demo-app__topbar--components">
+            <header class="demo-app__topbar demo-app__topbar--components">
                     <a href="/" class="demo-app__masthead-brand">
                         <img src="logo.png" class="demo-app__masthead-logo" alt="AgentBlazor" />
                         <span class="demo-app__masthead-copy">
@@ -46,59 +23,65 @@
                         </span>
                     </a>
 
-                    <nav class="demo-app__masthead-nav" aria-label="Primary">
-                        <a href="/">Home</a>
-                        <a href="/demo/dojo">Capability Dojo</a>
-                        <a href="/demo/components" aria-current="page">Agentic Components</a>
+                <nav class="demo-app__masthead-nav" aria-label="Primary">
+                    <a href="/">Home</a>
+                    <a href="/demo">Workflow Hub</a>
+                    <a href="/demo/components" aria-current="page">Component Kit</a>
+                </nav>
+
+                <div class="demo-app__controls">
+                    <MudSelect T="string"
+                               Value="_selectedThemeKey"
+                               ValueChanged="OnThemeChanged"
+                               Label="Theme"
+                               Dense="true"
+                               Variant="Variant.Outlined"
+                               Class="demo-app__theme-select">
+                        @foreach (var option in ThemeOptions)
+                        {
+                            <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </header>
+        }
+        else
+        {
+            <header class="demo-app__topbar">
+                <div class="demo-app__topbar-intro">
+                    <a href="/" class="demo-app__back">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
+                        <span>Back to Home</span>
+                    </a>
+
+                    <div class="demo-app__title-block">
+                        <p class="demo-app__title-eyebrow">@RouteTagline</p>
+                        <h1 class="demo-app__title">@RouteTitle</h1>
+                        <p class="demo-app__title-subtitle">@RouteSubtitle</p>
+                    </div>
+
+                    <nav class="demo-app__route-strip" aria-label="Demo routes">
+                        <a href="/demo" class="@(IsWorkflowHubRoute ? "is-active" : null)">Hub</a>
+                        <a href="/demo/workflows/response-orchestration?reset=true" class="@(IsResponseOrchestrationRoute ? "is-active" : null)">Response</a>
+                        <a href="/demo/workflows/release-dossier?reset=true" class="@(IsReleaseDossierRoute ? "is-active" : null)">Release</a>
                     </nav>
+                </div>
 
-                    <div class="demo-app__controls">
-                        <MudSelect T="string"
-                                   Value="_selectedThemeKey"
-                                   ValueChanged="OnThemeChanged"
-                                   Label="Theme"
-                                   Dense="true"
-                                   Variant="Variant.Outlined"
-                                   Class="demo-app__theme-select">
-                            @foreach (var option in ThemeOptions)
-                            {
-                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </div>
-                </header>
-            }
-            else
-            {
-                <header class="demo-app__topbar">
-                    <div class="demo-app__topbar-intro">
-                        <a href="/" class="demo-app__back">
-                            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />
-                            <span>Back to Home</span>
-                        </a>
-
-                        <div class="demo-app__title-block">
-                            <p class="demo-app__title-eyebrow">Workflow-First Product Proof</p>
-                            <h1 class="demo-app__title">AgentBlazor Workflow Hub</h1>
-                        </div>
-                    </div>
-
-                    <div class="demo-app__controls">
-                        <MudSelect T="string"
-                                   Value="_selectedThemeKey"
-                                   ValueChanged="OnThemeChanged"
-                                   Label="Theme"
-                                   Dense="true"
-                                   Variant="Variant.Outlined"
-                                   Class="demo-app__theme-select">
-                            @foreach (var option in ThemeOptions)
-                            {
-                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </div>
-                </header>
-            }
+                <div class="demo-app__controls">
+                    <MudSelect T="string"
+                               Value="_selectedThemeKey"
+                               ValueChanged="OnThemeChanged"
+                               Label="Theme"
+                               Dense="true"
+                               Variant="Variant.Outlined"
+                               Class="demo-app__theme-select">
+                        @foreach (var option in ThemeOptions)
+                        {
+                            <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </header>
         }
 
         <article class="demo-app__content @(IsComponentsRoute ? "demo-app__content--components" : null)">
@@ -106,13 +89,12 @@
         </article>
     </main>
 
-    @if (!IsDojoRoute && !IsComponentsRoute)
+    @if (!IsComponentsRoute)
     {
         <aside class="demo-app__assistant-pane">
             <MudPaper Elevation="0" Class="demo-app__assistant-card">
                 <div class="demo-app__assistant-head">
-                    <p class="demo-app__assistant-eyebrow">AI Assistant</p>
-                    <h2 class="demo-app__assistant-title">Control This Workspace</h2>
+                    <h2 class="demo-app__assistant-title">@AssistantTitle</h2>
                     <p class="demo-app__assistant-copy">
                         @AssistantDescription
                     </p>
@@ -141,29 +123,26 @@
     }
 </div>
 
-@if (!IsDojoRoute)
-{
-    <AgentChatWidget Title="@AssistantTitle"
-                     Description="@AssistantDescription"
-                     DefaultAgentName="@DefaultAssistantAgent"
-                     RequireHandoffApproval="@AssistantRequireHandoffApproval"
-                     HandoffApprovalPolicy="@_assistantHandoffApprovalPolicy"
-                     HandoffPolicy="@_assistantHandoffPolicy"
-                     MaxHandoffsPerSession="6"
-                     MaxHandoffsPerPair="2"
-                     MaxHandoffsPerWindow="3"
-                     HandoffWindowMinutes="10"
-                     MaxPairHandoffsPerWindow="2"
-                     BlockImmediateReturnHandoff="true"
-                     EnableGeneratedUi="@AssistantEnableGeneratedUi"
-                     Placeholder="@AssistantPlaceholder"
-                     Theme="_assistantTheme"
-                     Width="26rem"
-                     Height="68vh"
-                     Right="0.85rem"
-                     Bottom="0.85rem"
-                     CssClass="demo-app__assistant-widget" />
-}
+<AgentChatWidget Title="@AssistantTitle"
+                 Description="@AssistantDescription"
+                 DefaultAgentName="@DefaultAssistantAgent"
+                 RequireHandoffApproval="@AssistantRequireHandoffApproval"
+                 HandoffApprovalPolicy="@_assistantHandoffApprovalPolicy"
+                 HandoffPolicy="@_assistantHandoffPolicy"
+                 MaxHandoffsPerSession="6"
+                 MaxHandoffsPerPair="2"
+                 MaxHandoffsPerWindow="3"
+                 HandoffWindowMinutes="10"
+                 MaxPairHandoffsPerWindow="2"
+                 BlockImmediateReturnHandoff="true"
+                 EnableGeneratedUi="@AssistantEnableGeneratedUi"
+                 Placeholder="@AssistantPlaceholder"
+                 Theme="_assistantTheme"
+                 Width="26rem"
+                 Height="68vh"
+                 Right="0.85rem"
+                 Bottom="0.85rem"
+                 CssClass="demo-app__assistant-widget" />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -191,8 +170,7 @@
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Workflow Hub Agent"] = ["Supplier Compliance Agent", "File Workflow Agent", "Recipe Release Agent"],
-            ["Dojo Workspace Agent"] = ["Workflow Orchestrator Agent"],
-            ["Workflow Orchestrator Agent"] = ["Dojo Workspace Agent", "Supplier Analyst Agent"],
+            ["Workflow Orchestrator Agent"] = ["Supplier Analyst Agent"],
             ["Supplier Analyst Agent"] = ["Workflow Orchestrator Agent"]
         };
 
@@ -200,7 +178,7 @@
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Workflow Orchestrator Agent"] = ["Supplier Analyst Agent"],
-            ["*"] = ["!Dojo Workspace Agent"]
+            ["*"] = []
         };
 
     private static readonly MudTheme AuroraTheme = new()
@@ -280,8 +258,6 @@
     private bool IsWorkflowHubRoute =>
         string.Equals(CurrentRoutePath.TrimEnd('/'), "/demo", StringComparison.OrdinalIgnoreCase);
 
-    private bool IsDojoRoute => CurrentRoutePath.StartsWith("/demo/dojo", StringComparison.OrdinalIgnoreCase);
-
     private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
 
     private bool IsWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows", StringComparison.OrdinalIgnoreCase);
@@ -297,6 +273,8 @@
     private bool IsResponseOrchestrationRoute => CurrentRoutePath.StartsWith("/demo/workflows/response-orchestration", StringComparison.OrdinalIgnoreCase);
 
     private bool IsReleaseDossierRoute => CurrentRoutePath.StartsWith("/demo/workflows/release-dossier", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsFocusedDemoRoute => IsWorkflowHubRoute || IsWorkflowRoute;
 
     private string AssistantTitle =>
         IsComponentsRoute
@@ -317,41 +295,41 @@
 
     private string AssistantDescription =>
         IsComponentsRoute
-            ? "Inspect wrapper behavior, compare Mud parity, and drive deterministic component actions on the current route."
+            ? "Inspect one deterministic UI surface."
             : IsSupplierWorkflowRoute
-                ? "Use semantic supplier-risk workflows first: identify at-risk suppliers, explain the signals, apply the recovery playbook when severe supplier blockers remain, and prepare remediation-ready next steps with clear approval boundaries."
+                ? "Explain risk, clear blockers, prepare the draft."
                 : IsFileWorkflowRoute
-                    ? "Use the semantic file-audit workflow first: explain blockers, prepare audit-ready remote bundles, and apply the recovery playbook when remote policy rejects a file."
+                    ? "Prepare the bundle, recover rejected files, retry the handoff."
                         : IsRecipeWorkflowRoute
-                        ? "Use the semantic recipe-release workflow first: assess readiness, explain blockers, apply the recovery playbook when metadata conflicts appear, and prepare a release draft before any publish step."
+                        ? "Assess readiness, clear blockers, stage the draft."
                             : IsIncidentWorkflowRoute
-                            ? "Use the semantic incident-escalation workflow first: explain blockers, move the triage surface into evidence review, prepare the escalation brief only when the case is ready, and guide recovery if the board handoff is blocked."
+                            ? "Move the incident through triage, recovery, and handoff."
                             : IsResponseOrchestrationRoute
-                                ? "Use the cross-system response workflow first: assess supplier, file, and incident readiness together, advance the next guided subsystem stage when you want the orchestration shell to move the shared session forward, apply shared recovery when one subsystem blocks the handoff, and prepare one approval-gated response packet."
+                                ? "Coordinate supplier, file, and incident work into one packet."
                                 : IsReleaseDossierRoute
-                                    ? "Use the release dossier workflow first: assess recipe and evidence readiness together, advance the next guided subsystem stage when you want the orchestration shell to move the shared session forward, apply shared recovery when one subsystem blocks the release, and prepare one approval-gated release dossier."
+                                    ? "Coordinate recipe and evidence work into one dossier."
                         : IsWorkflowHubRoute
-                            ? "Start by choosing the right semantic workflow. Ask the assistant to compare the supplier, file, recipe, incident, response, and release-dossier showcases and route you to the best fit."
-                            : "Ask for workflow analysis, blocker explanations, approval-gated next steps, and deterministic execution against the current route.";
+                            ? "Ask where to start, then run the workflow."
+                            : "Ask for the next step.";
 
     private string AssistantPlaceholder =>
         IsComponentsRoute
-            ? "Try: compare this wrapper to MudBlazor, set form fields, validate the form, or open the parity route."
+            ? "Sort the grid. Validate the form. Switch tabs."
             : IsSupplierWorkflowRoute
-                ? "Try: explain why these suppliers are at risk, apply the supplier recovery playbook, or prepare the remediation draft."
+                ? "Explain risk. Recover. Prepare the draft."
                 : IsFileWorkflowRoute
-                    ? "Try: explain why this bundle is blocked, prepare an audit-ready remote bundle, or apply the file audit recovery playbook."
+                    ? "Explain blockers. Recover. Prepare the bundle."
                         : IsRecipeWorkflowRoute
-                        ? "Try: assess release readiness, explain this blocker, or apply the recipe release recovery playbook."
+                        ? "Assess readiness. Explain blockers. Recover."
                             : IsIncidentWorkflowRoute
-                            ? "Try: summarize the current incident triage workflow, submit the escalation handoff, or apply the recovery playbook."
+                            ? "Summarize triage. Recover. Submit handoff."
                             : IsResponseOrchestrationRoute
-                                ? "Try: assess cross-system response readiness, advance the next guided subsystem stage, prepare the response packet, or apply the cross-system recovery playbook."
+                                ? "Assess readiness. Advance the stage. Prepare the packet."
                                 : IsReleaseDossierRoute
-                                    ? "Try: assess release dossier readiness, advance the next guided subsystem stage, prepare the release dossier, or apply the release dossier recovery playbook."
+                                    ? "Assess readiness. Advance the stage. Prepare the dossier."
                         : IsWorkflowHubRoute
-                            ? "Try: which workflow should I open, compare the workflow showcases, or route me to the right production-style workflow."
-                            : "Try: explain the current blockers, prepare the next draft, summarize this workflow, or show what needs approval.";
+                            ? "Which workflow should I open?"
+                            : "What is next?";
 
     private bool AssistantRequireHandoffApproval => false;
 
@@ -373,6 +351,57 @@
                     : IsWorkflowHubRoute
                         ? "Workflow Hub Agent"
                         : null;
+
+    private string RouteTitle =>
+        IsWorkflowHubRoute
+            ? "Workflow Hub"
+            : IsResponseOrchestrationRoute
+                ? "Response Orchestration"
+                : IsReleaseDossierRoute
+                    ? "Release Dossier"
+                    : IsSupplierWorkflowRoute
+                        ? "Supplier Compliance"
+                        : IsFileWorkflowRoute
+                            ? "File Audit Bundle"
+                            : IsRecipeWorkflowRoute
+                                ? "Recipe Release"
+                                : IsIncidentWorkflowRoute
+                                    ? "Incident Escalation"
+                        : IsComponentsRoute
+                            ? "Component Kit"
+                            : "AgentBlazor Demo";
+
+    private string RouteTagline =>
+        IsWorkflowHubRoute
+            ? "Start with the live agent demo"
+            : IsResponseOrchestrationRoute
+                ? "Featured orchestration route"
+                : IsReleaseDossierRoute
+                    ? "Second orchestration proof"
+                    : IsSupplierWorkflowRoute || IsFileWorkflowRoute || IsRecipeWorkflowRoute || IsIncidentWorkflowRoute
+                        ? "Supporting module"
+                        : IsComponentsRoute
+                            ? "Reference surface"
+                            : "Live demo";
+
+    private string RouteSubtitle =>
+        IsWorkflowHubRoute
+            ? "Lead with one orchestration route. Everything else supports that story."
+            : IsResponseOrchestrationRoute
+                ? "One shared session coordinates supplier, evidence, and incident state."
+            : IsReleaseDossierRoute
+                ? "A second orchestration route proves the pattern is reusable."
+                : IsSupplierWorkflowRoute
+                    ? "Risk review, explanation, recovery, and remediation in one flow."
+                    : IsFileWorkflowRoute
+                        ? "Evidence handoff with failure, recovery, and retry."
+                        : IsRecipeWorkflowRoute
+                            ? "Release readiness with blocker recovery before the draft."
+                            : IsIncidentWorkflowRoute
+                                ? "Triage to escalation with recovery before board handoff."
+                                : IsComponentsRoute
+                                    ? "Inspect the deterministic UI layer after the workflow story lands."
+                                    : "Workflow-first agent demo.";
 
     protected override void OnInitialized()
     {

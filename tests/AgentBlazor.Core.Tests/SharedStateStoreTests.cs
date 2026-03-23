@@ -58,7 +58,7 @@ public class SharedStateStoreTests
             {
                 ["component.recipe.state.title"] = "Classic Scrambled Eggs",
                 ["component.recipe.state.minutes"] = "45",
-                ["route.current"] = "/demo/dojo"
+                ["route.current"] = "/demo/workflows/recipe-release"
             });
 
         store.ApplyDelta(
@@ -75,7 +75,7 @@ public class SharedStateStoreTests
 
         Assert.Equal("Test", snapshot.Values["component.recipe.state.title"]);
         Assert.False(snapshot.Values.ContainsKey("component.recipe.state.minutes"));
-        Assert.Equal("/demo/dojo", snapshot.Values["route.current"]);
+        Assert.Equal("/demo/workflows/recipe-release", snapshot.Values["route.current"]);
     }
 
     [Fact]
@@ -283,13 +283,13 @@ public class SharedStateStoreTests
     public async Task Runtime_AppliesContextSharedStateSnapshotAndDelta()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new StaticPlanChatClient("""
-            {"message":"Done.","actions":[],"needsClarification":false,"clarificationQuestion":null}
-            """));
-        services.AddAgentBlazorServices();
+        services.AddSingleton<IChatClient>(new StaticResponseChatClient("Done."));
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var sharedStore = provider.GetRequiredService<IAgentSharedStateStore>();
 
         var snapshotJson = JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -305,6 +305,7 @@ public class SharedStateStoreTests
 
         await runtime.RunTurnAsync(new AgentTurnRequest(
             UserMessage: "continue",
+            AgentName: "AgentBlazor UI Agent",
             SessionId: "session-shared-context",
             Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -317,7 +318,7 @@ public class SharedStateStoreTests
         Assert.False(latest.Values.ContainsKey("recipe.title"));
     }
 
-    private sealed class StaticPlanChatClient(string jsonPlan) : IChatClient
+    private sealed class StaticResponseChatClient(string responseText) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
@@ -327,7 +328,7 @@ public class SharedStateStoreTests
             _ = messages;
             _ = options;
             _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, jsonPlan)));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, responseText)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -338,7 +339,7 @@ public class SharedStateStoreTests
             _ = messages;
             _ = options;
             _ = cancellationToken;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, jsonPlan);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, responseText);
             await Task.CompletedTask;
         }
 

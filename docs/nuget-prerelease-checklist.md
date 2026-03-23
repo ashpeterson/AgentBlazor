@@ -1,5 +1,7 @@
 # NuGet Prerelease Checklist
 
+Last updated: 2026-03-20
+
 Use this before publishing an `AgentBlazor` prerelease for real-project validation.
 
 ## Goal
@@ -51,6 +53,7 @@ Current caveats to keep explicit:
 - `AgentDataGrid` still needs deeper public proof for richer server-backed and templated scenarios
 - `AgentTreeView` still needs deeper hierarchy-heavy proof
 - `AgentFileUpload` agent actions operate on file names and host workflow state; they do not synthesize real browser upload payloads
+- the workflow-first demo story is now much stronger, but the package story should still be sold as a parity-foundation preview plus workflow-oriented app-layer integration proof, not as a finished all-scenarios platform
 
 ## Publish Notes
 

@@ -1,6 +1,6 @@
 # AgentBlazor Architecture
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Purpose
 
@@ -36,9 +36,11 @@ tests/
 
 ### AgentBlazor.Core
 
-Owns deterministic runtime behavior and canonical contracts:
+Owns deterministic app-execution behavior and canonical contracts:
 
-- planning, validation, and execution
+- runtime adapter integration
+- execution-plan and trust contracts
+- semantic capability registration/discovery
 - component capability metadata
 - policy and entitlement checks
 - route and agent resolution
@@ -52,9 +54,11 @@ Core is the source of truth for:
 - `AgentUiDocument`
 - `AgentComponentCapabilityProfile`
 - `AgentComponentTierBoundaries`
-- `AgentPlanner`
 - `PlanValidator`
-- `AgentRuntime`
+- `IAgentRuntimeAdapter`
+- `ChatClientRuntimeAdapter`
+- `ExecutionPlan`
+- `PolicyDecision`
 
 ### AgentBlazor.Components
 
@@ -71,7 +75,7 @@ Current architectural state:
 
 - high-surface agentic components have been moved toward true MudBlazor compatibility instead of narrow wrapper subsets
 - reusable agent behavior is no longer expected to live only in `AgentControllableComponentBase`
-- shared runtime support now exists so Mud-backed `Agent*` components can preserve the full native MudBlazor contract while still participating in the agent runtime
+- shared runtime support now exists so Mud-backed `Agent*` components can preserve the full native MudBlazor contract while still participating in the adapter-backed execution model
 
 ### AgentBlazor.Hosting
 
@@ -85,7 +89,8 @@ Owns app startup and protocol/endpoint wiring:
 Current status:
 
 - hosting no longer needs a direct compile-time dependency on the removed `AgentBlazor.DefaultAgent` package
-- legacy default-agent compatibility now lives only through the remaining Core/Hosting option surface
+- hosting is now adapter-first; there is no planner/runtime service path in the normal container
+- the remaining default-agent surface is migration-only component-catalog compatibility
 
 ### AgentBlazor.ProviderAdapters
 
@@ -115,20 +120,21 @@ This keeps runtime decisions out of the UI layer, keeps provider-specific code o
 
 ## Runtime Pipeline
 
-The runtime flow remains:
+The primary runtime flow is now:
 
 1. gather request context
-2. plan
-3. normalize targets/actions
-4. apply policy and entitlement filters
-5. validate against mounted components
-6. execute
-7. emit events and persist conversation/state
+2. project semantic capabilities and live UI actions as tools
+3. let the active runtime adapter coordinate tool selection
+4. normalize execution into `ExecutionPlan`
+5. apply policy, approval, and entitlement filters
+6. validate against mounted components and current session state
+7. execute deterministically
+8. emit events and persist conversation/state
 
 The important current behavior is:
 
 - validation checks mounted live components, not only static catalog metadata
-- planner/validator recovery paths repair some invented component/action ids when the intent can be resolved deterministically
+- execution-plan helpers still repair some invented component/action ids when the intent can be resolved deterministically
 - blocked actions return deterministic diagnostics
 
 ## Native UI Model
@@ -166,8 +172,6 @@ Supported native block types include:
 ### Open-ended UI
 
 Open-ended UI is currently handled as a hosted surface pattern rather than as the main authoring model.
-
-The current Dojo demonstrates this as a sandboxed hosted app surface inside the Blazor shell.
 
 ## Declarative Interoperability
 
@@ -214,7 +218,7 @@ Current pieces:
 Current role in architecture:
 
 - route and mounted-component state is gathered into shared runtime context
-- that state is available to the planner
+- that state is available to the adapter-backed execution path
 - runtime emits structured state events for debugging and AG-UI flow
 
 ## Multi-Agent Model
@@ -292,13 +296,13 @@ Compatibility is no longer only an internal design goal.
 
 The repository now proves the current drop-in story through:
 
-- side-by-side demo pages in the demo app
+- focused component examples in the components explorer
 - rendered parity tests in `AgentBlazor.Components.Tests`
 - prompt-aware browser coverage in the Playwright suite
 
 Current proof areas include:
 
-- isolated component parity pages for forms, grids, dialogs, choice inputs, file upload, date pickers, workflow navigation, and hierarchy navigation
+- focused live examples for forms, grids, dialogs, choice inputs, file upload, date pickers, workflow navigation, and hierarchy navigation
 - multiple broader workflow pages that mount several Mud-backed `Agent*` components together on the same screen, including supplier-compliance, file-audit, and recipe-release flows with blocked and approval-gated branches
 
 ## Current Architectural Gaps
@@ -322,24 +326,8 @@ This is part of the core product story, not a side example.
 The demo app is now organized around one coherent journey:
 
 - Home: product framing
-- Dojo: capability patterns
-- Agentic Components: drop-in component exploration
-
-### Dojo
-
-The Dojo is now a focused three-pillar shell:
-
-1. Controlled Generative UI
-2. Declarative Generative UI
-3. Open-ended Generative UI
-
-Each pillar has:
-
-- `Preview`
-- `Code`
-- `Docs`
-
-The embedded chat is route-locked and tested across pillar changes.
+- Workflow Hub: orchestration-led product proof
+- Agentic Components: drop-in component exploration when needed
 
 ### Agentic Components
 
@@ -351,7 +339,7 @@ The components explorer is now a docs-style layout:
 - right contents rail
 - floating chat bubble
 
-This is meant to demonstrate drop-in agentic components, not to duplicate the Dojo.
+This is meant to demonstrate drop-in agentic components, not to compete with the workflow-first product story.
 
 ## Licensing Architecture
 

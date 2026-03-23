@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Current Product Shape
 
@@ -8,28 +8,48 @@ AgentBlazor is now positioned as a Blazor-first agentic UI framework with two pr
 
 - `/` explains the product and routes users into the current story
 - `/demo` is the workflow hub and demonstrates the workflow-first product story
-- `/demo/dojo` is now a supporting reference for the three core generative UI pillars
 - `/demo/components` is now a supporting reference for drop-in agentic components for Blazor apps
 
 The current story is no longer "many unrelated demo routes". It is:
 
 1. learn the platform on the landing page
 2. validate the workflow-first story in the workflow hub
-3. use the dojo and component explorer as supporting references
+3. use the component explorer only as a supporting reference when needed
+
+The current visible demo funnel is intentionally narrow:
+
+- `/`
+- `/demo`
+- `/demo/workflows/response-orchestration?reset=true`
+- `/demo/workflows/release-dossier?reset=true`
+- `/demo/components` as a supporting reference surface
+
+The acquisition story is now intentionally simple too:
+
+- `Free` should look shippable in one sprint
+- `Paid` should look like the app gets smarter with use
+- `Premium` should read as the team/governance layer
 
 The runtime realignment is now materially underway:
 
 - the external runtime adapter path is the default when a chat client/provider is present
+- the legacy planner/runtime bridge has now been removed from the normal product path and deleted from the codebase
 - semantic capabilities are now a first-class authoring surface in code
 - normalized execution, approval, policy, and context-freshness contracts now exist and are consumed by the adapter path
-- supplier-compliance, file-audit, recipe-release, incident-escalation, and response-orchestration workflow validation now exist as focused integration proof, not only demo wiring
+- the remaining plan-oriented helper models now live under `Runtime/ExecutionPlans` rather than `Runtime/Planning`
+- supplier-compliance, file-audit, recipe-release, incident-escalation, response-orchestration, and release-dossier workflow validation now exist as focused integration proof, not only demo wiring
 
 ## Shipped and Working
 
 ### Core Runtime
 
 - Deterministic runtime pipeline is shipped:
-  - `Plan -> Validate -> Execute`
+  - request context capture
+  - capability and UI tool projection
+  - adapter-led execution
+  - normalized `ExecutionPlan`
+  - policy / approval checks
+  - deterministic UI execution
 - Runtime policy and validation hardening is in place:
   - mounted live-component validation
   - tier-aware action filtering
@@ -108,18 +128,9 @@ Most high-surface MudBlazor-backed components have now been moved onto native-fi
 
 Baseline compatibility proof is now materially in place, not just planned:
 
-- side-by-side parity pages exist for:
-  - `MudForm -> AgentForm`
-  - `MudDataGrid -> AgentDataGrid`
-  - `MudDialog -> AgentDialog`
-  - `MudSelect/MudAutocomplete -> AgentSelect/AgentAutocomplete`
-  - `MudFileUpload -> AgentFileUpload`
-  - `MudDatePicker/MudDateRangePicker -> AgentDatePicker/AgentDateRangePicker`
-  - `MudTabs/MudStepper -> AgentTabs/AgentStepper`
-  - `MudNavMenu/MudTreeView -> AgentNavMenu/AgentTreeView`
-  - a composed multi-control workflow screen
-- rendered parity coverage now exists in `AgentBlazor.Components.Tests`
-- browser coverage now exercises the proof routes in the Playwright suite
+- the components explorer exposes focused live examples for every shipped Mud-backed `Agent*` component
+- rendered compatibility coverage exists in `AgentBlazor.Components.Tests`
+- browser coverage exercises the public landing, workflow funnel, and focused component routes
 
 Release posture:
 
@@ -134,34 +145,12 @@ The components explorer is now a docs-style surface:
 - right contents rail
 - floating `AgentChatWidget` for prompts
 
-### Dojo
-
-The Dojo is now a focused three-pillar workspace instead of the older mixed demo shell.
-
-Current pillars:
-
-1. Controlled Generative UI
-2. Declarative Generative UI
-3. Open-ended Generative UI
-
-Current behavior:
-
-- `Preview`, `Code`, and `Docs` modes are route-local and trustworthy
-- the controlled pillar uses a narrow, host-owned incident workflow
-- the declarative pillar demonstrates:
-  - native `AgentUiDocument`
-  - imported `A2UI`
-  - imported `Open-JSON-UI`
-- the open-ended pillar demonstrates a hosted, sandboxed app surface
-- the embedded Dojo chat is route-locked and prompt-tested across pillar switches
-
 ### Demo Journey
 
 The current demo app flow is intentionally unified:
 
 - Home explains the platform
 - Workflow Hub proves the workflow-first story
-- Dojo explains the generative UI patterns
 - Agentic Components shows the reusable primitives as a reference surface
 
 This replaced the earlier fragmented "try the demo" / separate-feeling routes.
@@ -187,6 +176,12 @@ Current paid differentiation is service-oriented, not component-action-oriented:
 - adaptive suggestions
 - proactive insights
 
+Current funnel intent:
+
+- landing page and README should make the free quickstart obvious
+- `/demo` should make the orchestration proof obvious
+- `Paid` should be introduced as compounding workflow intelligence rather than gated primitive control
+
 Important limitation:
 
 - persistent cross-session user intelligence is not complete yet
@@ -197,25 +192,21 @@ Important limitation:
 
 Latest local verification:
 
-- `dotnet build AgentBlazor.sln -nologo /p:UseSharedCompilation=false`
-- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj`
-- `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj`
-- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj`
+- `dotnet build demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj -c Release -nologo /p:UseSharedCompilation=false`
+- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj --filter "SharedStateStoreTests|PromptTracingTests|ComponentMockingTests|ComponentMockingReportTests|ServiceRegistrationTests" -c Release -nologo /p:UseSharedCompilation=false`
+- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj --filter "ResponseOrchestrationWorkflowIntegrationTests|ReleaseDossierWorkflowIntegrationTests|AgUiHostingIntegrationTests|AgentRuntimeIntegrationTests" -c Release -nologo /p:UseSharedCompilation=false`
 - `npm --prefix tests/e2e run test:e2e`
 
 Latest browser status:
 
 - full end-to-end Playwright suite passed
-- current suite count: `12/12`
+- current suite count: `3/3`
 
 Coverage includes:
 
 - landing page journey
-- Dojo layout and pillar switching
-- prompt-backed Dojo validation across all three pillars
-- failure-path / clarification-path checks
+- workflow-first launch into the featured orchestration route
 - components explorer layout and focused component routes
-- side-by-side parity proof routes, including the composed workflow screen
 
 ## Current Gaps
 
@@ -224,15 +215,14 @@ Coverage includes:
 - Persistent user-level intelligence is not complete:
   - no durable `IActionHistoryStore` implementation yet
   - paid suggestions are not yet a mature long-term personalization system
-- Open-ended generative UI is demonstrated in Dojo, but broader productized hosting controls are still limited.
 - Some component demos still prove isolated control better than full workflow depth, but the workflow showcase now spans multiple blocked and approval-gated scenarios.
 
 ### Demo Gaps
 
-- The Dojo now tells the right story, and it covers supplier, file, recipe, incident, and response-orchestration workflows with a shared decision-support shell, explicit recovery paths on the richer scenarios, and one cross-system composition route, but it is still a curated showcase rather than a complete playground.
+- The broader demo now covers supplier, file, recipe, incident, response-orchestration, and release-dossier workflows with shared decision-support patterns, explicit recovery paths on the richer scenarios, and two cross-system orchestration routes, but it is still a curated showcase rather than a complete playground.
 - Compatibility proof now exists for every shipped Mud-backed `Agent*` component, but some surfaces are still only proven in one or two shapes:
   - `AgentTreeView` still needs deeper hierarchy and expansion scenarios
-  - composed workflow proof should keep expanding beyond the current supplier, file, recipe, incident, and response-orchestration workflow set
+  - composed workflow proof should keep expanding beyond the current supplier, file, recipe, incident, response-orchestration, and release-dossier workflow set
   - `AgentDataGrid` still needs stronger public proof around richer server-backed and templated usage
 - `AgentFileUpload` should be treated as host-workflow-first:
   - file-name actions are useful for deterministic workflow state and demos
@@ -250,27 +240,27 @@ Coverage includes:
 
 ## What Needs Doing Next
 
-1. Keep tightening the workflow-first shell and UX so the supplier-compliance, file-audit, recipe-release, incident-escalation, and response-orchestration scenarios are the default story, not the component explorer.
-2. Keep removing planner-era compatibility plumbing now that the adapter-backed runtime path is the default.
-3. Continue narrowing and deprecating the remaining legacy runtime-first surfaces, especially the now-explicit default-agent compatibility options that remain after removing the standalone `AgentBlazor.DefaultAgent` package from the active solution.
-4. Keep aligning any remaining showcase/detail surfaces around the same normalized execution-plan and approval model now used by chat, approval prompts, inspector, and workflow pages.
-5. Continue expanding workflow-first proof from the current five-route showcase into broader production-style scenarios, especially deeper cross-screen and cross-system compositions.
+1. Keep tightening the workflow-first shell and UX so the orchestration routes and their supporting supplier/file/recipe/incident modules are the default story, not the component explorer.
+2. Keep aligning any remaining showcase/detail surfaces around the same normalized execution-plan and approval model now used by chat, approval prompts, inspector, and workflow pages.
+3. Continue expanding workflow-first proof from the current orchestration showcase into broader production-style scenarios, especially deeper cross-screen and cross-system compositions.
+4. Keep tightening the live demo journey so the orchestration routes, fresh-start links, and route-aware presenter cues feel effortless in a fast product video.
+5. Begin the eventual package/module split only after the demo/product proof is strong enough that the new package story can follow the product story.
 6. Continue parity depth where needed, but stop treating primitive component-control coverage as the main product measure.
 
 Current note:
-- `AgentBlazorOptions.DefaultAgent` is now explicitly obsolete as a legacy compatibility surface; host apps should move toward explicit `AddAgent(...)` registration and only keep default-agent fallback during migration.
+- `AgentBlazorOptions.DefaultAgent` is now explicitly obsolete as a legacy compatibility surface; host apps should move toward explicit `AddAgent(...)` registration, and normal runtime resolution no longer synthesizes or prefers a built-in default agent.
 - Adapter-backed inspector and trace persistence now record normalized step-oriented execution data as the canonical devtools shape; remaining legacy action/result payloads should only survive where the legacy runtime path still needs them.
-- The landing page, workflow hub, dojo, and components explorer now consistently reinforce a workflow-first journey, with dojo/components positioned as supporting reference surfaces rather than the default destination.
+- The landing page, workflow hub, and components explorer now reinforce a workflow-first journey, with the component surface positioned as a fallback reference rather than a default destination.
 - The workflow hub and workflow routes now use route-specific assistant profiles and semantic-first prompt guidance, so the assistant defaults line up with the workflow-first product story instead of falling back to generic component language.
 - Prompt tracing and report-style consumers now expose normalized workflow-step views as the primary reporting language, with planner-era action/result lists left as compatibility storage rather than the first-class presentation model.
 - Component-mocking and report-generation test helpers now prefer normalized `ExecutionPlan` data and only fall back to legacy action/result payloads when the legacy runtime path returns no plan.
-- `AgentRuntimeIntegrationTests` now use normalized execution-plan helpers first and explicitly opt into legacy default-agent fallback where they are validating the legacy deterministic runtime path.
+- the legacy planner runtime, `LegacyAgentRuntimeAdapter`, `IAgentRuntime`, `IAgentRuntimeStreaming`, `AgentRuntime`, `AgentPlanner`, and `PlanExecutor` have now been removed from the codebase entirely; remaining plan-oriented helpers are execution-model utilities rather than a hidden runtime path.
 - Hosted AG-UI response metadata now reports normalized execution-step counts before falling back to legacy planned-action counts.
-- `AgUiHostingIntegrationTests` now opt into legacy default-agent fallback explicitly on the legacy planner path, so the hosted AG-UI event assertions are green again without reintroducing implicit fallback on the normal service path.
+- `AgUiHostingIntegrationTests` now run fully adapter-first, including reconnect/stop control coverage through adapter-native test doubles; the hosted AG-UI suite no longer depends on any legacy runtime seam.
 - focused response/history tests now treat `ExecutionPlan` as the primary model and use `LegacyPlannedActions` / `LegacyExecutionResults` only when they are explicitly validating compatibility behavior.
-- the shared `/demo` shell now presents the experience as a workflow hub and uses route-aware assistant guidance so workflow routes lead with semantic workflow language rather than dojo/component-control framing.
+- the shared `/demo` shell now presents the experience as a workflow hub and uses route-aware assistant guidance so workflow routes lead with semantic workflow language rather than component-control framing.
 - prompt-trace reports and inspector phase labels now use workflow-step terminology, so workflow runs read consistently across reports, chat, workflow pages, and inspector/devtools.
-- Legacy prompt-tracing and component-mocking test suites now opt into default-agent fallback explicitly so they exercise the compatibility path on purpose rather than depending on deprecated defaults.
+- prompt tracing, component mocking/reporting, shared-state, hosted AG-UI, and runtime integration coverage now all run adapter-first by default.
 - Public response/history records now expose normalized execution-plan state directly and label the old planned-action / execution-result lists as legacy compatibility payloads instead of implying they are co-equal primary data.
 - The workflow hub now includes an incident-escalation scenario that exercises `AgentTreeView`, `AgentTabs`, `AgentStepper`, `AgentCommandBar`, and `AgentDialog` together behind semantic capabilities, with focused integration proof for blocked, approval-gated, and recovery-driven execution.
 - The recipe-release workflow now includes a semantic recovery playbook that clears safe metadata blockers and proves blocked -> recover -> approval-gated draft flow through focused integration coverage.
@@ -286,6 +276,17 @@ Current note:
 - The response-orchestration shell now keeps a visible orchestration activity trail, and the supplier, file, and incident workflow pages now explain their current orchestration contribution directly in the live surface, so the cross-route demo reads more like one coordinated application workflow than a hub plus disconnected pages.
 - The workflow hub now includes a second cross-system production-style route, `release-dossier`, which coordinates recipe release readiness and audit evidence into one approval-gated release dossier with guided live-surface handoffs.
 - The recipe release page now participates in orchestration handoff/return flow, so recipe readiness is no longer isolated from the broader multi-surface showcase story.
+- The workflow hub now includes an explicit suggested live-demo sequence and promotes the orchestration routes as featured live demos, so `/demo` reads more like a presenter flow than a flat route directory.
+- The featured response-orchestration and release-dossier routes now sit at the center of a much narrower workflow-first demo shell, so the product story is easier to grasp and faster to present live.
+- The landing page and `/demo` hub have now been refactored into a faster, lower-text demo shell that pushes two orchestration-led live demos first and hides older reference material behind supporting routes.
+- `DefaultAgentOptions` is now explicitly hidden and marked legacy in code, so the remaining built-in default-agent surface reads as migration scaffolding rather than a normal first-class host authoring model.
+- the public legacy default-agent registration entry points are now removed, and the remaining built-in default-agent surface is migration-only component-catalog scaffolding rather than runtime behavior.
+- implicit built-in default-agent registration and implicit default-agent runtime fallback are now removed from the normal service path; explicit registered agents and route/context targeting are the only non-legacy resolution modes.
+- the normal `IAgentRuntimeAdapter` registration now returns a no-provider response when no chat client/runtime adapter is configured, instead of silently falling back to a hidden planner runtime.
+- the normal `AddAgentBlazorServices()` path is now adapter-only; there is no `IAgentRuntime` registration path left in the product container.
+- `PromptTracingTests`, `ComponentMockingTests`, `ComponentMockingReportTests`, `SharedStateStoreTests`, `AgentRuntimeIntegrationTests`, and `AgUiHostingIntegrationTests` now run adapter-first, so the old planner-runtime architecture is no longer a test blocker.
+- the adapter now has an explicit opt-in legacy component-tool alias path for compatibility experiments, but it is disabled by default so normal tool projection stays normalized and single-shaped.
+- the public demo surface is now intentionally minimal: the old Dojo, parity pages, redirects, and playbook route are gone from the visible product story.
 
 ## Reference Docs
 

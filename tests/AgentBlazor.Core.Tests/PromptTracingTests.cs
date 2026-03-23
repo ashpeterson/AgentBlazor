@@ -1,11 +1,9 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Licensing;
-using AgentBlazor.Runtime;
 using AgentBlazor.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,18 +16,19 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingEnabled_StoresTraceInStore()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog", AgentName: "AgentBlazor UI Agent"));
 
         Assert.Equal(1, traceStore.Count);
     }
@@ -38,17 +37,18 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingDisabled_DoesNotStoreTrace()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback();
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog", AgentName: "AgentBlazor UI Agent"));
 
         Assert.Equal(0, traceStore.Count);
     }
@@ -57,19 +57,20 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingEnabled_TraceCapturesUserMessage()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         const string userMessage = "please open the dialog for me";
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest(userMessage));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest(userMessage, AgentName: "AgentBlazor UI Agent"));
 
         var traces = await traceStore.GetRecentAsync(1);
         var trace = Assert.Single(traces);
@@ -80,20 +81,22 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingEnabled_TraceCapturesSessionId()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         const string sessionId = "test-session-123";
         _ = await runtime.RunTurnAsync(new AgentTurnRequest(
             "open dialog",
+            AgentName: "AgentBlazor UI Agent",
             Context: new Dictionary<string, string>
             {
                 ["agentblazor.session_id"] = sessionId
@@ -109,7 +112,7 @@ public class PromptTracingTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_agentdatagrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskScore",
@@ -119,11 +122,12 @@ public class PromptTracingTests
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by high risk suppliers"));
@@ -142,15 +146,16 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingEnabled_TraceCapturesExecutionResults()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -170,15 +175,16 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithTracingEnabled_TraceCapturesResponse()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -205,12 +211,13 @@ public class PromptTracingTests
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("perform the action"));
@@ -235,7 +242,7 @@ public class PromptTracingTests
         // NavMenu navigation
         yield return new object?[]
         {
-            "agentblazor_agentnavmenu_navigate_to",
+            "ui_agentnavmenu_navigate_to",
             "AgentNavMenu",
             "navigate_to",
             new Dictionary<string, object?> { ["uri"] = "/suppliers" }
@@ -244,7 +251,7 @@ public class PromptTracingTests
         // DataGrid filter
         yield return new object?[]
         {
-            "agentblazor_agentdatagrid_filter",
+            "ui_agentdatagrid_filter",
             "AgentDataGrid",
             "filter",
             new Dictionary<string, object?>
@@ -258,7 +265,7 @@ public class PromptTracingTests
         // DataGrid sort
         yield return new object?[]
         {
-            "agentblazor_agentdatagrid_sort",
+            "ui_agentdatagrid_sort",
             "AgentDataGrid",
             "sort",
             new Dictionary<string, object?>
@@ -271,7 +278,7 @@ public class PromptTracingTests
         // DataGrid clear filters
         yield return new object?[]
         {
-            "agentblazor_agentdatagrid_clear_filters",
+            "ui_agentdatagrid_clear_filters",
             "AgentDataGrid",
             "clear_filters",
             null
@@ -280,7 +287,7 @@ public class PromptTracingTests
         // DataGrid go to page
         yield return new object?[]
         {
-            "agentblazor_agentdatagrid_go_to_page",
+            "ui_agentdatagrid_go_to_page",
             "AgentDataGrid",
             "go_to_page",
             new Dictionary<string, object?> { ["page"] = 2 }
@@ -289,7 +296,7 @@ public class PromptTracingTests
         // DataGrid select row
         yield return new object?[]
         {
-            "agentblazor_agentdatagrid_select_row",
+            "ui_agentdatagrid_select_row",
             "AgentDataGrid",
             "select_row",
             new Dictionary<string, object?> { ["row_index"] = 0 }
@@ -298,7 +305,7 @@ public class PromptTracingTests
         // Form set field
         yield return new object?[]
         {
-            "agentblazor_agentform_set_field",
+            "ui_agentform_set_field",
             "AgentForm",
             "set_field",
             new Dictionary<string, object?>
@@ -311,7 +318,7 @@ public class PromptTracingTests
         // Dialog open
         yield return new object?[]
         {
-            "agentblazor_agentdialog_open",
+            "ui_agentdialog_open",
             "AgentDialog",
             "open",
             null
@@ -320,7 +327,7 @@ public class PromptTracingTests
         // Dialog close
         yield return new object?[]
         {
-            "agentblazor_agentdialog_close",
+            "ui_agentdialog_close",
             "AgentDialog",
             "close",
             null
@@ -329,7 +336,7 @@ public class PromptTracingTests
         // Tabs switch_tab
         yield return new object?[]
         {
-            "agentblazor_agenttabs_switch_tab",
+            "ui_agenttabs_switch_tab",
             "AgentTabs",
             "switch_tab",
             new Dictionary<string, object?> { ["index"] = 1 }
@@ -343,19 +350,18 @@ public class PromptTracingTests
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
         var traceService = provider.GetRequiredService<IPromptTraceService>();
 
         // Run multiple prompts with different tools
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
-        var dialogRuntime = CreateRuntimeWithTool(provider, "agentblazor_agentdialog_open");
+        var dialogRuntime = CreateRuntimeWithTool(provider, "ui_agentdialog_open");
         _ = await dialogRuntime.RunTurnAsync(new AgentTurnRequest("open dialog"));
 
-        var navRuntime = CreateRuntimeWithTool(provider, "agentblazor_agentnavmenu_navigate_to",
+        var navRuntime = CreateRuntimeWithTool(provider, "ui_agentnavmenu_navigate_to",
             new Dictionary<string, object?> { ["uri"] = "/suppliers" });
         _ = await navRuntime.RunTurnAsync(new AgentTurnRequest("go to suppliers"));
 
@@ -369,15 +375,16 @@ public class PromptTracingTests
     public async Task GenerateReportAsync_ReturnsMarkdownReport()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceService = provider.GetRequiredService<IPromptTraceService>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -397,15 +404,16 @@ public class PromptTracingTests
     public async Task ClearTracesAsync_RemovesAllTraces()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
         var traceService = provider.GetRequiredService<IPromptTraceService>();
 
@@ -420,15 +428,16 @@ public class PromptTracingTests
     public async Task RunTurnAsync_WithFailedAction_TraceCapturesFailure()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdatagrid_sort"));
         services.AddSingleton<TracingFailingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingFailingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("sort the data"));
@@ -447,15 +456,16 @@ public class PromptTracingTests
     public async Task GetByOutcomeAsync_FiltersCorrectly()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -470,15 +480,16 @@ public class PromptTracingTests
     public async Task RunTurnAsync_TraceCapturesToolCount()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -494,15 +505,16 @@ public class PromptTracingTests
     public async Task RunTurnAsync_TraceCapturesDurations()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
@@ -521,15 +533,16 @@ public class PromptTracingTests
     public async Task TraceService_GetTracesAsync_WithQuery_FiltersCorrectly()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new TracingToolThenTextChatClient("ui_agentdialog_open"));
         services.AddSingleton<TracingCountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<TracingCountingExecutor>());
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceService = provider.GetRequiredService<IPromptTraceService>();
 
         const string sessionId = "query-test-session";
@@ -547,7 +560,7 @@ public class PromptTracingTests
         Assert.Equal(sessionId, traces[0].Entry.SessionId);
     }
 
-    private static IAgentRuntime CreateRuntimeWithTool(
+    private static IAgentRuntimeAdapter CreateRuntimeWithTool(
         ServiceProvider provider,
         string toolName,
         IDictionary<string, object?>? arguments = null)
@@ -559,77 +572,15 @@ public class PromptTracingTests
         newServices.AddSingleton(provider.GetRequiredService<IPromptTraceStore>());
         newServices.AddSingleton(provider.GetRequiredService<IPromptTraceService>());
         newServices.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         var newProvider = newServices.BuildServiceProvider();
-        return newProvider.GetRequiredService<IAgentRuntime>();
+        return newProvider.GetRequiredService<IAgentRuntimeAdapter>();
     }
 
     #region Test Doubles
-
-    private static string BuildPlanJson(
-        string toolName,
-        IDictionary<string, object?>? arguments = null)
-    {
-        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
-        {
-            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
-        }
-
-        var payload = new
-        {
-            message = $"Executing {componentId}.{actionId}",
-            actions = new[]
-            {
-                new
-                {
-                    agentId = componentId,
-                    action = actionId,
-                    args = arguments ?? new Dictionary<string, object?>()
-                }
-            },
-            needsClarification = false,
-            clarificationQuestion = (string?)null
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private static bool TryResolveToolName(
-        string toolName,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = string.Empty;
-        actionId = string.Empty;
-
-        return toolName.ToLowerInvariant() switch
-        {
-            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
-            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
-            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
-            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
-            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
-            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
-            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
-            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
-            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
-            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
-            _ => false
-        };
-    }
-
-    private static bool Resolve(
-        string resolvedComponentId,
-        string resolvedActionId,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = resolvedComponentId;
-        actionId = resolvedActionId;
-        return true;
-    }
 
     private sealed class TracingToolThenTextChatClient(
         string functionName,
@@ -637,17 +588,19 @@ public class PromptTracingTests
     {
         private readonly IDictionary<string, object?> _arguments = arguments ?? new Dictionary<string, object?>();
 
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(
-                ChatRole.Assistant,
-                BuildPlanJson(functionName, _arguments))));
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(function =>
+                    string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase)) ??
+                []);
+
+            await tool.InvokeAsync(new AIFunctionArguments(_arguments), cancellationToken);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {functionName}"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -655,11 +608,8 @@ public class PromptTracingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
-            await Task.CompletedTask;
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
@@ -700,3 +650,5 @@ public class PromptTracingTests
 
     #endregion
 }
+
+

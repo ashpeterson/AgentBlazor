@@ -1,6 +1,6 @@
 # Product Expansion Plan
 
-Last updated: 2026-03-16
+Last updated: 2026-03-20
 
 ## Goal
 
@@ -30,8 +30,10 @@ That means:
 ### Demo App
 
 - landing page introduces the product
-- Dojo demonstrates three pillars
-- Agentic Components demonstrates drop-in components
+- `/demo` is now the workflow hub and primary product-story entry point
+- the workflow hub now includes production-style orchestration routes such as `response-orchestration` and `release-dossier`
+- the landing page and workflow hub now lead with fast-launch orchestration flows and minimal supporting copy for repeatable recordings
+- Agentic Components demonstrates drop-in components as a supporting reference surface
 
 ### Agentic Components
 
@@ -83,7 +85,7 @@ Needed work:
 Current status:
 
 - the high-surface Mud-backed `Agent*` components have already been moved onto native-first implementations
-- side-by-side parity pages now exist for every shipped Mud-backed `Agent*` component
+- the components explorer now exposes focused live examples for every shipped Mud-backed `Agent*` component
 - rendered parity tests and browser coverage are in place
 
 Remaining work:
@@ -93,25 +95,7 @@ Remaining work:
 - decide and document the long-term role of `AgentCommandBar`
 - continue broadening composed-screen proofs so the story is not only isolated component parity
 
-### 2. Dojo Refinement
-
-Objective:
-
-- keep the Dojo as the clean capability story
-
-Current Dojo pillars:
-
-1. Controlled Generative UI
-2. Declarative Generative UI
-3. Open-ended Generative UI
-
-Needed work:
-
-- continue improving screenshot-level polish
-- keep `Code` and `Docs` tabs trustworthy as the examples evolve
-- deepen the open-ended hosted-surface story if it becomes a larger product focus
-
-### 3. Declarative UI Interop
+### 2. Declarative UI Interop
 
 Objective:
 
@@ -126,9 +110,9 @@ Needed work:
 
 - broaden mapping coverage
 - improve diagnostics for unsupported external payloads
-- add more realistic end-to-end examples in the Dojo
+- add more realistic end-to-end examples inside the workflow-first demo or focused reference surfaces
 
-### 4. Paid Intelligence
+### 3. Paid Intelligence
 
 Objective:
 
@@ -146,7 +130,7 @@ Needed work:
 - persistent user-level behavior model
 - clearer productization of suggestions and insights
 
-### 5. Observability
+### 4. Observability
 
 Objective:
 
@@ -164,7 +148,7 @@ Needed work:
 
 ## Recommended Delivery Order
 
-1. deepen the higher-value agentic component scenarios and public proof surfaces
+1. deepen the workflow-first product proof and the higher-value component scenarios that support it
 2. implement durable paid action history
 3. expand declarative adapter coverage
 4. continue inspector and troubleshooting improvements
@@ -185,14 +169,12 @@ For each major increment:
 Do:
 
 - keep `AgentUiDocument` as the canonical native declarative model
-- keep the Dojo focused on capability patterns
 - keep Agentic Components focused on reusable primitives
 - use adapters for external declarative schemas
 
 Do not:
 
 - replace the native model with external schemas
-- mix the Dojo and components explorer into one muddy surface
 - monetize baseline component interactions before the intelligence story is real
 - let demo-specific abstractions become the platform architecture
 
@@ -201,13 +183,13 @@ Do not:
 AgentBlazor should clearly communicate:
 
 - "Here are the agentic components you can drop into a Blazor app today."
-- "Here is how the broader agentic UI patterns work in Blazor."
+- "Here is how the broader workflow-first UI patterns work in Blazor."
 - "Here is where paid intelligence adds value once persistence is real."
 
 Current state against that standard:
 
 - the drop-in component story is now credible and publicly demonstrated
-- the broader Blazor-first pattern story is already visible through Home, Dojo, and Agentic Components
+- the broader Blazor-first pattern story is now visible through Home, the workflow hub, and Agentic Components
 - the weakest remaining product message is still paid intelligence, because persistence is not complete yet
 
 Compatibility planning reference:

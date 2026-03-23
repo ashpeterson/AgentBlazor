@@ -15,6 +15,7 @@ public static class AgentRuntimeContextKeys
     public const string AgentHandoffAt = "agentblazor.agent_handoff_at";
     public const string CurrentRoute = "agentblazor.current_route";
     public const string ContextVersion = "agentblazor.context_version";
+    public const string ProjectLegacyComponentToolAliases = "agentblazor.project_legacy_component_tool_aliases";
     public const string SharedStateSnapshot = "agentblazor.shared_state_snapshot";
     public const string SharedStateDelta = "agentblazor.shared_state_delta";
 }

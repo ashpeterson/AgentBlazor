@@ -1,7 +1,7 @@
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Components;
 
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 internal static class RuntimePlanApprovals
 {

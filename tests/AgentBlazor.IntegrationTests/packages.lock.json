@@ -298,18 +298,11 @@
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )"
         }
       },
-      "agentblazor.defaultagent": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )"
-        }
-      },
       "agentblazor.demo": {
         "type": "Project",
         "dependencies": {
           "AgentBlazor": "[1.0.0, )",
           "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.DefaultAgent": "[1.0.0, )",
           "AgentBlazor.Hosting": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.2, )",
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.2, )",
@@ -320,7 +313,6 @@
         "type": "Project",
         "dependencies": {
           "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.DefaultAgent": "[1.0.0, )",
           "AgentBlazor.Licensing": "[1.0.0, )",
           "AgentBlazor.ProviderAdapters": "[1.0.0, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"

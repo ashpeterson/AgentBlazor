@@ -13,18 +13,17 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
-        <MudText Typo="Typo.h5">File audit bundle workflow with semantic capabilities</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            This workflow combines file selection, upload policy, remote handoff, and token verification into a single
-            approval-aware flow. The agent is compressing the workflow, not replacing file-upload clicks.
+        <p class="demo-doc-page__eyebrow">Workflow module</p>
+        <MudText Typo="Typo.h5">File audit bundle</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
+            Handoff evidence. Recover failures. Verify tokens.
         </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            Try prompts like <code>summarize the current file workflow</code>,
-            <code>switch this workflow to remote mode</code>, or
-            <code>prepare an audit-ready remote bundle for the current files</code>.
-            If the handoff is rejected, try <code>apply the file audit recovery playbook</code>.
-        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Summarize the current file workflow</span>
+            <span>Switch this workflow to remote mode</span>
+            <span>Prepare an audit-ready remote bundle</span>
+        </div>
 
         @if (IsResponseOrchestrationHandoff)
         {
@@ -78,9 +77,6 @@
                 <MudStack Spacing="2">
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Attached files</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            The host still owns the upload surface. The semantic workflow uses this state to decide what to hand off and verify.
-                        </MudText>
 
                         <AgentFileUpload T="IReadOnlyList<IBrowserFile>"
                                          AgentId="file-audit-upload"
@@ -96,9 +92,6 @@
                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                             <div>
                                 <MudText Typo="Typo.h6">Workflow commands</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                    Deterministic fallback primitives remain visible, but the workflow capability is the primary path.
-                                </MudText>
                             </div>
                         </MudStack>
 
@@ -114,7 +107,7 @@
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
                     <WorkflowDecisionSupport Title="Decision support"
-                                             Description="The workflow surface should explain whether the bundle is still local-only, partially blocked, or already verified without relying on the chat transcript."
+                                             Description="Bundle mode, blockers, and verification state."
                                              PhaseLabel="@GetWorkflowPhase()"
                                              ApprovalBoundarySummary="remote bundle preparation"
                                              NextStepSummary="@GetNextStepSummary()"

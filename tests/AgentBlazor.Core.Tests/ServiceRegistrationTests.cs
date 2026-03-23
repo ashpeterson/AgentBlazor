@@ -3,6 +3,7 @@ using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -18,6 +19,7 @@ using AgentBlazor.Services;
 using AgentBlazor.Telemetry;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace AgentBlazor.Core.Tests;
@@ -42,13 +44,8 @@ public class ServiceRegistrationTests
         Assert.Equal("gpt-4o-mini", options.Provider.Model);
 
         var registry = provider.GetRequiredService<IAgentRegistry>();
-#pragma warning disable CS0618
-        Assert.False(options.DefaultAgent.Enabled);
-#pragma warning restore CS0618
         Assert.False(registry.TryGet("AgentBlazor UI Agent", out _));
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        Assert.NotNull(runtime);
         var runtimeAdapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
         Assert.NotNull(runtimeAdapter);
         var sharedStateStore = provider.GetRequiredService<IAgentSharedStateStore>();
@@ -56,23 +53,6 @@ public class ServiceRegistrationTests
         var componentRegistry = provider.GetRequiredService<IAgentComponentRegistry>();
         Assert.NotNull(componentRegistry);
 
-    }
-
-    [Fact]
-    public async Task AddAgentBlazorServices_RegistersRuntimeAdapterOverConfiguredRuntime()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IAgentRuntime, StubRuntime>();
-        services.AddAgentBlazorServices();
-
-        await using var provider = services.BuildServiceProvider();
-
-        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
-        var response = await adapter.RunTurnAsync(new AgentTurnRequest("hello"));
-
-        Assert.Equal("stub", response.AgentName);
-        Assert.Equal("stub-response", response.ResponseText);
-        Assert.False(adapter.SupportsStreaming);
     }
 
     [Fact]
@@ -247,7 +227,7 @@ public class ServiceRegistrationTests
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
         services.AddAgentBlazorServices()
             .UseChatClientRuntimeAdapter()
-            .UseLegacyDefaultAgentFallback();
+            .AddBuiltInUiAgent();
 
         await using var provider = services.BuildServiceProvider();
 
@@ -745,12 +725,7 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options =>
-            {
-#pragma warning disable CS0618
-                options.DefaultAgent.Enabled = false;
-#pragma warning restore CS0618
-            })
+        services.AddAgentBlazorServices()
             .UseChatClientRuntimeAdapter();
 
         await using var provider = services.BuildServiceProvider();
@@ -773,12 +748,7 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options =>
-            {
-#pragma warning disable CS0618
-                options.DefaultAgent.Enabled = false;
-#pragma warning restore CS0618
-            })
+        services.AddAgentBlazorServices()
             .UseChatClientRuntimeAdapter();
 
         await using var provider = services.BuildServiceProvider();
@@ -813,12 +783,7 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options =>
-            {
-#pragma warning disable CS0618
-                options.DefaultAgent.Enabled = false;
-#pragma warning restore CS0618
-            })
+        services.AddAgentBlazorServices()
             .UseChatClientRuntimeAdapter()
             .AddAgent("restricted-agent", agent =>
             {
@@ -847,12 +812,7 @@ public class ServiceRegistrationTests
         var services = new ServiceCollection();
         services.AddSingleton<RecordingChatClient>();
         services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
-        services.AddAgentBlazorServices(options =>
-            {
-#pragma warning disable CS0618
-                options.DefaultAgent.Enabled = false;
-#pragma warning restore CS0618
-            })
+        services.AddAgentBlazorServices()
             .UseChatClientRuntimeAdapter()
             .AddAgent("restricted-agent", agent =>
             {
@@ -1054,7 +1014,7 @@ public class ServiceRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback();
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
@@ -1304,12 +1264,12 @@ public class ServiceRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback();
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtimeAdapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the chat widget"));
+        var response = await runtimeAdapter.RunTurnAsync(new AgentTurnRequest("open the chat widget"));
 
         Assert.Contains("No AI provider configured", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(response.LegacyPlannedActions);
@@ -1898,16 +1858,6 @@ public class ServiceRegistrationTests
 
     private sealed class TestRuntimeEventSubscriber : IAgentRuntimeEventSubscriber
     {
-    }
-
-    private sealed class StubRuntime : IAgentRuntime
-    {
-        public Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
-        {
-            _ = request;
-            _ = cancellationToken;
-            return Task.FromResult(new AgentTurnResponse("stub", "stub-response", [], []));
-        }
     }
 
     private sealed class StubRuntimeAdapter : IAgentRuntimeAdapter

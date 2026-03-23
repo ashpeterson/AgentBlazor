@@ -134,12 +134,6 @@
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )"
         }
       },
-      "agentblazor.defaultagent": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )"
-        }
-      },
       "agentblazor.licensing": {
         "type": "Project"
       },

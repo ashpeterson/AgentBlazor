@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -19,6 +18,8 @@ namespace AgentBlazor.Core.Tests;
 /// </summary>
 public class ComponentMockingTests
 {
+    private const string BuiltInAgentName = "AgentBlazor UI Agent";
+
     [Fact]
     public async Task DataGrid_Filter_UpdatesComponentState()
     {
@@ -26,7 +27,7 @@ public class ComponentMockingTests
         var mockGrid = new MockDataGrid("supplier-grid");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_agentdatagrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskLevel",
@@ -34,16 +35,18 @@ public class ComponentMockingTests
                 ["value"] = "High",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockGrid);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by high risk", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by high risk", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Single(mockGrid.ExecutedActions);
@@ -60,23 +63,25 @@ public class ComponentMockingTests
         var mockGrid = new MockDataGrid("supplier-grid");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_sort",
+            "ui_agentdatagrid_sort",
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskScore",
                 ["direction"] = "desc",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockGrid);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("sort by risk score descending", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("sort by risk score descending", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Single(mockGrid.ExecutedActions);
@@ -92,23 +97,25 @@ public class ComponentMockingTests
         var mockGrid = new MockDataGrid("supplier-grid");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_go_to_page",
+            "ui_agentdatagrid_go_to_page",
             new Dictionary<string, object?>
             {
                 ["page"] = 3,
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockGrid);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to page 3", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to page 3", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal(3, mockGrid.CurrentPage);
@@ -123,21 +130,23 @@ public class ComponentMockingTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_clear_filters",
+            "ui_agentdatagrid_clear_filters",
             new Dictionary<string, object?>
             {
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockGrid);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("clear all filters", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("clear all filters", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Null(mockGrid.CurrentFilter);
@@ -152,21 +161,23 @@ public class ComponentMockingTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdialog_open",
+            "ui_agentdialog_open",
             new Dictionary<string, object?>
             {
                 ["target"] = "confirm-dialog"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockDialog);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open the dialog", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.True(mockDialog.IsOpen);
@@ -183,21 +194,23 @@ public class ComponentMockingTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdialog_close",
+            "ui_agentdialog_close",
             new Dictionary<string, object?>
             {
                 ["target"] = "confirm-dialog"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockDialog);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("close the dialog", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("close the dialog", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.False(mockDialog.IsOpen);
@@ -210,23 +223,25 @@ public class ComponentMockingTests
         var mockForm = new MockForm("supplier-form");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentform_set_field",
+            "ui_agentform_set_field",
             new Dictionary<string, object?>
             {
                 ["field"] = "supplierName",
                 ["value"] = "Northwind Traders",
                 ["target"] = "supplier-form"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockForm);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Northwind Traders", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Northwind Traders", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal("Northwind Traders", mockForm.GetFieldValue("supplierName"));
@@ -240,16 +255,18 @@ public class ComponentMockingTests
         var mockForm = new MockForm("supplier-form");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MultiFieldFormChatClient());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockForm);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act - simulate setting two fields
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Acme and risk level to Low", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("set supplier name to Acme and risk level to Low", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert - verify both actions were tracked
         Assert.Equal(2, mockForm.ExecutedActions.Count);
@@ -266,22 +283,24 @@ public class ComponentMockingTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
+            "ui_agentnavmenu_navigate_to",
             new Dictionary<string, object?>
             {
                 ["uri"] = "/suppliers",
                 ["target"] = "main-nav"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockNav);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers page", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers page", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert
         Assert.Equal("/suppliers", mockNav.CurrentUri);
@@ -295,18 +314,20 @@ public class ComponentMockingTests
         // This test verifies the action flows through the system
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agenttabs_switch_tab",
+            "ui_agenttabs_switch_tab",
             new Dictionary<string, object?>
             {
                 ["index"] = 2
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("switch to the third tab"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("switch to the third tab", AgentName: BuiltInAgentName));
 
         // Assert - action was planned
         Assert.True(
@@ -328,24 +349,26 @@ public class ComponentMockingTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_agentdatagrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "Status",
                 ["operator"] = "eq",
                 ["value"] = "Active"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(grid1);
         registry.Register(grid2);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         // Act
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status", SessionId: registry.SessionId));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("filter by active status", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         Assert.Contains("Specify 'agentId' to target one", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(grid1.ExecutedActions);
@@ -359,7 +382,7 @@ public class ComponentMockingTests
         var mockGrid = new MockDataGrid("traced-grid");
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new MockToolChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_agentdatagrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "Category",
@@ -368,18 +391,19 @@ public class ComponentMockingTests
                 ["target"] = "traced-grid"
             }));
         services.AddAgentBlazorServices()
-            .UseLegacyDefaultAgentFallback()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .EnablePromptTracing();
 
         using var provider = services.BuildServiceProvider();
         var registry = provider.GetRequiredService<IAgentComponentRegistry>();
         registry.Register(mockGrid);
 
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var traceStore = provider.GetRequiredService<IPromptTraceStore>();
 
         // Act
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by electronics", SessionId: registry.SessionId));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter by electronics", AgentName: BuiltInAgentName, SessionId: registry.SessionId));
 
         // Assert - verify trace captured the execution
         var traces = await traceStore.GetRecentAsync(1);
@@ -749,118 +773,25 @@ public class ComponentMockingTests
 
     #region Mock Chat Clients
 
-    private static string BuildPlanJson(
-        string toolName,
-        IDictionary<string, object?>? arguments = null)
-    {
-        if (!TryResolveToolName(toolName, out var componentId, out var actionId))
-        {
-            return """{"message":"","actions":[],"needsClarification":false,"clarificationQuestion":null}""";
-        }
-
-        var payload = new
-        {
-            message = $"Executing {componentId}.{actionId}",
-            actions = new[]
-            {
-                new
-                {
-                    agentId = componentId,
-                    action = actionId,
-                    args = arguments ?? new Dictionary<string, object?>()
-                }
-            },
-            needsClarification = false,
-            clarificationQuestion = (string?)null
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private static string BuildMultiStepPlanJson(IEnumerable<(string ToolName, IDictionary<string, object?> Arguments)> invocations)
-    {
-        var actions = new List<object>();
-        foreach (var invocation in invocations)
-        {
-            if (!TryResolveToolName(invocation.ToolName, out var componentId, out var actionId))
-            {
-                continue;
-            }
-
-            actions.Add(new
-            {
-                agentId = componentId,
-                action = actionId,
-                args = invocation.Arguments
-            });
-        }
-
-        return JsonSerializer.Serialize(new
-        {
-            message = "Executing multiple actions",
-            actions,
-            needsClarification = false,
-            clarificationQuestion = (string?)null
-        });
-    }
-
-    private static bool TryResolveToolName(
-        string toolName,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = string.Empty;
-        actionId = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(toolName))
-        {
-            return false;
-        }
-
-        return toolName.ToLowerInvariant() switch
-        {
-            "agentblazor_agentdatagrid_filter" => Resolve("AgentDataGrid", "filter", out componentId, out actionId),
-            "agentblazor_agentdatagrid_sort" => Resolve("AgentDataGrid", "sort", out componentId, out actionId),
-            "agentblazor_agentdatagrid_clear_filters" => Resolve("AgentDataGrid", "clear_filters", out componentId, out actionId),
-            "agentblazor_agentdatagrid_go_to_page" => Resolve("AgentDataGrid", "go_to_page", out componentId, out actionId),
-            "agentblazor_agentdatagrid_select_row" => Resolve("AgentDataGrid", "select_row", out componentId, out actionId),
-            "agentblazor_agentdialog_open" => Resolve("AgentDialog", "open", out componentId, out actionId),
-            "agentblazor_agentdialog_close" => Resolve("AgentDialog", "close", out componentId, out actionId),
-            "agentblazor_agentform_set_field" => Resolve("AgentForm", "set_field", out componentId, out actionId),
-            "agentblazor_agentnavmenu_navigate_to" => Resolve("AgentNavMenu", "navigate_to", out componentId, out actionId),
-            "agentblazor_agenttabs_switch_tab" => Resolve("AgentTabs", "switch_tab", out componentId, out actionId),
-            _ => false
-        };
-    }
-
-    private static bool Resolve(
-        string resolvedComponentId,
-        string resolvedActionId,
-        out string componentId,
-        out string actionId)
-    {
-        componentId = resolvedComponentId;
-        actionId = resolvedActionId;
-        return true;
-    }
-
     private sealed class MockToolChatClient(
         string functionName,
         IDictionary<string, object?>? arguments = null) : IChatClient
     {
         private readonly IDictionary<string, object?> _arguments = arguments ?? new Dictionary<string, object?>();
 
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(
-                ChatRole.Assistant,
-                BuildPlanJson(functionName, _arguments))));
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(function =>
+                    string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase)) ??
+                []);
+
+            await tool.InvokeAsync(new AIFunctionArguments(_arguments), cancellationToken);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {functionName}"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -868,11 +799,8 @@ public class ComponentMockingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
-            await Task.CompletedTask;
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
@@ -881,30 +809,40 @@ public class ComponentMockingTests
 
     private sealed class MultiFieldFormChatClient : IChatClient
     {
-        public Task<ChatResponse> GetResponseAsync(
+        private static readonly IReadOnlyList<(string ToolName, Dictionary<string, object?> Arguments)> Invocations =
+        [
+            ("ui_agentform_set_field", new Dictionary<string, object?>
+            {
+                ["field"] = "supplierName",
+                ["value"] = "Acme Corp",
+                ["target"] = "supplier-form"
+            }),
+            ("ui_agentform_set_field", new Dictionary<string, object?>
+            {
+                ["field"] = "riskLevel",
+                ["value"] = "Low",
+                ["target"] = "supplier-form"
+            })
+        ];
+
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            var json = BuildMultiStepPlanJson(
-            [
-                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
-                {
-                    ["field"] = "supplierName",
-                    ["value"] = "Acme Corp",
-                    ["target"] = "supplier-form"
-                }),
-                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
-                {
-                    ["field"] = "riskLevel",
-                    ["value"] = "Low",
-                    ["target"] = "supplier-form"
-                })
-            ]);
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, json)));
+
+            foreach (var invocation in Invocations)
+            {
+                var tool = Assert.Single(
+                    options?.Tools?.OfType<AIFunction>().Where(function =>
+                        string.Equals(function.Name, invocation.ToolName, StringComparison.OrdinalIgnoreCase)) ??
+                    []);
+
+                await tool.InvokeAsync(new AIFunctionArguments(invocation.Arguments), cancellationToken);
+            }
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "Executed multiple form actions"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -912,25 +850,8 @@ public class ComponentMockingTests
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            var json = BuildMultiStepPlanJson(
-            [
-                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
-                {
-                    ["field"] = "supplierName",
-                    ["value"] = "Acme Corp",
-                    ["target"] = "supplier-form"
-                }),
-                ("agentblazor_agentform_set_field", new Dictionary<string, object?>
-                {
-                    ["field"] = "riskLevel",
-                    ["value"] = "Low",
-                    ["target"] = "supplier-form"
-                })
-            ]);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, json);
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
@@ -939,3 +860,4 @@ public class ComponentMockingTests
 
     #endregion
 }
+

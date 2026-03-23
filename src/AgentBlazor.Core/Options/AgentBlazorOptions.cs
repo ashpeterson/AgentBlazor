@@ -7,7 +7,7 @@ public sealed class AgentBlazorOptions
 {
     public AgentProviderOptions Provider { get; } = new();
 
-    [Obsolete("DefaultAgent is a legacy compatibility surface. Prefer explicit agent registration via ConfigureBuilder(builder => builder.AddAgent(...)) and only use legacy default-agent fallback for migration.", false)]
+    [Obsolete("DefaultAgent is a legacy compatibility surface. Prefer explicit agent registration via ConfigureBuilder(builder => builder.AddAgent(...)). It only remains for shipped component catalog compatibility during migration.", false)]
     public DefaultAgentOptions DefaultAgent { get; } = new();
 
     /// <summary>

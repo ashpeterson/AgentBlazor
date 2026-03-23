@@ -6,7 +6,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 6rem 2rem 4rem;
+    padding: 5.75rem 1.6rem 3.2rem;
     overflow: hidden;
 }
 
@@ -80,7 +80,10 @@
     position: relative;
     z-index: 10;
     text-align: center;
-    max-width: 800px;
+    width: min(72rem, 100%);
+    display: grid;
+    gap: 1.25rem;
+    justify-items: center;
 }
 
 .landing-hero__eyebrow {
@@ -117,12 +120,10 @@
 
 .landing-hero__subtitle {
     font-size: clamp(1rem, 2.5vw, 1.25rem);
-    line-height: 1.6;
+    line-height: 1.5;
     color: var(--ab-ink-muted);
-    margin: 0 0 2.5rem;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0;
+    max-width: 40rem;
 }
 
 .landing-hero__cta {
@@ -130,7 +131,7 @@
     gap: 1rem;
     justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 1.25rem;
+    margin: 0;
 }
 
 .landing-hero__cta ::deep .mud-button-filled {
@@ -156,24 +157,179 @@
     color: rgba(210, 228, 255, 0.78);
 }
 
-.landing-hero__meta {
+.landing-hero__prompt-strip {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 0.65rem;
-    flex-wrap: wrap;
+    max-width: 54rem;
 }
 
-.landing-hero__meta > span {
+.landing-hero__prompt-strip > span {
     padding: 0.45rem 0.8rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(10, 14, 24, 0.45);
+    background: rgba(10, 14, 24, 0.62);
     color: rgba(216, 230, 255, 0.78);
     font-size: 0.8rem;
     font-weight: 600;
 }
 
+.landing-hero__quickstart {
+    width: min(62rem, 100%);
+    display: grid;
+    gap: 0.8rem;
+    padding: 1rem 1.05rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(110, 168, 254, 0.18);
+    background:
+        radial-gradient(circle at top left, rgba(110, 168, 254, 0.12), transparent 34%),
+        rgba(9, 14, 26, 0.74);
+}
+
+.landing-hero__quickstart-copy {
+    display: grid;
+    gap: 0.25rem;
+    justify-items: center;
+}
+
+.landing-hero__quickstart-copy p {
+    margin: 0;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(210, 228, 255, 0.7);
+}
+
+.landing-hero__quickstart-copy strong {
+    color: var(--ab-ink);
+    font-size: 0.98rem;
+}
+
+.landing-hero__quickstart-steps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.65rem;
+}
+
+.landing-hero__quickstart-steps > span {
+    padding: 0.52rem 0.8rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(6, 10, 18, 0.72);
+    color: rgba(226, 236, 255, 0.84);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.landing-hero__quickstart-steps code {
+    font-family: "IBM Plex Mono", "Cascadia Code", monospace;
+}
+
+.landing-hero__routes {
+    width: min(62rem, 100%);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin-top: 0.35rem;
+}
+
+.landing-hero__route-card {
+    display: grid;
+    gap: 0.3rem;
+    text-align: left;
+    text-decoration: none;
+    padding: 1rem 1.05rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        linear-gradient(155deg, rgba(12, 20, 36, 0.9), rgba(8, 14, 26, 0.94));
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+.landing-hero__route-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.landing-hero__route-card strong {
+    font-size: 0.9rem;
+    color: var(--ab-ink);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.landing-hero__route-card span {
+    color: var(--ab-ink-muted);
+    font-size: 0.93rem;
+    line-height: 1.35;
+}
+
+.landing-hero__plans {
+    width: min(62rem, 100%);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+
+.landing-hero__plan-card {
+    display: grid;
+    gap: 0.3rem;
+    text-align: left;
+    padding: 1rem 1.05rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 13, 25, 0.68);
+}
+
+.landing-hero__plan-card p {
+    margin: 0;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ab-ink-muted);
+}
+
+.landing-hero__plan-card strong {
+    color: var(--ab-ink);
+    font-size: 0.98rem;
+}
+
+.landing-hero__plan-card span {
+    color: var(--ab-ink-muted);
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.landing-hero__plan-card--free {
+    border-color: rgba(110, 168, 254, 0.18);
+}
+
+.landing-hero__plan-card--paid {
+    border-color: rgba(255, 190, 92, 0.24);
+    background:
+        radial-gradient(circle at top right, rgba(255, 190, 92, 0.11), transparent 34%),
+        rgba(9, 14, 26, 0.74);
+}
+
+.landing-hero__plan-card--premium {
+    border-color: rgba(111, 211, 194, 0.22);
+}
+
 /* ── Responsive ─────────────────────────────────── */
+
+@media (max-width: 900px) {
+    .landing-hero__routes {
+        grid-template-columns: 1fr;
+    }
+
+    .landing-hero__plans {
+        grid-template-columns: 1fr;
+    }
+}
 
 @media (max-width: 600px) {
     .landing-hero {

@@ -233,6 +233,64 @@ public class RuntimeAdapterCapabilityProjectionTests
         Assert.Contains("blocked", step.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ExecutesLegacyComponentToolAlias()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<LegacyAliasInvokingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<LegacyAliasInvokingChatClient>());
+        services.AddSingleton<LegacyAliasRecordingExecutor>();
+        services.AddSingleton<IComponentActionExecutor>(static sp => sp.GetRequiredService<LegacyAliasRecordingExecutor>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("dialog-agent", agent =>
+            {
+                agent.WithAllowedComponents("AgentDialog");
+                agent.WithAllowedActions("AgentDialog.open");
+            })
+            .ConfigureComponentCatalog(catalog => catalog.AddComponent(
+                "AgentDialog",
+                "Dialog surface.",
+                new ComponentActionCapability(
+                    "open",
+                    "Open the dialog.",
+                    RequiresApproval: false,
+                    InputSchema: """
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "target": { "type": "string" }
+                          }
+                        }
+                        """)));
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var executor = provider.GetRequiredService<LegacyAliasRecordingExecutor>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Open the dialog",
+            AgentName: "dialog-agent",
+            SessionId: "legacy-alias-session",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.ProjectLegacyComponentToolAliases] = bool.TrueString
+            }));
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal("AgentDialog", step.TargetId);
+        Assert.Equal("open", step.ActionId);
+        Assert.Equal(AgentExecutionStepStatus.Completed, step.Status);
+
+        var execution = Assert.Single(executor.Executions);
+        Assert.Equal("AgentDialog", execution.ComponentId);
+        Assert.Equal("open", execution.ActionId);
+        Assert.Equal("confirm-dialog", execution.Arguments["target"]);
+        Assert.Equal("legacy-alias-invoked", response.ResponseText);
+    }
+
     [AgentCapability(
         "supplier_compliance",
         Name = "Supplier Compliance",
@@ -377,6 +435,66 @@ public class RuntimeAdapterCapabilityProjectionTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class LegacyAliasInvokingChatClient : IChatClient
+    {
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    string.Equals(function.Name, "agentblazor_agentdialog_open", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+
+            await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["target"] = "confirm-dialog"
+            }), cancellationToken);
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "legacy-alias-invoked"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class LegacyAliasRecordingExecutor : IComponentActionExecutor
+    {
+        public List<PlannedComponentAction> Executions { get; } = [];
+
+        public Task<ComponentActionExecutionResult> ExecuteAsync(
+            PlannedComponentAction action,
+            CancellationToken cancellationToken = default)
+        {
+            _ = cancellationToken;
+            Executions.Add(action);
+            return Task.FromResult(new ComponentActionExecutionResult(
+                action.ComponentId,
+                action.ActionId,
+                Succeeded: true,
+                Message: "legacy-alias-executed"));
         }
     }
 }

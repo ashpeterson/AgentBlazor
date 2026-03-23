@@ -1,19 +1,4 @@
-namespace AgentBlazor.Core.Runtime.Planning;
-
-/// <summary>
-/// Validates action plans before execution.
-/// No inference. No auto-correction. Just validation.
-/// </summary>
-public interface IPlanValidator
-{
-    /// <summary>
-    /// Validates that all steps in the plan are executable.
-    /// Returns validation errors, not auto-corrected plans.
-    /// </summary>
-    PlanValidationResult Validate(
-        ActionPlan plan,
-        PlanValidationContext context);
-}
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
 /// Context for plan validation.

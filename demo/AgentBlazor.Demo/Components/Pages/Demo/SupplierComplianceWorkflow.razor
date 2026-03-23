@@ -8,18 +8,17 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
-        <MudText Typo="Typo.h5">Supplier compliance workflow with semantic capabilities</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            This page is the new demo direction: the agent is not replacing grid clicks. It can identify at-risk suppliers,
-            explain the risk signals, and prepare a remediation draft over the current workflow state.
+        <p class="demo-doc-page__eyebrow">Workflow module</p>
+        <MudText Typo="Typo.h5">Supplier compliance</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
+            Focus risk. Explain it. Draft remediation.
         </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            Try prompts like <code>show suppliers likely to fail compliance review</code>,
-            <code>explain why these suppliers are at risk</code>, or
-            <code>prepare a remediation draft for the highlighted suppliers</code>.
-            If drafting is blocked, try <code>apply the supplier recovery playbook</code>.
-        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Show suppliers likely to fail compliance review</span>
+            <span>Explain why these suppliers are at risk</span>
+            <span>Prepare a remediation draft</span>
+        </div>
 
         @if (IsResponseOrchestrationHandoff)
         {
@@ -77,9 +76,6 @@
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
                         <div>
                             <MudText Typo="Typo.h6">Focused supplier grid</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                The grid stays native. Semantic capabilities shape the current focus and remediation path.
-                            </MudText>
                         </div>
                         <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
                             Review window: @Workflow.CurrentReviewWindowDays days
@@ -123,7 +119,7 @@
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
                     <WorkflowDecisionSupport Title="Decision support"
-                                             Description="The page stays deterministic while the workflow surface explains the current phase, approval boundary, and recommended next actions."
+                                             Description="Risk focus, blockers, and draft readiness."
                                              PhaseLabel="@GetWorkflowPhase()"
                                              ApprovalBoundarySummary="@(Workflow.CurrentDraft is null ? "not reached" : "draft ready")"
                                              NextStepSummary="@GetNextStepSummary()"
@@ -146,9 +142,6 @@
 
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Remediation draft</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
-                            Approval-gated draft actions prepared from the current focus.
-                        </MudText>
 
                         @if (Workflow.CurrentDraft is { } draft)
                         {

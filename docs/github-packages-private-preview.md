@@ -1,5 +1,7 @@
 # GitHub Packages Private Preview
 
+Last updated: 2026-03-20
+
 Use this flow when you want to publish `AgentBlazor` privately and install it in a separate Blazor app as a test user.
 
 ## What This Gives You
@@ -64,3 +66,4 @@ dotnet add package AgentBlazor --prerelease --source github-agentblazor
 - This is the right path for private preview testing.
 - Once real-project validation is complete, move to `nuget.org` for normal public installation.
 - The package currently targets `net10.0`.
+- The current preview story should lead with the workflow-first app-layer positioning, not the removed planner/runtime architecture.

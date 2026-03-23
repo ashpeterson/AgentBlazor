@@ -1,5 +1,5 @@
 using AgentBlazor.Core.Runtime.Agents;
-using AgentBlazor.Core.Runtime.Planning;
+using AgentBlazor.Core.Runtime.ExecutionPlans;
 using AgentBlazor.Execution;
 
 namespace AgentBlazor.Core.Tests;

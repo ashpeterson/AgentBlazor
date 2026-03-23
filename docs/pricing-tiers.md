@@ -1,8 +1,20 @@
 # Pricing Tiers
 
-Last updated: 2026-03-16
+Last updated: 2026-03-20
 
 This document describes the current tier model and the current reality of what is wired in code.
+
+Current product framing note:
+
+- the workflow hub and orchestration routes are now the main product proof
+- paid differentiation should continue to support intelligence and workflow guidance, not basic component control
+
+Current conversion strategy:
+
+- `Free` must feel complete enough to ship
+- `Paid` must feel like the obvious upgrade once teams want the app to learn, guide, and prompt operators
+- `Premium` should be the team and governance layer, not a renamed paid tier
+- landing, README, and `/demo` should all make this upgrade path visible in under 30 seconds
 
 ## Tier Model
 
@@ -186,8 +198,15 @@ The current repository supports this product direction best:
 - built-in agentic components
 - Blazor-native chat surfaces
 - AG-UI hosting
-- Dojo and agentic component demos
+- workflow hub and agentic component demos
 - dev tools / inspector for development
+
+Sell it as:
+
+- "make your Blazor app agent-capable"
+- "ship the workflow layer without waiting for enterprise procurement"
+- "prove value with live orchestration and deterministic execution first"
+- "start free, wire one agent, and show the workflow in one sprint"
 
 ### Paid
 
@@ -196,9 +215,31 @@ The current repository supports this product direction best:
 - proactive insights
 - future durable user-behavior personalization
 
+Sell it as:
+
+- "the product gets smarter with use"
+- "operators see the right next step sooner"
+- "workflow guidance improves instead of staying static"
+- "free gets the workflow live; paid makes the workflow compound"
+
 ### Premium
 
 - reserved for deeper governance, analytics, or enterprise controls once those are real product features
+
+Sell it as:
+
+- "team-grade workflow governance"
+- "audit and oversight for agent-driven operations"
+- "analytics and policy depth for large deployments"
+
+## Demo Funnel Note
+
+The current product funnel should stay simple:
+
+- `/` sells the story fast
+- `/demo` makes the free path feel deployable
+- orchestration routes prove the workflow outcome
+- `Paid` is introduced as compounding intelligence, not feature withholding
 
 ## Summary
 

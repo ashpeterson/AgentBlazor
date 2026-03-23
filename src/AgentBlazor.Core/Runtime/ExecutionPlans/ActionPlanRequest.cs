@@ -1,27 +1,7 @@
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Tools;
 
-namespace AgentBlazor.Core.Runtime.Planning;
-
-/// <summary>
-/// Plans actions from user prompts using structured output.
-/// Returns ONLY structured plans - no execution, no heuristics.
-/// </summary>
-public interface IStructuredActionPlanner
-{
-    /// <summary>
-    /// Whether a backing chat provider/client is configured.
-    /// </summary>
-    bool IsProviderConfigured { get; }
-
-    /// <summary>
-    /// Produces a structured action plan from the user's request.
-    /// The LLM must return a JSON plan, not freeform text with tool calls.
-    /// </summary>
-    Task<ActionPlan> PlanAsync(
-        ActionPlanRequest request,
-        CancellationToken cancellationToken = default);
-}
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
 /// Request for action planning.

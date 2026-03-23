@@ -1,4 +1,3 @@
-using System.Reflection;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
@@ -19,45 +18,9 @@ public sealed class AgentBlazorRegistrationOptions
     private Action<IServiceCollection>? _serviceRegistration;
     private Action<AgentBlazorOptions>? _optionsConfiguration;
     private Action<AgentBlazorBuilder>? _builderConfiguration;
-    private readonly List<Assembly> _agentPageAssemblies = [];
     private readonly List<AgentServiceTool> _serviceTools = [];
     private readonly List<Func<IServiceCollection, IServiceCollection>> _mcpRegistrations = [];
     private readonly List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>> _middlewares = [];
-    private bool _legacyDefaultAgentCompatibilityEnabled;
-
-    [Obsolete("Default-agent naming on AgentBlazorRegistrationOptions is a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
-    public string? AgentName { get; set; }
-
-    [Obsolete("Default-agent description on AgentBlazorRegistrationOptions is a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
-    public string? AgentDescription { get; set; }
-
-    /// <summary>
-    /// Optional domain-specific hints for the agent.
-    /// You do NOT need to describe your components here — active components, actions, state, and
-    /// routes are all discovered automatically and included in every prompt.
-    /// Use this only for context the agent cannot infer, such as named chart data sources
-    /// or a one-line description of the app's purpose.
-    /// </summary>
-    [Obsolete("Default-agent instructions on AgentBlazorRegistrationOptions are a legacy compatibility path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
-    public string? AgentInstructions { get; set; }
-
-    /// <summary>
-    /// Reads agent instructions from a file instead of inlining them in Program.cs.
-    /// Path is resolved relative to the current directory (the app content root).
-    /// </summary>
-    [Obsolete("UseInstructionsFile configures the legacy default-agent path. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) and load instructions explicitly.", false)]
-    public void UseInstructionsFile(string path)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        _legacyDefaultAgentCompatibilityEnabled = true;
-        AgentInstructions = File.ReadAllText(path);
-    }
-
-    [Obsolete("Legacy default-agent compatibility should only be used for migration. Prefer ConfigureBuilder(builder => builder.AddAgent(...)) for explicit agent registration.", false)]
-    public void UseLegacyDefaultAgentCompatibility()
-    {
-        _legacyDefaultAgentCompatibilityEnabled = true;
-    }
 
     public void UseOpenAI(string apiKey, string model = "gpt-4o-mini")
     {
@@ -161,18 +124,6 @@ public sealed class AgentBlazorRegistrationOptions
         ArgumentNullException.ThrowIfNull(resolverFactory);
         _serviceRegistration += services => services.Replace(
             ServiceDescriptor.Singleton<AgentChartDataResolver>(sp => resolverFactory(sp)));
-    }
-
-    /// <summary>
-    /// Adds an assembly to the list scanned at startup for [Route] pages (used for intent→route and planner).
-    /// If never called, the entry assembly is scanned by default.
-    /// </summary>
-    [Obsolete("AddAssemblyToScan feeds the legacy default-agent/planner path. Prefer explicit agent registration and capability projection.", false)]
-    public void AddAssemblyToScan(Assembly assembly)
-    {
-        ArgumentNullException.ThrowIfNull(assembly);
-        _legacyDefaultAgentCompatibilityEnabled = true;
-        _agentPageAssemblies.Add(assembly);
     }
 
     public void Configure(Action<AgentBlazorOptions> configure)
@@ -377,59 +328,13 @@ public sealed class AgentBlazorRegistrationOptions
 
     internal void ApplyOptions(AgentBlazorOptions options)
     {
-#pragma warning disable CS0618 // Legacy default-agent surface remains wired here for compatibility.
-        var useLegacyDefaultAgentCompatibility =
-            _legacyDefaultAgentCompatibilityEnabled ||
-            !string.IsNullOrWhiteSpace(AgentName) ||
-            !string.IsNullOrWhiteSpace(AgentDescription) ||
-            !string.IsNullOrWhiteSpace(AgentInstructions) ||
-            _agentPageAssemblies.Count > 0;
-        if (useLegacyDefaultAgentCompatibility)
-        {
-            options.DefaultAgent.Enabled = true;
-            options.DefaultAgent.PreferAsImplicitFallback = true;
-
-            var assembliesToScan = _agentPageAssemblies.Count > 0
-                ? _agentPageAssemblies
-                : GetDefaultAgentPageAssemblies();
-            foreach (var assembly in assembliesToScan)
-            {
-                options.AssembliesToScan.Add(assembly);
-            }
-
-            if (!string.IsNullOrWhiteSpace(AgentName))
-            {
-                options.DefaultAgent.Name = AgentName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(AgentDescription))
-            {
-                options.DefaultAgent.Description = AgentDescription;
-            }
-
-            if (!string.IsNullOrWhiteSpace(AgentInstructions))
-            {
-                options.DefaultAgent.Instructions = AgentInstructions;
-            }
-        }
-
         if (_licensedTier.HasValue)
         {
             options.LicensedTier = _licensedTier.Value;
         }
-#pragma warning restore CS0618
 
         _optionsConfiguration?.Invoke(options);
     }
 
     internal void ApplyBuilder(AgentBlazorBuilder builder) => _builderConfiguration?.Invoke(builder);
-
-    private static List<Assembly> GetDefaultAgentPageAssemblies()
-    {
-        var list = new List<Assembly>();
-        var entry = Assembly.GetEntryAssembly();
-        if (entry is not null)
-            list.Add(entry);
-        return list;
-    }
 }

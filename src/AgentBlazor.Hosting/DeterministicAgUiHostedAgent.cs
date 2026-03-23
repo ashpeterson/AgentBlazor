@@ -382,29 +382,14 @@ internal sealed class DeterministicAgUiHostedAgent(
             return requested;
         }
 
-        var orderedAgents = _agentRegistry.GetAll()
-            .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-#pragma warning disable CS0618
-        var configuredDefault = orderedAgents.FirstOrDefault(agent =>
-            string.Equals(agent.Name, _options.Value.DefaultAgent.Name, StringComparison.OrdinalIgnoreCase));
-
-        if (_options.Value.DefaultAgent.PreferAsImplicitFallback && configuredDefault is not null)
-        {
-            return configuredDefault;
-        }
-#pragma warning restore CS0618
-
-#pragma warning disable CS0618
-        return orderedAgents.FirstOrDefault(agent =>
-                   !string.Equals(agent.Name, _options.Value.DefaultAgent.Name, StringComparison.OrdinalIgnoreCase))
-#pragma warning restore CS0618
-               ?? configuredDefault
+        return _agentRegistry.GetAll()
+                   .OrderBy(static agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+                   .FirstOrDefault()
                ?? new AgentRegistration
-            {
-                Name = "AgentBlazor UI Agent",
-                Description = "Deterministic AgentBlazor AG-UI hosted agent."
-            };
+               {
+                   Name = "AgentBlazor hosted agent",
+                   Description = "Deterministic AgentBlazor AG-UI hosted agent."
+               };
     }
 
     private TurnInvocation BuildInvocation(IEnumerable<ChatMessage> messages, AgentRunOptions? runOptions)

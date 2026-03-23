@@ -1,7 +1,7 @@
 using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
-using AgentBlazor.Core.Runtime.Planning;
+using AgentBlazor.Core.Runtime.ExecutionPlans;
 using AgentBlazor.Core.Runtime.Tools;
 
 namespace AgentBlazor.Core.Tests;

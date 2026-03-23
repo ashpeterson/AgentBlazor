@@ -12,17 +12,17 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Production-Style Showcase</p>
-        <MudText Typo="Typo.h5">Release dossier orchestration workflow</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            This route broadens the production-style story beyond operational response. It coordinates recipe release readiness and audit evidence into one approval-gated release dossier with shared blockers, guided live-surface handoffs, and one final dossier review surface.
+        <p class="demo-doc-page__eyebrow">Second live demo</p>
+        <MudText Typo="Typo.h4">Release dossier</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
+            Same orchestration pattern. Different business flow. One release-ready dossier.
         </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            Try prompts like <code>assess release dossier readiness</code>,
-            <code>advance the next guided subsystem stage</code>,
-            <code>prepare the release dossier</code>, or
-            <code>apply the release dossier recovery playbook</code>.
-        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Assess release dossier readiness</span>
+            <span>Advance the next guided subsystem stage</span>
+            <span>Prepare the release dossier</span>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(ReturnedFrom))
         {
@@ -30,47 +30,6 @@
                 @Workflow.GetGuidedJourneySummary(ReturnedFrom, ReturnState)
             </MudAlert>
         }
-
-        <MudPaper Class="pa-3 mt-4" Outlined="true">
-            <MudText Typo="Typo.subtitle2">Guided release journey</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                This route coordinates recipe and evidence readiness in one shared session. Each stage below reflects the current dossier state rather than a static checklist.
-            </MudText>
-            <MudGrid Spacing="2">
-                @foreach (var step in Workflow.GetJourneySteps(ReturnedFrom))
-                {
-                    <MudItem xs="12" sm="6" lg="4">
-                        <MudPaper Class="pa-3 h-100" Outlined="true">
-                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                                <MudText Typo="Typo.subtitle2">@step.Title</MudText>
-                                <MudChip T="string" Color="@GetStepColor(step.Status)" Variant="@(step.Status == ReleaseDossierJourneyStepStatus.Complete ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
-                                    @GetStepLabel(step.Status)
-                                </MudChip>
-                            </MudStack>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
-                                Phase: @step.Phase
-                            </MudText>
-                            <MudText Typo="Typo.body2" Class="mt-2">
-                                @step.Summary
-                            </MudText>
-                            @if ((step.Status is ReleaseDossierJourneyStepStatus.Current or ReleaseDossierJourneyStepStatus.Blocked) &&
-                                 !string.IsNullOrWhiteSpace(step.Route))
-                            {
-                                <MudButton Variant="Variant.Filled" Color="@GetStepColor(step.Status)" OnClick="AdvanceNextStageAsync" Class="mt-2 mr-2">
-                                    @(step.Status == ReleaseDossierJourneyStepStatus.Blocked ? "Retry this stage" : "Run this stage")
-                                </MudButton>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(step.Route))
-                            {
-                                <MudButton Variant="Variant.Text" Color="@GetStepColor(step.Status)" Href="@step.Route" Class="mt-2">
-                                    @(step.Status == ReleaseDossierJourneyStepStatus.Current ? "Continue this surface" : "Open live surface")
-                                </MudButton>
-                            }
-                        </MudPaper>
-                    </MudItem>
-                }
-            </MudGrid>
-        </MudPaper>
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
@@ -83,30 +42,58 @@
                 Verified files: @Workflow.Snapshot.VerifiedFileCount
             </MudChip>
             <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
-                Approval boundary: release dossier preparation
+                Approval: dossier
             </MudChip>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AssessAsync">
-                Assess Readiness
+                Assess
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AdvanceNextStageAsync">
-                Advance next stage
+                Advance
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareDossierAsync">
-                Prepare Release Dossier
+                Dossier
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryAsync">
-                Apply Recovery Playbook
+                Recover
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
-                Reset Workflow
+                Reset
             </MudButton>
             @if (GetNextGuidedRoute() is { } nextGuidedRoute)
             {
                 <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@(() => NavigateTo(nextGuidedRoute))">
-                    Continue guided route
+                    Next live route
                 </MudButton>
             }
         </MudStack>
+
+        <MudGrid Spacing="2" Class="mt-3">
+            @foreach (var step in Workflow.GetJourneySteps(ReturnedFrom))
+            {
+                <MudItem xs="12" sm="6" lg="4">
+                    <MudPaper Class="demo-doc-page__journey-card" Outlined="true">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.subtitle2">@step.Title</MudText>
+                            <MudChip T="string" Color="@GetStepColor(step.Status)" Variant="@(step.Status == ReleaseDossierJourneyStepStatus.Complete ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
+                                @GetStepLabel(step.Status)
+                            </MudChip>
+                        </MudStack>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
+                            @step.Phase
+                        </MudText>
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            @step.Summary
+                        </MudText>
+                        @if (!string.IsNullOrWhiteSpace(step.Route))
+                        {
+                            <MudButton Variant="Variant.Text" Color="@GetStepColor(step.Status)" Href="@step.Route" Class="mt-2 px-0">
+                                Open
+                            </MudButton>
+                        }
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
     </MudPaper>
 
     <section class="demo-doc-page__section">
@@ -116,7 +103,6 @@
                     <MudItem xs="12" md="6">
                         <MudPaper Class="pa-4" Outlined="true">
                             <MudText Typo="Typo.h6">Recipe release</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Metadata readiness, release blockers, and publish draft state.</MudText>
                             <MudDivider Class="my-3" />
                             <MudList T="string" Dense="true">
                                 <MudListItem T="string">Phase: @Workflow.Snapshot.RecipePhase</MudListItem>
@@ -131,7 +117,6 @@
                     <MudItem xs="12" md="6">
                         <MudPaper Class="pa-4" Outlined="true">
                             <MudText Typo="Typo.h6">Audit evidence</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Remote handoff and verification for release evidence.</MudText>
                             <MudDivider Class="my-3" />
                             <MudList T="string" Dense="true">
                                 <MudListItem T="string">Mode: @Workflow.Snapshot.FileSnapshot.UploadMode</MudListItem>
@@ -147,9 +132,6 @@
 
                 <MudPaper Class="pa-4 mt-4" Outlined="true">
                     <MudText Typo="Typo.h6">Release dossier preview</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                        The dossier is only available when recipe release and evidence verification are aligned. This is the approval-gated handoff surface for the release story.
-                    </MudText>
 
                     @if (Workflow.CurrentDossier is { } dossier)
                     {
@@ -174,7 +156,7 @@
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
                     <WorkflowDecisionSupport Title="Decision support"
-                                             Description="This route should read like one release workflow even though it spans recipe release and audit evidence surfaces."
+                                             Description="Shared release state. Shared blockers. One final dossier."
                                              PhaseLabel="@GetWorkflowPhase()"
                                              ApprovalBoundarySummary="release dossier preparation"
                                              NextStepSummary="@GetNextStepSummary()"
@@ -195,13 +177,10 @@
                     </WorkflowDecisionSupport>
 
                     <MudPaper Class="pa-4" Outlined="true">
-                        <MudText Typo="Typo.h6">Dossier activity</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            This timeline shows what the orchestration shell has already advanced or learned from the live recipe and evidence surfaces.
-                        </MudText>
+                        <MudText Typo="Typo.h6">Activity</MudText>
                         @if (Workflow.JourneyEvents.Count == 0)
                         {
-                            <MudText Typo="Typo.body2">No release-dossier activity has been recorded yet.</MudText>
+                            <MudText Typo="Typo.body2">No activity yet.</MudText>
                         }
                         else
                         {
@@ -262,8 +241,10 @@
 @code {
     [SupplyParameterFromQuery(Name = "returnedFrom")] public string? ReturnedFrom { get; set; }
     [SupplyParameterFromQuery(Name = "returnState")] public string? ReturnState { get; set; }
+    [SupplyParameterFromQuery(Name = "reset")] public bool? ResetDemo { get; set; }
 
     private string? _lastProcessedReturnKey;
+    private string? _lastResetKey;
 
     protected override async Task OnInitializedAsync()
     {
@@ -273,6 +254,21 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (ResetDemo is true)
+        {
+            var resetKey = $"release|{ComponentRegistry.SessionId}";
+            if (!string.Equals(_lastResetKey, resetKey, StringComparison.Ordinal))
+            {
+                _lastResetKey = resetKey;
+                Workflow.Reset();
+                await Workflow.LoadAsync(ComponentRegistry.SessionId);
+            }
+        }
+        else
+        {
+            _lastResetKey = null;
+        }
+
         if (string.IsNullOrWhiteSpace(ReturnedFrom))
         {
             _lastProcessedReturnKey = null;

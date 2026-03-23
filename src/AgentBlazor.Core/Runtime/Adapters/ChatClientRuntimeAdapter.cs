@@ -10,7 +10,7 @@ using AgentBlazor.Core.Runtime;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
-using AgentBlazor.Core.Runtime.Planning;
+using AgentBlazor.Core.Runtime.ExecutionPlans;
 using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Execution;
@@ -39,6 +39,7 @@ public sealed class ChatClientRuntimeAdapter(
     IConversationStore? conversationStore = null,
     IAgentInspectorStore? inspectorStore = null,
     IActionHistoryStore? actionHistoryStore = null,
+    IAgentSharedStateStore? sharedStateStore = null,
     IAgentServiceToolRegistry? serviceToolRegistry = null,
     IEnumerable<IMcpToolProvider>? mcpToolProviders = null,
     IAgentBlazorEntitlementService? entitlementService = null,
@@ -65,6 +66,7 @@ public sealed class ChatClientRuntimeAdapter(
     private readonly IConversationStore? _conversationStore = conversationStore;
     private readonly IAgentInspectorStore? _inspectorStore = inspectorStore;
     private readonly IActionHistoryStore? _actionHistoryStore = actionHistoryStore;
+    private readonly IAgentSharedStateStore? _sharedStateStore = sharedStateStore;
     private readonly IAgentServiceToolRegistry? _serviceToolRegistry = serviceToolRegistry;
     private readonly IEnumerable<IMcpToolProvider>? _mcpToolProviders = mcpToolProviders;
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
@@ -122,6 +124,7 @@ public sealed class ChatClientRuntimeAdapter(
                 : new Dictionary<string, string>(request.Context, StringComparer.OrdinalIgnoreCase));
         try
         {
+            ApplyContextSharedState(registration.Name, request, turnState.RunId);
             var agent = await CreateAgentAsync(registration, request, turnState, cancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             var response = await agent.RunAsync(
@@ -298,6 +301,7 @@ public sealed class ChatClientRuntimeAdapter(
 
         try
         {
+            ApplyContextSharedState(registration.Name, request, turnState.RunId);
             var agent = await CreateAgentAsync(registration, request, turnState, cancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             yield return new AgentTurnStreamEvent
@@ -522,6 +526,15 @@ public sealed class ChatClientRuntimeAdapter(
             {
                 var functionName = NormalizeToolName($"ui_{component.ComponentId}_{action.ActionId}");
                 tools.Add(CreateComponentActionTool(functionName, component, action, turnState));
+
+                if (ShouldProjectLegacyComponentToolAliases(request))
+                {
+                    var legacyAlias = BuildLegacyComponentToolAlias(component.ComponentId, action.ActionId);
+                    if (!string.Equals(legacyAlias, functionName, StringComparison.Ordinal))
+                    {
+                        tools.Add(CreateComponentActionTool(legacyAlias, component, action, turnState));
+                    }
+                }
             }
         }
 
@@ -628,6 +641,25 @@ public sealed class ChatClientRuntimeAdapter(
                 InvokeComponentActionAsync(component.ComponentId, action, arguments, turnState, cancellationToken));
 
         return WrapFunction(invocable, declaration, action.RequiresApproval);
+    }
+
+    private static string BuildLegacyComponentToolAlias(string componentId, string actionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(componentId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+
+        return NormalizeToolName($"agentblazor_{componentId}_{actionId}");
+    }
+
+    private static bool ShouldProjectLegacyComponentToolAliases(AgentTurnRequest? request)
+    {
+        if (request?.Context is null ||
+            !request.Context.TryGetValue(AgentRuntimeContextKeys.ProjectLegacyComponentToolAliases, out var raw))
+        {
+            return false;
+        }
+
+        return bool.TryParse(raw, out var enabled) && enabled;
     }
 
     private AITool CreateServiceTool(AgentServiceTool tool, TurnExecutionState? turnState)
@@ -1330,12 +1362,7 @@ public sealed class ChatClientRuntimeAdapter(
             return null;
         }
 
-        return RuntimeTurnPreflight.ResolveImplicitFallbackAgent(
-            _agentRegistry.GetAll(),
-#pragma warning disable CS0618
-            _options.Value.DefaultAgent.Name,
-            _options.Value.DefaultAgent.PreferAsImplicitFallback);
-#pragma warning restore CS0618
+        return RuntimeTurnPreflight.ResolveImplicitFallbackAgent(_agentRegistry.GetAll());
     }
 
     private string BuildSessionKey(string agentName, AgentTurnRequest request)
@@ -1354,11 +1381,7 @@ public sealed class ChatClientRuntimeAdapter(
             return registration.Instructions;
         }
 
-#pragma warning disable CS0618
-        return string.IsNullOrWhiteSpace(_options.Value.DefaultAgent.Instructions)
-            ? null
-            : _options.Value.DefaultAgent.Instructions;
-#pragma warning restore CS0618
+        return null;
     }
 
     private async Task<AgentTurnResponse> BuildNoAgentResponseAsync(
@@ -1866,6 +1889,109 @@ public sealed class ChatClientRuntimeAdapter(
         }
 
         return Guid.NewGuid().ToString("N");
+    }
+
+    private void ApplyContextSharedState(string agentName, AgentTurnRequest request, string runId)
+    {
+        if (_sharedStateStore is null || request.Context is null)
+        {
+            return;
+        }
+
+        if (!request.Context.ContainsKey(AgentRuntimeContextKeys.SharedStateSnapshot) &&
+            !request.Context.ContainsKey(AgentRuntimeContextKeys.SharedStateDelta))
+        {
+            return;
+        }
+
+        var sessionId = request.GetEffectiveSessionId();
+        var sharedState = new Dictionary<string, string>(
+            _sharedStateStore.GetSnapshot(agentName, sessionId).Values,
+            StringComparer.OrdinalIgnoreCase);
+
+        ApplyContextSharedStateSnapshot(sharedState, request.Context);
+        ApplyContextSharedStateDelta(sharedState, request.Context);
+        _sharedStateStore.SaveSnapshot(agentName, sessionId, runId, sharedState);
+    }
+
+    private void ApplyContextSharedStateSnapshot(
+        IDictionary<string, string> sharedState,
+        IDictionary<string, string> context)
+    {
+        if (!context.TryGetValue(AgentRuntimeContextKeys.SharedStateSnapshot, out var serialized) ||
+            string.IsNullOrWhiteSpace(serialized))
+        {
+            return;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(serialized);
+            if (parsed is null)
+            {
+                return;
+            }
+
+            sharedState.Clear();
+            foreach (var (key, value) in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                sharedState[key] = value ?? string.Empty;
+            }
+        }
+        catch (JsonException ex)
+        {
+            _loggerFactory?
+                .CreateLogger<ChatClientRuntimeAdapter>()
+                .LogWarning(ex, "Invalid shared-state snapshot context payload.");
+        }
+    }
+
+    private void ApplyContextSharedStateDelta(
+        IDictionary<string, string> sharedState,
+        IDictionary<string, string> context)
+    {
+        if (!context.TryGetValue(AgentRuntimeContextKeys.SharedStateDelta, out var serialized) ||
+            string.IsNullOrWhiteSpace(serialized))
+        {
+            return;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, string?>>(serialized);
+            if (parsed is null)
+            {
+                return;
+            }
+
+            foreach (var (key, value) in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (value is null)
+                {
+                    sharedState.Remove(key);
+                }
+                else
+                {
+                    sharedState[key] = value;
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            _loggerFactory?
+                .CreateLogger<ChatClientRuntimeAdapter>()
+                .LogWarning(ex, "Invalid shared-state delta context payload.");
+        }
     }
 
     private static string BuildUserMessage(AgentTurnRequest request)

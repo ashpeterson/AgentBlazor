@@ -581,17 +581,10 @@
           "Microsoft.Extensions.Options": "[10.0.2, )"
         }
       },
-      "agentblazor.defaultagent": {
-        "type": "Project",
-        "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )"
-        }
-      },
       "agentblazor.hosting": {
         "type": "Project",
         "dependencies": {
           "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.DefaultAgent": "[1.0.0, )",
           "AgentBlazor.Licensing": "[1.0.0, )",
           "AgentBlazor.ProviderAdapters": "[1.0.0, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"

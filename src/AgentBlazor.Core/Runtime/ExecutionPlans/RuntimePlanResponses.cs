@@ -2,7 +2,7 @@ using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Components;
 using AgentBlazor.Licensing;
 
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 internal static class RuntimePlanResponses
 {

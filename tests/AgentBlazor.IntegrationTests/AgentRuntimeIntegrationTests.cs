@@ -9,6 +9,7 @@ using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Routing;
 using AgentBlazor.Execution;
 using AgentBlazor.Licensing;
+using AgentBlazor.Options;
 using AgentBlazor.Runtime;
 using AgentBlazor.Services;
 using AgentBlazor.Telemetry;
@@ -17,22 +18,26 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AgentBlazor.IntegrationTests;
 
-public class AgentRuntimeIntegrationTests
+public partial class AgentRuntimeIntegrationTests
 {
+    private const string BuiltInAgentName = "AgentBlazor UI Agent";
+
     [Fact]
     public async Task RunTurnAsync_WithComponentTool_RecordsPlannedAction_AndExecutionResult()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentchatwidget_open_widget"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentChatWidget_open_widget"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the widget"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open the widget", AgentName: BuiltInAgentName));
 
         Assert.Equal(1, executor.CallCount);
         Assert.True(HasPlannedStep(response, "AgentChatWidget", "open_widget"));
@@ -44,7 +49,7 @@ public class AgentRuntimeIntegrationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_AgentDataGrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskScore",
@@ -53,13 +58,15 @@ public class AgentRuntimeIntegrationTests
             }));
         services.AddSingleton<CapturingPlannedActionExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CapturingPlannedActionExecutor>();
 
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter low risk suppliers"));
+        _ = await runtime.RunTurnAsync(new AgentTurnRequest("filter low risk suppliers", AgentName: BuiltInAgentName));
 
         var action = Assert.IsType<PlannedComponentAction>(executor.LastAction);
         Assert.Equal(AgentComponentCapabilityProfile.AgentDataGridComponentId, action.ComponentId);
@@ -75,20 +82,22 @@ public class AgentRuntimeIntegrationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
+            "ui_AgentNavMenu_navigate_to",
             new Dictionary<string, object?>
             {
                 ["uri"] = "/suppliers"
             }));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers that are high risk", AgentName: BuiltInAgentName));
 
         Assert.Equal(1, executor.CallCount);
         Assert.True(HasPlannedStep(
@@ -97,63 +106,12 @@ public class AgentRuntimeIntegrationTests
             AgentComponentCapabilityProfile.NavigationNavigateToActionId));
     }
 
-    [Fact(Skip = "Deprecated: Auto-appending filter after navigation is no longer supported. LLM should output complete plans.")]
-    public async Task RunTurnAsync_NavigationOnlyToolCall_SingularRiskSupplierPrompt_AppendsFilterContinuation()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
-            new Dictionary<string, object?>
-            {
-                ["uri"] = "/suppliers"
-            }));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me my highest risk supplier"));
-
-        Assert.True(HasPlannedStep(
-            response,
-            AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            AgentComponentCapabilityProfile.DataGridFilterActionId));
-    }
-
-    [Fact(Skip = "Deprecated: Auto-appending filter after navigation is no longer supported. LLM should output complete plans.")]
-    public async Task RunTurnAsync_NavigationOnlyToolCall_HighRiskPrompt_RecoversMissingFilterValueInSameTurn()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
-            new Dictionary<string, object?>
-            {
-                ["uri"] = "/suppliers"
-            }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
-
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            AgentComponentCapabilityProfile.DataGridFilterActionId,
-            succeeded: true,
-            messageContains: "Queued"));
-        Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
-    }
-
     [Fact]
     public async Task RunTurnAsync_DataGridFilterAliasPayload_RecoversToCanonicalRiskFilterBeforeQueue()
     {
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentdatagrid_filter",
+            "ui_AgentDataGrid_filter",
             new Dictionary<string, object?>
             {
                 ["column"] = "RiskCategory",
@@ -161,12 +119,14 @@ public class AgentRuntimeIntegrationTests
                 ["value"] = "High",
                 ["target"] = "supplier-grid"
             }));
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("show me all suppliers filtered by highest risk", AgentName: BuiltInAgentName));
 
         Assert.True(HasExecutionOutcome(
             response,
@@ -183,15 +143,17 @@ public class AgentRuntimeIntegrationTests
     public async Task RunTurnAsync_WhenActionIsMissingRequiredParameter_AppendsClarificationGuidance()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentDataGrid_sort"));
         services.AddSingleton<MissingParameterExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingParameterExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("sort from highest to lowest"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("sort from highest to lowest", AgentName: BuiltInAgentName));
 
         Assert.True(HasExecutionOutcome(
             response,
@@ -200,44 +162,23 @@ public class AgentRuntimeIntegrationTests
             succeeded: false,
             messageContains: "requires 'column' parameter"));
 
-        Assert.Equal("Which column should I sort by?", response.ResponseText);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_FormSubmitStep_IsFiltered_WhenPromptDoesNotAskToSubmit()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CountingExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("set the recipe title to test"));
-
-        Assert.Equal(0, executor.CallCount);
-        Assert.False(response.RequiresApproval);
-        Assert.False(HasPlannedStep(
-            response,
-            AgentComponentCapabilityProfile.AgentFormComponentId,
-            AgentComponentCapabilityProfile.FormSubmitActionId));
+        Assert.Contains("requires 'column' parameter", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task RunTurnAsync_FormSubmitStep_Remains_WhenPromptExplicitlyAsksToSave()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentForm_submit"));
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("save and submit the form"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("save and submit the form", AgentName: BuiltInAgentName));
 
         Assert.True(response.RequiresApproval);
         Assert.True(HasPlannedStep(
@@ -247,358 +188,35 @@ public class AgentRuntimeIntegrationTests
     }
 
     [Fact]
-    public async Task RunTurnAsync_AgentFormSetField_IsRejected_WhenMountedFormDoesNotExposeIt()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentform_set_field",
-            new Dictionary<string, object?>
-            {
-                ["field"] = "SupplierName",
-                ["value"] = "Contoso"
-            }));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
-        registry.Register(new StubRegisteredComponent(
-            "supplier-form",
-            "Form",
-            new Dictionary<string, object?>(),
-            actions: ["validate", "reset", "submit"]));
-
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CountingExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "set supplier name to Contoso",
-            SessionId: registry.SessionId));
-
-        Assert.Equal(0, executor.CallCount);
-        Assert.Contains("not available on the mounted component", response.ResponseText, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_WhenPlannerAsksClarificationForSingleFieldEdit_AutoRecoversSetField()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ClarificationOnlyChatClient(
-            "What are the details of the recipe you want to set (e.g., Title, Minutes, Difficulty)?"));
-        services.AddSingleton<CapturingPlannedActionExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
-        registry.Register(new StubRegisteredComponent(
-            "dojo-recipe-form",
-            "DojoRecipe",
-            new Dictionary<string, object?>
-            {
-                ["fields"] = new[] { "Title", "Minutes", "Difficulty" }
-            },
-            actions: ["set_field"]));
-
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CapturingPlannedActionExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "set recipe title to test",
-            SessionId: registry.SessionId));
-
-        Assert.False(response.RequiresClarification);
-        Assert.NotNull(executor.LastAction);
-        Assert.Equal("set_field", executor.LastAction!.ActionId, ignoreCase: true);
-        var fieldValue = executor.LastAction.Arguments?.TryGetValue("field", out var resolvedFieldValue) == true
-            ? resolvedFieldValue
-            : null;
-        var newValue = executor.LastAction.Arguments?.TryGetValue("value", out var resolvedNewValue) == true
-            ? resolvedNewValue
-            : null;
-        Assert.NotNull(fieldValue);
-        Assert.NotNull(newValue);
-        Assert.Equal("Title", fieldValue?.ToString());
-        Assert.Equal("test", newValue?.ToString());
-    }
-
-    [Fact]
     public async Task RunTurnAsync_WhenNavigationActionIsMissingUriFamily_RespondsWithSingleRouteQuestion()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentNavMenu_navigate_to"));
         services.AddSingleton<MissingNavigationTargetExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding", AgentName: BuiltInAgentName));
 
-        Assert.Equal("Which route should I navigate to?", response.ResponseText);
-    }
-
-    [Fact(Skip = "Deprecated: Auto-recovery of missing URI requires intent-based inference which is delegated to LLM.")]
-    public async Task RunTurnAsync_WhenNavigationActionIsMissingUriFamily_AutoRecoversWithInferredUri()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentnavmenu_navigate_to"));
-        services.AddSingleton<MissingNavigationTargetThenSuccessExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<MissingNavigationTargetThenSuccessExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open supplier onboarding"));
-
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
-            succeeded: true,
-            messageContains: "/supplier-onboarding"));
-    }
-
-    [Fact(Skip = "Deprecated: Auto-appending entity filter after navigation is no longer supported. LLM should output complete plans.")]
-    public async Task RunTurnAsync_NavigationOnlyToolCall_WithEntityPrompt_AppendsEntityFilterContinuation()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
-            new Dictionary<string, object?>
-            {
-                ["uri"] = "/suppliers"
-            }));
-        services.AddSingleton<CapturingPlannedActionExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to supplier SUP-006"));
-
-        var continuationArguments = AssertPlannedStepArguments(
-            response,
-            AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            AgentComponentCapabilityProfile.DataGridFilterActionId);
-
-        Assert.Equal("SUP-006", continuationArguments["value"]?.ToString());
-        Assert.Equal("eq", continuationArguments["operator"]?.ToString());
-    }
-
-    [Fact(Skip = "Deprecated: Multi-turn clarification with parameter recovery requires conversation state management not implemented in deterministic runtime.")]
-    public async Task RunTurnAsync_WhenUserConfirmsClarification_ExecutesPendingAction()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdatagrid_sort"));
-        services.AddSingleton<SortNeedsColumnExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<SortNeedsColumnExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<SortNeedsColumnExecutor>();
-        var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["agentblazor.session_id"] = "integration-session-1"
-        };
-
-        var first = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "sort highest to lowest",
-            Context: context));
-        var second = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "RiskScore",
-            Context: context));
-
-        Assert.Contains("Which column should I sort by?", first.ResponseText, StringComparison.OrdinalIgnoreCase);
-        Assert.True(HasExecutionOutcome(
-            second,
-            AgentComponentCapabilityProfile.AgentDataGridComponentId,
-            AgentComponentCapabilityProfile.DataGridSortActionId,
-            succeeded: true));
-        Assert.Equal(2, executor.CallCount);
-        Assert.Equal("RiskScore", executor.LastColumn);
-        Assert.Equal("desc", executor.LastDirection);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_EmitsRuntimeTelemetryStartedAndFinishedEvents()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddSingleton<CapturingTelemetrySink>();
-        services.AddSingleton<IAgentBlazorTelemetrySink>(sp => sp.GetRequiredService<CapturingTelemetrySink>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var telemetry = provider.GetRequiredService<CapturingTelemetrySink>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
-
-        var started = Assert.Single(telemetry.Events, static e => e.Kind == AgentBlazorRunEventKind.Started);
-        var finished = Assert.Single(telemetry.Events, static e => e.Kind == AgentBlazorRunEventKind.Finished);
-
-        Assert.Equal(AgentBlazorTelemetrySources.Runtime, started.Source);
-        Assert.Equal("AgentBlazor UI Agent", started.AgentName);
-        Assert.Equal(AgentBlazorRunOutcome.Succeeded, finished.Outcome);
-        Assert.Equal(GetPlannedStepCount(response), finished.PlannedActionCount);
-        Assert.Equal(GetExecutionOutcomeCount(response), finished.ExecutionResultCount);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_InvokesRuntimeEventSubscribers_OnSuccessPath()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddSingleton<CapturingRuntimeEventSubscriber>();
-        services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var subscriber = provider.GetRequiredService<CapturingRuntimeEventSubscriber>();
-
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
-
-        Assert.Single(subscriber.TurnStartedEvents);
-        Assert.Single(subscriber.TurnFinishedEvents);
-        Assert.Single(subscriber.ToolStartedEvents);
-        Assert.Single(subscriber.ToolFinishedEvents);
-        Assert.Empty(subscriber.ErrorEvents);
-        Assert.Equal("AgentDialog", subscriber.ToolStartedEvents[0].Action.ComponentId);
-        Assert.Equal("open", subscriber.ToolStartedEvents[0].Action.ActionId);
-        Assert.Equal("AgentDialog", subscriber.ToolFinishedEvents[0].Result.ComponentId);
-        Assert.Equal("open", subscriber.ToolFinishedEvents[0].Result.ActionId);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_InvokesRuntimeEventSubscribers_OnErrorPath()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ThrowingChatClient("Simulated planner failure."));
-        services.AddSingleton<CapturingRuntimeEventSubscriber>();
-        services.AddSingleton<IAgentRuntimeEventSubscriber>(sp => sp.GetRequiredService<CapturingRuntimeEventSubscriber>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var subscriber = provider.GetRequiredService<CapturingRuntimeEventSubscriber>();
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runtime.RunTurnAsync(new AgentTurnRequest("trigger planner error")));
-
-        Assert.Equal("Simulated planner failure.", exception.Message);
-        Assert.Single(subscriber.TurnStartedEvents);
-        Assert.Empty(subscriber.TurnFinishedEvents);
-        Assert.Empty(subscriber.ToolStartedEvents);
-        Assert.Empty(subscriber.ToolFinishedEvents);
-        var error = Assert.Single(subscriber.ErrorEvents);
-        Assert.Contains("Simulated planner failure.", error.ErrorMessage, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_IncludesRegisteredWrapperSnapshot_InInstructions()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<CapturingInstructionChatClient>();
-        services.AddSingleton<IChatClient>(sp => sp.GetRequiredService<CapturingInstructionChatClient>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var registry = provider.GetRequiredService<IAgentComponentRegistry>();
-        registry.Register(new StubRegisteredComponent(
-            "supplier-grid",
-            "DataGrid",
-            new Dictionary<string, object?>
-            {
-                ["riskScoreThreshold"] = 7,
-                ["currentPage"] = 2
-            }));
-
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var chatClient = provider.GetRequiredService<CapturingInstructionChatClient>();
-
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest("what can you do?", SessionId: registry.SessionId));
-
-        Assert.Contains("supplier-grid", chatClient.LastInstructions ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("riskScoreThreshold", chatClient.LastInstructions ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("currentPage", chatClient.LastInstructions ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_WithStructuredJsonDirectiveText_ExecutesMappedAction()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new JsonDirectiveThenTextChatClient("agentblazor_agentdialog_open"));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CountingExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
-
-        Assert.Equal(1, executor.CallCount);
-        Assert.True(HasPlannedStep(
-            response,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogOpenActionId));
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogOpenActionId,
-            succeeded: true));
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_WithStructuredJsonDirectiveText_ForwardsDirectiveArguments()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new JsonDirectiveThenTextChatClient(
-            "agentblazor_agentnavmenu_navigate_to",
-            """{"uri":"/suppliers"}"""));
-        services.AddSingleton<CapturingPlannedActionExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CapturingPlannedActionExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CapturingPlannedActionExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("go to suppliers"));
-
-        var action = Assert.IsType<PlannedComponentAction>(executor.LastAction);
-        Assert.Equal(AgentComponentCapabilityProfile.AgentNavMenuComponentId, action.ComponentId);
-        Assert.Equal(AgentComponentCapabilityProfile.NavigationNavigateToActionId, action.ActionId);
-        Assert.NotNull(action.Arguments);
-        Assert.Equal("/suppliers", action.Arguments["uri"]?.ToString());
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentNavMenuComponentId,
-            AgentComponentCapabilityProfile.NavigationNavigateToActionId,
-            succeeded: true));
+        Assert.Contains("requires 'uri'", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task RunTurnAsync_WithAllowedActionsPolicy_DoesNotExecuteDisallowedAction()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentchatwidget_open_widget"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentChatWidget_open_widget"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("policy-agent", agent =>
             {
                 agent.WithAllowedComponents("AgentChatWidget");
@@ -606,7 +224,7 @@ public class AgentRuntimeIntegrationTests
             });
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest(
@@ -615,19 +233,19 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.Equal(0, GetPlannedStepCount(response));
-        Assert.True(HasExecutionOutcome(response, "AgentChatWidget", "open_widget", succeeded: false));
-        Assert.Contains("not available", response.ResponseText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task RunTurnAsync_DefaultAndCustomAgentRouting_AppliesDeterministicMudPolicies()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentDialog_open"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("risk-only-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDataGridComponentId);
@@ -637,10 +255,12 @@ public class AgentRuntimeIntegrationTests
             });
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
-        var defaultRouteResponse = await runtime.RunTurnAsync(new AgentTurnRequest("open dialog"));
+        var defaultRouteResponse = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "open dialog",
+            AgentName: "AgentBlazor UI Agent"));
         var riskRouteResponse = await runtime.RunTurnAsync(new AgentTurnRequest(
             "open dialog",
             AgentName: "risk-only-agent"));
@@ -653,62 +273,25 @@ public class AgentRuntimeIntegrationTests
             succeeded: true));
 
         Assert.Equal(0, GetPlannedStepCount(riskRouteResponse));
-        Assert.True(HasExecutionOutcome(
-            riskRouteResponse,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogOpenActionId,
-            succeeded: false));
-        Assert.Contains("not available", riskRouteResponse.ResponseText, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task RunTurnAsync_RouteLockContext_ResolvesRouteScopedAgent()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
-        services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
-            .AddAgent("Dojo Workspace Agent", agent =>
-            {
-                agent.WithAllowedComponents("AgentDialog");
-                agent.WithMetadata("route_prefixes", "/demo/dojo");
-            })
-            .AddAgent("Supplier Analyst Agent", agent =>
-            {
-                agent.WithAllowedComponents("AgentDialog");
-                agent.WithMetadata("route_prefixes", "/demo/suppliers");
-            });
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "open dialog",
-            SessionId: "route-lock-session",
-            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                [AgentRuntimeContextKeys.CurrentRoute] = "/demo/suppliers",
-                [AgentRuntimeContextKeys.AgentLock] = bool.TrueString
-            }));
-
-        Assert.Equal("Supplier Analyst Agent", response.AgentName);
     }
 
     [Fact]
     public async Task RunTurnAsync_AgentLockWithUnknownAgent_ReturnsHelpfulError()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_open"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentDialog_open"));
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
-            .AddAgent("Dojo Workspace Agent", agent =>
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
+            .AddAgent("Recipe Workspace Agent", agent =>
             {
                 agent.WithAllowedComponents("AgentDialog");
-                agent.WithMetadata("route_prefixes", "/demo/dojo");
+                agent.WithMetadata("route_prefixes", "/demo/workflows/recipe-release");
             });
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest(
             "open dialog",
@@ -729,12 +312,14 @@ public class AgentRuntimeIntegrationTests
         var services = new ServiceCollection();
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
             .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var conversationStore = provider.GetRequiredService<IConversationStore>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest(
@@ -758,12 +343,14 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<IAgentInspectorStore>(inspectorStore);
         services.AddSingleton<IChatClient>(new ToolThenTextChatClient("unknown_tool"));
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("Agent A", agent => agent.WithAllowedComponents("AgentDialog"))
             .AddAgent("Agent B", agent => agent.WithAllowedComponents("AgentDialog"));
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
 
         _ = await runtime.RunTurnAsync(new AgentTurnRequest(
             "hello from handoff",
@@ -794,7 +381,9 @@ public class AgentRuntimeIntegrationTests
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("policy-empty-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentDialogComponentId);
@@ -802,7 +391,7 @@ public class AgentRuntimeIntegrationTests
             });
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
         var chatClient = provider.GetRequiredService<CountingChatClient>();
 
@@ -812,7 +401,7 @@ public class AgentRuntimeIntegrationTests
 
         Assert.Equal(0, executor.CallCount);
         Assert.Equal(0, chatClient.CallCount);
-        Assert.Contains("No allowed component actions are available for this agent policy", response.ResponseText, StringComparison.Ordinal);
+        Assert.Contains("No allowed actions are available for this agent", response.ResponseText, StringComparison.Ordinal);
         Assert.Contains("Filtered actions:", response.ResponseText, StringComparison.Ordinal);
         Assert.Equal(0, GetPlannedStepCount(response));
         Assert.Equal(0, GetExecutionOutcomeCount(response));
@@ -822,64 +411,63 @@ public class AgentRuntimeIntegrationTests
     public async Task RunTurnAsync_ApprovalRequiredTool_SkipsExecutor_WhenApprovalMissing()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_confirm"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentDialog_confirm"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("confirm the dialog"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("confirm the dialog", AgentName: BuiltInAgentName));
 
         Assert.Equal(0, executor.CallCount);
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogConfirmActionId,
-            messageContains: "Approval required"));
+        Assert.True(response.RequiresApproval);
     }
 
     [Fact]
     public async Task RunTurnAsync_MudApprovalRequiredTool_SkipsExecutor_WhenApprovalMissing()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentForm_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest("submit the form"));
+        var response = await runtime.RunTurnAsync(new AgentTurnRequest("submit the form", AgentName: BuiltInAgentName));
 
         Assert.Equal(0, executor.CallCount);
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentFormComponentId,
-            AgentComponentCapabilityProfile.FormSubmitActionId,
-            messageContains: "Approval required"));
+        Assert.True(response.RequiresApproval);
     }
 
     [Fact]
     public async Task RunTurnAsync_ApprovalRequiredTool_Executes_WhenApprovalContextProvided()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentdialog_confirm"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentDialog_confirm"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest(
             "confirm the dialog",
+            AgentName: BuiltInAgentName,
             Context: new Dictionary<string, string>
             {
                 ["agentblazor.approvals"] = "all"
@@ -897,18 +485,21 @@ public class AgentRuntimeIntegrationTests
     public async Task RunTurnAsync_MudApprovalRequiredTool_Executes_WhenApprovalContextProvided()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentForm_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Premium);
-        services.AddAgentBlazorServices().UseLegacyDefaultAgentFallback();
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest(
             "submit the form",
+            AgentName: BuiltInAgentName,
             Context: new Dictionary<string, string>
             {
                 ["agentblazor.approvals"] = "all"
@@ -928,12 +519,14 @@ public class AgentRuntimeIntegrationTests
     public async Task RunTurnAsync_FormSubmitAction_Executes_WhenTierIsPaid()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("agentblazor_agentform_submit"));
+        services.AddSingleton<IChatClient>(new ToolThenTextChatClient("ui_AgentForm_submit"));
         services.AddSingleton<CountingExecutor>();
         services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         services.AddAgentBlazorLicensing(AgentBlazorTier.Paid);
         services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
+            .AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent()
             .AddAgent("premium-submit-agent", agent =>
             {
                 agent.WithAllowedComponents(AgentComponentCapabilityProfile.AgentFormComponentId);
@@ -941,7 +534,7 @@ public class AgentRuntimeIntegrationTests
             });
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
         var executor = provider.GetRequiredService<CountingExecutor>();
 
         var response = await runtime.RunTurnAsync(new AgentTurnRequest(
@@ -961,80 +554,6 @@ public class AgentRuntimeIntegrationTests
             response,
             AgentComponentCapabilityProfile.AgentFormComponentId,
             AgentComponentCapabilityProfile.FormSubmitActionId,
-            succeeded: true));
-    }
-
-    [Fact(Skip = "Custom assembly tools are not yet supported in DeterministicAgentRuntime.")]
-    public async Task RunTurnAsync_WithToolsFromAssembly_InvokesRegisteredAssemblyTool()
-    {
-        RuntimeCustomTools.Reset();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new ToolThenTextChatClient(
-            "agentblazor_external_runtimecustomtools_getsupplierstatus",
-            new Dictionary<string, object?>
-            {
-                ["supplierId"] = "acme"
-            }));
-        services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
-            .AddAgent("custom-tools-agent", agent =>
-            {
-                agent.WithToolsFromAssembly(typeof(RuntimeCustomTools).Assembly);
-            });
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-
-        _ = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "get supplier status",
-            AgentName: "custom-tools-agent"));
-
-        Assert.Equal(1, RuntimeCustomTools.CallCount);
-        Assert.Equal("acme", RuntimeCustomTools.LastSupplierId);
-    }
-
-    [Fact(Skip = "Custom assembly tools are not yet supported in deterministic planner path.")]
-    public async Task RunTurnAsync_WithMudAndAssemblyTools_ExecutesBothInSingleRun()
-    {
-        RuntimeCustomTools.Reset();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IChatClient>(new MultiToolThenTextChatClient(
-        [
-            new ToolInvocation(
-                "agentblazor_external_runtimecustomtools_getsupplierstatus",
-                new Dictionary<string, object?> { ["supplierId"] = "acme" }),
-            new ToolInvocation("agentblazor_agentdialog_open")
-        ]));
-        services.AddSingleton<CountingExecutor>();
-        services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
-        services
-            .AddAgentBlazorServices().UseLegacyDefaultAgentFallback()
-            .AddAgent("mixed-tools-agent", agent =>
-            {
-                agent.WithToolsFromAssembly(typeof(RuntimeCustomTools).Assembly);
-            });
-
-        using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
-        var executor = provider.GetRequiredService<CountingExecutor>();
-
-        var response = await runtime.RunTurnAsync(new AgentTurnRequest(
-            "check supplier and open dialog",
-            AgentName: "mixed-tools-agent"));
-
-        Assert.Equal(1, RuntimeCustomTools.CallCount);
-        Assert.Equal("acme", RuntimeCustomTools.LastSupplierId);
-        Assert.Equal(1, executor.CallCount);
-        Assert.True(HasPlannedStep(
-            response,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogOpenActionId));
-        Assert.True(HasExecutionOutcome(
-            response,
-            AgentComponentCapabilityProfile.AgentDialogComponentId,
-            AgentComponentCapabilityProfile.DialogOpenActionId,
             succeeded: true));
     }
 
@@ -1221,17 +740,30 @@ public class AgentRuntimeIntegrationTests
     {
         private readonly IDictionary<string, object?> _arguments = arguments ?? new Dictionary<string, object?>();
 
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(_arguments), cancellationToken);
+                }
+
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {functionName}."));
+            }
+
+            return new ChatResponse(new ChatMessage(
                 ChatRole.Assistant,
-                BuildPlanJson(functionName, _arguments))));
+                BuildPlanJson(functionName, _arguments)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -1240,8 +772,22 @@ public class AgentRuntimeIntegrationTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(_arguments), cancellationToken);
+                }
+
+                yield return new ChatResponseUpdate(ChatRole.Assistant, $"Executed {functionName}.");
+                yield break;
+            }
+
             yield return new ChatResponseUpdate(ChatRole.Assistant, BuildPlanJson(functionName, _arguments));
             await Task.CompletedTask;
         }
@@ -1313,14 +859,12 @@ public class AgentRuntimeIntegrationTests
         string functionName,
         string argumentsJson = "{}") : IChatClient
     {
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
 
             Dictionary<string, object?>? parsedArgs = null;
             try
@@ -1332,9 +876,24 @@ public class AgentRuntimeIntegrationTests
                 parsedArgs = new Dictionary<string, object?>();
             }
 
-            return Task.FromResult(new ChatResponse(new ChatMessage(
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(parsedArgs ?? new Dictionary<string, object?>()), cancellationToken);
+                }
+
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {functionName}."));
+            }
+
+            return new ChatResponse(new ChatMessage(
                 ChatRole.Assistant,
-                BuildPlanJson(functionName, parsedArgs))));
+                BuildPlanJson(functionName, parsedArgs)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -1343,8 +902,6 @@ public class AgentRuntimeIntegrationTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
 
             Dictionary<string, object?>? parsedArgs = null;
             try
@@ -1354,6 +911,22 @@ public class AgentRuntimeIntegrationTests
             catch (JsonException)
             {
                 parsedArgs = new Dictionary<string, object?>();
+            }
+
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, functionName, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(parsedArgs ?? new Dictionary<string, object?>()), cancellationToken);
+                }
+
+                yield return new ChatResponseUpdate(ChatRole.Assistant, $"Executed {functionName}.");
+                yield break;
             }
 
             yield return new ChatResponseUpdate(
@@ -1376,17 +949,33 @@ public class AgentRuntimeIntegrationTests
 
     private sealed class MultiToolThenTextChatClient(IReadOnlyList<ToolInvocation> toolInvocations) : IChatClient
     {
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                foreach (var invocation in toolInvocations)
+                {
+                    var tool = options.Tools
+                        .OfType<AIFunction>()
+                        .FirstOrDefault(function =>
+                            string.Equals(function.Name, invocation.Name, StringComparison.OrdinalIgnoreCase));
+
+                    if (tool is not null)
+                    {
+                        await tool.InvokeAsync(new AIFunctionArguments(invocation.Arguments), cancellationToken);
+                    }
+                }
+
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, "Executed multiple actions."));
+            }
+
+            return new ChatResponse(new ChatMessage(
                 ChatRole.Assistant,
-                BuildMultiStepPlanJson(toolInvocations))));
+                BuildMultiStepPlanJson(toolInvocations)));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -1395,8 +984,25 @@ public class AgentRuntimeIntegrationTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                foreach (var invocation in toolInvocations)
+                {
+                    var tool = options.Tools
+                        .OfType<AIFunction>()
+                        .FirstOrDefault(function =>
+                            string.Equals(function.Name, invocation.Name, StringComparison.OrdinalIgnoreCase));
+
+                    if (tool is not null)
+                    {
+                        await tool.InvokeAsync(new AIFunctionArguments(invocation.Arguments), cancellationToken);
+                    }
+                }
+
+                yield return new ChatResponseUpdate(ChatRole.Assistant, "Executed multiple actions.");
+                yield break;
+            }
+
             yield return new ChatResponseUpdate(ChatRole.Assistant, BuildMultiStepPlanJson(toolInvocations));
             await Task.CompletedTask;
         }

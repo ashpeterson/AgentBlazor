@@ -1,17 +1,29 @@
 using AgentBlazor.Demo.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace AgentBlazor.Demo.Services;
 
 internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowDbContext> dbContextFactory)
 {
+    private static readonly SemaphoreSlim InitializationGate = new(1, 1);
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        await db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureDojoWorkspaceSchemaAsync(db, cancellationToken);
-        await EnsureFileWorkflowSchemaAsync(db, cancellationToken);
+        await InitializationGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            await EnsureDojoWorkspaceSchemaAsync(db, cancellationToken);
+            await EnsureFileWorkflowSchemaAsync(db, cancellationToken);
+        }
+        finally
+        {
+            InitializationGate.Release();
+        }
     }
 
     private static async Task EnsureDojoWorkspaceSchemaAsync(
@@ -180,6 +192,12 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
         string columnDefinition,
         CancellationToken cancellationToken)
     {
+        var columnName = GetColumnName(columnDefinition);
+        if (await ColumnExistsAsync(db, tableName, columnName, cancellationToken))
+        {
+            return;
+        }
+
         try
         {
             await db.Database.ExecuteSqlRawAsync(
@@ -189,10 +207,54 @@ internal sealed class DemoWorkflowDatabaseSeeder(IDbContextFactory<DemoWorkflowD
         catch (SqliteException ex) when (ex.SqliteErrorCode == 1 &&
                                          ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
+            // Another startup path may have added the column after the schema check.
         }
-        catch (InvalidOperationException)
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        DemoWorkflowDbContext db,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
         {
+            await connection.OpenAsync(cancellationToken);
         }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info({tableName});";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static string GetColumnName(string columnDefinition)
+    {
+        var firstSpace = columnDefinition.IndexOf(' ');
+        return firstSpace > 0
+            ? columnDefinition[..firstSpace]
+            : columnDefinition;
     }
 
     private static string BuildAddColumnSql(string tableName, string columnDefinition)

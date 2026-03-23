@@ -1,22 +1,6 @@
 using AgentBlazor.Core.Runtime.Components;
 
-namespace AgentBlazor.Core.Runtime.Planning;
-
-/// <summary>
-/// Executes validated action plans.
-/// No heuristics. No fallbacks. Just step-by-step execution.
-/// </summary>
-public interface IPlanExecutor
-{
-    /// <summary>
-    /// Executes all steps in the plan in order.
-    /// Stops on first failure unless configured otherwise.
-    /// </summary>
-    Task<PlanExecutionResult> ExecuteAsync(
-        ActionPlan plan,
-        PlanExecutionOptions options,
-        CancellationToken cancellationToken = default);
-}
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
 /// Options for plan execution.

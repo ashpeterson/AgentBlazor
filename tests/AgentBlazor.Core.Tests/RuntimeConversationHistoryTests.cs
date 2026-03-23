@@ -6,7 +6,7 @@ namespace AgentBlazor.Core.Tests;
 public sealed class RuntimeConversationHistoryTests
 {
     [Fact]
-    public void ToPlannerTurns_FlattensRecentConversationTurns()
+    public void ToExecutionTurns_FlattensRecentConversationTurns()
     {
         var history = new ConversationHistory
         {
@@ -28,10 +28,10 @@ public sealed class RuntimeConversationHistoryTests
             ]
         };
 
-        var plannerTurns = RuntimeConversationHistory.ToPlannerTurns(history);
+        var executionTurns = RuntimeConversationHistory.ToExecutionTurns(history);
 
         Assert.Collection(
-            plannerTurns,
+            executionTurns,
             turn =>
             {
                 Assert.Equal("user", turn.Role);
@@ -55,7 +55,7 @@ public sealed class RuntimeConversationHistoryTests
     }
 
     [Fact]
-    public void ToPlannerTurns_RespectsRecentTurnLimit()
+    public void ToExecutionTurns_RespectsRecentTurnLimit()
     {
         var history = new ConversationHistory
         {
@@ -83,10 +83,10 @@ public sealed class RuntimeConversationHistoryTests
             ]
         };
 
-        var plannerTurns = RuntimeConversationHistory.ToPlannerTurns(history, maxTurns: 2);
+        var executionTurns = RuntimeConversationHistory.ToExecutionTurns(history, maxTurns: 2);
 
-        Assert.Equal(4, plannerTurns.Count);
-        Assert.Equal("u2", plannerTurns[0].Content);
-        Assert.Equal("a3", plannerTurns[^1].Content);
+        Assert.Equal(4, executionTurns.Count);
+        Assert.Equal("u2", executionTurns[0].Content);
+        Assert.Equal("a3", executionTurns[^1].Content);
     }
 }

@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
+using AgentBlazor.Agents;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -24,9 +24,7 @@ public class AgUiHostingIntegrationTests
     [Fact]
     public async Task AgUiRun_ApprovalRequiredAction_SkipsExecution_WhenApprovalMissing()
     {
-        var app = await CreateAppAsync(
-            BuildPlanJson("AgentForm", "submit"),
-            tier: AgentBlazorTier.Premium);
+        var app = await CreateAppAsync("ui_AgentForm_submit", tier: AgentBlazorTier.Premium);
         try
         {
             using var client = CreateClient(app);
@@ -42,7 +40,6 @@ public class AgUiHostingIntegrationTests
             Assert.Contains("TEXT_MESSAGE_CONTENT", body, StringComparison.Ordinal);
             Assert.Contains("STATE_SNAPSHOT", body, StringComparison.Ordinal);
             Assert.Contains("approval_required", body, StringComparison.Ordinal);
-            Assert.Contains("Approval required for AgentForm.submit.", body, StringComparison.Ordinal);
             Assert.Equal(0, executor.CallCount);
         }
         finally
@@ -55,9 +52,7 @@ public class AgUiHostingIntegrationTests
     [Fact]
     public async Task AgUiRun_ApprovalRequiredAction_Executes_WhenApprovalProvided()
     {
-        var app = await CreateAppAsync(
-            BuildPlanJson("AgentForm", "submit"),
-            tier: AgentBlazorTier.Premium);
+        var app = await CreateAppAsync("ui_AgentForm_submit", tier: AgentBlazorTier.Premium);
         try
         {
             using var client = CreateClient(app);
@@ -92,7 +87,7 @@ public class AgUiHostingIntegrationTests
     [Fact]
     public async Task AgUiRun_EmitsLifecycleAndToolEvents_ForDeterministicExecution()
     {
-        var app = await CreateAppAsync(BuildPlanJson("AgentForm", "validate"));
+        var app = await CreateAppAsync("ui_AgentForm_validate");
         try
         {
             using var client = CreateClient(app);
@@ -123,14 +118,12 @@ public class AgUiHostingIntegrationTests
     public async Task AgUiRun_PaidTier_ExecutesFormSubmitAction()
     {
         var app = await CreateAppAsync(
-            BuildPlanJson("AgentForm", "submit"),
+            "ui_AgentForm_submit",
             tier: AgentBlazorTier.Paid,
-            configureOptions: options =>
+            configureBuiltInAgent: agent =>
             {
-#pragma warning disable CS0618
-                options.DefaultAgent.AllowedComponents.Add("AgentForm");
-                options.DefaultAgent.AllowedActions.Add("AgentForm.submit");
-#pragma warning restore CS0618
+                agent.WithAllowedComponents("AgentForm");
+                agent.WithAllowedActions("AgentForm.submit");
             });
         try
         {
@@ -163,7 +156,7 @@ public class AgUiHostingIntegrationTests
     public async Task AgUiRun_EmitsHostedTelemetryStartedAndFinishedEvents()
     {
         var telemetrySink = new CapturingTelemetrySink();
-        var app = await CreateAppAsync(BuildPlanJson("AgentForm", "validate"), telemetrySink: telemetrySink);
+        var app = await CreateAppAsync("ui_AgentForm_validate", telemetrySink: telemetrySink);
         try
         {
             using var client = CreateClient(app);
@@ -228,7 +221,7 @@ public class AgUiHostingIntegrationTests
     public async Task AgUiRun_ConnectOperation_UsesReconnectStream()
     {
         const string runId = "reconnect-run-1";
-        var runtime = new ControlStreamingRuntime();
+        var runtime = new ControlStreamingRuntimeAdapter();
         var app = await CreateAppWithControlRuntimeAsync(runtime);
         try
         {
@@ -263,7 +256,7 @@ public class AgUiHostingIntegrationTests
     public async Task AgUiRun_StopOperation_StopsActiveRun()
     {
         const string runId = "stop-run-1";
-        var runtime = new ControlStreamingRuntime();
+        var runtime = new ControlStreamingRuntimeAdapter();
         var app = await CreateAppWithControlRuntimeAsync(runtime);
         try
         {
@@ -348,14 +341,14 @@ public class AgUiHostingIntegrationTests
     }
 
     private static async Task<WebApplication> CreateAppAsync(
-        string planJson,
+        string toolName,
         AgentBlazorTier? tier = null,
-        Action<AgentBlazorOptions>? configureOptions = null,
+        Action<AgentRegistrationBuilder>? configureBuiltInAgent = null,
         IChatClient? chatClient = null,
         IAgentBlazorTelemetrySink? telemetrySink = null)
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddSingleton(chatClient ?? new FixedPlanChatClient(planJson));
+        builder.Services.AddSingleton(chatClient ?? new FixedPlanChatClient(toolName));
         builder.Services.AddSingleton<CountingExecutor>();
         builder.Services.AddSingleton<IComponentActionExecutor>(sp => sp.GetRequiredService<CountingExecutor>());
         if (telemetrySink is not null)
@@ -368,13 +361,13 @@ public class AgUiHostingIntegrationTests
             builder.Services.AddAgentBlazorLicensing(tier.Value);
         }
 
-        builder.Services.AddAgentBlazorServices(options =>
-        {
-            ConfigureDefaultAgent(options);
-            configureOptions?.Invoke(options);
-        })
-            .UseLegacyDefaultAgentFallback()
-            .UseLegacyRuntimeAdapter();
+        builder.Services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddBuiltInUiAgent(agent =>
+            {
+                ConfigureBuiltInUiAgent(agent);
+                configureBuiltInAgent?.Invoke(agent);
+            });
 
         builder.Services.AddAgentBlazorHosting();
 
@@ -386,13 +379,12 @@ public class AgUiHostingIntegrationTests
         return app;
     }
 
-    private static async Task<WebApplication> CreateAppWithControlRuntimeAsync(ControlStreamingRuntime runtime)
+    private static async Task<WebApplication> CreateAppWithControlRuntimeAsync(ControlStreamingRuntimeAdapter runtime)
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
-            .UseLegacyDefaultAgentFallback();
-        builder.Services.AddSingleton(runtime);
-        builder.Services.AddSingleton<IAgentRuntime>(static sp => sp.GetRequiredService<ControlStreamingRuntime>());
+        builder.Services.AddAgentBlazorServices()
+            .AddBuiltInUiAgent(ConfigureBuiltInUiAgent)
+            .UseRuntimeAdapter(_ => runtime);
         builder.Services.AddAgentBlazorHosting();
 
         var app = builder.Build();
@@ -406,7 +398,8 @@ public class AgUiHostingIntegrationTests
     private static async Task<WebApplication> CreateAppWithRuntimeAdapterAsync(IAgentRuntimeAdapter runtimeAdapter)
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
+        builder.Services.AddAgentBlazorServices()
+            .AddBuiltInUiAgent(ConfigureBuiltInUiAgent)
             .UseRuntimeAdapter(_ => runtimeAdapter);
         builder.Services.AddAgentBlazorHosting();
 
@@ -421,10 +414,9 @@ public class AgUiHostingIntegrationTests
     private static async Task<WebApplication> CreateAppWithStreamingRuntimeAsync()
     {
         var builder = WebApplication.CreateBuilder();
-        builder.Services.AddAgentBlazorServices(ConfigureDefaultAgent)
-            .UseLegacyDefaultAgentFallback();
-        builder.Services.AddSingleton<StubStreamingRuntime>();
-        builder.Services.AddSingleton<IAgentRuntime>(static sp => sp.GetRequiredService<StubStreamingRuntime>());
+        builder.Services.AddAgentBlazorServices()
+            .AddBuiltInUiAgent(ConfigureBuiltInUiAgent)
+            .UseRuntimeAdapter(static _ => new StubStreamingRuntimeAdapter());
         builder.Services.AddAgentBlazorHosting();
 
         var app = builder.Build();
@@ -435,15 +427,10 @@ public class AgUiHostingIntegrationTests
         return app;
     }
 
-    private static void ConfigureDefaultAgent(AgentBlazorOptions options)
+    private static void ConfigureBuiltInUiAgent(AgentRegistrationBuilder agent)
     {
-#pragma warning disable CS0618
-        options.DefaultAgent.AllowedComponents.Clear();
-        options.DefaultAgent.AllowedActions.Clear();
-        options.DefaultAgent.AllowedComponents.Add("AgentForm");
-        options.DefaultAgent.AllowedActions.Add("AgentForm.submit");
-        options.DefaultAgent.AllowedActions.Add("AgentForm.validate");
-#pragma warning restore CS0618
+        agent.WithAllowedComponents("AgentForm");
+        agent.WithAllowedActions("AgentForm.submit", "AgentForm.validate");
     }
 
     private static HttpClient CreateClient(WebApplication app)
@@ -485,41 +472,30 @@ public class AgUiHostingIntegrationTests
             forwardedProps
         };
 
-    private static string BuildPlanJson(
-        string componentId,
-        string actionId,
-        IReadOnlyDictionary<string, object?>? arguments = null)
+    private sealed class FixedPlanChatClient(string toolNameOrPlanJson) : IChatClient
     {
-        var payload = new
-        {
-            message = $"Executing {componentId}.{actionId}",
-            actions = new[]
-            {
-                new
-                {
-                    agentId = componentId,
-                    action = actionId,
-                    args = arguments ?? new Dictionary<string, object?>()
-                }
-            },
-            needsClarification = false,
-            clarificationQuestion = (string?)null
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private sealed class FixedPlanChatClient(string planJson) : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(
+        public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, planJson)));
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, toolNameOrPlanJson, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>()), cancellationToken);
+                }
+
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"Executed {toolNameOrPlanJson}."));
+            }
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, toolNameOrPlanJson));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -528,9 +504,23 @@ public class AgUiHostingIntegrationTests
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             _ = messages;
-            _ = options;
-            _ = cancellationToken;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, planJson);
+            if (options?.Tools?.OfType<AIFunction>().Any() == true)
+            {
+                var tool = options.Tools
+                    .OfType<AIFunction>()
+                    .FirstOrDefault(function =>
+                        string.Equals(function.Name, toolNameOrPlanJson, StringComparison.OrdinalIgnoreCase));
+
+                if (tool is not null)
+                {
+                    await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>()), cancellationToken);
+                }
+
+                yield return new ChatResponseUpdate(ChatRole.Assistant, $"Executed {toolNameOrPlanJson}.");
+                yield break;
+            }
+
+            yield return new ChatResponseUpdate(ChatRole.Assistant, toolNameOrPlanJson);
             await Task.CompletedTask;
         }
 
@@ -595,8 +585,14 @@ public class AgUiHostingIntegrationTests
         }
     }
 
-    private sealed class StubStreamingRuntime : IAgentRuntime, IAgentRuntimeStreaming
+    private sealed class StubStreamingRuntimeAdapter : IAgentRuntimeAdapter
     {
+        public bool SupportsStreaming => true;
+
+        public bool SupportsReconnect => false;
+
+        public bool SupportsCancellation => false;
+
         public Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
         {
             _ = request;
@@ -643,7 +639,7 @@ public class AgUiHostingIntegrationTests
                 sharedStateSnapshot: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["component.recipe.state.title"] = "Classic Scrambled Eggs",
-                    ["route.current"] = "/demo/dojo"
+                    ["route.current"] = "/demo/workflows/recipe-release"
                 });
             yield return CreateEvent(
                 AgentTurnStreamEventKind.StateDelta,
@@ -684,7 +680,7 @@ public class AgUiHostingIntegrationTests
         {
             _ = runId;
             _ = cancellationToken;
-            return Task.FromResult(true);
+            return Task.FromResult(false);
         }
 
         private static AgentTurnStreamEvent CreateEvent(
@@ -721,9 +717,15 @@ public class AgUiHostingIntegrationTests
         }
     }
 
-    private sealed class ControlStreamingRuntime : IAgentRuntime, IAgentRuntimeStreaming
+    private sealed class ControlStreamingRuntimeAdapter : IAgentRuntimeAdapter
     {
         private readonly HashSet<string> _activeRuns = new(StringComparer.Ordinal);
+
+        public bool SupportsStreaming => true;
+
+        public bool SupportsReconnect => true;
+
+        public bool SupportsCancellation => true;
 
         public int RunStreamCallCount { get; private set; }
 

@@ -2,8 +2,8 @@
   "minPassRate": 0.67,
   "maxFailures": 1,
   "requiredScenarioPasses": [
-    "dojo-shared-state-save",
-    "dojo-backend-tool-submit"
+    "response-readiness-assess",
+    "response-advance-stage"
   ],
   "maxRootCauseCounts": {
     "missing_generated_ui": 0,

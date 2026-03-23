@@ -1,6 +1,6 @@
 # MudBlazor Compatibility Roadmap
 
-Last updated: 2026-03-16
+Last updated: 2026-03-20
 
 ## Goal
 
@@ -20,9 +20,10 @@ Completed or materially completed:
 
 - shared agent runtime support was extracted so high-surface components no longer depend only on `AgentControllableComponentBase`
 - the current Mud-backed `Agent*` set has been moved onto native-first implementations
-- side-by-side compatibility proof pages exist for every shipped Mud-backed `Agent*` component
+- the components explorer exposes focused compatibility proof for every shipped Mud-backed `Agent*` component
 - rendered parity tests exist in `AgentBlazor.Components.Tests`
 - Playwright covers the proof routes in the public demo app
+- the component explorer now sits behind the workflow hub as a supporting reference surface instead of the primary product-story entry point
 
 Still outstanding:
 
@@ -193,7 +194,7 @@ Objective:
 
 Work:
 
-- add side-by-side compatibility demos
+- add focused compatibility demos inside the components explorer
 - add migration guidance from `Mud*` to `Agent*`
 - include realistic samples, not only simplified component cards
 - add prompt-backed browser tests against those examples
@@ -205,7 +206,7 @@ Definition of done:
 Status:
 
 - underway and already visible in the repo
-- isolated component proof pages are in place
+- focused component proof in the explorer is in place
 - one broader composed workflow proof page is in place
 - still not finished for the richest scenarios
 
@@ -323,7 +324,7 @@ Parity should be tested against realistic examples, not only synthetic unit case
 
 The demo app should include:
 
-- side-by-side `Mud*` and `Agent*` examples for complex screens
+- focused `Agent*` examples that prove MudBlazor-compatible behavior on complex screens
 - server-backed examples for `AgentDataGrid`
 - form-heavy examples with validation
 - workflow examples for dialogs, steppers, tabs, uploads, and tree views

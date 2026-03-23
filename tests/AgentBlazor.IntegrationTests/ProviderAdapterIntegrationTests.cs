@@ -1,5 +1,6 @@
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Interfaces;
+using AgentBlazor.Agents;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
 using AgentBlazor.Services;
@@ -20,35 +21,28 @@ public class ProviderAdapterIntegrationTests
 
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtimeAdapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var registry = provider.GetRequiredService<IAgentRegistry>();
 
-#pragma warning disable CS0618
-        Assert.False(options.DefaultAgent.Enabled);
-#pragma warning restore CS0618
         Assert.Empty(options.AssembliesToScan);
-        Assert.NotNull(runtime);
+        Assert.NotNull(runtimeAdapter);
+        Assert.False(registry.TryGet("AgentBlazor UI Agent", out _));
     }
 
     [Fact]
-    public void AddAgentBlazor_WithLegacyDefaultAgentCompatibility_RegistersBuiltInDefaultAgent()
+    public void AddAgentBlazor_WithExplicitAgentRegistration_RegistersBuiltInUiAgent()
     {
         var services = new ServiceCollection();
 
         AgentBlazorServiceExtensions.AddAgentBlazor(services, options =>
         {
-#pragma warning disable CS0618
-            options.UseLegacyDefaultAgentCompatibility();
-#pragma warning restore CS0618
+            options.ConfigureBuilder(builder => builder.AddAgent("AgentBlazor UI Agent"));
         });
 
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var registry = provider.GetRequiredService<IAgentRegistry>();
 
-#pragma warning disable CS0618
-        Assert.True(options.DefaultAgent.Enabled);
-        Assert.Equal("AgentBlazor UI Agent", options.DefaultAgent.Name);
-#pragma warning restore CS0618
-        Assert.NotEmpty(options.AssembliesToScan);
+        Assert.True(registry.TryGet("AgentBlazor UI Agent", out _));
     }
 
     [Fact]
@@ -140,10 +134,10 @@ public class ProviderAdapterIntegrationTests
         services.AddAgentBlazorServices();
 
         using var provider = services.BuildServiceProvider();
-        var runtime = provider.GetRequiredService<IAgentRuntime>();
+        var runtimeAdapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
 
-        var response = await runtime.RunTurnAsync(
+        var response = await runtimeAdapter.RunTurnAsync(
             new AgentTurnRequest("Reply with READY only."),
             cts.Token);
 

@@ -3,7 +3,7 @@ using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Tools;
 
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 internal static class RuntimePlanExecution
 {

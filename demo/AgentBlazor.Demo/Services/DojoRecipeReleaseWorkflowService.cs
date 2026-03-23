@@ -7,23 +7,23 @@ namespace AgentBlazor.Demo.Services;
 [AgentCapability(
     "recipe_release",
     Name = "Recipe Release Workflow",
-    Description = "Assess recipe readiness, explain blockers, and prepare a publish-ready release draft from the dojo workspace.",
+    Description = "Assess recipe readiness, explain blockers, and prepare a publish-ready release draft from the current recipe workspace.",
     Category = "Workflow")]
 internal sealed class DojoRecipeReleaseCapabilities(DojoRecipeReleaseWorkflowService workflow)
 {
-    [AgentAction("Assess the current dojo recipe for release readiness", ActionId = "assess_release_readiness")]
+    [AgentAction("Assess the current recipe for release readiness", ActionId = "assess_release_readiness")]
     public Task<CapabilityResult> AssessReleaseReadinessAsync(
         [AgentParam(ContextKey = AgentRuntimeContextKeys.SessionId)] string sessionId,
         CancellationToken cancellationToken = default)
         => workflow.AssessReleaseReadinessAsync(sessionId, cancellationToken);
 
-    [AgentAction("Prepare a publish-ready release draft for the current dojo recipe", ActionId = "prepare_release_draft", RequiresApproval = true)]
+    [AgentAction("Prepare a publish-ready release draft for the current recipe", ActionId = "prepare_release_draft", RequiresApproval = true)]
     public Task<CapabilityResult> PrepareReleaseDraftAsync(
         [AgentParam(ContextKey = AgentRuntimeContextKeys.SessionId)] string sessionId,
         CancellationToken cancellationToken = default)
         => workflow.PrepareReleaseDraftAsync(sessionId, cancellationToken);
 
-    [AgentAction("Apply the recipe release recovery playbook for the current dojo recipe", ActionId = "apply_release_recovery_playbook")]
+    [AgentAction("Apply the recipe release recovery playbook for the current recipe", ActionId = "apply_release_recovery_playbook")]
     public Task<CapabilityResult> ApplyReleaseRecoveryPlaybookAsync(
         [AgentParam(ContextKey = AgentRuntimeContextKeys.SessionId)] string sessionId,
         CancellationToken cancellationToken = default)

@@ -11,7 +11,7 @@ npm run test:e2e:ui
 npm run test:real-usability
 ```
 
-This suite starts the demo app via Playwright `webServer` and validates the current dojo and component explorer surfaces.
+This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
 
 Use `npm run test:e2e:headed` when you want to watch the browser, and `npm run test:e2e:ui` when you want Playwright's interactive runner.
 
@@ -35,7 +35,7 @@ set OLLAMA_MODEL=...
 set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1
 ```
 
-`test:real-usability` runs the nightly-style dojo suite on `/demo/dojo` using:
+`test:real-usability` runs the nightly-style orchestration suite using:
 - `tests/e2e/real-usability.prompts.json`
 - `tests/e2e/real-usability-baseline.json`
 

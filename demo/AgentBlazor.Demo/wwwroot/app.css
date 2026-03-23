@@ -145,7 +145,9 @@ h3 {
     padding: 1.3rem 1.35rem;
     border: 1px solid var(--ab-border);
     border-radius: 1rem;
-    background: linear-gradient(145deg, rgba(16, 25, 41, 0.9), rgba(13, 21, 35, 0.96));
+    background:
+        radial-gradient(circle at top right, rgba(110, 168, 254, 0.14), transparent 28%),
+        linear-gradient(145deg, rgba(16, 25, 41, 0.9), rgba(13, 21, 35, 0.97));
 }
 
 .demo-doc-page__eyebrow {
@@ -189,6 +191,36 @@ h3 {
     border-radius: 1rem;
     background: rgba(14, 22, 36, 0.76);
     padding: 1.2rem;
+}
+
+.demo-doc-page__hero-subtitle {
+    margin-top: 0.25rem;
+    max-width: 40rem;
+}
+
+.demo-doc-page__prompt-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.demo-doc-page__prompt-row > span {
+    padding: 0.42rem 0.78rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(9, 15, 27, 0.66);
+    color: rgba(230, 238, 255, 0.82);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.demo-doc-page__journey-card {
+    height: 100%;
+    padding: 0.95rem;
+    border-radius: 0.95rem;
+    background:
+        linear-gradient(165deg, rgba(14, 22, 37, 0.94), rgba(9, 15, 27, 0.96));
 }
 
 .demo-doc-page__section-head {

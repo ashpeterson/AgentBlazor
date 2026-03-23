@@ -1,34 +1,142 @@
 .demo-overview {
     display: grid;
-    gap: 0.75rem;
+    gap: 1rem;
 }
 
 .demo-overview__hero {
-    padding: 1.05rem;
-    border-radius: 0.9rem;
+    padding: 1.45rem;
+    border-radius: 1.2rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(150deg, rgba(12, 19, 37, 0.9), rgba(8, 13, 24, 0.94));
+    background:
+        radial-gradient(circle at top right, rgba(255, 90, 122, 0.14), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(110, 168, 254, 0.16), transparent 32%),
+        linear-gradient(155deg, rgba(14, 22, 38, 0.94), rgba(8, 13, 25, 0.98));
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.24);
 }
 
-.demo-overview__card {
-    height: 100%;
-    padding: 0.9rem;
+.demo-overview__lede {
+    max-width: 42rem;
+}
+
+.demo-overview__prompt-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.demo-overview__prompt-row > span {
+    padding: 0.48rem 0.82rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 13, 24, 0.55);
+    color: rgba(228, 238, 255, 0.82);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.demo-overview__quickstart {
+    display: grid;
+    gap: 1rem;
+    padding: 1.1rem 1.2rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(110, 168, 254, 0.16);
+    background:
+        radial-gradient(circle at top left, rgba(110, 168, 254, 0.1), transparent 28%),
+        rgba(9, 15, 27, 0.78);
+}
+
+.demo-overview__quickstart-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.demo-overview__quickstart-steps > span {
+    padding: 0.5rem 0.8rem;
     border-radius: 0.8rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(10, 16, 30, 0.68);
+    background: rgba(8, 13, 24, 0.62);
+    color: rgba(228, 238, 255, 0.82);
+    font-size: 0.8rem;
+    font-weight: 700;
 }
 
-.demo-overview__card--featured {
+.demo-overview__quickstart-steps code {
+    font-family: "IBM Plex Mono", "Cascadia Code", monospace;
+}
+
+.demo-overview__feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.demo-overview__feature {
+    display: grid;
+    gap: 1rem;
+    padding: 1.2rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 16, 30, 0.76);
+}
+
+.demo-overview__feature--primary {
     border-color: rgba(255, 190, 92, 0.22);
     background:
-        radial-gradient(circle at top right, rgba(255, 190, 92, 0.12), transparent 28%),
-        linear-gradient(145deg, rgba(18, 28, 47, 0.9), rgba(9, 15, 28, 0.94));
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+        radial-gradient(circle at top right, rgba(255, 190, 92, 0.12), transparent 30%),
+        linear-gradient(150deg, rgba(18, 27, 46, 0.94), rgba(10, 16, 30, 0.98));
 }
 
-.demo-overview__panel {
-    padding: 0.95rem;
-    border-radius: 0.9rem;
+.demo-overview__feature-list {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.demo-overview__feature-list > span {
+    padding-left: 0.9rem;
+    color: rgba(226, 236, 255, 0.82);
+    position: relative;
+}
+
+.demo-overview__feature-list > span::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55rem;
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: 50%;
+    background: var(--mud-palette-primary);
+}
+
+.demo-overview__plans {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.demo-overview__plan {
+    padding: 1.05rem 1.1rem;
+    border-radius: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(10, 15, 27, 0.74);
+    background: rgba(10, 16, 30, 0.72);
+}
+
+.demo-overview__plan--free {
+    border-color: rgba(110, 168, 254, 0.18);
+}
+
+.demo-overview__plan--paid {
+    border-color: rgba(255, 190, 92, 0.22);
+    background:
+        radial-gradient(circle at top right, rgba(255, 190, 92, 0.1), transparent 32%),
+        rgba(13, 19, 32, 0.84);
+}
+
+@media (max-width: 960px) {
+    .demo-overview__feature-grid,
+    .demo-overview__plans {
+        grid-template-columns: 1fr;
+    }
 }

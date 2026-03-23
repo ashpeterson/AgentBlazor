@@ -9,43 +9,63 @@
     </div>
 
     <div class="landing-hero__content">
-        <p class="landing-hero__eyebrow">Blazor-native agentic UI</p>
+        <p class="landing-hero__eyebrow">Blazor-native agent workflows</p>
         <h1 class="landing-hero__title">
-            Explore AgentBlazor<br />
-            <span class="landing-hero__accent">From capabilities to components</span>
+            Talk to the app.<br />
+            <span class="landing-hero__accent">Watch real workflows move.</span>
         </h1>
         <p class="landing-hero__subtitle">
-            Start with the workflow hub to see semantic, approval-aware product flows first, then use the dojo
-            and component catalog as supporting references for patterns and reusable Blazor building blocks.
+            Start the live orchestration demo, ask for the next stage, and let the agent coordinate supplier,
+            evidence, incident, and release work inside the app.
         </p>
         <div class="landing-hero__cta">
-            <MudButton Href="/demo"
+            <MudButton Href="/demo/workflows/response-orchestration?reset=true"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
+                       Size="Size.Large"
+                       EndIcon="@Icons.Material.Filled.PlayArrow">
+                Start Live Demo
+            </MudButton>
+            <MudButton Href="/demo"
+                       Variant="Variant.Outlined"
                        Size="Size.Large"
                        EndIcon="@Icons.Material.Filled.ArrowForward">
                 Open Workflow Hub
             </MudButton>
-            <MudButton Href="/demo/dojo"
-                       Variant="Variant.Outlined"
-                       Size="Size.Large">
-                Open Capability Dojo
-            </MudButton>
-            <MudButton Href="/demo/components"
-                       Variant="Variant.Text"
-                       Size="Size.Large">
-                Browse Agentic Components
-            </MudButton>
-            <MudButton Href="#explore"
-                       Variant="Variant.Text"
-                       Size="Size.Large">
-                Follow the Product Tour
-            </MudButton>
         </div>
-        <div class="landing-hero__meta">
-            <span>Controlled, declarative, and open-ended agentic UI</span>
-            <span>Drop-in components for Blazor and MudBlazor apps</span>
-            <span>AG-UI runtime and inspector built in</span>
+        <div class="landing-hero__prompt-strip" aria-label="Suggested prompts">
+            <span>“Assess cross-system response readiness”</span>
+            <span>“Advance the next guided subsystem stage”</span>
+            <span>“Prepare the response packet”</span>
+        </div>
+        <div class="landing-hero__quickstart" aria-label="Free quickstart">
+            <div class="landing-hero__quickstart-copy">
+                <p>Ship free first</p>
+                <strong>Add the runtime. Register one agent. Drop in the chat surface.</strong>
+            </div>
+            <div class="landing-hero__quickstart-steps">
+                <span><code>AddAgentBlazor(...)</code></span>
+                <span><code>AddAgent("ops")</code></span>
+                <span><code>&lt;AgentChatWidget /&gt;</code></span>
+            </div>
+        </div>
+
+        <div class="landing-hero__plans" aria-label="Plan summary">
+            <article class="landing-hero__plan-card landing-hero__plan-card--free">
+                <p>Free</p>
+                <strong>Ship the workflow layer</strong>
+                <span>Runtime, workflow chat, deterministic execution.</span>
+            </article>
+            <article class="landing-hero__plan-card landing-hero__plan-card--paid">
+                <p>Pro</p>
+                <strong>Make the product smarter</strong>
+                <span>History, adaptive suggestions, and better next steps.</span>
+            </article>
+            <article class="landing-hero__plan-card landing-hero__plan-card--premium">
+                <p>Premium</p>
+                <strong>Scale with control</strong>
+                <span>Governance, analytics, and audit visibility.</span>
+            </article>
         </div>
     </div>
 </section>

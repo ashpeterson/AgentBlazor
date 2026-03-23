@@ -205,7 +205,7 @@ public sealed record AgentUiAction
     public string Label { get; init; } = string.Empty;
 
     /// <summary>
-    /// Optional prompt sent to <see cref="IAgentRuntime"/> when action forwarding is enabled.
+    /// Optional prompt sent to the active runtime adapter when action forwarding is enabled.
     /// </summary>
     public string? Prompt { get; init; }
 

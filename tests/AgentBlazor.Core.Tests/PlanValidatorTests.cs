@@ -1,4 +1,4 @@
-using AgentBlazor.Core.Runtime.Planning;
+using AgentBlazor.Core.Runtime.ExecutionPlans;
 
 namespace AgentBlazor.Core.Tests;
 

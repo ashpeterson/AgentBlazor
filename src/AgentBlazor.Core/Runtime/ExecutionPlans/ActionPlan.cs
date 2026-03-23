@@ -1,9 +1,9 @@
 using AgentBlazor.Core.Components;
 
-namespace AgentBlazor.Core.Runtime.Planning;
+namespace AgentBlazor.Core.Runtime.ExecutionPlans;
 
 /// <summary>
-/// A deterministic action plan produced by the LLM planner.
+/// A deterministic execution plan produced by the runtime adapter/tool-selection flow.
 /// No heuristics. No fallbacks. Just structured steps.
 /// </summary>
 public sealed record ActionPlan
@@ -14,7 +14,7 @@ public sealed record ActionPlan
     public IReadOnlyList<AgentUiToolCall> UiToolCalls { get; init; } = [];
 
     /// <summary>
-    /// Natural language reply from the planner shown directly to the user.
+    /// Natural language reply shown directly to the user.
     /// </summary>
     public string? Message { get; init; }
 
