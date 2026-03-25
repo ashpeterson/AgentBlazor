@@ -1,71 +1,57 @@
 @using MudBlazor
 
 <section class="landing-hero" id="hero">
-    <div class="landing-hero__bg">
-        <div class="landing-hero__orb landing-hero__orb--1"></div>
-        <div class="landing-hero__orb landing-hero__orb--2"></div>
-        <div class="landing-hero__orb landing-hero__orb--3"></div>
-        <div class="landing-hero__grid"></div>
-    </div>
+    <div class="landing-hero__glow landing-hero__glow--orange"></div>
+    <div class="landing-hero__glow landing-hero__glow--blue"></div>
 
     <div class="landing-hero__content">
-        <p class="landing-hero__eyebrow">Blazor-native agent workflows</p>
-        <h1 class="landing-hero__title">
-            Talk to the app.<br />
-            <span class="landing-hero__accent">Watch real workflows move.</span>
-        </h1>
-        <p class="landing-hero__subtitle">
-            Start the live orchestration demo, ask for the next stage, and let the agent coordinate supplier,
-            evidence, incident, and release work inside the app.
-        </p>
+        <div class="landing-hero__intro">
+            <p class="landing-hero__eyebrow">Blazor-native agent workflows</p>
+            <h1 class="landing-hero__title">One prompt moves the app.</h1>
+            <p class="landing-hero__subtitle">
+                Ask the agent to assess, advance, and prepare the handoff. Watch real workflow state move inside the app.
+            </p>
+        </div>
+
         <div class="landing-hero__cta">
             <MudButton Href="/demo/workflows/response-orchestration?reset=true"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
                        Size="Size.Large"
                        EndIcon="@Icons.Material.Filled.PlayArrow">
-                Start Live Demo
+                Try live workflow
             </MudButton>
-            <MudButton Href="/demo"
+            <MudButton Href="/docs/getting-started"
                        Variant="Variant.Outlined"
                        Size="Size.Large"
-                       EndIcon="@Icons.Material.Filled.ArrowForward">
-                Open Workflow Hub
+                       EndIcon="@Icons.Material.Filled.MenuBook">
+                Docs
             </MudButton>
         </div>
-        <div class="landing-hero__prompt-strip" aria-label="Suggested prompts">
-            <span>“Assess cross-system response readiness”</span>
-            <span>“Advance the next guided subsystem stage”</span>
-            <span>“Prepare the response packet”</span>
-        </div>
-        <div class="landing-hero__quickstart" aria-label="Free quickstart">
-            <div class="landing-hero__quickstart-copy">
-                <p>Ship free first</p>
-                <strong>Add the runtime. Register one agent. Drop in the chat surface.</strong>
-            </div>
-            <div class="landing-hero__quickstart-steps">
-                <span><code>AddAgentBlazor(...)</code></span>
-                <span><code>AddAgent("ops")</code></span>
-                <span><code>&lt;AgentChatWidget /&gt;</code></span>
-            </div>
+
+        <div class="landing-hero__prompts" aria-label="Suggested prompts">
+            <span>Assess readiness</span>
+            <span>Advance next stage</span>
+            <span>Prepare handoff</span>
         </div>
 
-        <div class="landing-hero__plans" aria-label="Plan summary">
-            <article class="landing-hero__plan-card landing-hero__plan-card--free">
-                <p>Free</p>
-                <strong>Ship the workflow layer</strong>
-                <span>Runtime, workflow chat, deterministic execution.</span>
+        <div class="landing-hero__proof">
+            <article class="landing-hero__proof-card landing-hero__proof-card--primary">
+                <p>Live response workflow</p>
+                <strong>Supplier + evidence + incident</strong>
+                <span>One guided flow. One approval.</span>
             </article>
-            <article class="landing-hero__plan-card landing-hero__plan-card--paid">
-                <p>Pro</p>
-                <strong>Make the product smarter</strong>
-                <span>History, adaptive suggestions, and better next steps.</span>
+            <article class="landing-hero__proof-card">
+                <p>Free path</p>
+                <strong>Ship one workflow first</strong>
+                <span>Add the runtime, one workflow, one chat surface.</span>
             </article>
-            <article class="landing-hero__plan-card landing-hero__plan-card--premium">
-                <p>Premium</p>
-                <strong>Scale with control</strong>
-                <span>Governance, analytics, and audit visibility.</span>
-            </article>
+        </div>
+
+        <div class="landing-hero__plan-strip" aria-label="Plans">
+            <span><strong>Free</strong> ship the workflow layer</span>
+            <span><strong>Pro</strong> smarter next steps over time</span>
+            <span><strong>Premium</strong> governance and audit</span>
         </div>
     </div>
 </section>

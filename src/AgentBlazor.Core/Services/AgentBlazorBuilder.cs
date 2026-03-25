@@ -34,6 +34,41 @@ public sealed class AgentBlazorBuilder
         return this;
     }
 
+    /// <summary>
+    /// Registers a semantic capability and an explicit agent scoped to that capability's actions.
+    /// This is the lowest-ceremony path for a workflow-first agent.
+    /// </summary>
+    public AgentBlazorBuilder AddWorkflow<TCapability>(string name, Action<AgentRegistrationBuilder>? configure = null)
+        where TCapability : class
+    {
+        return AddWorkflow(typeof(TCapability), name, configure);
+    }
+
+    /// <summary>
+    /// Registers a semantic capability type and an explicit agent scoped to that capability's actions.
+    /// </summary>
+    public AgentBlazorBuilder AddWorkflow(Type capabilityType, string name, Action<AgentRegistrationBuilder>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(capabilityType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        AddCapability(capabilityType);
+
+        var actionIds = AgentCapabilityConventions.GetActionIds(capabilityType);
+        if (actionIds.Count == 0)
+        {
+            throw new ArgumentException(
+                $"Capability type '{capabilityType.FullName}' does not expose any public [AgentAction] methods.",
+                nameof(capabilityType));
+        }
+
+        return AddAgent(name, agent =>
+        {
+            agent.WithAllowedCapabilityActions(actionIds);
+            configure?.Invoke(agent);
+        });
+    }
+
     public AgentBlazorBuilder ConfigureComponentCatalog(Action<ComponentCapabilityCatalogBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);

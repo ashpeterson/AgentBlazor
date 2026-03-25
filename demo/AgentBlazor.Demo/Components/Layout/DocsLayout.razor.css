@@ -1,0 +1,112 @@
+.docs-shell {
+    min-height: 100svh;
+    background:
+        radial-gradient(circle at top right, rgba(224, 58, 88, 0.12), transparent 30%),
+        radial-gradient(circle at top left, rgba(74, 158, 221, 0.14), transparent 32%),
+        #040711;
+    color: #edf3ff;
+}
+
+.docs-shell__header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: rgba(6, 10, 22, 0.84);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.docs-shell__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.docs-shell__brand-logo {
+    width: 2.2rem;
+    height: 2.2rem;
+    object-fit: contain;
+}
+
+.docs-shell__brand-copy {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.docs-shell__brand-copy strong {
+    font-size: 0.95rem;
+}
+
+.docs-shell__brand-copy small {
+    color: rgba(199, 214, 238, 0.72);
+}
+
+.docs-shell__nav {
+    display: flex;
+    gap: 0.35rem;
+    margin-left: 1.25rem;
+}
+
+.docs-shell__nav a,
+.docs-shell__demo-link {
+    padding: 0.5rem 0.85rem;
+    border-radius: 999px;
+    color: rgba(216, 230, 255, 0.78);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.docs-shell__nav a:hover,
+.docs-shell__demo-link:hover,
+.docs-shell__nav a.is-active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.docs-shell__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.docs-shell__demo-link {
+    background: linear-gradient(135deg, rgba(224, 58, 88, 0.22), rgba(224, 58, 88, 0.08));
+    border-color: rgba(224, 58, 88, 0.28);
+}
+
+.docs-shell__body {
+    padding: 2rem 1.5rem 4rem;
+}
+
+@media (max-width: 900px) {
+    .docs-shell__header {
+        flex-wrap: wrap;
+    }
+
+    .docs-shell__nav {
+        order: 3;
+        width: 100%;
+        margin-left: 0;
+        overflow-x: auto;
+        padding-bottom: 0.15rem;
+    }
+
+}
+
+@media (max-width: 680px) {
+    .docs-shell__body {
+        padding: 1.25rem 1rem 3rem;
+    }
+}

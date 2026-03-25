@@ -1,0 +1,124 @@
+@page "/"
+@page "/ops-review"
+@inject OpsReviewService Workflow
+@inject StarterRuntimeStatus RuntimeStatus
+
+<PageTitle>Ops Review Starter</PageTitle>
+
+<div class="ops-review">
+    <section class="ops-review__hero">
+        <div>
+            <p class="ops-review__eyebrow">One workflow. One approval. One route.</p>
+            <h2>Talk to the agent or click through the same flow manually.</h2>
+            <div class="ops-review__prompts">
+                <span>Assess the current workflow</span>
+                <span>Apply the recovery playbook</span>
+                <span>Prepare the review draft</span>
+            </div>
+        </div>
+
+        <div class="ops-review__actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyRecoveryAsync">
+                Clear blocker
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetAsync">
+                Reset sample
+            </MudButton>
+        </div>
+    </section>
+
+    <section class="ops-review__runtime">
+        <span class="ops-review__badge ops-review__badge--action">@RuntimeStatus.ProviderLabel</span>
+        <span class="ops-review__badge">Conversations persisted</span>
+        <span class="ops-review__badge">Shared state persisted</span>
+        @if (RuntimeStatus.DevToolsEnabled)
+        {
+            <span class="ops-review__badge">DevTools enabled</span>
+        }
+    </section>
+
+    <section class="ops-review__grid">
+        <MudPaper Class="ops-review__panel ops-review__panel--primary" Outlined="true">
+            <div class="ops-review__status-row">
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">@Workflow.Current.Phase</MudChip>
+                @if (Workflow.Current.RequiresApproval)
+                {
+                    <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">Approval</MudChip>
+                }
+                @if (Workflow.Current.HasBlocker)
+                {
+                    <MudChip T="string" Color="Color.Error" Variant="Variant.Outlined" Size="Size.Small">Blocked</MudChip>
+                }
+            </div>
+
+            <MudText Typo="Typo.h5" Class="mt-4 mb-2">Current case</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary">@Workflow.Current.Summary</MudText>
+
+            <div class="ops-review__stat-grid">
+                <article>
+                    <strong>@Workflow.Current.SupplierCount</strong>
+                    <span>Suppliers</span>
+                </article>
+                <article>
+                    <strong>@Workflow.Current.ReviewQueue</strong>
+                    <span>Manual review</span>
+                </article>
+                <article>
+                    <strong>@(Workflow.Current.DraftPrepared ? "Ready" : "Pending")</strong>
+                    <span>Draft</span>
+                </article>
+            </div>
+        </MudPaper>
+
+        <MudPaper Class="ops-review__panel" Outlined="true">
+            <MudText Typo="Typo.h6" Class="mb-2">Decision support</MudText>
+
+            @if (Workflow.Current.Blockers.Count > 0)
+            {
+                <div class="ops-review__list">
+                    @foreach (var blocker in Workflow.Current.Blockers)
+                    {
+                        <span class="ops-review__badge ops-review__badge--error">@blocker</span>
+                    }
+                </div>
+            }
+
+            @if (Workflow.Current.Warnings.Count > 0)
+            {
+                <div class="ops-review__list">
+                    @foreach (var warning in Workflow.Current.Warnings)
+                    {
+                        <span class="ops-review__badge">@warning</span>
+                    }
+                </div>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Next actions</MudText>
+            <div class="ops-review__list">
+                @foreach (var nextAction in Workflow.Current.NextActions)
+                {
+                    <span class="ops-review__badge ops-review__badge--action">@nextAction</span>
+                }
+            </div>
+        </MudPaper>
+    </section>
+
+    <AgentChatWidget Title="Ops"
+                     Placeholder="Ask the agent to assess, recover, or prepare the draft..."
+                     Width="31rem"
+                     Height="70vh" />
+</div>
+
+@code {
+    private Task ApplyRecoveryAsync()
+    {
+        Workflow.ApplyRecoveryPlaybook();
+        return Task.CompletedTask;
+    }
+
+    private Task ResetAsync()
+    {
+        Workflow.Reset();
+        return Task.CompletedTask;
+    }
+}

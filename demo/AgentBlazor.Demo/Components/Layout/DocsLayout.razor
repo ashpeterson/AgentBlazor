@@ -1,0 +1,60 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="docs-shell">
+    <header class="docs-shell__header">
+        <a href="/" class="docs-shell__brand">
+            <img src="logo.png" class="docs-shell__brand-logo" alt="AgentBlazor" />
+            <span class="docs-shell__brand-copy">
+                <strong>AgentBlazor</strong>
+                <small>Docs</small>
+            </span>
+        </a>
+
+        <nav class="docs-shell__nav" aria-label="Docs">
+            <a href="/docs" class="@(IsDocsHome || IsGettingStarted ? "is-active" : null)">Setup</a>
+        </nav>
+
+        <div class="docs-shell__actions">
+            <a href="/demo/workflows/response-orchestration?reset=true" class="docs-shell__demo-link">Live Demo</a>
+        </div>
+    </header>
+
+    <main class="docs-shell__body">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private static readonly MudTheme _theme = new()
+    {
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#ff6a3d", Secondary = "#6ea8fe", Tertiary = "#7be0bf",
+            Info = "#6ea8fe", Success = "#40c89b", Warning = "#ffb84f", Error = "#ff5d7b",
+            Background = "#06111a", BackgroundGray = "#0b1824", Surface = "#0e1d2c",
+            AppbarBackground = "#09141f", AppbarText = "#eef6ff",
+            DrawerBackground = "#09141f", DrawerText = "#d2e0f6",
+            TextPrimary = "#eef6ff", TextSecondary = "#8ba5c4",
+            TableLines = "#203246", Divider = "#203246", LinesDefault = "#203246"
+        }
+    };
+
+    private string CurrentPath => new Uri(NavigationManager.Uri).AbsolutePath.TrimEnd('/');
+
+    private bool IsDocsHome => string.Equals(CurrentPath, "/docs", StringComparison.OrdinalIgnoreCase);
+    private bool IsGettingStarted => string.Equals(CurrentPath, "/docs/getting-started", StringComparison.OrdinalIgnoreCase);
+}

@@ -1,0 +1,33 @@
+@page "/docs"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Docs — AgentBlazor</PageTitle>
+
+<div class="docs-page">
+    <section class="docs-page__hero">
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Docs</MudChip>
+        <MudText Typo="Typo.h3" Class="mt-4 mb-2">Build one workflow.</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary">
+            Install. Register. Render. Run.
+        </MudText>
+
+        <div class="docs-page__hero-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">
+                Open setup
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">
+                Open demo
+            </MudButton>
+        </div>
+
+        <div class="docs-page__prompt-strip">
+            <span>Install</span>
+            <span>Register</span>
+            <span>Expose</span>
+            <span>Run</span>
+        </div>
+
+        <pre class="guide-page__code docs-page__code mt-4"><code>dotnet add package AgentBlazor</code></pre>
+    </section>
+</div>

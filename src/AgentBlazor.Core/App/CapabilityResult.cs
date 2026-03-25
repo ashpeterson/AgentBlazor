@@ -24,6 +24,57 @@ public sealed record CapabilityResult(string Summary)
 
     public IReadOnlyList<string> NextActions { get; init; } = [];
 
+    public CapabilityResult WithWarning(string warning)
+        => WithWarnings(warning);
+
+    public CapabilityResult WithWarnings(params string[] warnings)
+    {
+        var merged = Warnings
+            .Concat(warnings.Where(static warning => !string.IsNullOrWhiteSpace(warning)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return this with { Warnings = merged };
+    }
+
+    public CapabilityResult WithNextAction(string nextAction)
+        => WithNextActions(nextAction);
+
+    public CapabilityResult WithNextActions(params string[] nextActions)
+    {
+        var merged = NextActions
+            .Concat(nextActions.Where(static nextAction => !string.IsNullOrWhiteSpace(nextAction)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return this with { NextActions = merged };
+    }
+
+    public CapabilityResult WithOutput(string key, object? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var outputs = new Dictionary<string, object?>(Outputs, StringComparer.OrdinalIgnoreCase)
+        {
+            [key] = value
+        };
+
+        return this with { Outputs = outputs };
+    }
+
+    public CapabilityResult WithOutputs(IReadOnlyDictionary<string, object?> outputs)
+    {
+        ArgumentNullException.ThrowIfNull(outputs);
+
+        var merged = new Dictionary<string, object?>(Outputs, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in outputs)
+        {
+            merged[key] = value;
+        }
+
+        return this with { Outputs = merged };
+    }
+
     public static CapabilityResult Success(string summary) => new(summary);
 
     public static CapabilityResult Failure(string summary) => new(summary)

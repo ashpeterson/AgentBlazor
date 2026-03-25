@@ -76,12 +76,6 @@ builder.Services.AddAgentBlazor(options =>
     options.ConfigureBuilder(agentBuilder =>
     {
         agentBuilder.EnablePromptTracing();
-        agentBuilder.AddCapability<DemoFileWorkflowCapabilities>();
-        agentBuilder.AddCapability<DojoRecipeReleaseCapabilities>();
-        agentBuilder.AddCapability<IncidentEscalationCapabilities>();
-        agentBuilder.AddCapability<SupplierComplianceCapabilities>();
-        agentBuilder.AddCapability<ResponseOrchestrationCapabilities>();
-        agentBuilder.AddCapability<ReleaseDossierCapabilities>();
 
         agentBuilder.AddAgent("Workflow Hub Agent", agent =>
         {
@@ -100,7 +94,7 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDataGrid", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentSelect", "AgentAutocomplete");
-            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/datagrid,/demo/components/select,/demo/components/autocomplete,/demo/components/date-picker,/demo/components/date-range-picker,/demo/components/tree-view");
+            agent.WithRoutePrefixes("/demo/components", "/demo/components/datagrid", "/demo/components/select", "/demo/components/autocomplete", "/demo/components/date-picker", "/demo/components/date-range-picker", "/demo/components/tree-view");
         });
 
         agentBuilder.AddAgent("Workflow Orchestrator Agent", agent =>
@@ -111,10 +105,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentStepper", "AgentForm", "AgentDialog", "AgentTabs", "AgentNavMenu", "AgentTreeView", "AgentCommandBar", "AgentFileUpload");
-            agent.WithMetadata("route_prefixes", "/demo/components,/demo/components/form,/demo/components/dialog,/demo/components/tabs,/demo/components/stepper,/demo/components/command-bar,/demo/components/file-upload");
+            agent.WithRoutePrefixes("/demo/components", "/demo/components/form", "/demo/components/dialog", "/demo/components/tabs", "/demo/components/stepper", "/demo/components/command-bar", "/demo/components/file-upload");
         });
 
-        agentBuilder.AddAgent("Supplier Compliance Agent", agent =>
+        agentBuilder.AddWorkflow<SupplierComplianceCapabilities>("Supplier Compliance Agent", agent =>
         {
             agent.WithDescription("Focused on supplier risk review, explanation, recovery-playbook guidance, and remediation preparation.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -122,10 +116,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/supplier-compliance");
+            agent.WithRoutePrefixes("/demo/workflows/supplier-compliance");
         });
 
-        agentBuilder.AddAgent("File Workflow Agent", agent =>
+        agentBuilder.AddWorkflow<DemoFileWorkflowCapabilities>("File Workflow Agent", agent =>
         {
             agent.WithDescription("Focused on file audit bundles, remote handoff, and token verification workflows.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -133,10 +127,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentFileUpload", "AgentCommandBar");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/file-audit-bundle");
+            agent.WithRoutePrefixes("/demo/workflows/file-audit-bundle");
         });
 
-        agentBuilder.AddAgent("Recipe Release Agent", agent =>
+        agentBuilder.AddWorkflow<DojoRecipeReleaseCapabilities>("Recipe Release Agent", agent =>
         {
             agent.WithDescription("Focused on recipe readiness, release blockers, recovery-playbook guidance, and publish-ready draft preparation.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -144,10 +138,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentForm", "AgentDataGrid", "AgentDialog");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/recipe-release");
+            agent.WithRoutePrefixes("/demo/workflows/recipe-release");
         });
 
-        agentBuilder.AddAgent("Incident Escalation Agent", agent =>
+        agentBuilder.AddWorkflow<IncidentEscalationCapabilities>("Incident Escalation Agent", agent =>
         {
             agent.WithDescription("Focused on incident triage, evidence review, escalation brief preparation, and recovery from blocked review-board handoffs.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -155,10 +149,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentTreeView", "AgentTabs", "AgentStepper", "AgentCommandBar", "AgentDialog");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/incident-escalation");
+            agent.WithRoutePrefixes("/demo/workflows/incident-escalation");
         });
 
-        agentBuilder.AddAgent("Response Orchestration Agent", agent =>
+        agentBuilder.AddWorkflow<ResponseOrchestrationCapabilities>("Response Orchestration Agent", agent =>
         {
             agent.WithDescription("Focused on cross-system orchestration across supplier risk, audit evidence, and incident escalation, including guided subsystem-stage advancement before operational handoff.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -166,10 +160,10 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDialog");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/response-orchestration");
+            agent.WithRoutePrefixes("/demo/workflows/response-orchestration");
         });
 
-        agentBuilder.AddAgent("Release Dossier Agent", agent =>
+        agentBuilder.AddWorkflow<ReleaseDossierCapabilities>("Release Dossier Agent", agent =>
         {
             agent.WithDescription("Focused on recipe release readiness and audit evidence orchestration before release dossier handoff.");
             if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
@@ -177,7 +171,7 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDialog");
-            agent.WithMetadata("route_prefixes", "/demo/workflows/release-dossier");
+            agent.WithRoutePrefixes("/demo/workflows/release-dossier");
         });
     });
 });

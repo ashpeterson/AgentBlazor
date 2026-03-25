@@ -6,6 +6,7 @@ public sealed class AgentRegistrationBuilder
 {
     private readonly HashSet<string> _allowedComponents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _allowedActions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _allowedCapabilityActions = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _toolAssemblyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _metadata = new(StringComparer.OrdinalIgnoreCase);
 
@@ -60,6 +61,18 @@ public sealed class AgentRegistrationBuilder
         return this;
     }
 
+    internal AgentRegistrationBuilder WithAllowedCapabilityActions(IEnumerable<string> capabilityActionIds)
+    {
+        ArgumentNullException.ThrowIfNull(capabilityActionIds);
+
+        foreach (var capabilityActionId in capabilityActionIds.Where(static id => !string.IsNullOrWhiteSpace(id)))
+        {
+            _allowedCapabilityActions.Add(capabilityActionId.Trim());
+        }
+
+        return this;
+    }
+
     public AgentRegistrationBuilder WithAllowedActions(params (string ComponentId, string ActionId)[] actions)
     {
         foreach (var (componentId, actionId) in actions)
@@ -89,6 +102,31 @@ public sealed class AgentRegistrationBuilder
         return this;
     }
 
+    public AgentRegistrationBuilder WithRoutePrefixes(params string[] routePrefixes)
+    {
+        var prefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (_metadata.TryGetValue("route_prefixes", out var existing))
+        {
+            foreach (var prefix in existing.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                prefixes.Add(prefix);
+            }
+        }
+
+        foreach (var prefix in routePrefixes.Where(static prefix => !string.IsNullOrWhiteSpace(prefix)))
+        {
+            prefixes.Add(prefix.Trim());
+        }
+
+        if (prefixes.Count > 0)
+        {
+            _metadata["route_prefixes"] = string.Join(',', prefixes);
+        }
+
+        return this;
+    }
+
     internal AgentRegistration Build() => new()
     {
         Name = Name,
@@ -96,6 +134,7 @@ public sealed class AgentRegistrationBuilder
         Instructions = Instructions,
         AllowedComponents = new HashSet<string>(_allowedComponents, StringComparer.OrdinalIgnoreCase),
         AllowedActions = new HashSet<string>(_allowedActions, StringComparer.OrdinalIgnoreCase),
+        AllowedCapabilityActions = new HashSet<string>(_allowedCapabilityActions, StringComparer.OrdinalIgnoreCase),
         ToolAssemblyNames = _toolAssemblyNames.ToArray(),
         Metadata = new Dictionary<string, string>(_metadata, StringComparer.OrdinalIgnoreCase)
     };

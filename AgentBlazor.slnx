@@ -2,6 +2,9 @@
   <Folder Name="/demo/">
     <Project Path="demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AgentBlazor.Components/AgentBlazor.Components.csproj" />
     <Project Path="src/AgentBlazor.Core/AgentBlazor.Core.csproj" />

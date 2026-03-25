@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UseLocalAgentBlazorSource Condition="'$(UseLocalAgentBlazorSource)' == '' and Exists('..\..\src\AgentBlazor.Components\AgentBlazor.Components.csproj')">true</UseLocalAgentBlazorSource>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UseLocalAgentBlazorSource)' == 'true'">
+    <ProjectReference Include="..\..\src\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.Components\AgentBlazor.Components.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseLocalAgentBlazorSource)' != 'true'">
+    <PackageReference Include="AgentBlazor" Version="$(AgentBlazorPackageVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+
+  <Target Name="EnsurePackageVersionWhenUsingPackageReference" BeforeTargets="Restore"
+          Condition="'$(UseLocalAgentBlazorSource)' != 'true' and '$(AgentBlazorPackageVersion)' == ''">
+    <Error Text="Set AgentBlazorPackageVersion when UseLocalAgentBlazorSource is false. Example: dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview" />
+  </Target>
+
+</Project>

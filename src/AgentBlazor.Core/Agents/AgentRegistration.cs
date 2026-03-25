@@ -14,6 +14,9 @@ public sealed class AgentRegistration
     public IReadOnlySet<string> AllowedActions { get; init; } =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+    public IReadOnlySet<string> AllowedCapabilityActions { get; init; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     public IReadOnlyList<string> ToolAssemblyNames { get; init; } = Array.Empty<string>();
 
     public IReadOnlyDictionary<string, string> Metadata { get; init; } =

@@ -30,9 +30,14 @@ dotnet run
 Open the primary routes:
 
 - `/` for the product story
-- `/demo` for the workflow hub
+- `/demo` to jump straight into the featured live demo
 - `/demo/workflows/response-orchestration?reset=true` for the featured live demo
-- `/demo/workflows/release-dossier?reset=true` for the second orchestration proof
+- `/demo/workflows/release-dossier?reset=true` for the secondary release proof
+
+Starter sample:
+
+- `samples/AgentBlazor.Starter`
+- `dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj`
 
 Suggested prompts:
 
@@ -45,12 +50,18 @@ Suggested prompts:
 
 The free tier should be enough to prove value in a real app:
 
+- install one package
 - add the runtime and chat surface
-- register one explicit agent
-- expose one semantic workflow or capability
+- register one workflow agent
 - let the agent coordinate the app with deterministic execution
 
-### 1. Register AgentBlazor
+### 1. Install
+
+```bash
+dotnet add package AgentBlazor
+```
+
+### 2. Register AgentBlazor
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -60,38 +71,35 @@ builder.Services.AddAgentBlazor(options =>
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
         model: "gpt-5.4-mini");
-});
-```
 
-### 2. Register An Agent And A Capability
-
-```csharp
-builder.Services.AddAgentBlazor()
-    .AddAgent("operations", agent =>
+    options.ConfigureBuilder(agentBuilder =>
     {
-        agent.WithDisplayName("Operations Agent");
-        agent.WithInstructions("Guide the operator through the workflow and explain each approval.");
-    })
-    .AddCapability<OperationsCapabilities>();
+        agentBuilder.AddWorkflow<OperationsCapabilities>("operations", agent =>
+        {
+            agent.WithDescription("Guide the operator through the workflow and explain each approval.");
+            agent.WithRoutePrefixes("/ops");
+        });
+    });
 ```
+
+### 3. Expose One Capability
 
 ```csharp
 [AgentCapability("operations")]
 public sealed class OperationsCapabilities
 {
-    [AgentAction(
-        Name = "Prepare remediation draft",
-        RequiresApproval = true,
-        Category = "Operations")]
+    [AgentAction("Prepare remediation draft", RequiresApproval = true)]
     public Task<CapabilityResult> PrepareRemediationDraftAsync(Guid[] supplierIds)
     {
-        // host-owned workflow logic here
-        throw new NotImplementedException();
+        return Task.FromResult(
+            CapabilityResult.Success("Prepared the remediation draft.")
+                .WithWarning("Two suppliers still need manual review.")
+                .WithNextActions("Review the draft", "Approve the submission"));
     }
 }
 ```
 
-### 3. Add The Agent Surface
+### 4. Add The Agent Surface
 
 ```razor
 <AgentChatWidget
@@ -162,6 +170,36 @@ The biggest remaining product gap is not UI execution. It is durable paid intell
 - [Runtime Realignment Plan](docs/runtime-realignment-plan.md)
 - [Pricing Tiers](docs/pricing-tiers.md)
 - [MudBlazor Compatibility Roadmap](docs/mudblazor-compatibility-roadmap.md)
+
+## Template Direction
+
+We should not build templates for every domain.
+
+The intended approach is:
+
+- one golden-path starter
+- a few workflow scaffolds
+- examples for everything else
+
+The starter should generate:
+
+- one route
+- one workflow agent
+- one capability class
+- one service class
+- one chat surface
+- one approval boundary
+
+The current starter lives in:
+
+- `samples/AgentBlazor.Starter`
+
+Scaffolds should cover workflow shapes, not industries:
+
+- assessment
+- approval-gated mutation
+- recovery/retry
+- orchestration
 
 ## License
 

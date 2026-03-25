@@ -1,0 +1,81 @@
+@page "/docs/getting-started"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Getting Started — AgentBlazor Docs</PageTitle>
+
+<div class="guide-page">
+    <section class="guide-page__hero">
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Getting Started</MudChip>
+        <MudText Typo="Typo.h3" Class="mt-4 mb-2">From empty app to first workflow.</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary">
+            One package. One workflow. One route. One chat surface.
+        </MudText>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">1. Install</MudText>
+        <pre class="guide-page__code"><code>dotnet add package AgentBlazor</code></pre>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">2. Register</MudText>
+        <pre class="guide-page__code"><code>builder.Services.AddAgentBlazor(options =&gt;
+{
+    options.UseOpenAI(
+        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+        model: "gpt-5.4-mini");
+
+    options.ConfigureBuilder(agentBuilder =&gt;
+    {
+        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;("operations", agent =&gt;
+        {
+            agent.WithRoutePrefixes("/ops");
+        });
+    });
+});</code></pre>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">3. Expose</MudText>
+        <pre class="guide-page__code"><code>[AgentCapability("operations")]
+public sealed class OperationsCapabilities
+{
+    [AgentAction("Prepare remediation draft", RequiresApproval = true)]
+    public Task&lt;CapabilityResult&gt; PrepareRemediationDraftAsync(Guid[] supplierIds)
+        =&gt; Task.FromResult(
+            CapabilityResult.Success("Prepared the remediation draft.")
+                .WithNextActions("Review the draft", "Approve the submission"));
+}</code></pre>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">4. Render</MudText>
+        <pre class="guide-page__code"><code>&lt;AgentChatWidget
+    Title="Operations"
+    Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
+    Width="30rem"
+    Height="68vh" /&gt;</code></pre>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">5. Run</MudText>
+        <div class="guide-page__chips">
+            <span>Assess the workflow</span>
+            <span>Explain blockers</span>
+            <span>Prepare the draft</span>
+        </div>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            Starter sample: <code>samples/AgentBlazor.Starter</code>
+        </MudText>
+    </section>
+
+    <section class="guide-page__footer">
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs">
+            Back
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
+            Open live demo
+        </MudButton>
+    </section>
+</div>

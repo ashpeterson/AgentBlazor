@@ -1,0 +1,64 @@
+.guide-page {
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.guide-page__hero,
+.guide-page__section {
+    padding: 1.5rem;
+    border-radius: 1.3rem;
+    background: rgba(12, 18, 32, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.guide-page__section {
+    margin-top: 1rem;
+}
+
+.guide-page__code {
+    margin: 0.9rem 0 0;
+    padding: 1rem 1.1rem;
+    border-radius: 1rem;
+    background: rgba(4, 8, 18, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+}
+
+.guide-page__code code {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.9rem;
+    color: #e8f0ff;
+}
+
+.guide-page__chips {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.guide-page__chips span {
+    padding: 0.5rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(223, 235, 255, 0.82);
+    font-size: 0.84rem;
+}
+
+.guide-page__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 700px) {
+    .guide-page__hero,
+    .guide-page__section {
+        padding: 1.15rem;
+    }
+
+    .guide-page__footer {
+        flex-direction: column;
+    }
+}

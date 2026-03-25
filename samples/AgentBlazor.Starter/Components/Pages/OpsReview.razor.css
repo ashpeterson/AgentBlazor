@@ -1,0 +1,144 @@
+.ops-review {
+    display: grid;
+    gap: 1rem;
+}
+
+.ops-review__hero,
+.ops-review__runtime,
+.ops-review__panel {
+    padding: 1.25rem;
+    border-radius: 1.4rem;
+    background: rgba(7, 12, 24, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ops-review__hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.ops-review__eyebrow {
+    margin: 0 0 0.45rem;
+    color: rgba(173, 197, 255, 0.72);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+}
+
+.ops-review__hero h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.6vw, 2.4rem);
+    line-height: 1.02;
+}
+
+.ops-review__prompts {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.ops-review__prompts span,
+.ops-review__badge {
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(229, 236, 255, 0.84);
+    font-size: 0.85rem;
+}
+
+.ops-review__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.ops-review__grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1rem;
+}
+
+.ops-review__runtime {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.ops-review__panel--primary {
+    min-height: 18rem;
+}
+
+.ops-review__status-row {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.ops-review__stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: 1.1rem;
+}
+
+.ops-review__stat-grid article {
+    padding: 0.95rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ops-review__stat-grid strong {
+    display: block;
+    font-size: 1.4rem;
+    line-height: 1;
+    margin-bottom: 0.35rem;
+}
+
+.ops-review__stat-grid span {
+    color: rgba(214, 226, 255, 0.68);
+    font-size: 0.83rem;
+}
+
+.ops-review__list {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.ops-review__badge--error {
+    background: rgba(224, 58, 88, 0.12);
+    border-color: rgba(224, 58, 88, 0.28);
+}
+
+.ops-review__badge--action {
+    background: rgba(49, 99, 255, 0.14);
+    border-color: rgba(49, 99, 255, 0.3);
+}
+
+@media (max-width: 960px) {
+    .ops-review__hero,
+    .ops-review__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ops-review__hero {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .ops-review__actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .ops-review__stat-grid {
+        grid-template-columns: 1fr;
+    }
+}

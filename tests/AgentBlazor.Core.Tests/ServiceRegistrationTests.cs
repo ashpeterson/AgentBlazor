@@ -200,6 +200,51 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void AddWorkflow_RegistersCapabilityScopedAgent()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddWorkflow<WorkflowScaffoldCapabilities>("ops-agent", agent =>
+            {
+                agent.WithDescription("Operations workflow agent.");
+                agent.WithRoutePrefixes("/ops", "/ops/review");
+            });
+
+        using var provider = services.BuildServiceProvider();
+
+        var registry = provider.GetRequiredService<IAgentRegistry>();
+        Assert.True(registry.TryGet("ops-agent", out var registration));
+        Assert.Equal("Operations workflow agent.", registration.Description);
+        Assert.Empty(registration.AllowedActions);
+        Assert.Contains("workflow_scaffold.assess_case", registration.AllowedCapabilityActions);
+        Assert.Contains("workflow_scaffold.prepare_case", registration.AllowedCapabilityActions);
+        Assert.Equal("/ops,/ops/review", registration.Metadata["route_prefixes"]);
+
+        var capabilityRegistry = provider.GetRequiredService<global::AgentBlazor.App.IAgentCapabilityRegistry>();
+        var capabilities = capabilityRegistry.GetCapabilities(provider);
+        Assert.Contains(capabilities, static capability => capability.CapabilityId == "workflow_scaffold");
+    }
+
+    [Fact]
+    public void CapabilityResult_HelperMethods_MergeStructuredOutcomeData()
+    {
+        var result = global::AgentBlazor.App.CapabilityResult.Success("Prepared the workflow.")
+            .WithWarning("Manual review still required.")
+            .WithWarnings("Policy sign-off pending.")
+            .WithNextAction("Review the draft")
+            .WithNextActions("Approve the submission")
+            .WithOutput("supplierCount", 3);
+
+        Assert.Equal(
+            ["Manual review still required.", "Policy sign-off pending."],
+            result.Warnings);
+        Assert.Equal(
+            ["Review the draft", "Approve the submission"],
+            result.NextActions);
+        Assert.Equal(3, result.Outputs["supplierCount"]);
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_PrefersExplicitAgents_OverBuiltInDefaultFallback()
     {
         var services = new ServiceCollection();
@@ -1895,6 +1940,16 @@ public class ServiceRegistrationTests
             _ = cancellationToken;
             throw new NotSupportedException();
         }
+    }
+
+    [global::AgentBlazor.App.AgentCapability("workflow_scaffold", Name = "Workflow Scaffold")]
+    private sealed class WorkflowScaffoldCapabilities
+    {
+        [global::AgentBlazor.Attributes.AgentAction("Assess the current case")]
+        public global::AgentBlazor.App.CapabilityResult AssessCase() => global::AgentBlazor.App.CapabilityResult.Success("assessed");
+
+        [global::AgentBlazor.Attributes.AgentAction("Prepare the current case", RequiresApproval = true)]
+        public global::AgentBlazor.App.CapabilityResult PrepareCase() => global::AgentBlazor.App.CapabilityResult.Success("prepared");
     }
 
     private sealed class RecordingChatClient : IChatClient

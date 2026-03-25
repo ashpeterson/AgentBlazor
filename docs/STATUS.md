@@ -1,27 +1,28 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-20
+Last updated: 2026-03-23
 
 ## Current Product Shape
 
 AgentBlazor is now positioned as a Blazor-first agentic UI framework with two primary demo surfaces:
 
 - `/` explains the product and routes users into the current story
-- `/demo` is the workflow hub and demonstrates the workflow-first product story
+- `/demo` now jumps straight into the featured live workflow
 - `/demo/components` is now a supporting reference for drop-in agentic components for Blazor apps
 
 The current story is no longer "many unrelated demo routes". It is:
 
 1. learn the platform on the landing page
-2. validate the workflow-first story in the workflow hub
+2. validate the workflow-first story in the featured response-orchestration flow
 3. use the component explorer only as a supporting reference when needed
 
 The current visible demo funnel is intentionally narrow:
 
 - `/`
+- `/docs`
 - `/demo`
 - `/demo/workflows/response-orchestration?reset=true`
-- `/demo/workflows/release-dossier?reset=true`
+- `/demo/workflows/release-dossier?reset=true` as a secondary proof
 - `/demo/components` as a supporting reference surface
 
 The acquisition story is now intentionally simple too:
@@ -29,6 +30,12 @@ The acquisition story is now intentionally simple too:
 - `Free` should look shippable in one sprint
 - `Paid` should look like the app gets smarter with use
 - `Premium` should read as the team/governance layer
+
+The free-plan onboarding path is now also explicit:
+
+- `/docs` gives the developer-facing setup path
+- `samples/AgentBlazor.Starter` is the current golden-path starter
+- `AddWorkflow<T>()` is the lowest-ceremony workflow registration path in code
 
 The runtime realignment is now materially underway:
 
@@ -252,6 +259,7 @@ Current note:
 - Adapter-backed inspector and trace persistence now record normalized step-oriented execution data as the canonical devtools shape; remaining legacy action/result payloads should only survive where the legacy runtime path still needs them.
 - The landing page, workflow hub, and components explorer now reinforce a workflow-first journey, with the component surface positioned as a fallback reference rather than a default destination.
 - The workflow hub and workflow routes now use route-specific assistant profiles and semantic-first prompt guidance, so the assistant defaults line up with the workflow-first product story instead of falling back to generic component language.
+- `/docs`, `README.md`, and `samples/AgentBlazor.Starter` now present one package-first free onboarding path centered on `AddAgentBlazor(... ConfigureBuilder(... AddWorkflow<T> ...))`, with repo-local source mode treated as maintainer-only validation rather than the public story.
 - Prompt tracing and report-style consumers now expose normalized workflow-step views as the primary reporting language, with planner-era action/result lists left as compatibility storage rather than the first-class presentation model.
 - Component-mocking and report-generation test helpers now prefer normalized `ExecutionPlan` data and only fall back to legacy action/result payloads when the legacy runtime path returns no plan.
 - the legacy planner runtime, `LegacyAgentRuntimeAdapter`, `IAgentRuntime`, `IAgentRuntimeStreaming`, `AgentRuntime`, `AgentPlanner`, and `PlanExecutor` have now been removed from the codebase entirely; remaining plan-oriented helpers are execution-model utilities rather than a hidden runtime path.

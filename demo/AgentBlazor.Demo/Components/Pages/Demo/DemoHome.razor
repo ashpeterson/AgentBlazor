@@ -1,115 +1,32 @@
 @page "/demo"
 @layout DemoLayout
 @using MudBlazor
+@inject NavigationManager NavigationManager
 
 <PageTitle>Demo — AgentBlazor</PageTitle>
 
-<div class="demo-overview">
-    <MudPaper Elevation="1" Class="demo-overview__hero">
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Fast demo flow</MudChip>
-        <MudText Typo="Typo.h3" Class="mt-4 mb-2">Just talk to the agent.</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-overview__lede">
-            Start one orchestration route, ask for the next stage, then watch the app coordinate live workflow state.
-        </MudText>
-
-        <div class="demo-overview__prompt-row">
-            <span>Assess cross-system response readiness</span>
-            <span>Advance the next guided subsystem stage</span>
-            <span>Prepare the response packet</span>
+<div class="launchpad">
+    <MudPaper Elevation="0" Class="launchpad__hero">
+        <div class="launchpad__hero-copy">
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Opening demo</MudChip>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Loading response orchestration…</MudText>
         </div>
-
-        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
-                Start featured demo
+        <div class="launchpad__hero-actions">
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">
+                Open now
             </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/release-dossier?reset=true">
-                Start second flow
-            </MudButton>
-        </MudStack>
-    </MudPaper>
-
-    <MudPaper Class="demo-overview__quickstart">
-        <div>
-            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Free path</MudChip>
-            <MudText Typo="Typo.h6" Class="mt-3 mb-1">Ship this in one sprint</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Add the runtime, register one agent, expose one workflow, and let the app do the rest.
-            </MudText>
-        </div>
-
-        <div class="demo-overview__quickstart-steps">
-            <span><code>AddAgentBlazor</code></span>
-            <span><code>AddAgent("ops")</code></span>
-            <span><code>AddCapability&lt;T&gt;</code></span>
-            <span><code>&lt;AgentChatWidget /&gt;</code></span>
         </div>
     </MudPaper>
-
-    <div class="demo-overview__feature-grid">
-        <MudPaper Class="demo-overview__feature demo-overview__feature--primary">
-            <div class="demo-overview__feature-top">
-                <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined" Size="Size.Small">Featured</MudChip>
-                <MudText Typo="Typo.h5" Class="mt-3 mb-1">Response orchestration</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Supplier, evidence, and incident work aligned before one final packet handoff.
-                </MudText>
-            </div>
-
-            <div class="demo-overview__feature-list">
-                <span>Guided stage advancement</span>
-                <span>Recovery when a subsystem blocks</span>
-                <span>Approval at the final handoff</span>
-            </div>
-
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
-                Open workflow
-            </MudButton>
-        </MudPaper>
-
-        <MudPaper Class="demo-overview__feature">
-            <div class="demo-overview__feature-top">
-                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Second proof</MudChip>
-                <MudText Typo="Typo.h5" Class="mt-3 mb-1">Release dossier</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Recipe readiness and audit evidence combined into one release-ready dossier.
-                </MudText>
-            </div>
-
-            <div class="demo-overview__feature-list">
-                <span>Second orchestration story</span>
-                <span>Same pattern, different domain</span>
-                <span>Approval before release handoff</span>
-            </div>
-
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/release-dossier?reset=true">
-                Open workflow
-            </MudButton>
-        </MudPaper>
-    </div>
-
-    <div class="demo-overview__plans">
-        <MudPaper Class="demo-overview__plan demo-overview__plan--free">
-            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Free</MudChip>
-            <MudText Typo="Typo.h6" Class="mt-3 mb-1">Useful on day one</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Workflow chat, deterministic execution, AG-UI hosting, and the component kit.
-            </MudText>
-        </MudPaper>
-
-        <MudPaper Class="demo-overview__plan demo-overview__plan--paid">
-            <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">Pro</MudChip>
-            <MudText Typo="Typo.h6" Class="mt-3 mb-1">Where users upgrade</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Action history, smarter next steps, and proactive workflow prompts that improve with use.
-            </MudText>
-        </MudPaper>
-
-        <MudPaper Class="demo-overview__plan">
-            <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">Premium</MudChip>
-            <MudText Typo="Typo.h6" Class="mt-3 mb-1">For bigger teams</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Governance, analytics, and audit visibility when workflows become operationally critical.
-            </MudText>
-        </MudPaper>
-    </div>
 </div>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        NavigationManager.NavigateTo("/demo/workflows/response-orchestration?reset=true", replace: true);
+    }
+}

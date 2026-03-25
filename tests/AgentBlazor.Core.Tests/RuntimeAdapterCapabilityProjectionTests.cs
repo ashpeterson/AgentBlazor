@@ -76,6 +76,58 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task AddWorkflow_PreservesComponentTools_ForMixedWorkflowAgents()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<CapabilityToolCatalogChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<CapabilityToolCatalogChatClient>());
+        services.AddSingleton(new CapabilityRecorder());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddWorkflow<SupplierCapabilities>("supplier-agent", agent =>
+            {
+                agent.WithAllowedComponents("AgentGrid");
+                agent.WithRoutePrefixes("/suppliers");
+            })
+            .ConfigureComponentCatalog(catalog => catalog.AddComponent(
+                "AgentGrid",
+                "Grid for supplier records.",
+                new ComponentActionCapability(
+                    "filter",
+                    "Apply a filter to the grid.",
+                    RequiresApproval: false,
+                    InputSchema: """
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "column": { "type": "string" },
+                            "value": { "type": "string" }
+                          },
+                          "required": ["column", "value"]
+                        }
+                        """)));
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<CapabilityToolCatalogChatClient>();
+
+        _ = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show at-risk suppliers",
+            AgentName: "supplier-agent",
+            SessionId: "mixed-workflow-agent"));
+
+        var snapshot = Assert.Single(chatClient.ToolSnapshots);
+        Assert.Contains(
+            snapshot,
+            static name => name.Contains("capability_supplier_compliance_show_at_risk_suppliers", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            snapshot,
+            static name => name.Contains("ui_AgentGrid_filter", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_ExecutesProjectedSemanticCapability()
     {
         var services = new ServiceCollection();

@@ -5,7 +5,7 @@ If the user asks for an action on a component that is not mounted, explain that 
 and suggest the correct route.
 
 Primary route map:
-- /demo — workflow hub and primary product-story entry point.
+- /demo — minimal demo entry that opens the primary live workflow.
 - /demo/workflows/supplier-compliance — semantic supplier risk and remediation workflow.
 - /demo/workflows/file-audit-bundle — semantic file audit and remote handoff workflow.
 - /demo/workflows/recipe-release — semantic release-readiness and blocker workflow.
@@ -66,9 +66,8 @@ Mounted semantic workflow capabilities by route:
   - Prepare one approval-gated release dossier after the subsystem states are aligned
 
 For /demo:
-- Act as a workflow-routing assistant first.
-- Compare the supplier, file, recipe, incident, response-orchestration, and release-dossier workflows in semantic terms.
-- Recommend the best route based on the user's goal, then offer to navigate there.
+- Treat `/demo` as a redirect into `response-orchestration`.
+- Only mention `release-dossier` if the user explicitly asks for the second proof.
 
 Mounted wrappers by route:
 - /demo/components and /demo/components/{component-key}

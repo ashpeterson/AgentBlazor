@@ -141,7 +141,7 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
             ?? throw new InvalidOperationException(
                 $"Type '{type.FullName}' must be annotated with [AgentCapability] to be registered.");
 
-        var capabilityId = attribute.CapabilityId ?? ToCapabilityId(type.Name);
+        var capabilityId = AgentCapabilityConventions.GetCapabilityId(type);
         var name = attribute.Name ?? HumanizeTypeName(type.Name);
         var description = attribute.Description;
         var category = attribute.Category;
@@ -165,7 +165,7 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
     {
         var actionAttribute = method.GetCustomAttribute<AgentActionAttribute>()
             ?? throw new InvalidOperationException($"Method '{method.Name}' is missing [AgentAction].");
-        var localActionId = actionAttribute.ActionId ?? ToSnakeCase(method.Name);
+        var localActionId = AgentCapabilityConventions.GetLocalActionId(method);
         var actionId = $"{capabilityId}.{localActionId}";
         var name = ResolveActionName(method);
         var description = actionAttribute.Description ?? name;
@@ -459,43 +459,6 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
             }
 
             builder.Append(current);
-        }
-
-        return builder.ToString();
-    }
-
-    private static string ToCapabilityId(string typeName)
-    {
-        var trimmed = typeName.EndsWith("Capabilities", StringComparison.Ordinal)
-            ? typeName[..^"Capabilities".Length]
-            : typeName;
-        return ToSnakeCase(trimmed);
-    }
-
-    private static string ToSnakeCase(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        var builder = new StringBuilder(value.Length + 8);
-        for (var i = 0; i < value.Length; i++)
-        {
-            var current = value[i];
-            if (char.IsUpper(current))
-            {
-                if (i > 0)
-                {
-                    builder.Append('_');
-                }
-
-                builder.Append(char.ToLowerInvariant(current));
-            }
-            else
-            {
-                builder.Append(current);
-            }
         }
 
         return builder.ToString();

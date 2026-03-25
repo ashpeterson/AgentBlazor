@@ -512,7 +512,7 @@ public sealed class ChatClientRuntimeAdapter(
 
         foreach (var capability in semanticCapabilities)
         {
-            if (!IsNonComponentToolAllowed(registration, capability.ActionId))
+            if (!IsCapabilityToolAllowed(registration, capability.ActionId))
             {
                 continue;
             }
@@ -603,7 +603,19 @@ public sealed class ChatClientRuntimeAdapter(
             effectiveTier);
     }
 
-    private bool IsNonComponentToolAllowed(AgentRegistration registration, string toolName)
+    private bool IsCapabilityToolAllowed(AgentRegistration registration, string actionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+
+        if (registration.AllowedCapabilityActions.Count > 0)
+        {
+            return registration.AllowedCapabilityActions.Contains(actionId);
+        }
+
+        return IsNonComponentToolAllowed(registration, actionId);
+    }
+
+    private static bool IsNonComponentToolAllowed(AgentRegistration registration, string toolName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
 

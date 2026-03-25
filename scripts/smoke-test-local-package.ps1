@@ -99,7 +99,7 @@ Invoke-Step "Writing local package reference" {
 }
 
 Invoke-Step "Restoring against local package source" {
-    dotnet restore $projectPath -nologo --force-evaluate "--source=$packageOutputDir" "--source=https://api.nuget.org/v3/index.json"
+    dotnet restore $projectPath -nologo --force-evaluate --source $packageOutputDir --source "https://api.nuget.org/v3/index.json"
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet restore failed."
     }

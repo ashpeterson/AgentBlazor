@@ -6,72 +6,53 @@
 @implements IDisposable
 @inject ResponseOrchestrationWorkflowService Workflow
 @inject IAgentComponentRegistry ComponentRegistry
-@inject NavigationManager NavigationManager
 
 <PageTitle>Response Orchestration Workflow</PageTitle>
 
-<div class="demo-doc-page">
-    <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Featured live demo</p>
-        <MudText Typo="Typo.h4">Response orchestration</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
-            One agent. Three live systems. One final approval boundary.
-        </MudText>
+<div class="workflow-board">
+    <MudPaper Elevation="0" Class="workflow-board__hero">
+        <div class="workflow-board__hero-top">
+            <div>
+                <p class="workflow-board__eyebrow">Primary live flow</p>
+                <MudText Typo="Typo.h4">Response orchestration</MudText>
+            </div>
 
-        <div class="demo-doc-page__prompt-row">
-            <span>Assess cross-system response readiness</span>
-            <span>Advance the next guided subsystem stage</span>
-            <span>Prepare the response packet</span>
+            <div class="workflow-board__stat-strip">
+                <span><strong>@GetWorkflowPhase()</strong><small>phase</small></span>
+                <span><strong>@Workflow.Snapshot.HighlightedSupplierCount</strong><small>suppliers</small></span>
+                <span><strong>@Workflow.Snapshot.VerifiedFileCount</strong><small>files</small></span>
+                <span><strong>1</strong><small>approval</small></span>
+            </div>
+        </div>
+
+        <div class="workflow-board__prompt-row">
+            <span>Assess readiness</span>
+            <span>Run next step</span>
+            <span>Prepare packet</span>
+            <a href="/demo/workflows/release-dossier?reset=true">Release proof</a>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(ReturnedFrom))
         {
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3 mb-0">
                 @Workflow.GetGuidedJourneySummary(ReturnedFrom, ReturnState)
             </MudAlert>
         }
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
-                Phase: @GetWorkflowPhase()
-            </MudChip>
-            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
-                Suppliers: @Workflow.Snapshot.HighlightedSupplierCount
-            </MudChip>
-            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
-                Verified files: @Workflow.Snapshot.VerifiedFileCount
-            </MudChip>
-            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
-                Approval: packet
-            </MudChip>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AssessAsync">
-                Assess
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AdvanceNextStageAsync">
-                Advance
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PreparePacketAsync">
-                Packet
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ApplyRecoveryAsync">
-                Recover
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RunPrimaryActionAsync">
+                @GetPrimaryActionLabel()
             </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
                 Reset
             </MudButton>
-            @if (GetNextGuidedRoute() is { } nextGuidedRoute)
-            {
-                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@(() => NavigateTo(nextGuidedRoute))">
-                    Next live route
-                </MudButton>
-            }
         </MudStack>
 
-        <MudGrid Spacing="2" Class="mt-3">
+        <MudGrid Spacing="2" Class="mt-4">
             @foreach (var step in Workflow.GetJourneySteps(ReturnedFrom))
             {
                 <MudItem xs="12" sm="6" lg="3">
-                    <MudPaper Class="demo-doc-page__journey-card" Outlined="true">
+                    <MudPaper Class="workflow-board__journey-card" Outlined="true">
                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                             <MudText Typo="Typo.subtitle2">@step.Title</MudText>
                             <MudChip T="string" Color="@GetStepColor(step.Status)" Variant="@(step.Status == ResponseOrchestrationJourneyStepStatus.Complete ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
@@ -97,120 +78,41 @@
     </MudPaper>
 
     <section class="demo-doc-page__section">
-        <MudGrid Spacing="2">
-            <MudItem xs="12" xl="7">
-                <MudGrid Spacing="2">
-                    <MudItem xs="12" md="4">
-                        <MudPaper Class="pa-4" Outlined="true">
-                            <MudText Typo="Typo.h6">Supplier system</MudText>
-                            <MudDivider Class="my-3" />
-                            <MudList T="string" Dense="true">
-                                <MudListItem T="string">Phase: @Workflow.Snapshot.SupplierPhase</MudListItem>
-                                <MudListItem T="string">Highlighted: @Workflow.Snapshot.HighlightedSupplierCount</MudListItem>
-                                <MudListItem T="string">Recovery staged: @Workflow.Snapshot.RecoveredSupplierCount</MudListItem>
-                            </MudList>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@Workflow.GetSupplierWorkflowRoute()" Class="mt-2">
-                                Open live supplier surface
-                            </MudButton>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudPaper Class="pa-4" Outlined="true">
-                            <MudText Typo="Typo.h6">Audit evidence</MudText>
-                            <MudDivider Class="my-3" />
-                            <MudList T="string" Dense="true">
-                                <MudListItem T="string">Mode: @Workflow.Snapshot.FileSnapshot.UploadMode</MudListItem>
-                                <MudListItem T="string">Latest phase: @Workflow.Snapshot.FileBundlePhase</MudListItem>
-                                <MudListItem T="string">Verified files: @Workflow.Snapshot.VerifiedFileCount</MudListItem>
-                            </MudList>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@Workflow.GetFileWorkflowRoute()" Class="mt-2">
-                                Open live evidence surface
-                            </MudButton>
-                        </MudPaper>
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudPaper Class="pa-4" Outlined="true">
-                            <MudText Typo="Typo.h6">Incident escalation</MudText>
-                            <MudDivider Class="my-3" />
-                            <MudList T="string" Dense="true">
-                                <MudListItem T="string">Phase: @Workflow.Snapshot.IncidentPhase</MudListItem>
-                                <MudListItem T="string">Incident: @Workflow.Snapshot.IncidentSnapshot.Incident.IncidentId</MudListItem>
-                                <MudListItem T="string">Owner: @(Workflow.Snapshot.IncidentSnapshot.Incident.AssignedOwner ?? "Unassigned")</MudListItem>
-                            </MudList>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@Workflow.GetIncidentWorkflowRoute()" Class="mt-2">
-                                Open live incident surface
-                            </MudButton>
-                        </MudPaper>
-                    </MudItem>
-                </MudGrid>
+        <MudPaper Class="workflow-board__preview-card" Outlined="true">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">Packet preview</MudText>
+                <MudChip T="string" Color="@GetOutcomeChipColor()" Variant="Variant.Outlined" Size="Size.Small">
+                    @GetWorkflowPhase()
+                </MudChip>
+            </MudStack>
 
-                <MudPaper Class="pa-4 mt-4" Outlined="true">
-                    <MudText Typo="Typo.h6">Cross-system handoff preview</MudText>
-
-                    @if (Workflow.CurrentPacket is { } packet)
+            @if (Workflow.CurrentPacket is { } packet)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-3">@packet.Title</MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-2">
+                    Incident: @packet.IncidentId • Suppliers: @string.Join(", ", packet.SupplierIds)
+                </MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var packetSection in packet.Sections)
                     {
-                        <MudText Typo="Typo.subtitle2">@packet.Title</MudText>
-                        <MudText Typo="Typo.caption" Class="d-block mb-2">
-                            Incident: @packet.IncidentId • Suppliers: @string.Join(", ", packet.SupplierIds)
-                        </MudText>
-                        <MudList T="string" Dense="true">
-                            @foreach (var packetSection in packet.Sections)
-                            {
-                                <MudListItem T="string">@packetSection</MudListItem>
-                            }
-                        </MudList>
+                        <MudListItem T="string">@packetSection</MudListItem>
                     }
-                    else
+                </MudList>
+            }
+            else if (Workflow.LatestBlockers.Count > 0)
+            {
+                <MudList T="string" Dense="true" Class="mt-3">
+                    @foreach (var blocker in Workflow.LatestBlockers)
                     {
-                        <MudText Typo="Typo.body2">No response packet is active yet.</MudText>
+                        <MudListItem T="string">@blocker</MudListItem>
                     }
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" xl="5">
-                <MudStack Spacing="2">
-                    <WorkflowDecisionSupport Title="Decision support"
-                                             Description="Shared state. Shared blockers. One final packet."
-                                             PhaseLabel="@GetWorkflowPhase()"
-                                             ApprovalBoundarySummary="response packet preparation"
-                                             NextStepSummary="@GetNextStepSummary()"
-                                             OutcomeTitle="Cross-system narrative"
-                                             OutcomeSummary="@GetOutcomeSummary()"
-                                             OutcomeSeverity="@GetOutcomeSeverity()"
-                                             BlockerSummary="Clear these subsystem blockers before preparing the response packet."
-                                             Blockers="@Workflow.LatestBlockers"
-                                             Warnings="@GetWarnings()"
-                                             NextActions="@GetRecommendedActions()">
-                        <SummaryContent>
-                            <MudList T="string" Dense="true" Class="mb-0">
-                                <MudListItem T="string">Supplier phase: @Workflow.Snapshot.SupplierPhase</MudListItem>
-                                <MudListItem T="string">File phase: @Workflow.Snapshot.FileBundlePhase</MudListItem>
-                                <MudListItem T="string">Incident phase: @Workflow.Snapshot.IncidentPhase</MudListItem>
-                            </MudList>
-                        </SummaryContent>
-                    </WorkflowDecisionSupport>
-
-                    <MudPaper Class="pa-4" Outlined="true">
-                        <MudText Typo="Typo.h6">Activity</MudText>
-                        @if (Workflow.JourneyEvents.Count == 0)
-                        {
-                            <MudText Typo="Typo.body2">No activity yet.</MudText>
-                        }
-                        else
-                        {
-                            <MudList T="string" Dense="true">
-                                @foreach (var entry in Workflow.JourneyEvents.Take(6))
-                                {
-                                    <MudListItem T="string">
-                                        @($"{entry.TimestampUtc.ToLocalTime():HH:mm:ss} • {entry.Title} • {entry.Summary}")
-                                    </MudListItem>
-                                }
-                            </MudList>
-                        }
-                    </MudPaper>
-                </MudStack>
-            </MudItem>
-        </MudGrid>
+                </MudList>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Class="mt-3">@GetNextStepSummary()</MudText>
+            }
+        </MudPaper>
     </section>
 
     <AgentDialog AgentId="response-orchestration-dialog"
@@ -302,6 +204,32 @@
     private Task AssessAsync()
         => Workflow.AssessResponseReadinessAsync(ComponentRegistry.SessionId);
 
+    private Task RunPrimaryActionAsync()
+    {
+        if (Workflow.CurrentPacket is not null)
+        {
+            Workflow.SetPacketDialogVisible(true);
+            return Task.CompletedTask;
+        }
+
+        if (Workflow.LatestBlockers.Count > 0)
+        {
+            return ApplyRecoveryAsync();
+        }
+
+        if (GetNextGuidedRoute() is not null)
+        {
+            return AdvanceNextStageAsync();
+        }
+
+        if (HasAssessmentState())
+        {
+            return PreparePacketAsync();
+        }
+
+        return AssessAsync();
+    }
+
     private Task AdvanceNextStageAsync()
         => Workflow.AdvanceNextStageAsync(ComponentRegistry.SessionId);
 
@@ -329,6 +257,33 @@
         return Task.CompletedTask;
     }
 
+    private string GetPrimaryActionLabel()
+    {
+        if (Workflow.CurrentPacket is not null)
+        {
+            return "Open packet";
+        }
+
+        if (Workflow.LatestBlockers.Count > 0)
+        {
+            return "Run recovery";
+        }
+
+        if (GetNextGuidedRoute() is not null)
+        {
+            return "Run next step";
+        }
+
+        return HasAssessmentState() ? "Prepare packet" : "Assess";
+    }
+
+    private bool HasAssessmentState() =>
+        !string.Equals(Workflow.Snapshot.SupplierPhase, "Idle", StringComparison.OrdinalIgnoreCase) ||
+        !string.Equals(Workflow.Snapshot.FileBundlePhase, "Idle", StringComparison.OrdinalIgnoreCase) ||
+        !string.Equals(Workflow.Snapshot.IncidentPhase, "Idle", StringComparison.OrdinalIgnoreCase) ||
+        Workflow.Snapshot.HighlightedSupplierCount > 0 ||
+        Workflow.Snapshot.VerifiedFileCount > 0;
+
     private string GetWorkflowPhase() =>
         Workflow.CurrentPacket is not null
             ? "Response packet ready"
@@ -355,28 +310,17 @@
         return "Assess readiness first, then prepare the response packet once the subsystem phases are aligned.";
     }
 
-    private string GetOutcomeSummary() =>
-        string.IsNullOrWhiteSpace(Workflow.LatestNarrative)
-            ? "Run the readiness assessment to coordinate supplier, file, and incident state."
-            : Workflow.LatestNarrative!;
+    private string? GetNextGuidedRoute() => Workflow.GetNextGuidedWorkflowRoute(ReturnedFrom);
 
-    private Severity GetOutcomeSeverity()
+    private Color GetOutcomeChipColor()
     {
         if (Workflow.CurrentPacket is not null)
         {
-            return Severity.Success;
+            return Color.Success;
         }
 
-        return Workflow.LatestBlockers.Count > 0
-            ? Severity.Warning
-            : Severity.Info;
+        return Workflow.LatestBlockers.Count > 0 ? Color.Warning : Color.Primary;
     }
-
-    private IReadOnlyList<string> GetWarnings() => Workflow.LatestResult?.Warnings ?? [];
-
-    private IReadOnlyList<string> GetRecommendedActions() => Workflow.LatestResult?.NextActions ?? [GetNextStepSummary()];
-
-    private string? GetNextGuidedRoute() => Workflow.GetNextGuidedWorkflowRoute(ReturnedFrom);
 
     private static string GetStepLabel(ResponseOrchestrationJourneyStepStatus status) => status switch
     {
@@ -393,8 +337,6 @@
         ResponseOrchestrationJourneyStepStatus.Current => Color.Primary,
         _ => Color.Secondary
     };
-
-    private void NavigateTo(string route) => NavigationManager.NavigateTo(route);
 
     private void HandleWorkflowChanged() => _ = InvokeAsync(StateHasChanged);
 
