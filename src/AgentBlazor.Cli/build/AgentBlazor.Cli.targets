@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    AgentBlazor CLI MSBuild Integration
+
+    Auto-updates .agentblazor/AGENT.md after build when:
+    1. The .agentblazor/AGENT.md file exists (init was already run)
+    2. Building in non-incremental mode or source files changed
+
+    To disable, set <AgentBlazorAutoUpdate>false</AgentBlazorAutoUpdate> in your project.
+  -->
+
+  <PropertyGroup>
+    <AgentBlazorAutoUpdate Condition="'$(AgentBlazorAutoUpdate)' == ''">true</AgentBlazorAutoUpdate>
+    <AgentBlazorAgentMdPath Condition="'$(AgentBlazorAgentMdPath)' == ''">$(MSBuildProjectDirectory)\.agentblazor\AGENT.md</AgentBlazorAgentMdPath>
+  </PropertyGroup>
+
+  <Target Name="AgentBlazorUpdate"
+          AfterTargets="Build"
+          Condition="'$(AgentBlazorAutoUpdate)' == 'true' AND Exists('$(AgentBlazorAgentMdPath)')">
+
+    <Message Importance="low" Text="AgentBlazor: Checking for updates to AGENT.md..." />
+
+    <!-- Run the update command silently -->
+    <Exec Command="agentblazor update --non-interactive --quiet"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="false"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low" />
+
+  </Target>
+
+</Project>

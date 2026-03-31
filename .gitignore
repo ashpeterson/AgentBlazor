@@ -486,3 +486,6 @@ $RECYCLE.BIN/
 /demo/AgentBlazor.Demo/*.db
 /demo/AgentBlazor.Demo/*.db-shm
 /demo/AgentBlazor.Demo/*.db-wal
+
+# AgentBlazor CLI - ignore state file, keep AGENT.md
+.agentblazor/.state
