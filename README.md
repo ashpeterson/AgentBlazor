@@ -149,7 +149,7 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-03-20:
+As of 2026-03-31:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
@@ -165,6 +165,7 @@ The biggest remaining product gap is not UI execution. It is durable paid intell
 
 ## Docs
 
+- [Quickstart](docs/quickstart.md)
 - [Status](docs/STATUS.md)
 - [Architecture](docs/architecture.md)
 - [Runtime Realignment Plan](docs/runtime-realignment-plan.md)

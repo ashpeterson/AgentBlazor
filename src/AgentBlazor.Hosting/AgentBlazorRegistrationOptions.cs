@@ -291,7 +291,9 @@ public sealed class AgentBlazorRegistrationOptions
     /// Keys must start with "AB-PRO-" (Paid tier) or "AB-ENT-" (Premium tier)
     /// and be at least 24 characters long.
     /// </summary>
-    public AgentBlazorRegistrationOptions UseProLicense(string licenseKey)
+    /// <param name="licenseKey">The license key.</param>
+    /// <param name="dataDirectory">Optional directory for persistent storage. Defaults to current directory.</param>
+    public AgentBlazorRegistrationOptions UseProLicense(string licenseKey, string? dataDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(licenseKey);
 
@@ -306,12 +308,16 @@ public sealed class AgentBlazorRegistrationOptions
             ? AgentBlazor.Licensing.AgentBlazorTier.Premium
             : AgentBlazor.Licensing.AgentBlazorTier.Paid;
 
-        // Override free-tier no-op services with paid implementations
+        // Override free-tier no-op services with durable SQLite implementations
+        var dbDir = dataDirectory ?? Environment.CurrentDirectory;
+        var historyDbPath = Path.Combine(dbDir, "agentblazor-history.db");
+        var inspectorDbPath = Path.Combine(dbDir, "agentblazor-inspector.db");
+
         _serviceRegistration += services =>
         {
             services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
-                AgentBlazor.Core.Paid.IActionHistoryStore,
-                AgentBlazor.Core.Paid.InMemoryActionHistoryStore>());
+                AgentBlazor.Core.Paid.IActionHistoryStore>(
+                _ => AgentBlazor.Core.Paid.SqliteActionHistoryStore.CreateWithPath(historyDbPath)));
             services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
                 AgentBlazor.Core.Paid.IAdaptiveSuggestionService,
                 AgentBlazor.Core.Paid.LlmAdaptiveSuggestionService>());
@@ -319,8 +325,8 @@ public sealed class AgentBlazorRegistrationOptions
                 AgentBlazor.Core.Paid.IProactiveInsightService,
                 AgentBlazor.Core.Paid.LlmProactiveInsightService>());
             services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
-                AgentBlazor.Core.Paid.IAgentInspectorStore,
-                AgentBlazor.Core.Paid.InMemoryAgentInspectorStore>());
+                AgentBlazor.Core.Paid.IAgentInspectorStore>(
+                _ => AgentBlazor.Core.Paid.SqliteAgentInspectorStore.CreateWithPath(inspectorDbPath)));
         };
 
         return this;

@@ -1,26 +1,41 @@
 # Pricing Tiers
 
-Last updated: 2026-03-20
+Last updated: 2026-03-31
 
-This document describes the current tier model and the current reality of what is wired in code.
+This document describes the tier model, pricing strategy, and implementation status.
 
-Current product framing note:
+## Market Context
 
-- the workflow hub and orchestration routes are now the main product proof
-- paid differentiation should continue to support intelligence and workflow guidance, not basic component control
+Based on 2026 market research:
 
-Current conversion strategy:
+| Competitor | Free | Paid | Notes |
+|------------|------|------|-------|
+| LangSmith | 5k traces/mo | $39/seat/mo | Python-first, no Blazor |
+| Vercel v0 | $5 credits/mo | $20/mo | React-only, generative |
+| Syncfusion Blazor | Community license | ~$995/year | Components only, no agent runtime |
+| Telerik Blazor | Trial only | ~$999/year | Components only, no agent runtime |
 
-- `Free` must feel complete enough to ship
-- `Paid` must feel like the obvious upgrade once teams want the app to learn, guide, and prompt operators
-- `Premium` should be the team and governance layer, not a renamed paid tier
-- landing, README, and `/demo` should all make this upgrade path visible in under 30 seconds
+AgentBlazor occupies a unique position: the only Blazor-native agentic UI framework with deterministic execution, approval workflows, and MudBlazor integration.
+
+## Pricing Strategy
+
+| Tier | Price | Target | Value |
+|------|-------|--------|-------|
+| **Free** | $0 | Solo devs, POCs | Full runtime, all components, dev tools |
+| **Pro** | $29/seat/mo | Teams | Persistent intelligence, unlimited workflows |
+| **Enterprise** | Custom | Large orgs | SSO, audit logs, SLA, dedicated support |
+
+Rationale for $29/seat/mo:
+- Below LangSmith ($39) for easier .NET adoption
+- Above commodity pricing to signal serious product
+- Per-seat aligns with enterprise .NET budgeting
+- Monthly allows try-before-commit
 
 ## Tier Model
 
 - `Free`
-- `Paid`
-- `Premium`
+- `Pro` (formerly "Paid")
+- `Enterprise` (formerly "Premium")
 
 Tier primitives live in `AgentBlazor.Licensing`.
 
@@ -155,25 +170,31 @@ Note:
 
 - `UseDevTools()` can still replace the null inspector store for development without a paid license
 
-## Important Limitation
+## Implementation Status
 
-The current paid story is only partially complete.
+### What Exists
 
-What exists:
+| Service | Interface | Implementation | Status |
+|---------|-----------|----------------|--------|
+| Action History | `IActionHistoryStore` | `InMemoryActionHistoryStore` | In-memory only |
+| Adaptive Suggestions | `IAdaptiveSuggestionService` | `LlmAdaptiveSuggestionService` | Working |
+| Proactive Insights | `IProactiveInsightService` | `LlmProactiveInsightService` | Working |
+| Inspector Store | `IAgentInspectorStore` | `InMemoryAgentInspectorStore` | In-memory only |
 
-- action history abstraction
-- adaptive suggestion service
-- proactive insight service
+### Production Roadmap
 
-What is still missing:
+| Priority | Task | Status | Effort |
+|----------|------|--------|--------|
+| 1 | `SqliteActionHistoryStore` | Planned | 2-3 days |
+| 2 | `SqliteAgentInspectorStore` | Planned | 1 day |
+| 3 | License key server validation | Planned | 1 day |
+| 4 | User profile intelligence aggregation | Planned | 2-3 days |
 
-- durable persistent action history
-- mature cross-session user personalization
-- a finished "persistent user usage for intelligent suggestions" product story
+### Critical Gap
 
-Today the main limitation is that the shipped paid action history implementation is still in-memory, so it does not yet represent durable long-term user intelligence.
+The paid value story ("app learns over time") requires durable persistence. Current in-memory stores reset on app restart, breaking the core paid proposition.
 
-This is still the largest product-level gap in the repository today.
+Once `SqliteActionHistoryStore` ships, the paid tier delivers real value.
 
 ## Enforcement Status
 
@@ -245,8 +266,14 @@ The current product funnel should stay simple:
 
 Current truth:
 
-- the tier model exists
-- the component-action surface is now free
-- paid differentiation is intended to be intelligence-driven
-- the durable persistent intelligence story has started, but is not finished yet
-- the component compatibility push has reduced adoption risk on the UI side, so the biggest outstanding monetization risk is now the incomplete persistence/intelligence story rather than component gating
+- Free tier is production-ready and shippable
+- Pro tier infrastructure exists but persistence is incomplete
+- All component actions are free (correct product boundary)
+- Paid differentiation is intelligence-driven, not feature-gated
+- Remaining work: ~1 week to complete durable persistence
+
+Go-to-market readiness:
+
+- Free: Ready to ship to NuGet
+- Pro ($29/seat/mo): Ready after SqliteActionHistoryStore
+- Enterprise: Ready after SSO/audit log implementation

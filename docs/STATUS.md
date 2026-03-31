@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-23
+Last updated: 2026-03-31
 
 ## Current Product Shape
 
@@ -245,14 +245,43 @@ Coverage includes:
 - Declarative interoperability exists, but only as an adapter subset today, not full schema coverage for every external declarative UI feature.
 - MCP tool integration exists, but a broader production-grade hosted-app contract still needs more depth if open-ended hosting becomes a larger platform story.
 
-## What Needs Doing Next
+## Production Roadmap
 
-1. Keep tightening the workflow-first shell and UX so the orchestration routes and their supporting supplier/file/recipe/incident modules are the default story, not the component explorer.
-2. Keep aligning any remaining showcase/detail surfaces around the same normalized execution-plan and approval model now used by chat, approval prompts, inspector, and workflow pages.
-3. Continue expanding workflow-first proof from the current orchestration showcase into broader production-style scenarios, especially deeper cross-screen and cross-system compositions.
-4. Keep tightening the live demo journey so the orchestration routes, fresh-start links, and route-aware presenter cues feel effortless in a fast product video.
-5. Begin the eventual package/module split only after the demo/product proof is strong enough that the new package story can follow the product story.
-6. Continue parity depth where needed, but stop treating primitive component-control coverage as the main product measure.
+### Phase 1: Ship Free Tier (Ready Now)
+
+| Item | Status |
+|------|--------|
+| Core runtime | Done |
+| All 14 components | Done |
+| Demo app with workflows | Done |
+| CLI tool (`agentblazor`) | Done |
+| Publish NuGet pre-release | Pending |
+| Create `docs/quickstart.md` | Pending |
+
+### Phase 2: Complete Pro Tier (~1 week)
+
+| Item | Status | Effort |
+|------|--------|--------|
+| `SqliteActionHistoryStore` | Planned | 2-3 days |
+| `SqliteAgentInspectorStore` | Planned | 1 day |
+| License key server validation | Planned | 1 day |
+| User profile intelligence | Planned | 2-3 days |
+
+### Phase 3: Enterprise Features (Future)
+
+| Item | Status |
+|------|--------|
+| SSO/SAML integration | Not started |
+| Audit log export | Not started |
+| Role-based action permissions | Not started |
+| Usage analytics dashboard | Not started |
+
+### Ongoing
+
+1. Keep tightening the workflow-first shell and UX so the orchestration routes are the default story.
+2. Continue expanding workflow-first proof into broader production-style scenarios.
+3. Keep tightening the live demo journey for fast product videos.
+4. Begin package/module split after demo/product proof is strong enough.
 
 Current note:
 - `AgentBlazorOptions.DefaultAgent` is now explicitly obsolete as a legacy compatibility surface; host apps should move toward explicit `AddAgent(...)` registration, and normal runtime resolution no longer synthesizes or prefers a built-in default agent.
