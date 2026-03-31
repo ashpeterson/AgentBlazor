@@ -150,12 +150,16 @@ This means the repo no longer treats baseline component actions as monetized cap
 
 ## What Paid Currently Enables
 
-`UseProLicense(...)` currently swaps in:
+`UseProLicense(licenseKey, dataDirectory?)` currently swaps in:
 
-- `IActionHistoryStore -> InMemoryActionHistoryStore`
+- `IActionHistoryStore -> SqliteActionHistoryStore` (durable)
 - `IAdaptiveSuggestionService -> LlmAdaptiveSuggestionService`
 - `IProactiveInsightService -> LlmProactiveInsightService`
-- `IAgentInspectorStore -> InMemoryAgentInspectorStore`
+- `IAgentInspectorStore -> SqliteAgentInspectorStore` (durable)
+
+Data is persisted to SQLite databases in the specified `dataDirectory` (defaults to current directory):
+- `agentblazor-history.db` - Action history
+- `agentblazor-inspector.db` - Inspector runs
 
 ## Free Tier Service Defaults
 
@@ -176,25 +180,28 @@ Note:
 
 | Service | Interface | Implementation | Status |
 |---------|-----------|----------------|--------|
-| Action History | `IActionHistoryStore` | `InMemoryActionHistoryStore` | In-memory only |
+| Action History | `IActionHistoryStore` | `SqliteActionHistoryStore` | Durable |
 | Adaptive Suggestions | `IAdaptiveSuggestionService` | `LlmAdaptiveSuggestionService` | Working |
 | Proactive Insights | `IProactiveInsightService` | `LlmProactiveInsightService` | Working |
-| Inspector Store | `IAgentInspectorStore` | `InMemoryAgentInspectorStore` | In-memory only |
+| Inspector Store | `IAgentInspectorStore` | `SqliteAgentInspectorStore` | Durable |
 
-### Production Roadmap
+### Completed
 
-| Priority | Task | Status | Effort |
-|----------|------|--------|--------|
-| 1 | `SqliteActionHistoryStore` | Planned | 2-3 days |
-| 2 | `SqliteAgentInspectorStore` | Planned | 1 day |
-| 3 | License key server validation | Planned | 1 day |
-| 4 | User profile intelligence aggregation | Planned | 2-3 days |
+- `SqliteActionHistoryStore` - Durable action history with user/session indexing and pattern aggregation
+- `SqliteAgentInspectorStore` - Durable inspector runs with execution plan storage
+- `UseProLicense()` wiring with configurable data directory
 
-### Critical Gap
+### Future Enhancements
 
-The paid value story ("app learns over time") requires durable persistence. Current in-memory stores reset on app restart, breaking the core paid proposition.
+| Item | Priority |
+|------|----------|
+| License key server validation | Optional |
+| User profile intelligence aggregation | Medium |
+| Cross-session personalization | Medium |
 
-Once `SqliteActionHistoryStore` ships, the paid tier delivers real value.
+### Production Ready
+
+The paid tier now delivers durable "app learns over time" functionality. Action history and inspector data persist to SQLite databases across app restarts.
 
 ## Enforcement Status
 
@@ -267,13 +274,12 @@ The current product funnel should stay simple:
 Current truth:
 
 - Free tier is production-ready and shippable
-- Pro tier infrastructure exists but persistence is incomplete
+- Pro tier is production-ready with durable SQLite persistence
 - All component actions are free (correct product boundary)
 - Paid differentiation is intelligence-driven, not feature-gated
-- Remaining work: ~1 week to complete durable persistence
 
 Go-to-market readiness:
 
 - Free: Ready to ship to NuGet
-- Pro ($29/seat/mo): Ready after SqliteActionHistoryStore
+- Pro ($29/seat/mo): Ready to ship
 - Enterprise: Ready after SSO/audit log implementation

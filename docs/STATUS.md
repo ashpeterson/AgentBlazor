@@ -255,17 +255,18 @@ Coverage includes:
 | All 14 components | Done |
 | Demo app with workflows | Done |
 | CLI tool (`agentblazor`) | Done |
+| Create `docs/quickstart.md` | Done |
 | Publish NuGet pre-release | Pending |
-| Create `docs/quickstart.md` | Pending |
 
-### Phase 2: Complete Pro Tier (~1 week)
+### Phase 2: Complete Pro Tier (Done)
 
-| Item | Status | Effort |
-|------|--------|--------|
-| `SqliteActionHistoryStore` | Planned | 2-3 days |
-| `SqliteAgentInspectorStore` | Planned | 1 day |
-| License key server validation | Planned | 1 day |
-| User profile intelligence | Planned | 2-3 days |
+| Item | Status |
+|------|--------|
+| `SqliteActionHistoryStore` | Done |
+| `SqliteAgentInspectorStore` | Done |
+| Wire stores into `UseProLicense()` | Done |
+| License key server validation | Optional (format validation exists) |
+| User profile intelligence | Future enhancement |
 
 ### Phase 3: Enterprise Features (Future)
 
