@@ -1,0 +1,416 @@
+@namespace AgentBlazor.Components
+@using AgentBlazor.Core.Paid.Analytics
+@using AgentBlazor.Core.Paid.Audit
+@using AgentBlazor.Core.Paid.Suggestions
+@inject IUsageAnalyticsService AnalyticsService
+@inject IAuditLogService AuditService
+@inject ISmartSuggestionService SuggestionService
+
+<div class="ab-dashboard @(_loading ? "ab-dashboard--loading" : null)">
+    <div class="ab-dashboard__header">
+        <h2 class="ab-dashboard__title">@Title</h2>
+        <div class="ab-dashboard__actions">
+            <button type="button" class="ab-dashboard__refresh" @onclick="RefreshAsync" disabled="@_loading">
+                @(_loading ? "Loading..." : "Refresh")
+            </button>
+        </div>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="ab-dashboard__error">
+            <span>@_error</span>
+            <button type="button" @onclick="() => _error = null">Dismiss</button>
+        </div>
+    }
+
+    <div class="ab-dashboard__tabs" role="tablist">
+        <button type="button" role="tab" class="ab-dashboard__tab @(_activeTab == 0 ? "ab-dashboard__tab--active" : null)"
+                @onclick="() => _activeTab = 0">Overview</button>
+        <button type="button" role="tab" class="ab-dashboard__tab @(_activeTab == 1 ? "ab-dashboard__tab--active" : null)"
+                @onclick="() => _activeTab = 1">Actions</button>
+        <button type="button" role="tab" class="ab-dashboard__tab @(_activeTab == 2 ? "ab-dashboard__tab--active" : null)"
+                @onclick="() => _activeTab = 2">Audit Log</button>
+        <button type="button" role="tab" class="ab-dashboard__tab @(_activeTab == 3 ? "ab-dashboard__tab--active" : null)"
+                @onclick="() => _activeTab = 3">Patterns</button>
+    </div>
+
+    <div class="ab-dashboard__body">
+        @if (_activeTab == 0)
+        {
+            <div class="ab-dashboard__overview">
+                @if (_summary is not null)
+                {
+                    <div class="ab-dashboard__metrics">
+                        <div class="ab-dashboard__metric">
+                            <span class="ab-dashboard__metric-value">@_summary.TotalActions.ToString("N0")</span>
+                            <span class="ab-dashboard__metric-label">Total Actions</span>
+                        </div>
+                        <div class="ab-dashboard__metric">
+                            <span class="ab-dashboard__metric-value">@_summary.UniqueUsers.ToString("N0")</span>
+                            <span class="ab-dashboard__metric-label">Unique Users</span>
+                        </div>
+                        <div class="ab-dashboard__metric">
+                            <span class="ab-dashboard__metric-value">@_summary.UniqueSessions.ToString("N0")</span>
+                            <span class="ab-dashboard__metric-label">Sessions</span>
+                        </div>
+                        <div class="ab-dashboard__metric ab-dashboard__metric--@(_summary.SuccessRate >= 0.95 ? "success" : _summary.SuccessRate >= 0.8 ? "warning" : "error")">
+                            <span class="ab-dashboard__metric-value">@((_summary.SuccessRate * 100).ToString("F1"))%</span>
+                            <span class="ab-dashboard__metric-label">Success Rate</span>
+                        </div>
+                        <div class="ab-dashboard__metric">
+                            <span class="ab-dashboard__metric-value">@_summary.AvgResponseTime.TotalMilliseconds.ToString("F0")ms</span>
+                            <span class="ab-dashboard__metric-label">Avg Response</span>
+                        </div>
+                    </div>
+
+                    @if (_summary.TopActions.Count > 0)
+                    {
+                        <div class="ab-dashboard__section">
+                            <h3 class="ab-dashboard__section-title">Top Actions</h3>
+                            <div class="ab-dashboard__chips">
+                                @foreach (var action in _summary.TopActions.Take(5))
+                                {
+                                    <span class="ab-dashboard__chip">@action</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="ab-dashboard__empty">No usage data available yet.</p>
+                }
+
+                @if (_dailyTrends.Count > 0)
+                {
+                    <div class="ab-dashboard__section">
+                        <h3 class="ab-dashboard__section-title">Daily Trends (Last 7 Days)</h3>
+                        <table class="ab-dashboard__table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                    <th>Users</th>
+                                    <th>Success</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var day in _dailyTrends.Take(7))
+                                {
+                                    <tr>
+                                        <td>@day.Date.ToString("MMM dd")</td>
+                                        <td>@day.ActionCount.ToString("N0")</td>
+                                        <td>@day.UserCount.ToString("N0")</td>
+                                        <td class="@(day.SuccessRate >= 0.95 ? "ab-dashboard__cell--success" : day.SuccessRate >= 0.8 ? "ab-dashboard__cell--warning" : "ab-dashboard__cell--error")">
+                                            @((day.SuccessRate * 100).ToString("F0"))%
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (_anomalies.Count > 0)
+                {
+                    <div class="ab-dashboard__section">
+                        <h3 class="ab-dashboard__section-title">Anomalies Detected</h3>
+                        <ul class="ab-dashboard__anomaly-list">
+                            @foreach (var anomaly in _anomalies)
+                            {
+                                <li class="ab-dashboard__anomaly ab-dashboard__anomaly--@GetSeverityClass(anomaly.Severity)">
+                                    <span class="ab-dashboard__anomaly-type">@anomaly.AnomalyType</span>
+                                    <span class="ab-dashboard__anomaly-desc">@anomaly.Description</span>
+                                    <span class="ab-dashboard__anomaly-time">@anomaly.DetectedAt.ToLocalTime().ToString("g")</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        }
+        else if (_activeTab == 1)
+        {
+            <div class="ab-dashboard__actions-tab">
+                @if (_topActions.Count > 0)
+                {
+                    <table class="ab-dashboard__table">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>Executions</th>
+                                <th>Success Rate</th>
+                                <th>Avg Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var action in _topActions)
+                            {
+                                <tr>
+                                    <td><code>@action.ActionId</code></td>
+                                    <td>@action.ExecutionCount.ToString("N0")</td>
+                                    <td class="@(action.SuccessRate >= 0.95 ? "ab-dashboard__cell--success" : action.SuccessRate >= 0.8 ? "ab-dashboard__cell--warning" : "ab-dashboard__cell--error")">
+                                        @((action.SuccessRate * 100).ToString("F0"))%
+                                    </td>
+                                    <td>@action.AvgDuration.TotalMilliseconds.ToString("F0")ms</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="ab-dashboard__empty">No action data available yet.</p>
+                }
+
+                @if (_agentMetrics.Count > 0)
+                {
+                    <div class="ab-dashboard__section">
+                        <h3 class="ab-dashboard__section-title">Agent Performance</h3>
+                        <table class="ab-dashboard__table">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Total Actions</th>
+                                    <th>Success Rate</th>
+                                    <th>Avg Response</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var agent in _agentMetrics)
+                                {
+                                    <tr>
+                                        <td><code>@agent.AgentId</code></td>
+                                        <td>@agent.TotalActions.ToString("N0")</td>
+                                        <td class="@(agent.SuccessRate >= 0.95 ? "ab-dashboard__cell--success" : agent.SuccessRate >= 0.8 ? "ab-dashboard__cell--warning" : "ab-dashboard__cell--error")">
+                                            @((agent.SuccessRate * 100).ToString("F0"))%
+                                        </td>
+                                        <td>@agent.AvgResponseTime.TotalMilliseconds.ToString("F0")ms</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+        else if (_activeTab == 2)
+        {
+            <div class="ab-dashboard__audit-tab">
+                <div class="ab-dashboard__audit-toolbar">
+                    <select class="ab-dashboard__filter" @bind="_auditFilter">
+                        <option value="">All Events</option>
+                        <option value="ActionExecuted">Action Executed</option>
+                        <option value="ActionFailed">Action Failed</option>
+                        <option value="ActionApproved">Approval Granted</option>
+                        <option value="ActionDenied">Approval Denied</option>
+                    </select>
+                    <button type="button" class="ab-dashboard__export" @onclick="ExportAuditAsync">Export CSV</button>
+                </div>
+
+                @if (_auditEvents.Count > 0)
+                {
+                    <table class="ab-dashboard__table ab-dashboard__table--audit">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Event</th>
+                                <th>Target</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var evt in GetFilteredAuditEvents())
+                            {
+                                <tr class="ab-dashboard__audit-row--@GetAuditRowClass(evt.EventType)">
+                                    <td>@evt.Timestamp.ToLocalTime().ToString("g")</td>
+                                    <td>@(evt.UserEmail ?? evt.UserId)</td>
+                                    <td><code>@evt.EventType</code></td>
+                                    <td><code>@evt.TargetId</code></td>
+                                    <td class="ab-dashboard__audit-details">@TruncateDetails(evt.Description)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="ab-dashboard__empty">No audit events recorded yet.</p>
+                }
+            </div>
+        }
+        else if (_activeTab == 3)
+        {
+            <div class="ab-dashboard__patterns-tab">
+                @if (_patterns.Count > 0)
+                {
+                    <div class="ab-dashboard__section">
+                        <h3 class="ab-dashboard__section-title">Discovered Action Sequences</h3>
+                        <p class="ab-dashboard__section-desc">Patterns learned from user behavior that power smart suggestions.</p>
+                        <ul class="ab-dashboard__pattern-list">
+                            @foreach (var pattern in _patterns)
+                            {
+                                <li class="ab-dashboard__pattern">
+                                    <div class="ab-dashboard__pattern-sequence">
+                                        @foreach (var action in pattern.PrecedingActions)
+                                        {
+                                            <span class="ab-dashboard__pattern-action">@action</span>
+                                            <span class="ab-dashboard__pattern-arrow">→</span>
+                                        }
+                                        <span class="ab-dashboard__pattern-action ab-dashboard__pattern-action--next">@pattern.NextAction</span>
+                                    </div>
+                                    <div class="ab-dashboard__pattern-meta">
+                                        <span class="ab-dashboard__pattern-count">@pattern.Occurrences occurrences</span>
+                                        <span class="ab-dashboard__pattern-confidence">@((pattern.Confidence * 100).ToString("F0"))% confidence</span>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <p class="ab-dashboard__empty">No patterns discovered yet. Patterns emerge as users interact with your application.</p>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _loading;
+    private string? _error;
+    private int _activeTab;
+    private string _auditFilter = string.Empty;
+
+    private UsageSummary? _summary;
+    private IReadOnlyList<DailyUsage> _dailyTrends = [];
+    private IReadOnlyList<ActionMetric> _topActions = [];
+    private IReadOnlyList<AgentMetric> _agentMetrics = [];
+    private IReadOnlyList<UsageAnomaly> _anomalies = [];
+    private IReadOnlyList<AuditEvent> _auditEvents = [];
+    private IReadOnlyList<ActionSequencePattern> _patterns = [];
+
+    [Parameter]
+    public string Title { get; set; } = "Pro Dashboard";
+
+    [Parameter]
+    public int DaysRange { get; set; } = 30;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_loading) return;
+
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var range = new DateRange(
+                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-DaysRange)),
+                DateOnly.FromDateTime(DateTime.UtcNow));
+
+            var summaryTask = AnalyticsService.GetSummaryAsync(range);
+            var trendsTask = AnalyticsService.GetDailyTrendsAsync(7);
+            var actionsTask = AnalyticsService.GetTopActionsAsync(20);
+            var agentsTask = AnalyticsService.GetAgentPerformanceAsync();
+            var anomaliesTask = AnalyticsService.DetectAnomaliesAsync();
+            var auditTask = AuditService.GetRecentAsync(100);
+            var patternsTask = SuggestionService.GetPatternsAsync(null, 20);
+
+            await Task.WhenAll(summaryTask, trendsTask, actionsTask, agentsTask, anomaliesTask, auditTask, patternsTask);
+
+            _summary = await summaryTask;
+            _dailyTrends = await trendsTask;
+            _topActions = await actionsTask;
+            _agentMetrics = await agentsTask;
+            _anomalies = await anomaliesTask;
+            _auditEvents = await auditTask;
+            _patterns = await patternsTask;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load dashboard data: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private IEnumerable<AuditEvent> GetFilteredAuditEvents()
+    {
+        if (string.IsNullOrWhiteSpace(_auditFilter))
+            return _auditEvents;
+
+        if (!Enum.TryParse<AuditEventType>(_auditFilter, out var eventType))
+            return _auditEvents;
+
+        return _auditEvents.Where(e => e.EventType == eventType);
+    }
+
+    private static string GetAuditRowClass(AuditEventType eventType)
+    {
+        return eventType switch
+        {
+            AuditEventType.ActionFailed or AuditEventType.ActionDenied => "error",
+            AuditEventType.ActionApproved => "success",
+            _ => "default"
+        };
+    }
+
+    private static string GetSeverityClass(double severity)
+    {
+        return severity switch
+        {
+            >= 0.7 => "high",
+            >= 0.4 => "medium",
+            _ => "low"
+        };
+    }
+
+    private static string TruncateDetails(string? details, int maxLength = 50)
+    {
+        if (string.IsNullOrWhiteSpace(details))
+            return "-";
+
+        return details.Length > maxLength
+            ? details[..maxLength] + "..."
+            : details;
+    }
+
+    private async Task ExportAuditAsync()
+    {
+        try
+        {
+            var query = new AuditQuery
+            {
+                StartDate = DateTimeOffset.UtcNow.AddDays(-DaysRange),
+                EndDate = DateTimeOffset.UtcNow
+            };
+
+            if (!string.IsNullOrWhiteSpace(_auditFilter) && Enum.TryParse<AuditEventType>(_auditFilter, out var eventType))
+            {
+                query = query with { EventType = eventType };
+            }
+
+            using var stream = await AuditService.ExportAsync(query, AuditExportFormat.Csv);
+            // In a real implementation, this would trigger a file download via JS interop
+            // For now, we just show a success message
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Export failed: {ex.Message}";
+        }
+    }
+}
