@@ -87,7 +87,7 @@ public class UseProLicenseTests
     }
 
     [Fact]
-    public void UseProLicense_OverridesDiWithPaidHistoryStore()
+    public async Task UseProLicense_OverridesDiWithPaidHistoryStore()
     {
         var services = new ServiceCollection();
 
@@ -96,10 +96,17 @@ public class UseProLicenseTests
             options.UseProLicense("AB-PRO-VALID-KEY-12345678");
         });
 
-        using var provider = services.BuildServiceProvider();
-        var store = provider.GetRequiredService<IActionHistoryStore>();
+        var provider = services.BuildServiceProvider();
+        try
+        {
+            var store = provider.GetRequiredService<IActionHistoryStore>();
 
-        Assert.IsType<InMemoryActionHistoryStore>(store);
+            Assert.IsType<SqliteActionHistoryStore>(store);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+        }
     }
 
     [Fact]

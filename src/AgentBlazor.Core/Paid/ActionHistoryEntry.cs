@@ -7,4 +7,9 @@ public record ActionHistoryEntry(
     string UserMessage,
     string ActionId,
     string AgentId,
-    IReadOnlyDictionary<string, object?> Args);
+    IReadOnlyDictionary<string, object?> Args,
+    // Execution metrics (for analytics)
+    bool Succeeded = true,
+    TimeSpan? Duration = null,
+    string? Route = null,
+    string? ErrorMessage = null);

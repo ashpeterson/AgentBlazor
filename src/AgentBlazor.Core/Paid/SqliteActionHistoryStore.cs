@@ -58,12 +58,18 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
                     action_id TEXT NOT NULL,
                     agent_id TEXT NOT NULL,
                     args_json TEXT NOT NULL,
+                    succeeded INTEGER NOT NULL DEFAULT 1,
+                    duration_ms INTEGER,
+                    route TEXT,
+                    error_message TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_session_id ON action_history(session_id);
                 CREATE INDEX IF NOT EXISTS idx_user_id ON action_history(user_id);
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON action_history(timestamp DESC);
+                CREATE INDEX IF NOT EXISTS idx_action_id ON action_history(action_id);
+                CREATE INDEX IF NOT EXISTS idx_succeeded ON action_history(succeeded);
                 """;
 
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -86,8 +92,8 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
         {
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = """
-                INSERT INTO action_history (session_id, user_id, timestamp, user_message, action_id, agent_id, args_json)
-                VALUES (@sessionId, @userId, @timestamp, @userMessage, @actionId, @agentId, @argsJson)
+                INSERT INTO action_history (session_id, user_id, timestamp, user_message, action_id, agent_id, args_json, succeeded, duration_ms, route, error_message)
+                VALUES (@sessionId, @userId, @timestamp, @userMessage, @actionId, @agentId, @argsJson, @succeeded, @durationMs, @route, @errorMessage)
                 """;
 
             cmd.Parameters.AddWithValue("@sessionId", entry.SessionId);
@@ -97,6 +103,10 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
             cmd.Parameters.AddWithValue("@actionId", entry.ActionId);
             cmd.Parameters.AddWithValue("@agentId", entry.AgentId);
             cmd.Parameters.AddWithValue("@argsJson", JsonSerializer.Serialize(entry.Args, JsonOptions));
+            cmd.Parameters.AddWithValue("@succeeded", entry.Succeeded ? 1 : 0);
+            cmd.Parameters.AddWithValue("@durationMs", entry.Duration.HasValue ? (object)(long)entry.Duration.Value.TotalMilliseconds : DBNull.Value);
+            cmd.Parameters.AddWithValue("@route", entry.Route ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@errorMessage", entry.ErrorMessage ?? (object)DBNull.Value);
 
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
@@ -116,7 +126,7 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
         {
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = """
-                SELECT session_id, user_id, timestamp, user_message, action_id, agent_id, args_json
+                SELECT session_id, user_id, timestamp, user_message, action_id, agent_id, args_json, succeeded, duration_ms, route, error_message
                 FROM action_history
                 WHERE session_id = @sessionId
                 ORDER BY timestamp DESC
@@ -152,7 +162,7 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
         {
             using var cmd = _connection.CreateCommand();
             cmd.CommandText = """
-                SELECT session_id, user_id, timestamp, user_message, action_id, agent_id, args_json
+                SELECT session_id, user_id, timestamp, user_message, action_id, agent_id, args_json, succeeded, duration_ms, route, error_message
                 FROM action_history
                 WHERE user_id = @userId
                 ORDER BY timestamp DESC
@@ -255,6 +265,10 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
         var actionId = reader.GetString(4);
         var agentId = reader.GetString(5);
         var argsJson = reader.GetString(6);
+        var succeeded = reader.GetInt32(7) == 1;
+        var durationMs = reader.IsDBNull(8) ? (long?)null : reader.GetInt64(8);
+        var route = reader.IsDBNull(9) ? null : reader.GetString(9);
+        var errorMessage = reader.IsDBNull(10) ? null : reader.GetString(10);
 
         var args = JsonSerializer.Deserialize<Dictionary<string, object?>>(argsJson, JsonOptions)
             ?? new Dictionary<string, object?>();
@@ -266,7 +280,11 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
             userMessage,
             actionId,
             agentId,
-            args);
+            args,
+            succeeded,
+            durationMs.HasValue ? TimeSpan.FromMilliseconds(durationMs.Value) : null,
+            route,
+            errorMessage);
     }
 
     public async ValueTask DisposeAsync()

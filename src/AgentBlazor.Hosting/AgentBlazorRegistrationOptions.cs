@@ -6,6 +6,9 @@ using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Core.Runtime.Tools;
+using AgentBlazor.Core.Paid.Analytics;
+using AgentBlazor.Core.Paid.Audit;
+using AgentBlazor.Core.Paid.Suggestions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -312,9 +315,11 @@ public sealed class AgentBlazorRegistrationOptions
         var dbDir = dataDirectory ?? Environment.CurrentDirectory;
         var historyDbPath = Path.Combine(dbDir, "agentblazor-history.db");
         var inspectorDbPath = Path.Combine(dbDir, "agentblazor-inspector.db");
+        var auditDbPath = Path.Combine(dbDir, "agentblazor-audit.db");
 
         _serviceRegistration += services =>
         {
+            // Core persistence
             services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
                 AgentBlazor.Core.Paid.IActionHistoryStore>(
                 _ => AgentBlazor.Core.Paid.SqliteActionHistoryStore.CreateWithPath(historyDbPath)));
@@ -327,6 +332,23 @@ public sealed class AgentBlazorRegistrationOptions
             services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
                 AgentBlazor.Core.Paid.IAgentInspectorStore>(
                 _ => AgentBlazor.Core.Paid.SqliteAgentInspectorStore.CreateWithPath(inspectorDbPath)));
+
+            // Analytics service
+            services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
+                IUsageAnalyticsService>(
+                _ => SqliteUsageAnalyticsService.CreateWithPath(historyDbPath)));
+
+            // Audit log service
+            services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
+                IAuditLogService>(
+                _ => SqliteAuditLogService.CreateWithPath(auditDbPath)));
+
+            // Smart suggestions with pattern matching (uses same history DB)
+            services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
+                ISmartSuggestionService>(
+                sp => SqliteSmartSuggestionService.CreateWithPath(
+                    historyDbPath,
+                    sp.GetService<Microsoft.Extensions.AI.IChatClient>())));
         };
 
         return this;

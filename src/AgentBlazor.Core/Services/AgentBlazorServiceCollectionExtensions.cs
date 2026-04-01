@@ -19,6 +19,9 @@ using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime;
 using AgentBlazor.Core.Paid;
+using AgentBlazor.Core.Paid.Analytics;
+using AgentBlazor.Core.Paid.Audit;
+using AgentBlazor.Core.Paid.Suggestions;
 using Microsoft.Extensions.AI;
 
 namespace AgentBlazor.Services;
@@ -104,6 +107,9 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAdaptiveSuggestionService, StaticSuggestionService>();
         services.TryAddSingleton<IProactiveInsightService, NullProactiveInsightService>();
         services.TryAddSingleton<IAgentInspectorStore, NullAgentInspectorStore>();
+        services.TryAddSingleton<IUsageAnalyticsService, NullUsageAnalyticsService>();
+        services.TryAddSingleton<IAuditLogService, NullAuditLogService>();
+        services.TryAddSingleton<ISmartSuggestionService, NullSmartSuggestionService>();
 
         // Service tools + MCP (null defaults so runtime works without them)
         services.TryAddSingleton<IAgentServiceToolRegistry, InMemoryAgentServiceToolRegistry>();

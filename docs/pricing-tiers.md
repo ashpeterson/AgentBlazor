@@ -180,15 +180,21 @@ Note:
 
 | Service | Interface | Implementation | Status |
 |---------|-----------|----------------|--------|
-| Action History | `IActionHistoryStore` | `SqliteActionHistoryStore` | Durable |
-| Adaptive Suggestions | `IAdaptiveSuggestionService` | `LlmAdaptiveSuggestionService` | Working |
-| Proactive Insights | `IProactiveInsightService` | `LlmProactiveInsightService` | Working |
-| Inspector Store | `IAgentInspectorStore` | `SqliteAgentInspectorStore` | Durable |
+| Action History | `IActionHistoryStore` | `SqliteActionHistoryStore` | ✅ Durable |
+| Adaptive Suggestions | `IAdaptiveSuggestionService` | `LlmAdaptiveSuggestionService` | ✅ Working |
+| Proactive Insights | `IProactiveInsightService` | `LlmProactiveInsightService` | ✅ Working |
+| Inspector Store | `IAgentInspectorStore` | `SqliteAgentInspectorStore` | ✅ Durable |
+| Usage Analytics | `IUsageAnalyticsService` | `SqliteUsageAnalyticsService` | ✅ NEW |
+| Audit Log | `IAuditLogService` | `SqliteAuditLogService` | ✅ NEW |
+| Smart Suggestions | `ISmartSuggestionService` | `SqliteSmartSuggestionService` | ✅ NEW |
 
 ### Completed
 
-- `SqliteActionHistoryStore` - Durable action history with user/session indexing and pattern aggregation
+- `SqliteActionHistoryStore` - Durable action history with user/session indexing, pattern aggregation, and execution metrics
 - `SqliteAgentInspectorStore` - Durable inspector runs with execution plan storage
+- `SqliteUsageAnalyticsService` - Analytics queries over action history (summary, trends, anomalies)
+- `SqliteAuditLogService` - Compliance-ready audit trail with CSV/JSON export
+- `SqliteSmartSuggestionService` - Pattern-based suggestions with sequence analysis and LLM fallback
 - `UseProLicense()` wiring with configurable data directory
 
 ### Future Enhancements
