@@ -22,7 +22,12 @@
 
         <nav class="demo-shell__nav" aria-label="Demo routes">
             <a href="/docs">Docs</a>
-            <a href="/demo/workflows/response-orchestration?reset=true" class="@((IsWorkflowHubRoute || IsResponseOrchestrationRoute) ? "is-active" : null)">Demo</a>
+            <a href="/demo/components" class="@(IsComponentsRoute ? "is-active" : null)">Components</a>
+            <a href="/demo/workflows/response-orchestration?reset=true" class="@((IsWorkflowHubRoute || IsWorkflowRoute) ? "is-active" : null)">Workflows</a>
+            <a href="/demo/dashboard" class="@(IsDashboardRoute ? "is-active" : null)">
+                Dashboard
+                <span class="demo-shell__nav-badge">Pro</span>
+            </a>
         </nav>
     </header>
 
@@ -142,6 +147,7 @@
     private bool IsWorkflowHubRoute => string.Equals(CurrentRoutePath.TrimEnd('/'), "/demo", StringComparison.OrdinalIgnoreCase);
     private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
     private bool IsWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows", StringComparison.OrdinalIgnoreCase);
+    private bool IsDashboardRoute => CurrentRoutePath.StartsWith("/demo/dashboard", StringComparison.OrdinalIgnoreCase);
     private bool IsSupplierWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/supplier-compliance", StringComparison.OrdinalIgnoreCase);
     private bool IsFileWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/file-audit-bundle", StringComparison.OrdinalIgnoreCase);
     private bool IsRecipeWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/recipe-release", StringComparison.OrdinalIgnoreCase);

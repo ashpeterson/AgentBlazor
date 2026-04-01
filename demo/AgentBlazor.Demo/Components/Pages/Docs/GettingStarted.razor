@@ -22,30 +22,56 @@
         <MudText Typo="Typo.h5">2. Register</MudText>
         <pre class="guide-page__code"><code>builder.Services.AddAgentBlazor(options =&gt;
 {
+    // Use OpenAI (or UseOllama for local)
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: "gpt-5.4-mini");
+        model: "gpt-4o-mini");
+
+    // Optional: Enable Pro tier features
+    // options.UseProLicense("AB-PRO-YOUR-KEY-HERE");
 
     options.ConfigureBuilder(agentBuilder =&gt;
     {
-        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;("operations", agent =&gt;
-        {
-            agent.WithRoutePrefixes("/ops");
-        });
+        // Register your workflow capability
+        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;(
+            "Operations Agent",
+            agent =&gt;
+            {
+                agent.WithDescription("Handles workflow assessment and remediation.");
+                agent.WithRoutePrefixes("/ops");
+            });
     });
 });</code></pre>
     </section>
 
     <section class="guide-page__section">
-        <MudText Typo="Typo.h5">3. Expose</MudText>
-        <pre class="guide-page__code"><code>[AgentCapability("operations")]
-public sealed class OperationsCapabilities
+        <MudText Typo="Typo.h5">3. Define Capabilities</MudText>
+        <pre class="guide-page__code"><code>using AgentBlazor.App;
+using AgentBlazor.Attributes;
+
+[AgentCapability("operations",
+    Name = "Operations Workflow",
+    Description = "Assess workflow readiness and prepare remediation.",
+    Category = "Workflow")]
+public sealed class OperationsCapabilities(IOperationsService ops)
 {
+    [AgentAction("Assess current workflow readiness")]
+    public Task&lt;CapabilityResult&gt; AssessReadinessAsync()
+    {
+        var summary = ops.GetReadinessSummary();
+        return Task.FromResult(CapabilityResult.Success(summary) with
+        {
+            NextActions = ["Explain blockers", "Prepare remediation"]
+        });
+    }
+
     [AgentAction("Prepare remediation draft", RequiresApproval = true)]
-    public Task&lt;CapabilityResult&gt; PrepareRemediationDraftAsync(Guid[] supplierIds)
-        =&gt; Task.FromResult(
-            CapabilityResult.Success("Prepared the remediation draft.")
-                .WithNextActions("Review the draft", "Approve the submission"));
+    public Task&lt;CapabilityResult&gt; PrepareRemediationAsync(
+        [AgentParam("Target area")] string area)
+    {
+        var draft = ops.PrepareRemediation(area);
+        return Task.FromResult(CapabilityResult.Success(draft));
+    }
 }</code></pre>
     </section>
 
@@ -66,7 +92,7 @@ public sealed class OperationsCapabilities
             <span>Prepare the draft</span>
         </div>
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            Starter sample: <code>samples/AgentBlazor.Starter</code>
+            See the <MudLink Href="/demo/components">component explorer</MudLink> for all 14 agentic components.
         </MudText>
     </section>
 

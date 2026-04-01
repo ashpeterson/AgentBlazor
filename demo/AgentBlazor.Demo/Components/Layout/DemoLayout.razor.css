@@ -76,6 +76,21 @@
     border-color: rgba(255, 255, 255, 0.12);
 }
 
+.demo-shell__nav-badge {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    margin-left: 0.35rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #ff6a3d;
+    background: rgba(255, 106, 61, 0.15);
+    border: 1px solid rgba(255, 106, 61, 0.3);
+    border-radius: 4px;
+    vertical-align: middle;
+}
+
 .demo-shell__frame {
     width: min(92rem, calc(100% - 2rem));
     margin: 0 auto;
