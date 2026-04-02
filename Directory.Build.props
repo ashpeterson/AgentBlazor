@@ -3,4 +3,18 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
   </PropertyGroup>
+
+  <!-- Common package metadata for all AgentBlazor packages -->
+  <PropertyGroup>
+    <Version>0.1.0-preview.1</Version>
+    <Authors>Ash Peterson</Authors>
+    <Company>AgentBlazor</Company>
+    <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ashpeterson/AgentBlazor</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ashpeterson/AgentBlazor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>Initial preview release of AgentBlazor - a Blazor-first agentic UI framework.</PackageReleaseNotes>
+  </PropertyGroup>
 </Project>

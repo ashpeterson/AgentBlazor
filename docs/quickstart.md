@@ -185,9 +185,74 @@ AgentBlazor includes MudBlazor-backed components the agent can control:
 
 The agent can filter, sort, paginate the grid, and fill form fields automatically.
 
+## Pro Tier Features
+
+Enable analytics, audit logging, and smart suggestions with a Pro license:
+
+```csharp
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseOpenAI(apiKey, "gpt-4o-mini");
+
+    // Enable Pro tier with SQLite persistence
+    options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
+});
+```
+
+Then add the Pro Dashboard to your app:
+
+```razor
+<AgentProDashboard Title="Analytics" DaysRange="30" />
+```
+
+## Available Components
+
+AgentBlazor includes 14 agentic components:
+
+| Component | Purpose |
+|-----------|---------|
+| `AgentDataGrid` | Filterable, sortable, paginated data grid |
+| `AgentForm` | Validated form with agent-fillable fields |
+| `AgentDialog` | Modal dialogs with approval boundaries |
+| `AgentTabs` | Tab navigation |
+| `AgentNavMenu` | Route navigation |
+| `AgentSelect` | Dropdown selection |
+| `AgentAutocomplete` | Search-as-you-type selection |
+| `AgentDatePicker` | Single date selection |
+| `AgentDateRangePicker` | Date range selection |
+| `AgentTreeView` | Hierarchical selection |
+| `AgentStepper` | Multi-step workflows |
+| `AgentCommandBar` | Action buttons |
+| `AgentFileUpload` | File attachment with policies |
+| `AgentChatWidget` | Floating chat interface |
+
+## Troubleshooting
+
+### Agent not responding
+
+1. Check your OpenAI API key is valid
+2. Ensure `AddAgentBlazor` is called before `builder.Build()`
+3. Verify the capability class is registered with `AddWorkflow<T>`
+
+### Actions not appearing
+
+1. Ensure methods are marked with `[AgentAction]`
+2. Check the class has `[AgentCapability("agent-name")]`
+3. Verify the route prefix matches the current page
+
+### Component state not visible to agent
+
+1. Add `[AgentReadable]` to properties the agent should see
+2. Ensure the component has a `@ref` reference in the page
+
+### Pro features not working
+
+1. Verify `UseProLicense()` is called with a valid key
+2. Check the SQLite database is writable at the data directory
+3. Ensure `IUsageAnalyticsService` is injected (not the null implementation)
+
 ## Next Steps
 
-- See `samples/AgentBlazor.Starter` for a complete example
 - Run `demo/AgentBlazor.Demo` to see workflow orchestration in action
-- Read [Architecture](architecture.md) for deeper understanding
 - See [Pricing Tiers](pricing-tiers.md) for Pro features
+- Check `docs/STATUS.md` for current implementation status

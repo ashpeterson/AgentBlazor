@@ -6,13 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AgentBlazor</AssemblyName>
     <PackageId>AgentBlazor</PackageId>
-    <Description>Agentic component library for ASP.NET Core Blazor.</Description>
-    <Authors>Ash Peterson</Authors>
-    <PackageTags>blazor;aspnetcore;ai;agents;mudblazor;ui</PackageTags>
+    <Description>Blazor-first agentic UI framework. 14 deterministic components, workflow orchestration, and AI-powered assistance. Free tier includes full runtime. Pro tier adds analytics, audit logging, and smart suggestions.</Description>
+    <PackageTags>blazor;aspnetcore;ai;agents;mudblazor;ui;workflow;llm;openai;agentic</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/ashpeterson/AgentBlazor</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/ashpeterson/AgentBlazor</PackageProjectUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferenceBuildOutputs</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
@@ -43,6 +39,7 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <None Include="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <Target Name="IncludeProjectReferenceBuildOutputs" DependsOnTargets="ResolveReferences">

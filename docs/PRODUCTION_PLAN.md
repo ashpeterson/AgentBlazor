@@ -1,44 +1,50 @@
 # Production Plan
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 Honest assessment and actionable plan to ship both tiers.
 
 ## Current State
 
-### Free Tier - 90% Ready
-- Core runtime works
-- 14 components work
-- Demo proves value
-- CLI tool ships
-- Missing: NuGet publish, minor polish
+### Free Tier - 95% Ready ✅ UPDATED
+- ✅ Core runtime works
+- ✅ 14 components work
+- ✅ Demo proves value
+- ✅ CLI tool ships
+- ✅ Package metadata (description, tags, icon)
+- ✅ Version: 0.1.0-preview.1
+- ✅ GitHub Actions workflow ready
+- Missing: Run publish workflow
 
-### Paid Tier - 90% Ready ✅ UPDATED
+### Paid Tier - 95% Ready ✅ UPDATED
 - ✅ SQLite persistence (action history, inspector runs)
 - ✅ Usage Analytics Service (`IUsageAnalyticsService`)
 - ✅ Audit Log Service (`IAuditLogService`)
 - ✅ Smart Suggestions with pattern matching (`ISmartSuggestionService`)
 - ✅ Execution metrics (duration, success/failure tracking)
 - ✅ Dashboard UI component (`AgentProDashboard`)
-- Missing: Documentation polish
+- ✅ Demo showcases Pro Dashboard at `/demo/dashboard`
+- ✅ Documentation (quickstart.md with troubleshooting)
 
 ---
 
 ## Phase 1: Ship Free Tier (1-2 days)
 
-### 1.1 NuGet Package Prep
-- [ ] Create package metadata (description, tags, icon)
-- [ ] Set up package versioning (0.1.0-preview)
-- [ ] Configure GitHub Actions for publish
-- [ ] Test install from NuGet in clean project
+### 1.1 NuGet Package Prep ✅ COMPLETE
+- [x] Create package metadata (description, tags, icon)
+- [x] Set up package versioning (0.1.0-preview.1 in Directory.Build.props)
+- [x] Configure GitHub Actions for publish (publish-github-packages-preview.yml)
+- [ ] Test install from NuGet in clean project (after publish)
 
-### 1.2 Documentation Polish
-- [ ] Review quickstart.md for accuracy
-- [ ] Add troubleshooting section
-- [ ] Ensure demo runs out of box
+### 1.2 Documentation Polish ✅ COMPLETE
+- [x] Review quickstart.md for accuracy
+- [x] Add troubleshooting section
+- [x] Add Pro tier features section
+- [x] Add component reference table
+- [x] Ensure demo runs out of box
 
 ### 1.3 Ship It
-- [ ] Publish to NuGet as preview
+- [ ] Run publish workflow with version 0.1.0-preview.1
 - [ ] Announce on social/blog
 
 **Deliverable:** Free tier on NuGet, usable by anyone.
