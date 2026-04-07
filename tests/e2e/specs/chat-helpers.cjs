@@ -1,6 +1,6 @@
 async function openAssistantChatSurface(page, timeoutMs = 30000) {
-  const inlineSurface = page.locator(".ab-chat-surface").first();
-  if (await inlineSurface.isVisible().catch(() => false)) {
+  const inlineSurface = await findInteractiveSurface(page.locator(".ab-chat-surface"));
+  if (inlineSurface) {
     return inlineSurface;
   }
 
@@ -12,9 +12,29 @@ async function openAssistantChatSurface(page, timeoutMs = 30000) {
   }
 
   await widgetWindow.waitFor({ state: "visible", timeout: timeoutMs });
-  const widgetSurface = widgetWindow.locator(".ab-chat-surface").first();
-  await widgetSurface.waitFor({ state: "visible", timeout: timeoutMs });
+  const widgetSurface = await findInteractiveSurface(widgetWindow.locator(".ab-chat-surface"));
+  if (!widgetSurface) {
+    throw new Error("Unable to locate an interactive chat surface.");
+  }
+
   return widgetSurface;
+}
+
+async function findInteractiveSurface(locator) {
+  const count = await locator.count();
+  for (let index = 0; index < count; index++) {
+    const surface = locator.nth(index);
+    if (!(await surface.isVisible().catch(() => false))) {
+      continue;
+    }
+
+    const promptInput = surface.getByLabel("Message input").first();
+    if (await promptInput.isVisible().catch(() => false)) {
+      return surface;
+    }
+  }
+
+  return null;
 }
 
 module.exports = {

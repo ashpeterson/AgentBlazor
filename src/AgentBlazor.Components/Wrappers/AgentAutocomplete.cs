@@ -46,15 +46,15 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
     private ILogger? _logger;
     private bool _hasRendered;
     private Func<string?, CancellationToken, Task<IEnumerable<T>>?>? _generatedSearchFunc;
-    private EventCallback<string> _externalTextChanged;
-    private EventCallback<string> _wrappedTextChanged;
+    private EventCallback<string?> _externalTextChanged;
+    private EventCallback<string?> _wrappedTextChanged;
     private string? _lastSyncedQuery;
 
     [AgentReadable("Current query text")]
-    public string? CurrentQuery => Query ?? Text;
+    public string? CurrentQuery => Query ?? GetCurrentText();
 
     [AgentReadable("Currently selected value")]
-    public T? SelectedValue => Value;
+    public T? SelectedValue => GetSelectedValue();
 
     [AgentReadable("Available option values")]
     public string[] AvailableOptions => GetAvailableOptionTexts();
@@ -80,9 +80,9 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
         EnsureGeneratedSearchFunc();
         EnsureTextChangedBridge();
 
-        if (Query is not null && !string.Equals(Query, Text, StringComparison.Ordinal))
+        if (Query is not null && !string.Equals(Query, GetCurrentText(), StringComparison.Ordinal))
         {
-            Text = Query;
+            MudPrivateParameterStateAccessor.SetValue(this, "_textState", Query);
         }
 
         base.OnParametersSet();
@@ -110,8 +110,8 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
 
     public virtual RuntimeComponentState GetCurrentState() => new()
     {
-        ["query"] = Query ?? Text,
-        ["selectedValue"] = ConvertOptionToText(Value),
+        ["query"] = Query ?? GetCurrentText(),
+        ["selectedValue"] = ConvertOptionToText(GetSelectedValue()),
         ["options"] = GetAvailableOptionTexts(),
         ["disabled"] = Disabled,
         ["readOnly"] = ReadOnly,
@@ -230,11 +230,11 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
             _externalTextChanged = TextChanged;
         }
 
-        _wrappedTextChanged = EventCallback.Factory.Create<string>(this, HandleTextChangedAsync);
+        _wrappedTextChanged = EventCallback.Factory.Create<string?>(this, HandleTextChangedAsync);
         TextChanged = _wrappedTextChanged;
     }
 
-    private async Task HandleTextChangedAsync(string text)
+    private async Task HandleTextChangedAsync(string? text)
     {
         Query = text;
         await QueryChanged.InvokeAsync(text);
@@ -247,7 +247,7 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
 
     private async Task SyncQueryAliasAsync()
     {
-        var current = Text;
+        var current = GetCurrentText();
         if (string.Equals(_lastSyncedQuery, current, StringComparison.Ordinal))
         {
             return;
@@ -370,18 +370,9 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
 
     private async Task SetTextSafelyAsync(string? text)
     {
-        Text = text;
-
-        if (text is null)
-        {
-            Query = null;
-            await QueryChanged.InvokeAsync(null);
-            return;
-        }
-
         try
         {
-            await TextChanged.InvokeAsync(text);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_textState", text);
         }
         catch (InvalidOperationException)
         {
@@ -414,22 +405,19 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
         }
         catch (InvalidOperationException)
         {
-            Value = value;
-            await ValueChanged.InvokeAsync(value);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_valueState", value);
             await SetTextSafelyAsync(ConvertOptionToText(value));
         }
         catch (Exception) when (!_hasRendered)
         {
-            Value = value;
-            await ValueChanged.InvokeAsync(value);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_valueState", value);
             await SetTextSafelyAsync(ConvertOptionToText(value));
         }
     }
 
     private async Task ClearValueSafelyAsync()
     {
-        Value = default;
-        await ValueChanged.InvokeAsync(Value);
+        await MudPrivateParameterStateAccessor.SetValueAsync<T?>(this, "_valueState", default);
     }
 
     private async Task ClearAutocompleteSafelyAsync()
@@ -461,4 +449,8 @@ public class AgentAutocomplete<T> : MudAutocomplete<T>, IAgentControllable
             return Task.CompletedTask;
         }
     }
+
+    private string? GetCurrentText() => MudPrivateParameterStateAccessor.GetValue<string>(this, "_textState");
+
+    private T? GetSelectedValue() => MudPrivateParameterStateAccessor.GetValue<T>(this, "_valueState");
 }

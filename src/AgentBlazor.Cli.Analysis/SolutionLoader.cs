@@ -43,10 +43,7 @@ public sealed class SolutionLoader : IDisposable
 
         var diagnostics = new List<string>();
         _workspace = MSBuildWorkspace.Create();
-        _workspace.WorkspaceFailed += (_, e) =>
-        {
-            diagnostics.Add($"[{e.Diagnostic.Kind}] {e.Diagnostic.Message}");
-        };
+        RegisterWorkspaceDiagnostics(_workspace, diagnostics);
 
         var solution = await _workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
         Diagnostics = diagnostics;
@@ -59,14 +56,18 @@ public sealed class SolutionLoader : IDisposable
 
         var diagnostics = new List<string>();
         _workspace = MSBuildWorkspace.Create();
-        _workspace.WorkspaceFailed += (_, e) =>
-        {
-            diagnostics.Add($"[{e.Diagnostic.Kind}] {e.Diagnostic.Message}");
-        };
+        RegisterWorkspaceDiagnostics(_workspace, diagnostics);
 
         var project = await _workspace.OpenProjectAsync(projectPath, cancellationToken: ct);
         Diagnostics = diagnostics;
         return project;
+    }
+
+    private static void RegisterWorkspaceDiagnostics(Workspace workspace, ICollection<string> diagnostics)
+    {
+        workspace.RegisterWorkspaceFailedHandler(
+            e => diagnostics.Add($"[{e.Diagnostic.Kind}] {e.Diagnostic.Message}"),
+            options: null);
     }
 
     /// <summary>

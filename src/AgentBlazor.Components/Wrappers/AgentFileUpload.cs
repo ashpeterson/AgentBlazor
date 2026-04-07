@@ -227,7 +227,7 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private async Task HandleFilesChangedAsync(T? files)
     {
-        Files = files;
+        await MudPrivateParameterStateAccessor.SetValueAsync(this, "_filesState", files);
 
         if (ShouldUseFileNameCompatibilityMode())
         {
@@ -257,20 +257,20 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
         }
 
         var normalizedNames = NormalizeFileNames(FileNames);
-        var currentNames = NormalizeFileNames(ExtractFileNames(Files));
+        var currentNames = NormalizeFileNames(ExtractFileNames(GetFiles()));
         if (normalizedNames.SequenceEqual(currentNames, StringComparer.OrdinalIgnoreCase))
         {
             return;
         }
 
-        Files = BuildBrowserFileValue(normalizedNames);
+        MudPrivateParameterStateAccessor.SetValue(this, "_filesState", BuildBrowserFileValue(normalizedNames));
     }
 
     private IReadOnlyList<string> GetEffectiveFileNames()
     {
         if (SupportsBrowserFileValue() && HasConcreteBrowserFiles())
         {
-            return NormalizeFileNames(ExtractFileNames(Files));
+            return NormalizeFileNames(ExtractFileNames(GetFiles()));
         }
 
         if (ShouldUseFileNameCompatibilityMode())
@@ -280,7 +280,7 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
         if (SupportsBrowserFileValue())
         {
-            return NormalizeFileNames(ExtractFileNames(Files));
+            return NormalizeFileNames(ExtractFileNames(GetFiles()));
         }
 
         return NormalizeFileNames(FileNames);
@@ -298,7 +298,7 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private bool CanSafelyReplaceCurrentFiles()
     {
-        return Files switch
+        return GetFiles() switch
         {
             null => true,
             NamedBrowserFile => true,
@@ -309,7 +309,7 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private bool HasConcreteBrowserFiles()
     {
-        return Files switch
+        return GetFiles() switch
         {
             IBrowserFile file => file is not NamedBrowserFile,
             IReadOnlyList<IBrowserFile> fileList => fileList.Any(static file => file is not NamedBrowserFile),
@@ -336,7 +336,7 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
     private async Task<bool> RemoveFileByNameAsync(string fileName)
     {
-        switch (Files)
+        switch (GetFiles())
         {
             case IBrowserFile singleFile when string.Equals(singleFile.Name, fileName, StringComparison.OrdinalIgnoreCase):
                 await HandleFilesChangedAsync(default);
@@ -442,6 +442,8 @@ public class AgentFileUpload<T> : MudFileUpload<T>, IAgentControllable, IDisposa
 
         return normalized;
     }
+
+    private T? GetFiles() => MudPrivateParameterStateAccessor.GetValue<T>(this, "_filesState");
 
     private void EnsureAgentUserAttributes()
     {

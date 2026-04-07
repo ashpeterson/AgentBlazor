@@ -25,7 +25,7 @@ public sealed class AgentBlazorRegistrationOptions
     private readonly List<Func<IServiceCollection, IServiceCollection>> _mcpRegistrations = [];
     private readonly List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>> _middlewares = [];
 
-    public void UseOpenAI(string apiKey, string model = "gpt-4o-mini")
+    public void UseOpenAI(string apiKey, string model = "gpt-5.4-mini")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -229,7 +229,7 @@ public sealed class AgentBlazorRegistrationOptions
             Console.WriteLine("║  AgentBlazor Warning: No AI provider or runtime adapter configured.          ║");
             Console.WriteLine("║                                                                               ║");
             Console.WriteLine("║  Add one of the following to your AddAgentBlazor() call:                     ║");
-            Console.WriteLine("║    options.UseOpenAI(apiKey, \"gpt-4o-mini\");                                  ║");
+            Console.WriteLine("║    options.UseOpenAI(apiKey, \"gpt-5.4-mini\");                                  ║");
             Console.WriteLine("║    options.UseAzureOpenAI(endpoint, deploymentName);                         ║");
             Console.WriteLine("║    options.UseOllama(\"llama3.2\");  // Free, runs locally                      ║");
             Console.WriteLine("║    options.UseRuntimeAdapter<TAdapter>();                                    ║");

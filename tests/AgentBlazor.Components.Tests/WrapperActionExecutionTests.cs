@@ -5,6 +5,7 @@ using AgentBlazor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using System.Reflection;
+using MudBlazor.Extensions;
 
 #pragma warning disable BL0005 // Setting parameters directly is intentional in wrapper logic unit tests.
 
@@ -341,7 +342,7 @@ public class WrapperActionExecutionTests
         Assert.True(open.Succeeded);
         Assert.True(confirm.Succeeded);
         Assert.True(close.Succeeded);
-        Assert.False(dialog.Visible);
+        Assert.False(dialog.GetState(x => x.Visible));
         Assert.False(observedVisible);
         Assert.Equal("Confirmed supplier dialog.", confirm.Message);
 
@@ -392,7 +393,7 @@ public class WrapperActionExecutionTests
 
         string? observedValue = null;
         var callbacks = new EventCallbackFactory();
-        select.ValueChanged = callbacks.Create<string>(this, value => observedValue = value);
+        select.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
 
         var open = await select.ExecuteActionAsync(AgentAction.Create("open"));
         var set = await select.ExecuteActionAsync(AgentAction.Create("set_value", new Dictionary<string, object?>
@@ -407,7 +408,7 @@ public class WrapperActionExecutionTests
         Assert.True(clear.Succeeded);
         Assert.True(close.Succeeded);
 
-        Assert.Null(select.Value);
+        Assert.Null(select.GetState(x => x.Value));
         Assert.Null(observedValue);
 
         var state = select.GetCurrentState();
@@ -421,8 +422,7 @@ public class WrapperActionExecutionTests
     {
         var tabs = new AgentTabs
         {
-            AgentId = "components-tabs",
-            ActivePanelIndex = 0
+            AgentId = "components-tabs"
         };
 
         var observedIndex = -1;
@@ -435,7 +435,7 @@ public class WrapperActionExecutionTests
         }));
 
         Assert.True(switchTab.Succeeded);
-        Assert.Equal(2, tabs.ActivePanelIndex);
+        Assert.Equal(2, tabs.GetState(x => x.ActivePanelIndex));
         Assert.Equal(2, observedIndex);
 
         var state = tabs.GetCurrentState();
@@ -456,7 +456,7 @@ public class WrapperActionExecutionTests
         string? observedValue = null;
         var callbacks = new EventCallbackFactory();
         autocomplete.QueryChanged = callbacks.Create<string?>(this, query => observedQuery = query);
-        autocomplete.ValueChanged = callbacks.Create<string>(this, value => observedValue = value);
+        autocomplete.ValueChanged = callbacks.Create<string?>(this, value => observedValue = value);
 
         var setQuery = await autocomplete.ExecuteActionAsync(AgentAction.Create("set_query", new Dictionary<string, object?>
         {
@@ -473,7 +473,7 @@ public class WrapperActionExecutionTests
         Assert.True(clear.Succeeded);
 
         Assert.Null(autocomplete.Query);
-        Assert.Null(autocomplete.Value);
+        Assert.Null(autocomplete.GetState(x => x.Value));
         Assert.Null(observedQuery);
         Assert.Null(observedValue);
 
@@ -762,12 +762,12 @@ public class WrapperActionExecutionTests
         var upload = new AgentFileUpload<IReadOnlyList<IBrowserFile>>
         {
             AgentId = "attachments",
-            Files =
-            [
-                new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
-            ],
             FileNames = ["stale-token.txt"]
         };
+        SetMudParameterStateValue(upload, "_filesState", (IReadOnlyList<IBrowserFile>)
+        [
+            new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
+        ]);
 
         var result = await upload.ExecuteActionAsync(AgentAction.Create("list_files"));
 
@@ -775,7 +775,7 @@ public class WrapperActionExecutionTests
         Assert.Contains("evidence.pdf", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("stale-token.txt", result.Message, StringComparison.OrdinalIgnoreCase);
 
-        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.Files);
+        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.GetState(x => x.Files));
         Assert.Single(files);
         Assert.Equal("evidence.pdf", files[0].Name);
 
@@ -788,12 +788,12 @@ public class WrapperActionExecutionTests
     {
         var upload = new AgentFileUpload<IReadOnlyList<IBrowserFile>>
         {
-            AgentId = "attachments",
-            Files =
-            [
-                new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
-            ]
+            AgentId = "attachments"
         };
+        SetMudParameterStateValue(upload, "_filesState", (IReadOnlyList<IBrowserFile>)
+        [
+            new ConcreteBrowserFile("evidence.pdf", "application/pdf", 1024)
+        ]);
 
         IReadOnlyList<string>? observedFiles = null;
         var callbacks = new EventCallbackFactory();
@@ -808,7 +808,7 @@ public class WrapperActionExecutionTests
         Assert.Contains("cannot synthesize a real browser file", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Null(observedFiles);
 
-        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.Files);
+        var files = Assert.IsAssignableFrom<IReadOnlyList<IBrowserFile>>(upload.GetState(x => x.Files));
         Assert.Single(files);
         Assert.Equal("evidence.pdf", files[0].Name);
     }
@@ -817,6 +817,29 @@ public class WrapperActionExecutionTests
     // The generic SetField approach is unreliable for forms inside dialogs (forms aren't mounted
     // when dialog is closed). The recommended pattern is to create compound workflow actions
     // with explicit parameters. See SupplierOnboardingAgent.razor for an example.
+
+    private static void SetMudParameterStateValue<TComponent, TValue>(TComponent component, string fieldName, TValue value)
+        where TComponent : class
+    {
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
+        for (var currentType = component.GetType(); currentType is not null; currentType = currentType.BaseType)
+        {
+            var field = currentType.GetField(fieldName, flags);
+            if (field is null)
+            {
+                continue;
+            }
+
+            var state = field.GetValue(component)
+                ?? throw new InvalidOperationException($"Field '{fieldName}' on '{component.GetType().FullName}' was not initialized.");
+            var setValueAsync = state.GetType().GetMethod("SetValueAsync", BindingFlags.Instance | BindingFlags.Public)
+                ?? throw new InvalidOperationException($"Field '{fieldName}' on '{component.GetType().FullName}' does not expose SetValueAsync.");
+            (setValueAsync.Invoke(state, [value]) as Task)?.GetAwaiter().GetResult();
+            return;
+        }
+
+        throw new InvalidOperationException($"Field '{fieldName}' was not found on '{component.GetType().FullName}'.");
+    }
 
     private sealed record SupplierRow(string SupplierId, string Region, int RiskScore);
 

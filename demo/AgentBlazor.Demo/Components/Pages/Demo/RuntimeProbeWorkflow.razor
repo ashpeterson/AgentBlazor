@@ -1,0 +1,87 @@
+@page "/demo/workflows/runtime-probe"
+@layout DemoLayout
+
+<PageTitle>Runtime Probe</PageTitle>
+
+<section class="wf-shell">
+    <header class="wf-shell__hero">
+        <p class="wf-shell__eyebrow">Validation surface</p>
+        <h1>Runtime probe</h1>
+        <p>
+            This page exists to validate stop and reconnect behavior against the real runtime path.
+            Ask the assistant to run the cancellation probe, then stop the run from the chat surface.
+        </p>
+    </header>
+
+    <div class="wf-shell__grid">
+        <article class="wf-card">
+            <h2>Expected flow</h2>
+            <ol class="wf-list">
+                <li>Send: <code>run the runtime cancellation probe</code></li>
+                <li>Wait for the chat surface to expose the stop action</li>
+                <li>Stop the run and confirm the assistant reports <code>Run canceled.</code></li>
+            </ol>
+        </article>
+        <article class="wf-card">
+            <h2>Approval flow</h2>
+            <ol class="wf-list">
+                <li>Send: <code>run the runtime approval probe</code></li>
+                <li>Approve the pending action in the chat surface</li>
+                <li>Confirm the assistant reports <code>Runtime approval probe completed.</code></li>
+            </ol>
+        </article>
+        <article class="wf-card">
+            <h2>Reconnect flow</h2>
+            <ol class="wf-list">
+                <li>Send: <code>run the runtime reconnect probe</code></li>
+                <li>Refresh the page while the run is still active</li>
+                <li>Confirm the chat resumes and completes with <code>Runtime reconnect probe completed.</code></li>
+            </ol>
+        </article>
+    </div>
+</section>
+
+<style>
+    .wf-shell {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .wf-shell__hero,
+    .wf-card {
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 1rem;
+        padding: 1.25rem;
+        background: rgba(8, 20, 32, 0.72);
+    }
+
+    .wf-shell__eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 0.75rem;
+        opacity: 0.72;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .wf-shell__hero h1,
+    .wf-card h2 {
+        margin: 0 0 0.75rem 0;
+    }
+
+    .wf-shell__hero p,
+    .wf-card li {
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .wf-shell__grid {
+        display: grid;
+    }
+
+    .wf-list {
+        display: grid;
+        gap: 0.65rem;
+        padding-left: 1.25rem;
+        margin: 0;
+    }
+</style>

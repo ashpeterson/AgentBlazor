@@ -11,6 +11,7 @@ using AgentBlazor.Options;
 using AgentBlazor.Telemetry;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace AgentBlazor.Hosting;
@@ -121,7 +122,8 @@ internal sealed class DeterministicAgUiHostedAgent(
         AgentTurnResponse response;
         try
         {
-            using var runtimeExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
+            using var serviceScope = _serviceProvider.CreateScope();
+            using var runtimeExecutionScope = _executionScopeAccessor.Push(serviceScope.ServiceProvider);
             response = await _runtimeAdapter.RunTurnAsync(invocation.Request, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -241,7 +243,8 @@ internal sealed class DeterministicAgUiHostedAgent(
             AgentTurnResponse nonStreamingResponse;
             try
             {
-                using var runtimeExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
+                using var fallbackScope = _serviceProvider.CreateScope();
+                using var runtimeExecutionScope = _executionScopeAccessor.Push(fallbackScope.ServiceProvider);
                 nonStreamingResponse = await _runtimeAdapter.RunTurnAsync(invocation.Request, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -279,7 +282,8 @@ internal sealed class DeterministicAgUiHostedAgent(
         }
 
         var mappingState = new MappingState(invocation.RunId);
-        using var streamExecutionScope = _executionScopeAccessor.Push(_serviceProvider);
+        using var serviceScope = _serviceProvider.CreateScope();
+        using var streamExecutionScope = _executionScopeAccessor.Push(serviceScope.ServiceProvider);
         var stream = (invocation.Operation is HostedRunOperation.Connect
                 ? _runtimeAdapter.ConnectRunStreamAsync(invocation.RunId, cancellationToken)
                 : _runtimeAdapter.RunTurnStreamingAsync(invocation.Request, cancellationToken))

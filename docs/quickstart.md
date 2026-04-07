@@ -5,7 +5,18 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 ## Prerequisites
 
 - .NET 10 SDK
-- An OpenAI API key (or Azure OpenAI, Ollama)
+- An OpenAI API key
+
+The currently validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI and other providers still work as integrations, but OpenAI is the primary path to ship first.
+
+## Optional: Install The CLI
+
+The CLI generates `.agentblazor/AGENT.md` for your app, but it does not replace runtime wiring.
+
+```bash
+dotnet tool install --global AgentBlazor.Cli --prerelease
+agentblazor init ./MySolution.sln --host MyBlazorApp
+```
 
 ## 1. Install the Package
 
@@ -18,12 +29,17 @@ dotnet add package AgentBlazor
 In `Program.cs`:
 
 ```csharp
+using AgentBlazor;
+using MudBlazor.Services;
+
+builder.Services.AddMudServices();
+
 builder.Services.AddAgentBlazor(options =>
 {
     // Choose your LLM provider
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: "gpt-4o-mini");
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
 
     // Register your workflow agent
     options.ConfigureBuilder(agentBuilder =>
@@ -37,7 +53,47 @@ builder.Services.AddAgentBlazor(options =>
 });
 ```
 
-## 3. Create a Capability Class
+## 3. Add The Host Shell
+
+In `Components/App.razor`, include the MudBlazor and AgentBlazor assets:
+
+```razor
+<link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+<link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
+...
+<script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+<script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+```
+
+In your main layout, add the MudBlazor providers:
+
+```razor
+@using MudBlazor
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+```
+
+For a complete runnable shape, copy the host shell from:
+
+- [App.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/App.razor)
+- [MainLayout.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/Layout/MainLayout.razor)
+
+## 4. Map Endpoints
+
+After `builder.Build()`:
+
+```csharp
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();
+```
+
+Without `MapAgentBlazorEndpoints()`, the chat UI can render but the runtime endpoint will not be available.
+
+## 5. Create a Capability Class
 
 Use `[AgentCapability]` to mark a class as agent-accessible:
 
@@ -71,7 +127,7 @@ public sealed class MyCapabilities
 }
 ```
 
-## 4. Add the Chat Widget
+## 6. Add a Chat Surface
 
 In your layout or page:
 
@@ -85,7 +141,21 @@ In your layout or page:
     Height="60vh" />
 ```
 
-## 5. Run Your App
+Use `AgentChatWidget` for a floating assistant.
+Use `AgentChatSurface` when chat should be embedded directly in the page:
+
+```razor
+@using AgentBlazor.Components
+
+<AgentChatSurface
+    Title="Assistant"
+    Description="Help users complete the current workflow."
+    LockAgentToCurrentRoute="true"
+    ShowAgentSelector="false"
+    EnableGeneratedUi="true" />
+```
+
+## 7. Run Your App
 
 ```bash
 dotnet run
@@ -192,7 +262,7 @@ Enable analytics, audit logging, and smart suggestions with a Pro license:
 ```csharp
 builder.Services.AddAgentBlazor(options =>
 {
-    options.UseOpenAI(apiKey, "gpt-4o-mini");
+    options.UseOpenAI(apiKey, "gpt-5.4-mini");
 
     // Enable Pro tier with SQLite persistence
     options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
@@ -231,8 +301,13 @@ AgentBlazor includes 14 agentic components:
 ### Agent not responding
 
 1. Check your OpenAI API key is valid
-2. Ensure `AddAgentBlazor` is called before `builder.Build()`
-3. Verify the capability class is registered with `AddWorkflow<T>`
+2. Confirm `OpenAI:Model` resolves to a tool-capable model such as `gpt-5.4-mini`
+3. Ensure `AddAgentBlazor` is called before `builder.Build()`
+4. Ensure `AddMudServices()` is registered
+5. Ensure the MudBlazor providers are present in your layout
+6. Ensure the CSS and JS assets are added in `Components/App.razor`
+7. Ensure `app.MapAgentBlazorEndpoints()` is called after `builder.Build()`
+8. Verify the capability class is registered with `AddWorkflow<T>`
 
 ### Actions not appearing
 
@@ -254,5 +329,7 @@ AgentBlazor includes 14 agentic components:
 ## Next Steps
 
 - Run `demo/AgentBlazor.Demo` to see workflow orchestration in action
+- Read [CLI Guide](cli.md) if you want to generate `.agentblazor/AGENT.md`
 - See [Pricing Tiers](pricing-tiers.md) for Pro features
 - Check `docs/STATUS.md` for current implementation status
+- Use OpenAI as the first production provider you validate in a real app

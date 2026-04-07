@@ -34,5 +34,126 @@
     "maxClarifications": 1,
     "maxDeferredRepeats": 2,
     "expectedDbDelta": {}
+  },
+  {
+    "id": "release-dossier-approval-flow",
+    "name": "Release Dossier Approval Flow",
+    "route": "/demo/workflows/release-dossier?reset=true",
+    "prompts": [
+      "apply the release dossier recovery playbook",
+      "advance the next guided subsystem stage",
+      "advance the next guided subsystem stage",
+      "prepare the release dossier"
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2,
+    "maxApprovalInteractions": 2,
+    "expectedTranscriptIncludes": [
+      "approval"
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "runtime-probe-approval-flow",
+    "name": "Runtime Probe Approval Flow",
+    "route": "/demo/workflows/runtime-probe",
+    "prompts": [
+      {
+        "text": "run the runtime approval probe"
+      }
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 0,
+    "maxDeferredRepeats": 0,
+    "maxApprovalInteractions": 1,
+    "minApprovalInteractions": 1,
+    "expectedTranscriptIncludes": [
+      "Runtime approval probe completed."
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "runtime-probe-stop-flow",
+    "name": "Runtime Probe Stop Flow",
+    "route": "/demo/workflows/runtime-probe",
+    "prompts": [
+      {
+        "text": "run the runtime cancellation probe",
+        "cancelAfterStopVisible": true
+      }
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 0,
+    "maxDeferredRepeats": 0,
+    "maxStopInteractions": 1,
+    "minStopInteractions": 1,
+    "expectedTranscriptIncludes": [
+      "Run canceled."
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "runtime-probe-reconnect-flow",
+    "name": "Runtime Probe Reconnect Flow",
+    "route": "/demo/workflows/runtime-probe",
+    "prompts": [
+      {
+        "text": "run the runtime reconnect probe",
+        "reloadAfterStopVisible": true
+      }
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 0,
+    "maxDeferredRepeats": 0,
+    "expectedTranscriptIncludes": [
+      "Runtime reconnect probe completed"
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "runtime-probe-sustained-session-flow",
+    "name": "Runtime Probe Sustained Session Flow",
+    "route": "/demo/workflows/runtime-probe",
+    "prompts": [
+      {
+        "text": "run the runtime approval probe"
+      },
+      {
+        "text": "run the runtime cancellation probe",
+        "cancelAfterStopVisible": true
+      },
+      {
+        "text": "run the runtime reconnect probe",
+        "reloadAfterStopVisible": true
+      },
+      {
+        "text": "run the runtime reconnect probe",
+        "reloadAfterStopVisible": true
+      }
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 0,
+    "maxDeferredRepeats": 0,
+    "maxApprovalInteractions": 1,
+    "minApprovalInteractions": 1,
+    "maxStopInteractions": 1,
+    "minStopInteractions": 1,
+    "expectedTranscriptIncludes": [
+      "Runtime approval probe completed.",
+      "Run canceled.",
+      "Runtime reconnect probe completed"
+    ],
+    "expectedDbDelta": {}
   }
 ]

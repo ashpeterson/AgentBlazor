@@ -176,6 +176,25 @@ public class AgentCapabilityRegistryTests
         Assert.Equal("ctx-123", recorder.LastSessionId);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_PropagatesCancellation_WhenCapabilityIsCanceled()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<CancellationCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            registry.ExecuteAsync(
+                "cancellation_probe.wait_for_cancel",
+                new Dictionary<string, object?>(),
+                provider,
+                cts.Token));
+    }
+
     [AgentCapability(
         "supplier_compliance",
         Name = "Supplier Compliance",
@@ -225,6 +244,17 @@ public class AgentCapabilityRegistryTests
         {
             recorder.LastSessionId = sessionId;
             return CapabilityResult.Success($"Captured {sessionId}.");
+        }
+    }
+
+    [AgentCapability("cancellation_probe", Name = "Cancellation Probe", Category = "Workflow")]
+    public sealed class CancellationCapabilities
+    {
+        [AgentAction("Wait for cancellation", ActionId = "wait_for_cancel")]
+        public async Task<CapabilityResult> WaitForCancelAsync(CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+            return CapabilityResult.Success("Unexpected completion.");
         }
     }
 

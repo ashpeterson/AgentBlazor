@@ -66,6 +66,7 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddSingleton<IAgentChatWidgetState, AgentChatWidgetState>();
         services.TryAddScoped<IAgentChatSessionState, AgentChatSessionState>();
         services.TryAddSingleton<IAgentChatSessionEvents, AgentChatSessionEvents>();
+        services.TryAddSingleton<IAgentChatActiveRunStore, AgentChatActiveRunStore>();
         services.TryAddSingleton<IAgentExecutionScopeAccessor, AgentExecutionScopeAccessor>();
 
         // Circuit-scoped component registry — each Blazor Server circuit gets its own registry

@@ -17,6 +17,8 @@ public static class AgentProviderRegistrationExtensions
         string apiKey)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
 
         services.Configure<AgentBlazorOptions>(options =>
         {
@@ -44,7 +46,7 @@ public static class AgentProviderRegistrationExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
 
-        var normalizedEndpoint = endpoint.TrimEnd('/');
+        var normalizedEndpoint = NormalizeAbsoluteEndpoint(endpoint, nameof(endpoint));
 
         services.Configure<AgentBlazorOptions>(options =>
         {
@@ -83,11 +85,15 @@ public static class AgentProviderRegistrationExtensions
         string? apiKey)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deploymentName);
+
+        var normalizedEndpoint = NormalizeAbsoluteEndpoint(endpoint, nameof(endpoint));
 
         services.Configure<AgentBlazorOptions>(options =>
         {
             options.Provider.Kind = AgentProviderKind.AzureOpenAI;
-            options.Provider.Endpoint = endpoint;
+            options.Provider.Endpoint = normalizedEndpoint;
             options.Provider.DeploymentName = deploymentName;
             options.Provider.ApiKey = apiKey;
         });
@@ -96,7 +102,7 @@ public static class AgentProviderRegistrationExtensions
             services.Replace(ServiceDescriptor.Singleton<IChatClient>(_ =>
             {
                 var client = new AzureOpenAIClient(
-                    new Uri(endpoint),
+                    new Uri(normalizedEndpoint, UriKind.Absolute),
                     new ApiKeyCredential(apiKey));
                 return client.GetChatClient(deploymentName).AsIChatClient();
             }));
@@ -118,7 +124,7 @@ public static class AgentProviderRegistrationExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantInfo);
 
-        var normalizedEndpoint = endpoint.TrimEnd('/');
+        var normalizedEndpoint = NormalizeAbsoluteEndpoint(endpoint, nameof(endpoint));
 
         services.Configure<AgentBlazorOptions>(options =>
         {
@@ -160,7 +166,7 @@ public static class AgentProviderRegistrationExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
 
-        var normalizedEndpoint = endpoint.TrimEnd('/');
+        var normalizedEndpoint = NormalizeAbsoluteEndpoint(endpoint, nameof(endpoint));
         var effectiveApiKey = string.IsNullOrWhiteSpace(apiKey) ? "ollama" : apiKey;
 
         services.Configure<AgentBlazorOptions>(options =>
@@ -183,5 +189,15 @@ public static class AgentProviderRegistrationExtensions
         }));
 
         return services;
+    }
+
+    private static string NormalizeAbsoluteEndpoint(string endpoint, string paramName)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var absoluteUri))
+        {
+            throw new ArgumentException("Endpoint must be an absolute URI.", paramName);
+        }
+
+        return absoluteUri.AbsoluteUri.TrimEnd('/');
     }
 }

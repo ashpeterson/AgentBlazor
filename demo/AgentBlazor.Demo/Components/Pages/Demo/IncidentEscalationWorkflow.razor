@@ -226,6 +226,7 @@
 
     <AgentDialog AgentId="incident-escalation-dialog"
                  Visible="@Workflow.IsEscalationDialogOpen"
+                 OnConfirm="ConfirmEscalationBriefAsync"
                  VisibleChanged="OnEscalationDialogVisibilityChanged">
         <TitleContent>
             <MudText Typo="Typo.h6">Incident escalation brief</MudText>
@@ -332,6 +333,12 @@
 
     private Task CloseEscalationBriefAsync()
         => Workflow.SetEscalationDialogVisibleAsync(ComponentRegistry.SessionId, false);
+
+    private async Task<AgentBlazor.Runtime.ActionResult> ConfirmEscalationBriefAsync()
+    {
+        await Workflow.SetEscalationDialogVisibleAsync(ComponentRegistry.SessionId, false);
+        return AgentBlazor.Runtime.ActionResult.Applied("Approved the escalation brief dialog.");
+    }
 
     private string GetWorkflowPhase() =>
         Workflow.Snapshot.Incident.EscalationStatus == "Submitted"

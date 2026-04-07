@@ -23,6 +23,7 @@ Ship a package that:
    - `dotnet pack src/AgentBlazor.Components/AgentBlazor.Components.csproj -nologo -c Release /p:UseSharedCompilation=false /p:PackageVersion=0.1.0-preview.N`
 4. Run the local consumer smoke test:
    - `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.N`
+   - add `-OpenAIApiKey $env:OPENAI_API_KEY` to include a live AG-UI workflow run
    - add `-KeepScratch` if you want to inspect the generated consumer app after the build
 
 ## What The Smoke Test Proves
@@ -30,15 +31,20 @@ Ship a package that:
 The smoke test script:
 
 - creates a clean Blazor app under `.tmp/`
-- installs the local `AgentBlazor` package from `src/AgentBlazor.Components/bin/Release`
-- adds a real `AgentTabs` usage to the consumer app
-- builds the app
+- creates an isolated local NuGet feed for the full AgentBlazor package set
+- installs the local `AgentBlazor` package in a fresh consumer app
+- writes the same host wiring the public quickstart now requires
+- installs the local `AgentBlazor.Cli` tool and generates `.agentblazor/AGENT.md`
+- starts the app and verifies the home route loads
+- optionally runs a live AG-UI semantic workflow turn when an OpenAI key is supplied
 
 This catches packaging regressions such as:
 
 - unresolved internal package dependencies
 - missing component assemblies in the `.nupkg`
 - broken compile-time imports in a fresh consumer app
+- missing host-shell assets or endpoint wiring in the documented setup
+- CLI packaging regressions that would break `agentblazor init`
 
 ## Current Release Position
 

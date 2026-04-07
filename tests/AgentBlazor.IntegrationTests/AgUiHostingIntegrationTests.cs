@@ -218,6 +218,48 @@ public class AgUiHostingIntegrationTests
     }
 
     [Fact]
+    public async Task AgUiRun_ConnectOperation_ReplaysAndContinuesLiveStream_ForChatClientRuntimeAdapter()
+    {
+        const string runId = "chat-runtime-reconnect";
+        var chatClient = new GatedStreamingChatClient();
+        var app = await CreateAppAsync("unused", chatClient: chatClient);
+        try
+        {
+            using var client = CreateClient(app);
+
+            var initialResponse = await PostAsJsonHeadersReadAsync(client, "/agentblazor/agui/run", CreateRunPayload(runId: runId));
+            initialResponse.EnsureSuccessStatusCode();
+            var initialBodyTask = initialResponse.Content.ReadAsStringAsync();
+
+            await chatClient.FirstChunkDelivered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            var reconnectResponse = await PostAsJsonHeadersReadAsync(
+                client,
+                "/agentblazor/agui/run",
+                CreateRunPayload(runId: runId, forwardedProps: new { ag_ui_operation = "connect" }));
+            reconnectResponse.EnsureSuccessStatusCode();
+
+            chatClient.AllowCompletion.TrySetResult(true);
+
+            var reconnectBody = await reconnectResponse.Content.ReadAsStringAsync();
+            var initialBody = await initialBodyTask;
+
+            Assert.Equal("text/event-stream", reconnectResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Contains("RUN_STARTED", reconnectBody, StringComparison.Ordinal);
+            Assert.Contains("RUN_FINISHED", reconnectBody, StringComparison.Ordinal);
+            Assert.Contains("hello ", reconnectBody, StringComparison.Ordinal);
+            Assert.Contains("world", reconnectBody, StringComparison.Ordinal);
+            Assert.Contains("hello ", initialBody, StringComparison.Ordinal);
+            Assert.Contains("world", initialBody, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await app.StopAsync();
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task AgUiRun_ConnectOperation_UsesReconnectStream()
     {
         const string runId = "reconnect-run-1";
@@ -447,6 +489,19 @@ public class AgUiHostingIntegrationTests
         };
     }
 
+    private static Task<HttpResponseMessage> PostAsJsonHeadersReadAsync(
+        HttpClient client,
+        string requestUri,
+        object payload,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        {
+            Content = JsonContent.Create(payload)
+        };
+        return client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    }
+
     private static object CreateRunPayload(
         IEnumerable<KeyValuePair<string, string>>? context = null,
         string? runId = null,
@@ -522,6 +577,50 @@ public class AgUiHostingIntegrationTests
 
             yield return new ChatResponseUpdate(ChatRole.Assistant, toolNameOrPlanJson);
             await Task.CompletedTask;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class GatedStreamingChatClient : IChatClient
+    {
+        public TaskCompletionSource<bool> FirstChunkDelivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> AllowCompletion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "hello world")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "hello ");
+            FirstChunkDelivered.TrySetResult(true);
+
+            await AllowCompletion.Task.WaitAsync(cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "world");
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null)

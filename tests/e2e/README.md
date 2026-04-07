@@ -9,6 +9,7 @@ npm run test:e2e
 npm run test:e2e:headed
 npm run test:e2e:ui
 npm run test:real-usability
+npm run test:paid-dashboard
 ```
 
 This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
@@ -26,7 +27,7 @@ The suite uses the real runtime path (no deterministic e2e mock client). Configu
 1. OpenAI:
 ```bash
 set OPENAI_API_KEY=...
-set OpenAI__Model=gpt-4o-mini
+set OpenAI__Model=gpt-5.4-mini
 ```
 
 2. Ollama:
@@ -41,6 +42,11 @@ set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1
 
 Evidence output is written to:
 - `tests/e2e/artifacts/real-usability/<timestamp>/`
+
+`test:paid-dashboard` starts the demo with a temporary paid license/data directory, seeds paid data through the release-dossier workflow, and verifies the Pro Dashboard plus SQLite paid stores.
+
+Evidence output is written to:
+- `tests/e2e/artifacts/paid-dashboard/<timestamp>/`
 
 Failure artifacts for `test:e2e` are written to:
 - `tests/e2e/test-results/`

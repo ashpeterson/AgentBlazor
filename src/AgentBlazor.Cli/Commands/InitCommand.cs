@@ -199,10 +199,14 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
                 return Task.FromResult<string?>(slnFiles[0]);
             }
 
+            var solutionChoices = slnFiles
+                .Select(file => System.IO.Path.GetFileName(file) ?? file)
+                .ToList();
+
             var selected = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Multiple solution files found. Select one:")
-                    .AddChoices(slnFiles.Select(System.IO.Path.GetFileName)!));
+                    .AddChoices(solutionChoices));
 
             return Task.FromResult<string?>(slnFiles.First(f => System.IO.Path.GetFileName(f) == selected));
         }
@@ -216,10 +220,14 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
 
         if (csprojFiles.Length > 1 && !nonInteractive)
         {
+            var projectChoices = csprojFiles
+                .Select(file => System.IO.Path.GetFileName(file) ?? file)
+                .ToList();
+
             var selected = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Multiple project files found. Select one:")
-                    .AddChoices(csprojFiles.Select(System.IO.Path.GetFileName)!));
+                    .AddChoices(projectChoices));
 
             return Task.FromResult<string?>(csprojFiles.First(f => System.IO.Path.GetFileName(f) == selected));
         }

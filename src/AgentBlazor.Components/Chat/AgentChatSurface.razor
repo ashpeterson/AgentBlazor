@@ -22,6 +22,7 @@
 @inject IConversationStore ConversationStore
 @inject IAgentComponentRegistry ComponentRegistry
 @inject IAgentChatSessionEvents SessionEvents
+@inject IAgentChatActiveRunStore ActiveRunStore
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 @inject IAgentActionRenderRegistry ActionRenderRegistry
@@ -423,6 +424,16 @@
                     aria-label="@(_isBusy ? "Sending..." : "Send message")">
                 @(_isBusy ? "Sending…" : "Send")
             </button>
+            @if (CanRequestStop)
+            {
+                <button type="button"
+                        class="ab-chat-surface__submit"
+                        disabled="@_stopRequested"
+                        aria-label="@(_stopRequested ? "Stopping active run" : "Stop active run")"
+                        @onclick="RequestStopAsync">
+                    @(_stopRequested ? "Stopping…" : "Stop")
+                </button>
+            }
         </EditForm>
     </section>
     @if (ResolvedShowDevTools)
@@ -484,6 +495,8 @@
     private bool _reasoningComplete;
     private string? _streamingAgentName;
     private string? _activeRunId;
+    private bool _stopRequested;
+    private string? _lastReconnectAttemptRunId;
     private readonly List<ActivityMessage> _streamingActivityMessages = [];
     private readonly HashSet<string> _completedActivityKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _assistantTimelineIndexByRunId =
@@ -631,6 +644,11 @@
 
     private bool _canSubmit => !string.IsNullOrWhiteSpace(_prompt.Trim()) && _pendingClarification is null;
 
+    private bool CanRequestStop =>
+        _isBusy &&
+        RuntimeAdapter.SupportsCancellation &&
+        !string.IsNullOrWhiteSpace(_activeRunId);
+
     private string? _themeStyle => Theme?.GetStyleString();
 
     protected override void OnInitialized()
@@ -650,6 +668,7 @@
     {
         ApplyAgentSelectionPolicy();
         await HydrateTimelineFromHistoryAsync();
+        await TryResumeActiveRunAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -839,6 +858,7 @@
         _reasoningComplete = false;
         _streamingAgentName = null;
         _activeRunId = null;
+        _stopRequested = false;
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
         _isBusy = true;
@@ -849,12 +869,13 @@
 
         try
         {
+            var conversationTurnCountBefore = await GetConversationTurnCountAsync();
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 message,
                 _selectedAgent,
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
-            ApplyTurnOutcome(message, turnOutcome);
+            await ApplyTurnOutcomeAsync(message, turnOutcome, conversationTurnCountBefore);
             ClearPendingHandoffMetadata();
             _ = FireProactiveInsightAsync(message, turnOutcome);
             _scrollRequested = true;
@@ -913,6 +934,7 @@
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
         _activeRunId = null;
+        _stopRequested = false;
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
         _isBusy = true;
@@ -923,12 +945,13 @@
 
         try
         {
+            var conversationTurnCountBefore = await GetConversationTurnCountAsync();
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 fullMessage,
                 _selectedAgent,
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext()));
-            ApplyTurnOutcome(fullMessage, turnOutcome);
+            await ApplyTurnOutcomeAsync(fullMessage, turnOutcome, conversationTurnCountBefore);
             _scrollRequested = true;
         }
         finally
@@ -967,6 +990,7 @@
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
         _activeRunId = null;
+        _stopRequested = false;
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
         _isBusy = true;
@@ -978,12 +1002,14 @@
         try
         {
             var approvalMessage = "Approve the pending actions.";
+            var conversationTurnCountBefore = await GetConversationTurnCountAsync();
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 approvalMessage,
                 _selectedAgent,
                 SessionId: EffectiveSessionId,
                 Context: CreateRequestContext(approvalContext)));
-            ApplyTurnOutcome(approvalMessage, turnOutcome);
+            turnOutcome = EnrichApprovalOutcome(turnOutcome);
+            await ApplyTurnOutcomeAsync(approvalMessage, turnOutcome, conversationTurnCountBefore);
             _scrollRequested = true;
         }
         finally
@@ -1005,11 +1031,30 @@
         _streamingResponseText = string.Empty;
         _streamingAgentName = null;
         _activeRunId = null;
+        _stopRequested = false;
         _streamingActivityMessages.Clear();
         _completedActivityKeys.Clear();
         _agentState = AgentState.Idle;
         _scrollRequested = true;
         StateHasChanged();
+    }
+
+    private async Task RequestStopAsync()
+    {
+        if (!CanRequestStop || _stopRequested || string.IsNullOrWhiteSpace(_activeRunId))
+        {
+            return;
+        }
+
+        _stopRequested = true;
+        await InvokeAsync(StateHasChanged);
+
+        var stopped = await RuntimeAdapter.StopRunAsync(_activeRunId);
+        if (!stopped)
+        {
+            _stopRequested = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task<StreamTurnOutcome> RunTurnWithOptionalStreamingAsync(AgentTurnRequest request)
@@ -1030,6 +1075,23 @@
                 RunId: null);
         }
 
+        return await ConsumeStreamingRunAsync(
+            RuntimeAdapter.RunTurnStreamingAsync(request),
+            request,
+            fallbackAgentName: _selectedAgent ?? request.AgentName,
+            conversationSessionId: EffectiveConversationSessionId,
+            initialUserMessage: request.UserMessage,
+            trackActiveRun: true);
+    }
+
+    private async Task<StreamTurnOutcome> ConsumeStreamingRunAsync(
+        IAsyncEnumerable<AgentTurnStreamEvent> stream,
+        AgentTurnRequest? request,
+        string? fallbackAgentName,
+        string conversationSessionId,
+        string? initialUserMessage,
+        bool trackActiveRun)
+    {
         _streamingResponseText = string.Empty;
         _streamingReasoningText = string.Empty;
         _reasoningComplete = false;
@@ -1040,157 +1102,198 @@
         AgentTurnResponse? finalResponse = null;
         string? clarificationQuestion = null;
         var pendingApprovals = new List<PendingApproval>();
-        await foreach (var streamEvent in RuntimeAdapter.RunTurnStreamingAsync(request))
+        try
         {
-            if (string.IsNullOrWhiteSpace(_activeRunId) &&
-                !string.IsNullOrWhiteSpace(streamEvent.RunId))
+            await foreach (var streamEvent in stream)
             {
-                _activeRunId = streamEvent.RunId;
+                if (string.IsNullOrWhiteSpace(_activeRunId) &&
+                    !string.IsNullOrWhiteSpace(streamEvent.RunId))
+                {
+                    _activeRunId = streamEvent.RunId;
+                    if (trackActiveRun)
+                    {
+                        ActiveRunStore.Track(new AgentChatActiveRun(
+                            conversationSessionId,
+                            streamEvent.RunId,
+                            fallbackAgentName,
+                            initialUserMessage,
+                            DateTimeOffset.UtcNow));
+                        SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
+                    }
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
+                    streamEvent.PlannedAction is not null)
+                {
+                    var plannedAction = streamEvent.PlannedAction;
+                    AddStreamingActivityMessage(
+                        new ActivityMessage(
+                            BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                            FormatToolCallStartMessage(plannedAction),
+                            Succeeded: true,
+                            ComponentId: plannedAction.ComponentId,
+                            ActionId: plannedAction.ActionId,
+                            Status: ActionStatus.InProgress,
+                            Args: plannedAction.Arguments,
+                            Result: null));
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallArgs &&
+                    streamEvent.PlannedAction is not null)
+                {
+                    var plannedAction = streamEvent.PlannedAction;
+                    var args = streamEvent.ToolArguments ?? plannedAction.Arguments;
+                    AddStreamingActivityMessage(
+                        new ActivityMessage(
+                            BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
+                            FormatToolCallStartMessage(plannedAction),
+                            Succeeded: true,
+                            ComponentId: plannedAction.ComponentId,
+                            ActionId: plannedAction.ActionId,
+                            Status: ActionStatus.InProgress,
+                            Args: args,
+                            Result: null));
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallEnd &&
+                    streamEvent.PlannedAction is not null)
+                {
+                    var plannedAction = streamEvent.PlannedAction;
+                    var key = BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId);
+                    AddStreamingActivityMessage(
+                        new ActivityMessage(
+                            key,
+                            FormatToolCallStartMessage(plannedAction),
+                            Succeeded: true,
+                            ComponentId: plannedAction.ComponentId,
+                            ActionId: plannedAction.ActionId,
+                            Status: ActionStatus.Executing,
+                            Args: streamEvent.ToolArguments ?? plannedAction.Arguments ?? GetActivityArgsByKey(key),
+                            Result: null));
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
+                    streamEvent.ExecutionResult is not null)
+                {
+                    var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
+                    var resultStatus = streamEvent.ExecutionResult.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+                    AddStreamingActivityMessage(
+                        new ActivityMessage(
+                            resultKey,
+                            FormatToolCallResultMessage(streamEvent.ExecutionResult),
+                            streamEvent.ExecutionResult.Succeeded,
+                            streamEvent.ExecutionResult.ComponentId,
+                            streamEvent.ExecutionResult.ActionId,
+                            resultStatus,
+                            GetActivityArgsByKey(resultKey),
+                            streamEvent.ExecutionResult.Message));
+                    _completedActivityKeys.Add(resultKey);
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningContent &&
+                    !string.IsNullOrEmpty(streamEvent.ReasoningDelta))
+                {
+                    _streamingReasoningText += streamEvent.ReasoningDelta;
+                    _reasoningComplete = false;
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningEnd)
+                {
+                    _reasoningComplete = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.TextMessageContent &&
+                    !string.IsNullOrEmpty(streamEvent.TextDelta))
+                {
+                    _streamingAgentName ??= streamEvent.AgentName;
+                    _streamingResponseText += streamEvent.TextDelta;
+                    _scrollRequested = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ClarificationRequired &&
+                    !string.IsNullOrWhiteSpace(streamEvent.ClarificationQuestion))
+                {
+                    clarificationQuestion = streamEvent.ClarificationQuestion;
+                    pendingApprovals.Clear();
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.ApprovalRequired &&
+                    streamEvent.PendingApprovals is { Count: > 0 })
+                {
+                    clarificationQuestion = null;
+                    pendingApprovals.Clear();
+                    pendingApprovals.AddRange(streamEvent.PendingApprovals);
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.RunFinished &&
+                    streamEvent.Response is not null)
+                {
+                    finalResponse = streamEvent.Response;
+                    continue;
+                }
+
+                if (streamEvent.Kind == AgentTurnStreamEventKind.RunError)
+                {
+                    throw new InvalidOperationException(streamEvent.ErrorMessage ?? "Streaming run failed.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_stopRequested)
+        {
+            if (!string.IsNullOrWhiteSpace(_activeRunId))
+            {
+                ActiveRunStore.Clear(conversationSessionId, _activeRunId);
             }
 
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallStart &&
-                streamEvent.PlannedAction is not null)
-            {
-                var plannedAction = streamEvent.PlannedAction;
-                AddStreamingActivityMessage(
-                    new ActivityMessage(
-                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
-                        FormatToolCallStartMessage(plannedAction),
-                        Succeeded: true,
-                        ComponentId: plannedAction.ComponentId,
-                        ActionId: plannedAction.ActionId,
-                        Status: ActionStatus.InProgress,
-                        Args: plannedAction.Arguments,
-                        Result: null));
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallArgs &&
-                streamEvent.PlannedAction is not null)
-            {
-                var plannedAction = streamEvent.PlannedAction;
-                var args = streamEvent.ToolArguments ?? plannedAction.Arguments;
-                AddStreamingActivityMessage(
-                    new ActivityMessage(
-                        BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId),
-                        FormatToolCallStartMessage(plannedAction),
-                        Succeeded: true,
-                        ComponentId: plannedAction.ComponentId,
-                        ActionId: plannedAction.ActionId,
-                        Status: ActionStatus.InProgress,
-                        Args: args,
-                        Result: null));
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallEnd &&
-                streamEvent.PlannedAction is not null)
-            {
-                var plannedAction = streamEvent.PlannedAction;
-                var key = BuildActivityKey(plannedAction.ComponentId, plannedAction.ActionId);
-                AddStreamingActivityMessage(
-                    new ActivityMessage(
-                        key,
-                        FormatToolCallStartMessage(plannedAction),
-                        Succeeded: true,
-                        ComponentId: plannedAction.ComponentId,
-                        ActionId: plannedAction.ActionId,
-                        Status: ActionStatus.Executing,
-                        Args: streamEvent.ToolArguments ?? plannedAction.Arguments ?? GetActivityArgsByKey(key),
-                        Result: null));
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
-                streamEvent.ExecutionResult is not null)
-            {
-                var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
-                var resultStatus = streamEvent.ExecutionResult.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
-                AddStreamingActivityMessage(
-                    new ActivityMessage(
-                        resultKey,
-                        FormatToolCallResultMessage(streamEvent.ExecutionResult),
-                        streamEvent.ExecutionResult.Succeeded,
-                        streamEvent.ExecutionResult.ComponentId,
-                        streamEvent.ExecutionResult.ActionId,
-                        resultStatus,
-                        GetActivityArgsByKey(resultKey),
-                        streamEvent.ExecutionResult.Message));
-                _completedActivityKeys.Add(resultKey);
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningContent &&
-                !string.IsNullOrEmpty(streamEvent.ReasoningDelta))
-            {
-                _streamingReasoningText += streamEvent.ReasoningDelta;
-                _reasoningComplete = false;
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ReasoningEnd)
-            {
-                _reasoningComplete = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.TextMessageContent &&
-                !string.IsNullOrEmpty(streamEvent.TextDelta))
-            {
-                _streamingAgentName ??= streamEvent.AgentName;
-                _streamingResponseText += streamEvent.TextDelta;
-                _scrollRequested = true;
-                await InvokeAsync(StateHasChanged);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ClarificationRequired &&
-                !string.IsNullOrWhiteSpace(streamEvent.ClarificationQuestion))
-            {
-                clarificationQuestion = streamEvent.ClarificationQuestion;
-                pendingApprovals.Clear();
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.ApprovalRequired &&
-                streamEvent.PendingApprovals is { Count: > 0 })
-            {
-                clarificationQuestion = null;
-                pendingApprovals.Clear();
-                pendingApprovals.AddRange(streamEvent.PendingApprovals);
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.RunFinished &&
-                streamEvent.Response is not null)
-            {
-                finalResponse = streamEvent.Response;
-                continue;
-            }
-
-            if (streamEvent.Kind == AgentTurnStreamEventKind.RunError)
-            {
-                throw new InvalidOperationException(streamEvent.ErrorMessage ?? "Streaming run failed.");
-            }
+            return BuildCanceledTurnOutcome(request, fallbackAgentName);
+        }
+        finally
+        {
+            _stopRequested = false;
         }
 
         _streamingResponseText = string.Empty;
         _streamingReasoningText = string.Empty;
         _streamingAgentName = null;
 
-        var response = finalResponse
-            ?? throw new InvalidOperationException("Streaming completed without a final response.");
+        if (finalResponse is null)
+        {
+            if (!trackActiveRun &&
+                !string.IsNullOrWhiteSpace(_activeRunId))
+            {
+                ActiveRunStore.Clear(conversationSessionId, _activeRunId);
+            }
+
+            return BuildReconnectUnavailableOutcome(fallbackAgentName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_activeRunId))
+        {
+            ActiveRunStore.Clear(conversationSessionId, _activeRunId);
+        }
+
+        var response = finalResponse;
         return new StreamTurnOutcome(
             response,
             clarificationQuestion ?? (response.RequiresClarification ? response.ClarificationQuestion : null),
@@ -1200,7 +1303,71 @@
             _activeRunId);
     }
 
-    private void ApplyTurnOutcome(string sourceMessage, StreamTurnOutcome turnOutcome)
+    private StreamTurnOutcome BuildCanceledTurnOutcome(AgentTurnRequest? request, string? fallbackAgentName)
+    {
+        var agentName = _streamingAgentName
+            ?? fallbackAgentName
+            ?? _selectedAgent
+            ?? request?.AgentName
+            ?? "Assistant";
+        _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _streamingAgentName = null;
+        var response = new AgentTurnResponse(
+            agentName,
+            "Run canceled.",
+            [],
+            []);
+        return new StreamTurnOutcome(response, null, [], _activeRunId);
+    }
+
+    private StreamTurnOutcome BuildReconnectUnavailableOutcome(string? fallbackAgentName)
+    {
+        _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _streamingAgentName = null;
+        var response = new AgentTurnResponse(
+            fallbackAgentName ?? _selectedAgent ?? DefaultAgentName ?? "Assistant",
+            "The active run could not be resumed.",
+            [],
+            []);
+        return new StreamTurnOutcome(response, null, [], _activeRunId);
+    }
+
+    private static StreamTurnOutcome EnrichApprovalOutcome(StreamTurnOutcome turnOutcome)
+    {
+        if (!string.Equals(turnOutcome.Response.ResponseText, "Approved.", StringComparison.Ordinal))
+        {
+            return turnOutcome;
+        }
+
+        var enrichedMessage = turnOutcome.Response.ExecutionPlan?.Steps
+            .Where(static step => step.Status is AgentExecutionStepStatus.Completed)
+            .Select(static step => step.Message)
+            .FirstOrDefault(static message => !string.IsNullOrWhiteSpace(message))
+            ?? turnOutcome.Response.LegacyExecutionResults
+                .Where(static result => result.Succeeded)
+                .Select(static result => result.Message)
+                .FirstOrDefault(static message => !string.IsNullOrWhiteSpace(message));
+
+        if (string.IsNullOrWhiteSpace(enrichedMessage))
+        {
+            return turnOutcome;
+        }
+
+        return turnOutcome with
+        {
+            Response = turnOutcome.Response with
+            {
+                ResponseText = enrichedMessage
+            }
+        };
+    }
+
+    private async Task ApplyTurnOutcomeAsync(
+        string sourceMessage,
+        StreamTurnOutcome turnOutcome,
+        int conversationTurnCountBefore)
     {
         var response = turnOutcome.Response;
         var runId = string.IsNullOrWhiteSpace(turnOutcome.RunId) ? null : turnOutcome.RunId;
@@ -1212,12 +1379,112 @@
         {
             _assistantTimelineIndexByRunId[runId] = _timeline.Count - 1;
         }
+        await PersistDisplayedTurnAsync(sourceMessage, response, conversationTurnCountBefore);
         SessionEvents.NotifySessionUpdated(EffectiveConversationSessionId, _instanceId);
         ApplyInteractionState(
             sourceMessage,
             turnOutcome.ClarificationQuestion,
             turnOutcome.PendingApprovals,
             turnOutcome.Response.ExecutionPlan);
+    }
+
+    private async Task<int> GetConversationTurnCountAsync()
+    {
+        var history = await ConversationStore.GetHistoryAsync(EffectiveConversationSessionId);
+        return history?.Turns.Count ?? 0;
+    }
+
+    private async Task PersistDisplayedTurnAsync(
+        string sourceMessage,
+        AgentTurnResponse response,
+        int conversationTurnCountBefore)
+    {
+        if (string.IsNullOrWhiteSpace(sourceMessage))
+        {
+            return;
+        }
+
+        var sessionId = EffectiveConversationSessionId;
+        var persistedTurn = CreateConversationTurn(sourceMessage, response);
+        var history = await ConversationStore.GetHistoryAsync(sessionId);
+        if (history is null || history.Turns.Count == 0)
+        {
+            await ConversationStore.AppendTurnAsync(sessionId, persistedTurn);
+            return;
+        }
+
+        var lastTurn = history.Turns[^1];
+        var runtimePersistedCurrentTurn =
+            history.Turns.Count > conversationTurnCountBefore &&
+            string.Equals(lastTurn.UserMessage, sourceMessage, StringComparison.Ordinal);
+
+        if (runtimePersistedCurrentTurn)
+        {
+            if (AreEquivalentTurns(lastTurn, persistedTurn))
+            {
+                return;
+            }
+
+            await RewriteConversationHistoryAsync(
+                sessionId,
+                history,
+                [.. history.Turns.Take(history.Turns.Count - 1), persistedTurn]);
+            return;
+        }
+
+        await ConversationStore.AppendTurnAsync(sessionId, persistedTurn);
+    }
+
+    private async Task RewriteConversationHistoryAsync(
+        string sessionId,
+        ConversationHistory history,
+        IReadOnlyList<ConversationTurn> turns)
+    {
+        await ConversationStore.ClearSessionAsync(sessionId);
+        foreach (var turn in turns)
+        {
+            await ConversationStore.AppendTurnAsync(sessionId, turn);
+        }
+
+        if (!string.IsNullOrWhiteSpace(history.UserId))
+        {
+            await ConversationStore.SetUserIdAsync(sessionId, history.UserId);
+        }
+    }
+
+    private static ConversationTurn CreateConversationTurn(string sourceMessage, AgentTurnResponse response)
+        => new()
+        {
+            Timestamp = DateTime.UtcNow,
+            UserMessage = sourceMessage,
+            AgentResponse = response.ResponseText,
+            PlannedActions = response.LegacyPlannedActions,
+            ExecutionResults = response.LegacyExecutionResults,
+            ExecutionPlan = response.ExecutionPlan,
+            GeneratedUi = response.GeneratedUi
+        };
+
+    private static bool AreEquivalentTurns(ConversationTurn left, ConversationTurn right)
+    {
+        return string.Equals(left.UserMessage, right.UserMessage, StringComparison.Ordinal) &&
+               string.Equals(left.AgentResponse, right.AgentResponse, StringComparison.Ordinal) &&
+               left.HasNormalizedExecutionPlan == right.HasNormalizedExecutionPlan &&
+               left.LegacyPlannedActions.Count == right.LegacyPlannedActions.Count &&
+               left.LegacyExecutionResults.Count == right.LegacyExecutionResults.Count &&
+               GetExecutionPlanSignature(left.ExecutionPlan) == GetExecutionPlanSignature(right.ExecutionPlan);
+    }
+
+    private static string GetExecutionPlanSignature(AgentExecutionPlan? executionPlan)
+    {
+        if (executionPlan?.Steps.Count is not > 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            "|",
+            executionPlan.Steps.Select(static step =>
+                $"{step.TargetId}:{step.ActionId}:{step.Status}:{step.Message}"));
     }
 
     private void SetPendingApprovals(
@@ -1769,6 +2036,7 @@
         _ = InvokeAsync(async () =>
         {
             await HydrateTimelineFromHistoryAsync(force: true);
+            await TryResumeActiveRunAsync();
             StateHasChanged();
         });
     }
@@ -1803,6 +2071,7 @@
         _pendingHandoffRequest = null;
         _clarificationResponse = string.Empty;
         _agentState = AgentState.Idle;
+        _lastReconnectAttemptRunId = null;
 
         if (history is null || history.Turns.Count == 0)
         {
@@ -1829,6 +2098,74 @@
                     turn.ExecutionPlan,
                     GeneratedUi: turn.GeneratedUi,
                     RunId: null));
+            }
+        }
+    }
+
+    private async Task TryResumeActiveRunAsync()
+    {
+        if (_isBusy || !RuntimeAdapter.SupportsReconnect)
+        {
+            return;
+        }
+
+        if (!ActiveRunStore.TryGet(EffectiveConversationSessionId, out var activeRun))
+        {
+            return;
+        }
+
+        if (string.Equals(_lastReconnectAttemptRunId, activeRun.RunId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _lastReconnectAttemptRunId = activeRun.RunId;
+
+        if (!string.IsNullOrWhiteSpace(activeRun.UserMessage) &&
+            (_timeline.Count == 0 ||
+             !string.Equals(_timeline.Last().Role, "user", StringComparison.OrdinalIgnoreCase) ||
+             !string.Equals(_timeline.Last().Text, activeRun.UserMessage, StringComparison.Ordinal)))
+        {
+            _timeline.Add(ChatTimelineItem.User(activeRun.UserMessage));
+        }
+
+        _streamingResponseText = string.Empty;
+        _streamingReasoningText = string.Empty;
+        _reasoningComplete = false;
+        _streamingAgentName = activeRun.AgentName ?? _selectedAgent ?? DefaultAgentName;
+        _activeRunId = activeRun.RunId;
+        _stopRequested = false;
+        _streamingActivityMessages.Clear();
+        _completedActivityKeys.Clear();
+        _pendingClarification = null;
+        _pendingApprovals.Clear();
+        _clarificationResponse = string.Empty;
+        _isBusy = true;
+        _agentState = AgentState.Thinking;
+        _scrollRequested = true;
+        StartTimeoutTimer();
+        StateHasChanged();
+
+        try
+        {
+            var conversationTurnCountBefore = await GetConversationTurnCountAsync();
+            var turnOutcome = await ConsumeStreamingRunAsync(
+                RuntimeAdapter.ConnectRunStreamAsync(activeRun.RunId),
+                request: null,
+                fallbackAgentName: activeRun.AgentName ?? _selectedAgent ?? DefaultAgentName,
+                conversationSessionId: EffectiveConversationSessionId,
+                initialUserMessage: activeRun.UserMessage,
+                trackActiveRun: false);
+            await ApplyTurnOutcomeAsync(activeRun.UserMessage ?? "Resumed run.", turnOutcome, conversationTurnCountBefore);
+            _scrollRequested = true;
+        }
+        finally
+        {
+            StopTimeoutTimer();
+            _isBusy = false;
+            if (_agentState == AgentState.Thinking)
+            {
+                _agentState = AgentState.Idle;
             }
         }
     }

@@ -31,8 +31,8 @@ How to run it:
 What the workflow does:
 
 - restore, build, test, and run Playwright
-- pack the `AgentBlazor` NuGet package
-- run the local consumer smoke test script
+- pack the AgentBlazor package set
+- run the local consumer smoke test script, including CLI and startup validation
 - push the `.nupkg` to GitHub Packages
 
 ## Install As A Test User

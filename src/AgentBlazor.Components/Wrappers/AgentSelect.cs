@@ -50,7 +50,7 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
     private bool _isOpen;
 
     [AgentReadable("Currently selected value")]
-    public T? SelectedValue => Value;
+    public T? SelectedValue => GetSelectedValue();
 
     [AgentReadable("Whether the select is currently disabled")]
     public bool IsDisabled => Disabled;
@@ -103,7 +103,7 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
 
     public virtual RuntimeComponentState GetCurrentState() => new()
     {
-        ["value"] = ConvertOptionToText(Value),
+        ["value"] = ConvertOptionToText(GetSelectedValue()),
         ["options"] = GetAvailableOptionTexts(),
         ["disabled"] = Disabled,
         ["readOnly"] = ReadOnly,
@@ -167,7 +167,7 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
     }
 
     [AgentAction("Clear current selection", ActionId = "clear")]
-    public new async Task<ActionResult> Clear()
+    public async Task<ActionResult> Clear()
     {
         if (Disabled || ReadOnly)
         {
@@ -392,14 +392,12 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         catch (InvalidOperationException)
         {
             _isOpen = true;
-            Open = true;
-            await OpenChanged.InvokeAsync(true);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_openState", true);
         }
         catch (Exception) when (!_hasRendered)
         {
             _isOpen = true;
-            Open = true;
-            await OpenChanged.InvokeAsync(true);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_openState", true);
         }
     }
 
@@ -413,14 +411,12 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         catch (InvalidOperationException)
         {
             _isOpen = false;
-            Open = false;
-            await OpenChanged.InvokeAsync(false);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_openState", false);
         }
         catch (Exception) when (!_hasRendered)
         {
             _isOpen = false;
-            Open = false;
-            await OpenChanged.InvokeAsync(false);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_openState", false);
         }
     }
 
@@ -432,13 +428,11 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         }
         catch (InvalidOperationException)
         {
-            Value = value;
-            await ValueChanged.InvokeAsync(value);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_valueState", value);
         }
         catch (Exception) when (!_hasRendered)
         {
-            Value = value;
-            await ValueChanged.InvokeAsync(value);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_valueState", value);
         }
     }
 
@@ -450,13 +444,11 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
         }
         catch (InvalidOperationException)
         {
-            Value = default;
-            await ValueChanged.InvokeAsync(Value);
+            await MudPrivateParameterStateAccessor.SetValueAsync<T?>(this, "_valueState", default);
         }
         catch (Exception) when (!_hasRendered)
         {
-            Value = default;
-            await ValueChanged.InvokeAsync(Value);
+            await MudPrivateParameterStateAccessor.SetValueAsync<T?>(this, "_valueState", default);
         }
     }
 
@@ -471,4 +463,6 @@ public class AgentSelect<T> : MudSelect<T>, IAgentControllable
             return Task.CompletedTask;
         }
     }
+
+    private T? GetSelectedValue() => MudPrivateParameterStateAccessor.GetValue<T>(this, "_valueState");
 }

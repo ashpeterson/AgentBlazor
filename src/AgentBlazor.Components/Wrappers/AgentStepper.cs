@@ -102,11 +102,11 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
 
         if (ShouldApplyCurrentStepAlias())
         {
-            ActiveIndex = CurrentStepIndex;
+            MudPrivateParameterStateAccessor.SetValue(this, "_activeIndex", CurrentStepIndex);
         }
         else
         {
-            CurrentStepIndex = ActiveIndex;
+            CurrentStepIndex = GetActiveIndex();
         }
 
         base.OnParametersSet();
@@ -206,7 +206,7 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
         if (CanUseNativeStepperNavigation())
         {
             await NextStepAsync();
-            await SyncCurrentStepIndexAsync(ActiveIndex);
+            await SyncCurrentStepIndexAsync(GetActiveIndex());
         }
         else
         {
@@ -234,7 +234,7 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
         if (CanUseNativeStepperNavigation())
         {
             await PreviousStepAsync();
-            await SyncCurrentStepIndexAsync(ActiveIndex);
+            await SyncCurrentStepIndexAsync(GetActiveIndex());
         }
         else
         {
@@ -297,7 +297,7 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
     {
         if (Steps.Count > 0 || _hasRendered)
         {
-            return ActiveIndex;
+            return GetActiveIndex();
         }
 
         return CurrentStepIndex;
@@ -416,12 +416,12 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
             return;
         }
 
-        await SyncCurrentStepIndexAsync(ActiveIndex);
+        await SyncCurrentStepIndexAsync(GetActiveIndex());
     }
 
     private async Task SetHeadlessIndexAsync(int index)
     {
-        ActiveIndex = index;
+        await MudPrivateParameterStateAccessor.SetValueAsync(this, "_activeIndex", index);
         await SyncCurrentStepIndexAsync(index);
     }
 
@@ -430,6 +430,8 @@ public class AgentStepper : MudStepper, IAgentControllable, IDisposable
         CurrentStepIndex = index;
         await HandleActiveIndexChangedAsync(index);
     }
+
+    private int GetActiveIndex() => MudPrivateParameterStateAccessor.GetValue<int>(this, "_activeIndex");
 
     private async Task NotifyTargetStepClickedAsync(int index)
     {

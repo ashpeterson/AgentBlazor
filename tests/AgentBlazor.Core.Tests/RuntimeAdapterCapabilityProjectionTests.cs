@@ -9,10 +9,12 @@ using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Paid;
+using AgentBlazor.Core.Paid.Audit;
 using AgentBlazor.Execution;
 using AgentBlazor.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
 
 namespace AgentBlazor.Core.Tests;
 
@@ -286,6 +288,87 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_LogsApprovalRequestedAuditEvent_WhenCapabilityApprovalMissing()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingAuditLogService>();
+        services.AddSingleton<IAuditLogService>(static sp => sp.GetRequiredService<RecordingAuditLogService>());
+        services.AddSingleton<ApprovalCapabilityChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ApprovalCapabilityChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var auditLog = provider.GetRequiredService<RecordingAuditLogService>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Create the change request",
+            AgentName: "approval-agent",
+            SessionId: "approval-missing"));
+
+        Assert.True(response.RequiresApproval);
+        var auditEvent = Assert.Single(auditLog.Events);
+        Assert.Equal(AuditEventType.ActionApprovalRequested, auditEvent.EventType);
+        Assert.Equal("approval-missing", auditEvent.UserId);
+        Assert.Equal("approval_workflow.create_change_request", auditEvent.TargetId);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_LogsApprovalAndExecutionAuditEvents_ForApprovedCapability()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingAuditLogService>();
+        services.AddSingleton<IAuditLogService>(static sp => sp.GetRequiredService<RecordingAuditLogService>());
+        services.AddSingleton<ApprovalCapabilityChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ApprovalCapabilityChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var auditLog = provider.GetRequiredService<RecordingAuditLogService>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Create the change request",
+            AgentName: "approval-agent",
+            SessionId: "approval-granted",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentblazor.approvals"] = "all"
+            }));
+
+        Assert.False(response.RequiresApproval);
+        Assert.Equal("approval-capability-invoked", response.ResponseText);
+        Assert.Collection(
+            auditLog.Events,
+            evt =>
+            {
+                Assert.Equal(AuditEventType.ActionApproved, evt.EventType);
+                Assert.Equal("approval-granted", evt.UserId);
+                Assert.Equal("approval_workflow.create_change_request", evt.TargetId);
+            },
+            evt =>
+            {
+                Assert.Equal(AuditEventType.ActionExecuted, evt.EventType);
+                Assert.Equal("approval-granted", evt.UserId);
+                Assert.Equal("approval_workflow.create_change_request", evt.TargetId);
+            });
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_ExecutesLegacyComponentToolAlias()
     {
         var services = new ServiceCollection();
@@ -339,7 +422,8 @@ public class RuntimeAdapterCapabilityProjectionTests
         var execution = Assert.Single(executor.Executions);
         Assert.Equal("AgentDialog", execution.ComponentId);
         Assert.Equal("open", execution.ActionId);
-        Assert.Equal("confirm-dialog", execution.Arguments["target"]);
+        var executionArguments = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(execution.Arguments);
+        Assert.Equal("confirm-dialog", executionArguments["target"]);
         Assert.Equal("legacy-alias-invoked", response.ResponseText);
     }
 
@@ -363,6 +447,16 @@ public class RuntimeAdapterCapabilityProjectionTests
     public sealed class CapabilityRecorder
     {
         public int LastDays { get; set; }
+    }
+
+    [AgentCapability("approval_workflow", Name = "Approval Workflow", Description = "Approval-gated change workflow.")]
+    public sealed class ApprovalCapabilities
+    {
+        [AgentAction("Create a change request", ActionId = "create_change_request", RequiresApproval = true)]
+        public CapabilityResult CreateChangeRequest([AgentParam("Change request name")] string name = "Default")
+        {
+            return CapabilityResult.Success($"Created change request '{name}'.");
+        }
     }
 
     [AgentCapability("recipe_release", Name = "Recipe Release", Description = "Release workflow checks.")]
@@ -450,6 +544,134 @@ public class RuntimeAdapterCapabilityProjectionTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class ApprovalCapabilityChatClient : IChatClient
+    {
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    function.Name.Contains("capability_approval_workflow_create_change_request", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+
+            await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["name"] = "CAB-17"
+            }), cancellationToken);
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "approval-capability-invoked"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class RecordingAuditLogService : IAuditLogService
+    {
+        public List<AuditEvent> Events { get; } = [];
+
+        public Task LogAsync(AuditEvent evt, CancellationToken ct = default)
+        {
+            _ = ct;
+            Events.Add(evt);
+            return Task.CompletedTask;
+        }
+
+        public Task LogActionAsync(
+            string userId,
+            string? userEmail,
+            string actionId,
+            string agentId,
+            bool succeeded,
+            string? errorMessage = null,
+            string? ipAddress = null,
+            CancellationToken ct = default)
+        {
+            _ = ct;
+            Events.Add(new AuditEvent(
+                Guid.NewGuid().ToString("N"),
+                DateTimeOffset.UtcNow,
+                userId,
+                userEmail,
+                succeeded ? AuditEventType.ActionExecuted : AuditEventType.ActionFailed,
+                "action",
+                actionId,
+                succeeded
+                    ? $"Executed action '{actionId}' via agent '{agentId}'"
+                    : $"Failed to execute action '{actionId}' via agent '{agentId}': {errorMessage}",
+                ipAddress,
+                new Dictionary<string, object?>
+                {
+                    ["actionId"] = actionId,
+                    ["agentId"] = agentId,
+                    ["succeeded"] = succeeded,
+                    ["errorMessage"] = errorMessage
+                }));
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<AuditEvent>> QueryAsync(AuditQuery query, CancellationToken ct = default)
+        {
+            _ = ct;
+            IEnumerable<AuditEvent> filtered = Events;
+            if (query.EventType is { } eventType)
+            {
+                filtered = filtered.Where(evt => evt.EventType == eventType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.UserId))
+            {
+                filtered = filtered.Where(evt => string.Equals(evt.UserId, query.UserId, StringComparison.Ordinal));
+            }
+
+            return Task.FromResult<IReadOnlyList<AuditEvent>>(filtered.Take(query.Limit).ToArray());
+        }
+
+        public Task<IReadOnlyList<AuditEvent>> GetByUserAsync(string userId, int limit = 100, CancellationToken ct = default)
+            => QueryAsync(new AuditQuery { UserId = userId, Limit = limit }, ct);
+
+        public Task<IReadOnlyList<AuditEvent>> GetRecentAsync(int limit = 100, CancellationToken ct = default)
+        {
+            _ = ct;
+            return Task.FromResult<IReadOnlyList<AuditEvent>>(Events.TakeLast(limit).ToArray());
+        }
+
+        public Task<Stream> ExportAsync(AuditQuery query, AuditExportFormat format, CancellationToken ct = default)
+        {
+            _ = query;
+            _ = format;
+            _ = ct;
+            return Task.FromResult<Stream>(new MemoryStream());
+        }
+
+        public Task PruneAsync(int retentionDays = 365, CancellationToken ct = default)
+        {
+            _ = retentionDays;
+            _ = ct;
+            return Task.CompletedTask;
         }
     }
 

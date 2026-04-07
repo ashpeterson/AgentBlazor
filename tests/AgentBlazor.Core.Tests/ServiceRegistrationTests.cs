@@ -34,14 +34,14 @@ public class ServiceRegistrationTests
         services.AddAgentBlazorServices(options =>
         {
             options.Provider.Kind = AgentProviderKind.OpenAI;
-            options.Provider.Model = "gpt-4o-mini";
+            options.Provider.Model = "gpt-5.4-mini";
         });
 
         using var provider = services.BuildServiceProvider();
 
         var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
         Assert.Equal(AgentProviderKind.OpenAI, options.Provider.Kind);
-        Assert.Equal("gpt-4o-mini", options.Provider.Model);
+        Assert.Equal("gpt-5.4-mini", options.Provider.Model);
 
         var registry = provider.GetRequiredService<IAgentRegistry>();
         Assert.False(registry.TryGet("AgentBlazor UI Agent", out _));
@@ -99,8 +99,8 @@ public class ServiceRegistrationTests
 
         Assert.IsType<AgentBlazor.Core.Runtime.Adapters.ChatClientRuntimeAdapter>(adapter);
         Assert.True(adapter.SupportsStreaming);
-        Assert.False(adapter.SupportsReconnect);
-        Assert.False(adapter.SupportsCancellation);
+        Assert.True(adapter.SupportsReconnect);
+        Assert.True(adapter.SupportsCancellation);
 
         var first = await adapter.RunTurnAsync(new AgentTurnRequest("hello", SessionId: "session-a"));
         var second = await adapter.RunTurnAsync(new AgentTurnRequest("continue", SessionId: "session-a"));
@@ -136,6 +136,176 @@ public class ServiceRegistrationTests
         Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent && e.TextDelta == "world");
         Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.TextMessageEnd);
         Assert.Contains(events, static e => e.Kind == AgentTurnStreamEventKind.RunFinished);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ReconnectsAndReplaysBufferedStreamEvents()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<StreamingRecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<StreamingRecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        const string runId = "replay-run-1";
+        var original = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in adapter.RunTurnStreamingAsync(new AgentTurnRequest(
+                           "stream please",
+                           SessionId: "session-replay",
+                           Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                           {
+                               [AgentRuntimeContextKeys.RunId] = runId
+                           })))
+        {
+            original.Add(streamEvent);
+        }
+
+        var replayed = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in adapter.ConnectRunStreamAsync(runId))
+        {
+            replayed.Add(streamEvent);
+        }
+
+        Assert.NotEmpty(original);
+        Assert.Equal(original.Count, replayed.Count);
+        Assert.All(replayed, static e => Assert.True(e.IsReplay));
+        Assert.Equal(
+            original.Select(static e => (e.Kind, e.TextDelta)),
+            replayed.Select(static e => (e.Kind, e.TextDelta)));
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ConcurrentRuns_ForDifferentSessions_CanOverlap()
+    {
+        var chatClient = new ParallelProbeChatClient();
+        var services = new ServiceCollection();
+        services.AddSingleton(chatClient);
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ParallelProbeChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
+
+        await using var provider = services.BuildServiceProvider();
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var firstTask = Task.Run(() => adapter.RunTurnAsync(new AgentTurnRequest("first", SessionId: "parallel-a")));
+        var secondTask = Task.Run(() => adapter.RunTurnAsync(new AgentTurnRequest("second", SessionId: "parallel-b")));
+
+        await chatClient.TwoCallsObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        chatClient.ReleaseAll.TrySetResult(true);
+
+        var responses = await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal(2, responses.Length);
+        Assert.True(chatClient.MaxConcurrentCalls >= 2, $"Expected overlap but max concurrency was {chatClient.MaxConcurrentCalls}.");
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ConcurrentRuns_ForSameSession_AreSerialized()
+    {
+        var chatClient = new ParallelProbeChatClient();
+        var services = new ServiceCollection();
+        services.AddSingleton(chatClient);
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ParallelProbeChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
+
+        await using var provider = services.BuildServiceProvider();
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var firstTask = Task.Run(() => adapter.RunTurnAsync(new AgentTurnRequest("first", SessionId: "shared-serial")));
+        await chatClient.FirstCallObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var secondTask = Task.Run(() => adapter.RunTurnAsync(new AgentTurnRequest("second", SessionId: "shared-serial")));
+        await Task.Delay(200);
+        Assert.Equal(1, chatClient.ActiveCalls);
+        Assert.Equal(1, chatClient.MaxConcurrentCalls);
+
+        chatClient.ReleaseAll.TrySetResult(true);
+        await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal(1, chatClient.MaxConcurrentCalls);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ConnectRunStreamAsync_AllowsMultipleSubscribers()
+    {
+        var chatClient = new MultiReconnectStreamingChatClient();
+        var services = new ServiceCollection();
+        services.AddSingleton(chatClient);
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<MultiReconnectStreamingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddAgent("chat-agent");
+
+        await using var provider = services.BuildServiceProvider();
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        const string runId = "multi-reconnect-run";
+
+        var originalTask = Task.Run(async () =>
+        {
+            var events = new List<AgentTurnStreamEvent>();
+            await foreach (var streamEvent in adapter.RunTurnStreamingAsync(new AgentTurnRequest(
+                               "stream please",
+                               SessionId: "multi-reconnect-session",
+                               Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                               {
+                                   [AgentRuntimeContextKeys.RunId] = runId
+                               })))
+            {
+                events.Add(streamEvent);
+            }
+
+            return events;
+        });
+
+        await chatClient.FirstChunkDelivered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var reconnectOneTask = Task.Run(async () =>
+        {
+            var events = new List<AgentTurnStreamEvent>();
+            await foreach (var streamEvent in adapter.ConnectRunStreamAsync(runId))
+            {
+                events.Add(streamEvent);
+            }
+
+            return events;
+        });
+
+        var reconnectTwoTask = Task.Run(async () =>
+        {
+            var events = new List<AgentTurnStreamEvent>();
+            await foreach (var streamEvent in adapter.ConnectRunStreamAsync(runId))
+            {
+                events.Add(streamEvent);
+            }
+
+            return events;
+        });
+
+        chatClient.AllowCompletion.TrySetResult(true);
+
+        var original = await originalTask;
+        var reconnectOne = await reconnectOneTask;
+        var reconnectTwo = await reconnectTwoTask;
+
+        Assert.NotEmpty(original);
+        Assert.NotEmpty(reconnectOne);
+        Assert.NotEmpty(reconnectTwo);
+        Assert.Contains(reconnectOne, static e => e.IsReplay);
+        Assert.Contains(reconnectTwo, static e => e.IsReplay);
+
+        var originalText = string.Concat(original.Where(static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent).Select(static e => e.TextDelta));
+        var reconnectOneText = string.Concat(reconnectOne.Where(static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent).Select(static e => e.TextDelta));
+        var reconnectTwoText = string.Concat(reconnectTwo.Where(static e => e.Kind == AgentTurnStreamEventKind.TextMessageContent).Select(static e => e.TextDelta));
+
+        Assert.Equal(originalText, reconnectOneText);
+        Assert.Equal(originalText, reconnectTwoText);
     }
 
     [Fact]
@@ -330,6 +500,36 @@ public class ServiceRegistrationTests
                 Assert.Contains("audit_lookup", snapshot);
                 Assert.True(snapshot.Count >= 2);
             });
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_TruncatesLongCapabilityToolNames_ToProviderSafeLength()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ToolCatalogRecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ToolCatalogRecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddWorkflow<LongCapabilityNameCapabilities>("long-capability-agent");
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<ToolCatalogRecordingChatClient>();
+
+        _ = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Inspect the available workflow tools",
+            AgentName: "long-capability-agent",
+            SessionId: "long-capability-tool-name"));
+
+        var toolSnapshot = Assert.Single(chatClient.ToolSnapshots);
+        var toolName = Assert.Single(
+            toolSnapshot,
+            static name => name.StartsWith("capability_", StringComparison.Ordinal) &&
+                           name.Contains("prepare_release_packet_for_final_review", StringComparison.Ordinal));
+        Assert.True(toolName.Length <= 64, $"Expected tool name length <= 64 but got '{toolName}' ({toolName.Length}).");
+        Assert.StartsWith("capability_", toolName, StringComparison.Ordinal);
+        Assert.Contains("prepare_release_packet_for_final_review", toolName, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1952,6 +2152,16 @@ public class ServiceRegistrationTests
         public global::AgentBlazor.App.CapabilityResult PrepareCase() => global::AgentBlazor.App.CapabilityResult.Success("prepared");
     }
 
+    [global::AgentBlazor.App.AgentCapability("long_capability_name", Name = "Long Capability Name")]
+    private sealed class LongCapabilityNameCapabilities
+    {
+        [global::AgentBlazor.Attributes.AgentAction(
+            "Prepare a very long workflow step",
+            ActionId = "release_dossier_super_long_semantic_prepare_release_packet_for_final_review")]
+        public global::AgentBlazor.App.CapabilityResult PrepareReleasePacket()
+            => global::AgentBlazor.App.CapabilityResult.Success("prepared");
+    }
+
     private sealed class RecordingChatClient : IChatClient
     {
         private int _callCount;
@@ -2019,6 +2229,136 @@ public class ServiceRegistrationTests
             yield return new ChatResponseUpdate(ChatRole.Assistant, "hello ");
             yield return new ChatResponseUpdate(ChatRole.Assistant, "world");
             await Task.CompletedTask;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class ParallelProbeChatClient : IChatClient
+    {
+        private int _activeCalls;
+        private int _maxConcurrentCalls;
+        private int _callCount;
+
+        public int ActiveCalls => Volatile.Read(ref _activeCalls);
+
+        public int MaxConcurrentCalls => Volatile.Read(ref _maxConcurrentCalls);
+
+        public TaskCompletionSource<bool> FirstCallObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> TwoCallsObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ReleaseAll { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            var currentActive = Interlocked.Increment(ref _activeCalls);
+            UpdateMaxConcurrent(currentActive);
+            if (currentActive >= 1)
+            {
+                FirstCallObserved.TrySetResult(true);
+            }
+
+            if (currentActive >= 2)
+            {
+                TwoCallsObserved.TrySetResult(true);
+            }
+
+            var call = Interlocked.Increment(ref _callCount);
+
+            try
+            {
+                await ReleaseAll.Task.WaitAsync(cancellationToken);
+                return new ChatResponse(new ChatMessage(ChatRole.Assistant, $"parallel-{call}"));
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeCalls);
+            }
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private void UpdateMaxConcurrent(int currentActive)
+        {
+            while (true)
+            {
+                var snapshot = Volatile.Read(ref _maxConcurrentCalls);
+                if (currentActive <= snapshot)
+                {
+                    return;
+                }
+
+                if (Interlocked.CompareExchange(ref _maxConcurrentCalls, currentActive, snapshot) == snapshot)
+                {
+                    return;
+                }
+            }
+        }
+    }
+
+    private sealed class MultiReconnectStreamingChatClient : IChatClient
+    {
+        public TaskCompletionSource<bool> FirstChunkDelivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> AllowCompletion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "alpha omega")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "alpha ");
+            FirstChunkDelivered.TrySetResult(true);
+
+            await AllowCompletion.Task.WaitAsync(cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "omega");
         }
 
         public object? GetService(Type serviceType, object? serviceKey = null)

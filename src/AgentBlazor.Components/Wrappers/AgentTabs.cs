@@ -37,7 +37,7 @@ public class AgentTabs : MudTabs, IAgentControllable, IAsyncDisposable
     private bool _hasRendered;
 
     [AgentReadable("Currently active tab index (0-based)")]
-    public int CurrentTabIndex => ActivePanelIndex;
+    public int CurrentTabIndex => MudPrivateParameterStateAccessor.GetValue<int>(this, "_activePanelIndexState");
 
     [AgentReadable("Available tab labels")]
     public string[] AvailableTabs => Panels
@@ -81,7 +81,7 @@ public class AgentTabs : MudTabs, IAgentControllable, IAsyncDisposable
 
     public virtual RuntimeComponentState GetCurrentState() => new()
     {
-        ["activePanelIndex"] = ActivePanelIndex,
+        ["activePanelIndex"] = MudPrivateParameterStateAccessor.GetValue<int>(this, "_activePanelIndexState"),
         ["availableTabs"] = AvailableTabs
     };
 
@@ -156,8 +156,7 @@ public class AgentTabs : MudTabs, IAgentControllable, IAsyncDisposable
     {
         if (Panels.Count == 0)
         {
-            ActivePanelIndex = index;
-            await ActivePanelIndexChanged.InvokeAsync(index);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_activePanelIndexState", index);
             return;
         }
 
@@ -167,13 +166,11 @@ public class AgentTabs : MudTabs, IAgentControllable, IAsyncDisposable
         }
         catch (InvalidOperationException)
         {
-            ActivePanelIndex = index;
-            await ActivePanelIndexChanged.InvokeAsync(index);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_activePanelIndexState", index);
         }
         catch (Exception) when (!_hasRendered)
         {
-            ActivePanelIndex = index;
-            await ActivePanelIndexChanged.InvokeAsync(index);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_activePanelIndexState", index);
         }
     }
 

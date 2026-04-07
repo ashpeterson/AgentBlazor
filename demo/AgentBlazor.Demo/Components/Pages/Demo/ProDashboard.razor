@@ -22,7 +22,7 @@
 
     <section class="dashboard-page__info">
         <MudExpansionPanels>
-            <MudExpansionPanel Text="What's in the Pro Dashboard?" IsInitiallyExpanded="true">
+            <MudExpansionPanel Text="What's in the Pro Dashboard?" Expanded="true">
                 <MudGrid>
                     <MudItem xs="12" md="6">
                         <MudCard Outlined="true">
@@ -74,7 +74,7 @@
             <MudExpansionPanel Text="How to Enable Pro Features">
                 <pre class="dashboard-page__code"><code>builder.Services.AddAgentBlazor(options =>
 {
-    options.UseOpenAI(apiKey, "gpt-4o-mini");
+    options.UseOpenAI(apiKey, "gpt-5.4-mini");
 
     // Enable Pro tier with durable SQLite persistence
     options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");

@@ -1,9 +1,11 @@
 @inherits LayoutComponentBase
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using Microsoft.JSInterop
 @using MudBlazor
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <MudThemeProvider Theme="_theme" IsDarkMode="true" />
 <MudPopoverProvider />
@@ -67,32 +69,47 @@
                         <p class="demo-shell__assistant-copy">@AssistantDescription</p>
                     </div>
 
-                    <AgentChatSurface Title="@AssistantTitle"
-                                      Description="@AssistantDescription"
-                                      DefaultAgentName="@DefaultAssistantAgent"
-                                      LockAgentToCurrentRoute="true"
-                                      ShowAgentSelector="false"
-                                      EnableGeneratedUi="true"
-                                      Placeholder="@AssistantPlaceholder"
-                                      Theme="_assistantTheme"
-                                      CssClass="demo-shell__assistant-surface" />
+                    @if (_assistantClientId is not null)
+                    {
+                        <AgentChatSurface Title="@AssistantTitle"
+                                          Description="@AssistantDescription"
+                                          DefaultAgentName="@DefaultAssistantAgent"
+                                          SessionId="@AssistantSessionId"
+                                          LockAgentToCurrentRoute="true"
+                                          ShowAgentSelector="false"
+                                          EnableGeneratedUi="true"
+                                          Placeholder="@AssistantPlaceholder"
+                                          Theme="_assistantTheme"
+                                          CssClass="demo-shell__assistant-surface" />
+                    }
+                    else
+                    {
+                        <p class="demo-shell__assistant-copy">Loading assistant…</p>
+                    }
                 </MudPaper>
             </aside>
         }
     </div>
 </div>
 
-<AgentChatWidget Title="@AssistantTitle"
-                 Description="@AssistantDescription"
-                 DefaultAgentName="@DefaultAssistantAgent"
-                 EnableGeneratedUi="true"
-                 Placeholder="@AssistantPlaceholder"
-                 Theme="_assistantTheme"
-                 Width="26rem"
-                 Height="68vh"
-                 Right="0.85rem"
-                 Bottom="0.85rem"
-                 CssClass="demo-shell__assistant-widget" />
+@if (!ShowAssistantPane)
+{
+    @if (_assistantClientId is not null)
+    {
+        <AgentChatWidget Title="@AssistantTitle"
+                         Description="@AssistantDescription"
+                         DefaultAgentName="@DefaultAssistantAgent"
+                         SessionId="@AssistantSessionId"
+                         EnableGeneratedUi="true"
+                         Placeholder="@AssistantPlaceholder"
+                         Theme="_assistantTheme"
+                         Width="26rem"
+                         Height="68vh"
+                         Right="0.85rem"
+                         Bottom="0.85rem"
+                         CssClass="demo-shell__assistant-widget" />
+    }
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -142,7 +159,10 @@
         FontSize = "0.92rem"
     };
 
+    private string? _assistantClientId;
+
     private string CurrentRoutePath => new Uri(NavigationManager.Uri).AbsolutePath;
+    private string AssistantSessionId => $"demo:{_assistantClientId}:{CurrentRoutePath.TrimEnd('/').ToLowerInvariant()}";
 
     private bool IsWorkflowHubRoute => string.Equals(CurrentRoutePath.TrimEnd('/'), "/demo", StringComparison.OrdinalIgnoreCase);
     private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
@@ -154,6 +174,7 @@
     private bool IsIncidentWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/incident-escalation", StringComparison.OrdinalIgnoreCase);
     private bool IsResponseOrchestrationRoute => CurrentRoutePath.StartsWith("/demo/workflows/response-orchestration", StringComparison.OrdinalIgnoreCase);
     private bool IsReleaseDossierRoute => CurrentRoutePath.StartsWith("/demo/workflows/release-dossier", StringComparison.OrdinalIgnoreCase);
+    private bool IsRuntimeProbeRoute => CurrentRoutePath.StartsWith("/demo/workflows/runtime-probe", StringComparison.OrdinalIgnoreCase);
 
     private bool ShowAssistantPane => IsWorkflowRoute && !IsComponentsRoute;
 
@@ -172,6 +193,8 @@
                             ? "Recipe assistant"
                             : IsIncidentWorkflowRoute
                                 ? "Incident assistant"
+                                : IsRuntimeProbeRoute
+                                    ? "Runtime probe assistant"
                                 : "Workflow assistant";
 
     private string AssistantDescription =>
@@ -189,6 +212,8 @@
                             ? "Assess, recover, stage."
                             : IsIncidentWorkflowRoute
                                 ? "Triage, recover, hand off."
+                                : IsRuntimeProbeRoute
+                                    ? "Run the cancellation probe, then stop it."
                                 : "Ask for the next step.";
 
     private string AssistantPlaceholder =>
@@ -206,6 +231,8 @@
                             ? "Assess readiness. Recover. Prepare."
                             : IsIncidentWorkflowRoute
                                 ? "Summarize triage. Recover. Submit."
+                                : IsRuntimeProbeRoute
+                                    ? "Run the runtime cancellation probe, then stop."
                                 : "What should happen next?";
 
     private string? DefaultAssistantAgent =>
@@ -223,6 +250,8 @@
                             ? "Recipe Release Agent"
                             : IsIncidentWorkflowRoute
                                 ? "Incident Escalation Agent"
+                                : IsRuntimeProbeRoute
+                                    ? "Runtime Probe Agent"
                                 : null;
 
     private string RouteTitle =>
@@ -239,7 +268,9 @@
                             : IsRecipeWorkflowRoute
                                 ? "Recipe release"
                                 : IsIncidentWorkflowRoute
-                                    ? "Incident escalation"
+                            ? "Incident escalation"
+                            : IsRuntimeProbeRoute
+                                ? "Runtime probe"
                                     : "Reference";
 
     private string RouteTagline =>
@@ -249,6 +280,8 @@
                 ? "Primary proof"
                 : IsReleaseDossierRoute
                     ? "Second proof"
+                    : IsRuntimeProbeRoute
+                        ? "Runtime validation"
                     : "Drill-in surface";
 
     private IReadOnlyList<string> RoutePrompts =>
@@ -258,6 +291,8 @@
                 ? ["Assess readiness", "Advance next stage", "Prepare packet"]
                 : IsReleaseDossierRoute
                     ? ["Assess readiness", "Advance next stage", "Prepare dossier"]
+                    : IsRuntimeProbeRoute
+                        ? ["Run the cancellation probe", "Stop the active run"]
                     : IsSupplierWorkflowRoute
                         ? ["Review risk", "Recover blockers", "Prepare draft"]
                         : IsFileWorkflowRoute
@@ -271,6 +306,24 @@
     protected override void OnInitialized()
     {
         NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _assistantClientId is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            _assistantClientId = await JSRuntime.InvokeAsync<string>("AgentBlazorDemo.getOrCreateAssistantClientId");
+            StateHasChanged();
+        }
+        catch (JSException)
+        {
+            // Ignore until interactive JS is available.
+        }
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)

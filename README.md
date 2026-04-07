@@ -4,6 +4,8 @@ Make your Blazor app agent-capable.
 
 AgentBlazor is the Blazor-native execution and UX layer for agent workflows. It gives external or host-provided agents live app context, deterministic UI execution, approvals, and in-app workflow surfaces without turning your app into a chat-for-clicking gimmick.
 
+Today, the validated production provider path is OpenAI-compatible chat tools via `options.UseOpenAI(...)`. Other providers remain supported as integrations, but they should be treated as secondary validation targets until they have matching real-app proof.
+
 ## What It Is
 
 - Semantic workflow execution for Blazor apps
@@ -51,7 +53,8 @@ Suggested prompts:
 The free tier should be enough to prove value in a real app:
 
 - install one package
-- add the runtime and chat surface
+- optionally run the CLI to generate `AGENT.md`
+- add the runtime, host shell, and chat surface
 - register one workflow agent
 - let the agent coordinate the app with deterministic execution
 
@@ -66,11 +69,13 @@ dotnet add package AgentBlazor
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddMudServices();
+
 builder.Services.AddAgentBlazor(options =>
 {
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: "gpt-5.4-mini");
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
 
     options.ConfigureBuilder(agentBuilder =>
     {
@@ -80,9 +85,41 @@ builder.Services.AddAgentBlazor(options =>
             agent.WithRoutePrefixes("/ops");
         });
     });
+});
 ```
 
-### 3. Expose One Capability
+### 3. Add The Host Shell
+
+For a Blazor Web App, add the CSS and JS assets in `Components/App.razor`:
+
+```razor
+<link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+<link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
+...
+<script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+<script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+```
+
+Add the MudBlazor providers in your main layout:
+
+```razor
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+```
+
+### 4. Map The Runtime Endpoint
+
+```csharp
+var app = builder.Build();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();
+```
+
+### 5. Expose One Capability
 
 ```csharp
 [AgentCapability("operations")]
@@ -99,7 +136,15 @@ public sealed class OperationsCapabilities
 }
 ```
 
-### 4. Add The Agent Surface
+### 6. Add The Agent Surface
+
+Add the namespace once in your component imports or page:
+
+```razor
+@using AgentBlazor.Components
+```
+
+Use `AgentChatWidget` when you want a floating assistant:
 
 ```razor
 <AgentChatWidget
@@ -107,6 +152,17 @@ public sealed class OperationsCapabilities
     Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
     Width="30rem"
     Height="68vh" />
+```
+
+Use `AgentChatSurface` when the chat should be embedded in the page layout:
+
+```razor
+<AgentChatSurface
+    Title="Operations"
+    Description="Assess, prepare, and approve the next workflow step."
+    LockAgentToCurrentRoute="true"
+    ShowAgentSelector="false"
+    EnableGeneratedUi="true" />
 ```
 
 That gives you the free hook:
@@ -166,6 +222,7 @@ The biggest remaining product gap is not UI execution. It is durable paid intell
 ## Docs
 
 - [Quickstart](docs/quickstart.md)
+- [CLI Guide](docs/cli.md)
 - [Status](docs/STATUS.md)
 - [Architecture](docs/architecture.md)
 - [Runtime Realignment Plan](docs/runtime-realignment-plan.md)

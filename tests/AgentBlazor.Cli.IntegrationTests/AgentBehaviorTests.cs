@@ -15,6 +15,8 @@ namespace AgentBlazor.Cli.IntegrationTests;
 /// </summary>
 public class AgentBehaviorTests : IAsyncLifetime
 {
+    private const string DefaultOpenAiModel = "gpt-5.4-mini";
+
     private ChatClient? _chatClient;
     private string _agentMdContent = "";
     private bool _skipTests;
@@ -26,8 +28,11 @@ public class AgentBehaviorTests : IAsyncLifetime
         // Try environment variables first
         var azureEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
         var azureKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var azureDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o-mini";
+        var azureDeployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? DefaultOpenAiModel;
         var openAiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var openAiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL")
+            ?? Environment.GetEnvironmentVariable("OpenAI__Model")
+            ?? DefaultOpenAiModel;
 
         // Fallback to appsettings.Development.json
         if (string.IsNullOrEmpty(openAiKey) && string.IsNullOrEmpty(azureKey))
@@ -41,6 +46,11 @@ public class AgentBehaviorTests : IAsyncLifetime
                 {
                     if (openAiSection.TryGetProperty("ApiKey", out var apiKeyProp))
                         openAiKey = apiKeyProp.GetString();
+                    if (openAiSection.TryGetProperty("Model", out var modelProp) &&
+                        !string.IsNullOrWhiteSpace(modelProp.GetString()))
+                    {
+                        openAiModel = modelProp.GetString()!;
+                    }
                 }
             }
         }
@@ -53,7 +63,7 @@ public class AgentBehaviorTests : IAsyncLifetime
         else if (!string.IsNullOrEmpty(openAiKey))
         {
             var client = new OpenAI.OpenAIClient(openAiKey);
-            _chatClient = client.GetChatClient("gpt-4o-mini");
+            _chatClient = client.GetChatClient(openAiModel);
         }
         else
         {

@@ -209,8 +209,9 @@ public class AgentDatePicker : MudDatePicker, IAgentControllable
         {
             await SetDateAsync(date, true);
         }
-        catch (InvalidOperationException)
+        catch (Exception)
         {
+            Date = date;
             _value = date;
             await HandleDateChangedAsync(date);
         }
@@ -222,8 +223,9 @@ public class AgentDatePicker : MudDatePicker, IAgentControllable
         {
             await ClearAsync();
         }
-        catch (InvalidOperationException)
+        catch (Exception)
         {
+            Date = null;
             _value = null;
             await HandleDateChangedAsync(null);
         }

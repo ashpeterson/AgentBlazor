@@ -9,7 +9,7 @@
         <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Docs</MudChip>
         <MudText Typo="Typo.h3" Class="mt-4 mb-2">Build one workflow.</MudText>
         <MudText Typo="Typo.body1" Color="Color.Secondary">
-            Install. Register. Render. Run.
+            Install. Register. Map. Render. Run.
         </MudText>
 
         <div class="docs-page__hero-actions">
@@ -24,10 +24,14 @@
         <div class="docs-page__prompt-strip">
             <span>Install</span>
             <span>Register</span>
+            <span>Map</span>
             <span>Expose</span>
             <span>Run</span>
         </div>
 
         <pre class="guide-page__code docs-page__code mt-4"><code>dotnet add package AgentBlazor</code></pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            Optional: run <code>agentblazor init ./MySolution.sln --host MyBlazorApp</code> to generate <code>.agentblazor/AGENT.md</code>.
+        </MudText>
     </section>
 </div>

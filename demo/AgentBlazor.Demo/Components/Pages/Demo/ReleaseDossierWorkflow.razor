@@ -116,6 +116,7 @@
 
     <AgentDialog AgentId="release-dossier-dialog"
                  Visible="@Workflow.IsDossierDialogOpen"
+                 OnConfirm="ConfirmDossierAsync"
                  VisibleChanged="OnDossierVisibilityChanged">
         <TitleContent>
             <MudText Typo="Typo.h6">Release dossier</MudText>
@@ -248,6 +249,12 @@
     {
         Workflow.SetDossierDialogVisible(false);
         return Task.CompletedTask;
+    }
+
+    private Task<AgentBlazor.Runtime.ActionResult> ConfirmDossierAsync()
+    {
+        Workflow.SetDossierDialogVisible(false);
+        return Task.FromResult(AgentBlazor.Runtime.ActionResult.Applied("Approved the release dossier dialog."));
     }
 
     private Task OnDossierVisibilityChanged(bool visible)

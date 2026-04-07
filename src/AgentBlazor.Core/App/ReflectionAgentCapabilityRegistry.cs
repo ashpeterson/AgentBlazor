@@ -285,6 +285,14 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
 
             return CapabilityResult.Success($"Executed {info.Name}.");
         }
+        catch (TargetInvocationException tie) when (tie.InnerException is OperationCanceledException && cancellationToken.IsCancellationRequested)
+        {
+            throw tie.InnerException;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (TargetInvocationException tie) when (tie.InnerException is not null)
         {
             return CapabilityResult.Failure(

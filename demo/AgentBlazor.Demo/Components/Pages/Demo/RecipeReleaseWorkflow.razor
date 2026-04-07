@@ -263,6 +263,7 @@
 
     <AgentDialog AgentId="recipe-release-dialog"
                  Visible="@Workflow.IsReleaseDialogOpen"
+                 OnConfirm="ConfirmReleaseDraftAsync"
                  VisibleChanged="OnReleaseDialogVisibilityChanged">
         <TitleContent>
             <MudText Typo="Typo.h6">Recipe release draft</MudText>
@@ -388,6 +389,12 @@
     {
         Workflow.SetReleaseDialogVisible(false);
         return Task.CompletedTask;
+    }
+
+    private Task<AgentBlazor.Runtime.ActionResult> ConfirmReleaseDraftAsync()
+    {
+        Workflow.SetReleaseDialogVisible(false);
+        return Task.FromResult(AgentBlazor.Runtime.ActionResult.Applied("Approved the recipe release dialog."));
     }
 
     private Task OnReleaseDialogVisibilityChanged(bool visible)

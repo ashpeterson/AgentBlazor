@@ -30,8 +30,10 @@ builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapte
 
 var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_LICENSE_KEY");
+var proDataDirectory = builder.Configuration["AgentBlazor:DataDirectory"]
+    ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_DATA_DIRECTORY");
 
-var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 var ollamaModel = builder.Configuration["Ollama:Model"]
@@ -70,7 +72,7 @@ builder.Services.AddAgentBlazor(options =>
 
     if (!string.IsNullOrWhiteSpace(proLicenseKey))
     {
-        options.UseProLicense(proLicenseKey);
+        options.UseProLicense(proLicenseKey, proDataDirectory);
     }
 
     options.ConfigureBuilder(agentBuilder =>
@@ -172,6 +174,12 @@ builder.Services.AddAgentBlazor(options =>
             }
             agent.WithAllowedComponents("AgentDialog");
             agent.WithRoutePrefixes("/demo/workflows/release-dossier");
+        });
+
+        agentBuilder.AddWorkflow<RuntimeProbeCapabilities>("Runtime Probe Agent", agent =>
+        {
+            agent.WithDescription("Focused on validating runtime cancellation behavior in the live demo host.");
+            agent.WithRoutePrefixes("/demo/workflows/runtime-probe");
         });
     });
 });

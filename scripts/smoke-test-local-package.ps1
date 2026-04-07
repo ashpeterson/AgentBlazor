@@ -1,18 +1,65 @@
 param(
     [string]$PackageVersion = "",
-    [string]$PackageId = "AgentBlazor",
-    [string]$ProjectName = "package-smoke",
+    [string]$ProjectName = "PackageSmoke",
     [switch]$Pack,
-    [switch]$KeepScratch
+    [switch]$KeepScratch,
+    [string]$OpenAIApiKey = "",
+    [string]$OpenAIModel = "gpt-5.4-mini"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$packageProject = Join-Path (Join-Path (Join-Path $repoRoot "src") "AgentBlazor.Components") "AgentBlazor.Components.csproj"
-$packageOutputDir = Join-Path (Join-Path (Join-Path $repoRoot "src") "AgentBlazor.Components") (Join-Path "bin" "Release")
 $scratchRoot = Join-Path (Join-Path $repoRoot ".tmp") $ProjectName
+$appRoot = Join-Path $scratchRoot $ProjectName
+$solutionPath = Join-Path $scratchRoot "$ProjectName.sln"
+$projectPath = Join-Path $appRoot "$ProjectName.csproj"
+$toolPath = Join-Path $scratchRoot "toolbin"
+$localFeed = Join-Path $scratchRoot "local-feed"
+$nugetConfigPath = Join-Path $scratchRoot "NuGet.Config"
+$directoryPackagesPropsPath = Join-Path $scratchRoot "Directory.Packages.props"
+$programPath = Join-Path $appRoot "Program.cs"
+$appRazorPath = Join-Path (Join-Path $appRoot "Components") "App.razor"
+$importsPath = Join-Path (Join-Path $appRoot "Components") "_Imports.razor"
+$mainLayoutPath = Join-Path (Join-Path (Join-Path $appRoot "Components") "Layout") "MainLayout.razor"
+$homePath = Join-Path (Join-Path (Join-Path $appRoot "Components") "Pages") "Home.razor"
+$servicesDir = Join-Path $appRoot "Services"
+$workflowsDir = Join-Path $appRoot "Workflows"
+$appSettingsDevelopmentPath = Join-Path $appRoot "appsettings.Development.json"
+
+$packageDefinitions = @(
+    @{
+        Id = "AgentBlazor.Licensing"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Licensing\AgentBlazor.Licensing.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Licensing\bin\Release"
+    },
+    @{
+        Id = "AgentBlazor.Core"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Core\AgentBlazor.Core.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Core\bin\Release"
+    },
+    @{
+        Id = "AgentBlazor.ProviderAdapters"
+        Project = Join-Path $repoRoot "src\AgentBlazor.ProviderAdapters\AgentBlazor.ProviderAdapters.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.ProviderAdapters\bin\Release"
+    },
+    @{
+        Id = "AgentBlazor.Hosting"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Hosting\AgentBlazor.Hosting.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Hosting\bin\Release"
+    },
+    @{
+        Id = "AgentBlazor"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Components\AgentBlazor.Components.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Components\bin\Release"
+    },
+    @{
+        Id = "AgentBlazor.Cli"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Cli\AgentBlazor.Cli.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Cli\bin\Release"
+    }
+)
 
 function Invoke-Step {
     param(
@@ -50,46 +97,178 @@ function Resolve-PackageVersion {
     return $name.Substring($Id.Length + 1)
 }
 
-if ($Pack -and [string]::IsNullOrWhiteSpace($PackageVersion)) {
-    throw "PackageVersion is required when -Pack is used."
+function Invoke-DotNet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [string]$WorkingDirectory = $repoRoot
+    )
+
+    & dotnet @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed."
+    }
 }
 
-if ($Pack) {
-    Invoke-Step "Packing $PackageId $PackageVersion" {
-        dotnet pack $packageProject -nologo -c Release /p:UseSharedCompilation=false "/p:PackageVersion=$PackageVersion"
-        if ($LASTEXITCODE -ne 0) {
-            throw "dotnet pack failed."
+function Clear-LocalPackageCache {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    $packageIds = @(
+        "agentblazor",
+        "agentblazor.core",
+        "agentblazor.hosting",
+        "agentblazor.licensing",
+        "agentblazor.provideradapters",
+        "agentblazor.cli"
+    )
+
+    foreach ($packageId in $packageIds) {
+        $path = Join-Path $env:USERPROFILE ".nuget\packages\$packageId\$Version"
+        if (Test-Path $path) {
+            Remove-Item -Recurse -Force $path
         }
     }
 }
 
-if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
-    $PackageVersion = Resolve-PackageVersion -OutputDir $packageOutputDir -Id $PackageId
+function Copy-PackageToFeed {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Definition,
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    $packagePath = Join-Path $Definition.OutputDir "$($Definition.Id).$Version.nupkg"
+    if (-not (Test-Path $packagePath)) {
+        throw "Expected package '$packagePath' does not exist. Run with -Pack or build the release packages first."
+    }
+
+    Copy-Item -LiteralPath $packagePath -Destination $localFeed -Force
 }
 
-Invoke-Step "Resetting scratch app" {
+function Test-AllPackagesAvailable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    foreach ($definition in $packageDefinitions) {
+        $packagePath = Join-Path $definition.OutputDir "$($definition.Id).$Version.nupkg"
+        if (-not (Test-Path $packagePath)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Write-TextFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Content
+    )
+
+    Set-Content -Path $Path -Value $Content -NoNewline
+}
+
+if ($Pack -and [string]::IsNullOrWhiteSpace($PackageVersion)) {
+    throw "PackageVersion is required when -Pack is used."
+}
+
+if ([string]::IsNullOrWhiteSpace($PackageVersion)) {
+    $PackageVersion = Resolve-PackageVersion -OutputDir (Join-Path $repoRoot "src\AgentBlazor.Components\bin\Release") -Id "AgentBlazor"
+}
+
+Invoke-Step "Resetting scratch workspace" {
     if (Test-Path $scratchRoot) {
         Remove-Item -Recurse -Force $scratchRoot
     }
+
+    New-Item -ItemType Directory -Force $scratchRoot | Out-Null
+    New-Item -ItemType Directory -Force $localFeed | Out-Null
 }
 
-Invoke-Step "Creating scratch Blazor app" {
-    dotnet new blazor -o $scratchRoot --no-https
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet new blazor failed."
+Invoke-Step "Preparing local package feed" {
+    $shouldPack = $Pack -or -not (Test-AllPackagesAvailable -Version $PackageVersion)
+
+    if ($shouldPack) {
+        foreach ($definition in $packageDefinitions) {
+            Invoke-DotNet -Arguments @(
+                "pack",
+                $definition.Project,
+                "-nologo",
+                "-c", "Release",
+                "-o", $localFeed,
+                "/p:UseSharedCompilation=false",
+                "/p:PackageVersion=$PackageVersion"
+            )
+        }
+    }
+    else {
+        foreach ($definition in $packageDefinitions) {
+            Copy-PackageToFeed -Definition $definition -Version $PackageVersion
+        }
     }
 }
 
-$importsPath = Join-Path (Join-Path $scratchRoot "Components") "_Imports.razor"
-$homePath = Join-Path (Join-Path (Join-Path $scratchRoot "Components") "Pages") "Home.razor"
-$projectPath = Join-Path $scratchRoot "$ProjectName.csproj"
-$programPath = Join-Path $scratchRoot "Program.cs"
+Invoke-Step "Clearing cached package versions" {
+    Clear-LocalPackageCache -Version $PackageVersion
+}
 
-Invoke-Step "Writing local package reference" {
+Invoke-Step "Writing isolated NuGet configuration" {
+    $nugetConfig = @"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local-agentblazor" value="$localFeed" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local-agentblazor">
+      <package pattern="AgentBlazor*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+"@
+
+    Write-TextFile -Path $nugetConfigPath -Content $nugetConfig
+}
+
+Invoke-Step "Writing local central package management file" {
+    $directoryPackagesProps = @"
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="AgentBlazor" Version="$PackageVersion" />
+  </ItemGroup>
+</Project>
+"@
+
+    Write-TextFile -Path $directoryPackagesPropsPath -Content $directoryPackagesProps
+}
+
+Invoke-Step "Creating scratch Blazor app" {
+    Invoke-DotNet -Arguments @("new", "blazor", "-n", $ProjectName, "-o", $appRoot, "--no-https") -WorkingDirectory $scratchRoot
+    Invoke-DotNet -Arguments @("new", "sln", "--format", "sln", "-n", $ProjectName, "-o", $scratchRoot) -WorkingDirectory $scratchRoot
+    Invoke-DotNet -Arguments @("sln", $solutionPath, "add", $projectPath) -WorkingDirectory $scratchRoot
+}
+
+Invoke-Step "Writing package reference" {
     $projectContent = Get-Content -Path $projectPath -Raw
     $packageReference = @"
   <ItemGroup>
-    <PackageReference Include="$PackageId" VersionOverride="$PackageVersion" />
+    <PackageReference Include="AgentBlazor" />
   </ItemGroup>
 
 "@
@@ -98,75 +277,290 @@ Invoke-Step "Writing local package reference" {
     Set-Content -Path $projectPath -Value $updatedProject
 }
 
-Invoke-Step "Restoring against local package source" {
-    dotnet restore $projectPath -nologo --force-evaluate --source $packageOutputDir --source "https://api.nuget.org/v3/index.json"
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet restore failed."
-    }
+Invoke-Step "Writing smoke-test host files" {
+    New-Item -ItemType Directory -Force $servicesDir | Out-Null
+    New-Item -ItemType Directory -Force $workflowsDir | Out-Null
+
+    $programContent = @"
+using AgentBlazor;
+using MudBlazor.Services;
+using $ProjectName.Components;
+using $ProjectName.Services;
+using $ProjectName.Workflows;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddMudServices();
+builder.Services.AddScoped<IMyService, DemoItemService>();
+
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseOpenAI(
+        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+        model: builder.Configuration["OpenAI:Model"] ?? "$OpenAIModel");
+
+    options.ConfigureBuilder(agentBuilder =>
+    {
+        agentBuilder.AddWorkflow<MyCapabilities>("assistant", agent =>
+        {
+            agent.WithDescription("Help users complete their tasks.");
+            agent.WithRoutePrefixes("/");
+        });
+    });
+});
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
 }
 
-Invoke-Step "Writing smoke test component usage" {
-    $programContent = Get-Content -Path $programPath -Raw
-    if ($programContent -notmatch "using AgentBlazor;") {
-        $programContent = "using AgentBlazor;`r`n" + $programContent
-    }
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseHttpsRedirection();
+app.UseAntiforgery();
 
-    if ($programContent -notmatch "using MudBlazor.Services;") {
-        $programContent = "using MudBlazor.Services;`r`n" + $programContent
-    }
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();
 
-    if ($programContent -notmatch [regex]::Escape("builder.Services.AddAgentBlazor();")) {
-        $programContent = $programContent.Replace(
-            "builder.Services.AddRazorComponents()`r`n    .AddInteractiveServerComponents();",
-            "builder.Services.AddRazorComponents()`r`n    .AddInteractiveServerComponents();`r`nbuilder.Services.AddMudServices();`r`nbuilder.Services.AddAgentBlazor();")
-    }
+app.Run();
+"@
 
-    Set-Content -Path $programPath -Value $programContent
+    $appRazorContent = @"
+<!DOCTYPE html>
+<html lang="en">
 
-    $existingImports = Get-Content -Path $importsPath -Raw
-    $requiredImports = @(
-        "@using AgentBlazor.Components",
-        "@using MudBlazor"
-    )
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
+    <link rel="stylesheet" href="@Assets["$ProjectName.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
 
-    foreach ($import in $requiredImports) {
-        if ($existingImports -notmatch [regex]::Escape($import)) {
-            if (-not $existingImports.EndsWith("`r`n")) {
-                $existingImports += "`r`n"
-            }
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+    <script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+</body>
 
-            $existingImports += "$import`r`n"
-        }
-    }
+</html>
+"@
 
-    Set-Content -Path $importsPath -Value $existingImports
+    $importsContent = @"
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@using AgentBlazor.Components
+@using MudBlazor
+@using $ProjectName
+@using $ProjectName.Components
+@using $ProjectName.Components.Layout
+"@
 
-    @'
+    $mainLayoutContent = @"
+@inherits LayoutComponentBase
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">x</span>
+</div>
+"@
+
+    $homeContent = @"
 @page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Package smoke test</PageTitle>
 
 <h1>Package smoke test</h1>
 
-<AgentTabs AgentId="smoke-tabs">
-    <MudTabPanel Text="Overview">
-        <p>Local NuGet package resolved correctly.</p>
-    </MudTabPanel>
-    <MudTabPanel Text="Details">
-        <p>AgentBlazor component compiled in a clean consumer app.</p>
-    </MudTabPanel>
-</AgentTabs>
-'@ | Set-Content -Path $homePath
+<p>Package restore, host wiring, and chat surface are active.</p>
+
+<AgentChatWidget
+    Title="Assistant"
+    Placeholder="Ask me anything..."
+    Width="28rem"
+    Height="60vh" />
+"@
+
+    $serviceInterfaceContent = @"
+namespace $ProjectName.Services;
+
+public interface IMyService
+{
+    Task<IReadOnlyList<string>> SearchAsync(string query);
+    Task SubmitAsync(Guid orderId);
+}
+"@
+
+    $serviceContent = @"
+namespace $ProjectName.Services;
+
+public sealed class DemoItemService : IMyService
+{
+    public Task<IReadOnlyList<string>> SearchAsync(string query)
+    {
+        IReadOnlyList<string> results =
+        [
+            `$"Result for {query}",
+            `$"Another result for {query}"
+        ];
+
+        return Task.FromResult(results);
+    }
+
+    public Task SubmitAsync(Guid orderId)
+    {
+        _ = orderId;
+        return Task.CompletedTask;
+    }
+}
+"@
+
+    $capabilitiesContent = @"
+using AgentBlazor.App;
+using AgentBlazor.Attributes;
+using $ProjectName.Services;
+
+namespace $ProjectName.Workflows;
+
+[AgentCapability("assistant")]
+public sealed class MyCapabilities(IMyService service)
+{
+    [AgentAction("Search for items")]
+    public async Task<CapabilityResult> SearchAsync(
+        [AgentParam("Search query")] string query)
+    {
+        var results = await service.SearchAsync(query);
+        return CapabilityResult.Success(`$"Found {results.Count} items.");
+    }
+
+    [AgentAction("Submit order", RequiresApproval = true)]
+    public async Task<CapabilityResult> SubmitOrderAsync(
+        [AgentParam("Order ID")] Guid orderId)
+    {
+        await service.SubmitAsync(orderId);
+        return CapabilityResult.Success("Order submitted.")
+            .WithNextActions("View order status", "Create another order");
+    }
+}
+"@
+
+    $apiKey = if ([string]::IsNullOrWhiteSpace($OpenAIApiKey)) { "placeholder-key" } else { $OpenAIApiKey }
+    $appSettingsContent = @"
+{
+  "OpenAI": {
+    "ApiKey": "$apiKey",
+    "Model": "$OpenAIModel"
+  }
+}
+"@
+
+    Write-TextFile -Path $programPath -Content $programContent
+    Write-TextFile -Path $appRazorPath -Content $appRazorContent
+    Write-TextFile -Path $importsPath -Content $importsContent
+    Write-TextFile -Path $mainLayoutPath -Content $mainLayoutContent
+    Write-TextFile -Path $homePath -Content $homeContent
+    Write-TextFile -Path (Join-Path $servicesDir "IMyService.cs") -Content $serviceInterfaceContent
+    Write-TextFile -Path (Join-Path $servicesDir "DemoItemService.cs") -Content $serviceContent
+    Write-TextFile -Path (Join-Path $workflowsDir "MyCapabilities.cs") -Content $capabilitiesContent
+    Write-TextFile -Path $appSettingsDevelopmentPath -Content $appSettingsContent
 }
 
-Invoke-Step "Building scratch app against local package" {
-    dotnet build $projectPath -nologo --no-restore
+Invoke-Step "Restoring and building against the isolated local feed" {
+    if (Test-Path (Join-Path $appRoot "packages.lock.json")) {
+        Remove-Item -Force (Join-Path $appRoot "packages.lock.json")
+    }
+
+    if (Test-Path (Join-Path $appRoot "obj")) {
+        Remove-Item -Recurse -Force (Join-Path $appRoot "obj")
+    }
+
+    Invoke-DotNet -Arguments @(
+        "restore",
+        $projectPath,
+        "--configfile", $nugetConfigPath,
+        "-nologo"
+    ) -WorkingDirectory $scratchRoot
+
+    Invoke-DotNet -Arguments @(
+        "build",
+        $projectPath,
+        "-nologo",
+        "--no-restore"
+    ) -WorkingDirectory $scratchRoot
+}
+
+Invoke-Step "Installing the local CLI package" {
+    if (Test-Path $toolPath) {
+        Remove-Item -Recurse -Force $toolPath
+    }
+
+    Invoke-DotNet -Arguments @(
+        "tool",
+        "install",
+        "AgentBlazor.Cli",
+        "--version", $PackageVersion,
+        "--tool-path", $toolPath,
+        "--add-source", $localFeed
+    ) -WorkingDirectory $scratchRoot
+}
+
+Invoke-Step "Generating AGENT.md with the CLI" {
+    $cliExe = Join-Path $toolPath "agentblazor.exe"
+    & $cliExe init $solutionPath --host $ProjectName --non-interactive
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet build failed."
+        throw "agentblazor init failed."
+    }
+
+    $agentMdPath = Join-Path (Join-Path $scratchRoot ".agentblazor") "AGENT.md"
+    $agentMd = Get-Content -Path $agentMdPath -Raw
+
+    if ($agentMd -notmatch "Search" -or $agentMd -notmatch "Submit Order") {
+        throw "AGENT.md did not include the expected workflow actions."
     }
 }
 
-Invoke-Step "Running scratch app startup check" {
+Invoke-Step "Starting the scratch app" {
     $port = 5187
     $stdoutLog = Join-Path $scratchRoot "agentblazor-smoke.stdout.log"
     $stderrLog = Join-Path $scratchRoot "agentblazor-smoke.stderr.log"
@@ -215,8 +609,36 @@ Invoke-Step "Running scratch app startup check" {
         }
 
         $response = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -UseBasicParsing
-        if ($response.StatusCode -ne 200 -or $response.Content -notmatch "smoke-tabs") {
-            throw "Scratch app did not render the expected AgentTabs markup."
+        if ($response.StatusCode -ne 200 -or $response.Content -notmatch "Package smoke test") {
+            throw "Scratch app did not render the expected home page."
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($OpenAIApiKey)) {
+            $runRequest = @{
+                threadId = "package-smoke"
+                runId = "package-smoke"
+                messages = @(
+                    @{
+                        role = "user"
+                        content = "search for widgets"
+                    }
+                )
+                state = @{}
+            } | ConvertTo-Json -Depth 5
+
+            $runResponse = Invoke-WebRequest `
+                -Uri "http://127.0.0.1:$port/agentblazor/agui/run" `
+                -Method Post `
+                -ContentType "application/json" `
+                -Body $runRequest `
+                -UseBasicParsing
+
+            if ($runResponse.StatusCode -ne 200 -or $runResponse.Content -notmatch "search_async") {
+                throw "AG-UI run did not execute the expected semantic workflow action."
+            }
+        }
+        else {
+            Write-Host "Skipping live AG-UI run because no OpenAI API key was provided." -ForegroundColor Yellow
         }
     }
     finally {
@@ -227,7 +649,7 @@ Invoke-Step "Running scratch app startup check" {
 }
 
 Write-Host ""
-Write-Host "Smoke test passed for $PackageId $PackageVersion." -ForegroundColor Green
+Write-Host "Smoke test passed for AgentBlazor $PackageVersion." -ForegroundColor Green
 
 if ($KeepScratch) {
     Write-Host "Scratch app kept at: $scratchRoot"

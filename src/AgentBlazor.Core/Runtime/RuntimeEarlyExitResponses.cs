@@ -51,7 +51,7 @@ internal static class RuntimeEarlyExitResponses
             "Add one of the following to your `Program.cs`:\n\n" +
             "```csharp\n" +
             "// OpenAI\n" +
-            "options.UseOpenAI(apiKey: \"sk-...\", model: \"gpt-4o-mini\");\n\n" +
+            "options.UseOpenAI(apiKey: \"sk-...\", model: \"gpt-5.4-mini\");\n\n" +
             "// Azure OpenAI\n" +
             "options.UseAzureOpenAI(endpoint: \"https://...\", deploymentName: \"...\");\n\n" +
             "// Ollama (free, local)\n" +

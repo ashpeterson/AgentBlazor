@@ -13,6 +13,7 @@
     <ToolCommandName>agentblazor</ToolCommandName>
     <PackageId>AgentBlazor.Cli</PackageId>
     <Description>CLI tool for generating AGENT.md from Blazor applications</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,11 @@
 
   <ItemGroup>
     <PackageReference Include="Spectre.Console.Cli" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\AgentBlazor.Components\icon.png" Pack="true" PackagePath="" Link="icon.png" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Include MSBuild targets for build-time integration -->

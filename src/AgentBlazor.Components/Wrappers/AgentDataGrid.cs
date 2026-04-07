@@ -525,7 +525,8 @@ public class AgentDataGrid<TItem> : MudDataGrid<TItem>, IAgentControllable
 
     private string? ResolveFocusedRowKey()
     {
-        if (SelectedItem is not null && TryGetPropertyValue(SelectedItem, RowKeyProperty, out var keyValue))
+        var selectedItem = GetSelectedItem();
+        if (selectedItem is not null && TryGetPropertyValue(selectedItem, RowKeyProperty, out var keyValue))
         {
             return keyValue?.ToString();
         }
@@ -742,7 +743,7 @@ public class AgentDataGrid<TItem> : MudDataGrid<TItem>, IAgentControllable
 
     private IReadOnlyDictionary<string, object?>? ResolveFocusedRowSnapshot()
     {
-        var item = SelectedItem ?? (!string.IsNullOrWhiteSpace(FocusedRowKey) ? FindItemByKey(FocusedRowKey!) : default);
+        var item = GetSelectedItem() ?? (!string.IsNullOrWhiteSpace(FocusedRowKey) ? FindItemByKey(FocusedRowKey!) : default);
         return item is null ? null : BuildRowSnapshot(item);
     }
 
@@ -1182,4 +1183,6 @@ public class AgentDataGrid<TItem> : MudDataGrid<TItem>, IAgentControllable
     }
 
     private sealed record ColumnResolution(string? PropertyName, Column<TItem>? Column, Type? PropertyType);
+
+    private TItem? GetSelectedItem() => MudPrivateParameterStateAccessor.GetValue<TItem>(this, "_selectedItemState");
 }

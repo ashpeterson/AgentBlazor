@@ -201,6 +201,7 @@
                 <div class="ab-dashboard__audit-toolbar">
                     <select class="ab-dashboard__filter" @bind="_auditFilter">
                         <option value="">All Events</option>
+                        <option value="ActionApprovalRequested">Approval Requested</option>
                         <option value="ActionExecuted">Action Executed</option>
                         <option value="ActionFailed">Action Failed</option>
                         <option value="ActionApproved">Approval Granted</option>
@@ -364,6 +365,7 @@
         {
             AuditEventType.ActionFailed or AuditEventType.ActionDenied => "error",
             AuditEventType.ActionApproved => "success",
+            AuditEventType.ActionApprovalRequested => "warning",
             _ => "default"
         };
     }

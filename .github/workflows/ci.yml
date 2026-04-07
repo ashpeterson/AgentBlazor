@@ -52,6 +52,11 @@ jobs:
       - name: Test
         run: dotnet test AgentBlazor.slnx -c Release --no-build -nologo
 
+      - name: Local Package Smoke Test
+        shell: pwsh
+        run: |
+          ./scripts/smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.1
+
       - name: Install E2E Dependencies
         working-directory: tests/e2e
         run: npm ci

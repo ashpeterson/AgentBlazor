@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using AgentBlazor.Agents;
 using AgentBlazor.App;
 using AgentBlazor.Components;
@@ -17,8 +20,10 @@ using AgentBlazor.Execution;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Core.Paid;
+using AgentBlazor.Core.Paid.Audit;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -48,6 +53,8 @@ public sealed class ChatClientRuntimeAdapter(
     ILoggerFactory? loggerFactory = null,
     IServiceProvider? serviceProvider = null) : IAgentRuntimeAdapter
 {
+    private const int MaxRetainedReconnectRuns = 64;
+    private static readonly TimeSpan ReconnectRetention = TimeSpan.FromMinutes(10);
     private static readonly AsyncLocal<TurnExecutionState?> CurrentTurnState = new();
     private static readonly JsonElement EmptyObjectSchema = JsonDocument.Parse("""
         {
@@ -75,12 +82,14 @@ public sealed class ChatClientRuntimeAdapter(
     private readonly ILoggerFactory? _loggerFactory = loggerFactory;
     private readonly IServiceProvider? _serviceProvider = serviceProvider;
     private readonly ConcurrentDictionary<string, Task<SessionState>> _sessions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeRunCancellations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ReconnectableRunState> _reconnectableRuns = new(StringComparer.OrdinalIgnoreCase);
 
     public bool SupportsStreaming => true;
 
-    public bool SupportsReconnect => false;
+    public bool SupportsReconnect => true;
 
-    public bool SupportsCancellation => false;
+    public bool SupportsCancellation => true;
 
     public async Task<AgentTurnResponse> RunTurnAsync(
         AgentTurnRequest request,
@@ -110,13 +119,21 @@ public sealed class ChatClientRuntimeAdapter(
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var sessionState = await GetOrCreateSessionStateAsync(registration, request, cancellationToken).ConfigureAwait(false);
-        await sessionState.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var runId = ResolveOrCreateRunId(request);
+        using var activeRun = RegisterActiveRun(runId, cancellationToken);
+        using var runExecutionProviderLease = LeaseRunExecutionServiceProvider();
+        var runExecutionScope = runExecutionProviderLease is { ServiceProvider: { } runExecutionServiceProvider }
+            ? _executionScopeAccessor?.Push(runExecutionServiceProvider)
+            : null;
+        var effectiveCancellationToken = activeRun.Token;
+        var reconnectState = RegisterReconnectableRun(runId, registration.Name);
+        var sessionState = await GetOrCreateSessionStateAsync(registration, request, effectiveCancellationToken).ConfigureAwait(false);
+        await sessionState.Gate.WaitAsync(effectiveCancellationToken).ConfigureAwait(false);
         var startedAt = DateTimeOffset.UtcNow;
         var turnState = new TurnExecutionState(
             registration.Name,
             request.GetEffectiveSessionId(),
-            ResolveOrCreateRunId(request),
+            runId,
             request.UserMessage,
             request.GeneratedUiAction,
             request.Context is null
@@ -125,20 +142,26 @@ public sealed class ChatClientRuntimeAdapter(
         try
         {
             ApplyContextSharedState(registration.Name, request, turnState.RunId);
-            var agent = await CreateAgentAsync(registration, request, turnState, cancellationToken).ConfigureAwait(false);
+            var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             var response = await agent.RunAsync(
                 new ChatMessage(ChatRole.User, BuildUserMessage(request)),
                 sessionState.Session,
                 options: null,
-                cancellationToken).ConfigureAwait(false);
+                effectiveCancellationToken).ConfigureAwait(false);
 
             var turnResponse = BuildTurnResponse(registration.Name, response.Text, request, turnState);
-            await StoreConversationTurnAsync(registration.Name, request, turnResponse, cancellationToken).ConfigureAwait(false);
-            await RecordActionHistoryAsync(request, turnState, cancellationToken).ConfigureAwait(false);
-            await StoreTraceAsync(traceBuilder, turnState, turnResponse, cancellationToken).ConfigureAwait(false);
+            await StoreConversationTurnAsync(registration.Name, request, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
+            await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
+            await StoreTraceAsync(traceBuilder, turnState, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
             RecordInspectorRun(registration.Name, request, turnState, turnResponse, startedAt, succeeded: !turnState.HasFailures, errorMessage: turnState.HasFailures ? turnResponse.ResponseText : null);
             return turnResponse;
+        }
+        catch (OperationCanceledException) when (effectiveCancellationToken.IsCancellationRequested)
+        {
+            traceBuilder.RecordCanceled();
+            await StoreTraceAsync(traceBuilder, effectiveCancellationToken).ConfigureAwait(false);
+            throw;
         }
         catch (Exception ex)
         {
@@ -148,6 +171,7 @@ public sealed class ChatClientRuntimeAdapter(
         }
         finally
         {
+            runExecutionScope?.Dispose();
             CurrentTurnState.Value = null;
             sessionState.Gate.Release();
         }
@@ -281,10 +305,16 @@ public sealed class ChatClientRuntimeAdapter(
             yield break;
         }
 
-        var sessionState = await GetOrCreateSessionStateAsync(registration, request, cancellationToken).ConfigureAwait(false);
-        await sessionState.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
         var runId = ResolveOrCreateRunId(request);
+        using var activeRun = RegisterActiveRun(runId, cancellationToken);
+        using var runExecutionProviderLease = LeaseRunExecutionServiceProvider();
+        var runExecutionScope = runExecutionProviderLease is { ServiceProvider: { } runExecutionServiceProvider }
+            ? _executionScopeAccessor?.Push(runExecutionServiceProvider)
+            : null;
+        var effectiveCancellationToken = activeRun.Token;
+        var reconnectState = RegisterReconnectableRun(runId, registration.Name);
+        var sessionState = await GetOrCreateSessionStateAsync(registration, request, effectiveCancellationToken).ConfigureAwait(false);
+        await sessionState.Gate.WaitAsync(effectiveCancellationToken).ConfigureAwait(false);
         var sequence = 0L;
         var responseText = new StringBuilder();
         var openedTextMessage = false;
@@ -302,32 +332,34 @@ public sealed class ChatClientRuntimeAdapter(
         try
         {
             ApplyContextSharedState(registration.Name, request, turnState.RunId);
-            var agent = await CreateAgentAsync(registration, request, turnState, cancellationToken).ConfigureAwait(false);
+            var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
-            yield return new AgentTurnStreamEvent
+            yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
             {
                 Kind = AgentTurnStreamEventKind.RunStarted,
                 RunId = runId,
                 Sequence = ++sequence,
                 Timestamp = DateTimeOffset.UtcNow,
                 AgentName = registration.Name
-            };
+            });
 
             CurrentTurnState.Value = turnState;
             await foreach (var update in agent.RunStreamingAsync(
                                new ChatMessage(ChatRole.User, BuildUserMessage(request)),
                                sessionState.Session,
                                options: null,
-                               cancellationToken).ConfigureAwait(false))
+                               effectiveCancellationToken).ConfigureAwait(false))
             {
                 foreach (var queuedEvent in turnState.DrainStreamEvents())
                 {
-                    yield return queuedEvent with
+                    var emitted = queuedEvent with
                     {
                         RunId = runId,
                         Sequence = ++sequence,
                         AgentName = queuedEvent.AgentName ?? registration.Name
                     };
+                    reconnectState.Publish(emitted);
+                    yield return emitted;
                 }
 
                 var text = update.Text;
@@ -339,18 +371,18 @@ public sealed class ChatClientRuntimeAdapter(
                 if (!openedTextMessage)
                 {
                     openedTextMessage = true;
-                    yield return new AgentTurnStreamEvent
+                    yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
                     {
                         Kind = AgentTurnStreamEventKind.TextMessageStart,
                         RunId = runId,
                         Sequence = ++sequence,
                         Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
                         AgentName = registration.Name
-                    };
+                    });
                 }
 
                 responseText.Append(text);
-                yield return new AgentTurnStreamEvent
+                yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
                 {
                     Kind = AgentTurnStreamEventKind.TextMessageContent,
                     RunId = runId,
@@ -358,47 +390,51 @@ public sealed class ChatClientRuntimeAdapter(
                     Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
                     AgentName = registration.Name,
                     TextDelta = text
-                };
+                });
 
                 foreach (var queuedEvent in turnState.DrainStreamEvents())
                 {
-                    yield return queuedEvent with
+                    var emitted = queuedEvent with
                     {
                         RunId = runId,
                         Sequence = ++sequence,
                         AgentName = queuedEvent.AgentName ?? registration.Name
                     };
+                    reconnectState.Publish(emitted);
+                    yield return emitted;
                 }
             }
 
             foreach (var queuedEvent in turnState.DrainStreamEvents())
             {
-                yield return queuedEvent with
+                var emitted = queuedEvent with
                 {
                     RunId = runId,
                     Sequence = ++sequence,
                     AgentName = queuedEvent.AgentName ?? registration.Name
                 };
+                reconnectState.Publish(emitted);
+                yield return emitted;
             }
 
             if (openedTextMessage)
             {
-                yield return new AgentTurnStreamEvent
+                yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
                 {
                     Kind = AgentTurnStreamEventKind.TextMessageEnd,
                     RunId = runId,
                     Sequence = ++sequence,
                     Timestamp = DateTimeOffset.UtcNow,
                     AgentName = registration.Name
-                };
+                });
             }
 
             var turnResponse = BuildTurnResponse(registration.Name, responseText.ToString(), request, turnState);
-            await StoreConversationTurnAsync(registration.Name, request, turnResponse, cancellationToken).ConfigureAwait(false);
-            await RecordActionHistoryAsync(request, turnState, cancellationToken).ConfigureAwait(false);
-            await StoreTraceAsync(traceBuilder, turnState, turnResponse, cancellationToken).ConfigureAwait(false);
+            await StoreConversationTurnAsync(registration.Name, request, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
+            await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
+            await StoreTraceAsync(traceBuilder, turnState, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
             RecordInspectorRun(registration.Name, request, turnState, turnResponse, startedAt, succeeded: !turnState.HasFailures, errorMessage: turnState.HasFailures ? turnResponse.ResponseText : null);
-            yield return new AgentTurnStreamEvent
+            yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
             {
                 Kind = AgentTurnStreamEventKind.RunFinished,
                 RunId = runId,
@@ -406,31 +442,171 @@ public sealed class ChatClientRuntimeAdapter(
                 Timestamp = DateTimeOffset.UtcNow,
                 AgentName = registration.Name,
                 Response = turnResponse
-            };
+            });
         }
         finally
         {
+            reconnectState.Complete();
+            runExecutionScope?.Dispose();
             CurrentTurnState.Value = null;
             sessionState.Gate.Release();
         }
     }
 
-    public IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+    public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
         string runId,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        _ = runId;
-        _ = cancellationToken;
-        throw new NotSupportedException("This runtime adapter does not support reconnecting to existing runs.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+        CleanupExpiredReconnectRuns();
+
+        if (!_reconnectableRuns.TryGetValue(runId, out var runState))
+        {
+            var sequence = 0L;
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.RunStarted,
+                RunId = runId,
+                Sequence = ++sequence,
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageStart,
+                RunId = runId,
+                Sequence = ++sequence,
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageContent,
+                RunId = runId,
+                Sequence = ++sequence,
+                Timestamp = DateTimeOffset.UtcNow,
+                TextDelta = $"No buffered run was found for '{runId}'."
+            };
+            yield return new AgentTurnStreamEvent
+            {
+                Kind = AgentTurnStreamEventKind.TextMessageEnd,
+                RunId = runId,
+                Sequence = ++sequence,
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            yield break;
+        }
+
+        using var subscription = runState.CreateSubscription();
+        foreach (var replayEvent in subscription.Replay)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return replayEvent with { IsReplay = true };
+        }
+
+        if (subscription.IsCompleted)
+        {
+            yield break;
+        }
+
+        await foreach (var streamEvent in subscription.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return streamEvent;
+        }
     }
 
     public Task<bool> StopRunAsync(
         string runId,
         CancellationToken cancellationToken = default)
     {
-        _ = runId;
         _ = cancellationToken;
-        throw new NotSupportedException("This runtime adapter does not support canceling active runs.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(runId);
+
+        if (!_activeRunCancellations.TryGetValue(runId, out var linkedCts))
+        {
+            return Task.FromResult(false);
+        }
+
+        try
+        {
+            linkedCts.Cancel();
+            return Task.FromResult(true);
+        }
+        catch (ObjectDisposedException)
+        {
+            _activeRunCancellations.TryRemove(runId, out _);
+            return Task.FromResult(false);
+        }
+    }
+
+    private ActiveRunRegistration RegisterActiveRun(string runId, CancellationToken cancellationToken)
+    {
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (!_activeRunCancellations.TryAdd(runId, linkedCts))
+        {
+            linkedCts.Dispose();
+            throw new InvalidOperationException($"Run '{runId}' is already active.");
+        }
+
+        return new ActiveRunRegistration(runId, linkedCts, _activeRunCancellations);
+    }
+
+    private ReconnectableRunState RegisterReconnectableRun(string runId, string agentName)
+    {
+        CleanupExpiredReconnectRuns();
+
+        while (true)
+        {
+            if (_reconnectableRuns.TryGetValue(runId, out var existing))
+            {
+                if (existing.IsCompleted)
+                {
+                    _reconnectableRuns.TryRemove(runId, out _);
+                    continue;
+                }
+
+                throw new InvalidOperationException($"Run '{runId}' is already active.");
+            }
+
+            var created = new ReconnectableRunState(runId, agentName);
+            if (_reconnectableRuns.TryAdd(runId, created))
+            {
+                return created;
+            }
+        }
+    }
+
+    private static AgentTurnStreamEvent PublishReconnectEvent(ReconnectableRunState reconnectState, AgentTurnStreamEvent streamEvent)
+    {
+        reconnectState.Publish(streamEvent);
+        return streamEvent;
+    }
+
+    private void CleanupExpiredReconnectRuns()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var pair in _reconnectableRuns)
+        {
+            if (pair.Value.IsExpired(now))
+            {
+                _reconnectableRuns.TryRemove(pair.Key, out _);
+            }
+        }
+
+        if (_reconnectableRuns.Count <= MaxRetainedReconnectRuns)
+        {
+            return;
+        }
+
+        var removable = _reconnectableRuns
+            .Where(static pair => pair.Value.IsCompleted)
+            .OrderBy(static pair => pair.Value.SortKey)
+            .Take(Math.Max(0, _reconnectableRuns.Count - MaxRetainedReconnectRuns))
+            .Select(static pair => pair.Key)
+            .ToArray();
+
+        foreach (var key in removable)
+        {
+            _reconnectableRuns.TryRemove(key, out _);
+        }
     }
 
     private async Task<SessionState> GetOrCreateSessionStateAsync(
@@ -479,6 +655,11 @@ public sealed class ChatClientRuntimeAdapter(
         if (tools.Count > 0)
         {
             chatOptions.Tools = tools.ToList();
+            // Workflow agents (with capability actions) should prefer tool use
+            if (registration.AllowedCapabilityActions.Count > 0)
+            {
+                chatOptions.ToolMode = ChatToolMode.RequireAny;
+            }
         }
 
         var executionServiceProvider = ResolveExecutionServiceProvider();
@@ -775,7 +956,7 @@ public sealed class ChatClientRuntimeAdapter(
                 invocationArguments,
                 policyDecision);
             turnState?.AddPendingApproval(approval);
-            if (stepIndex is int approvalStepIndex)
+            if (stepIndex is int approvalStepIndex && turnState is not null)
             {
                 turnState.UpdateExecutionStep(
                     approvalStepIndex,
@@ -814,7 +995,7 @@ public sealed class ChatClientRuntimeAdapter(
                 ActionOutcome.Blocked,
                 "Explicit submit intent is required before submitting a generated form action.");
             turnState?.AddExecutionResult(blockedResult);
-            if (stepIndex is int blockedStepIndex)
+            if (stepIndex is int blockedStepIndex && turnState is not null)
             {
                 turnState.UpdateExecutionStep(
                     blockedStepIndex,
@@ -850,7 +1031,7 @@ public sealed class ChatClientRuntimeAdapter(
             .ExecuteAsync(plannedAction, cancellationToken)
             .ConfigureAwait(false);
         turnState?.AddExecutionResult(result);
-        if (stepIndex is int completedStepIndex)
+        if (stepIndex is int completedStepIndex && turnState is not null)
         {
             turnState.UpdateExecutionStep(
                 completedStepIndex,
@@ -955,7 +1136,7 @@ public sealed class ChatClientRuntimeAdapter(
                 invocationArguments,
                 policyDecision);
             turnState?.AddPendingApproval(approval);
-            if (stepIndex is int approvalStepIndex)
+            if (stepIndex is int approvalStepIndex && turnState is not null)
             {
                 turnState.UpdateExecutionStep(
                     approvalStepIndex,
@@ -983,10 +1164,18 @@ public sealed class ChatClientRuntimeAdapter(
                 PlannedAction = plannedAction,
                 StepIndex = stepIndex
             });
+            await TryLogCapabilityApprovalAsync(
+                    ResolveExecutionServiceProvider(),
+                    turnState,
+                    capability,
+                    approved: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
             return $"Approval required for semantic capability {capability.ActionId}.";
         }
 
-        var executionServiceProvider = ResolveExecutionServiceProvider();
+        using var executionProviderLease = LeaseExecutionServiceProvider();
+        var executionServiceProvider = executionProviderLease?.ServiceProvider;
         if (executionServiceProvider is null)
         {
             var failure = new ComponentActionExecutionResult(
@@ -995,7 +1184,7 @@ public sealed class ChatClientRuntimeAdapter(
                 ActionOutcome.Failed,
                 "Capability execution requires a service provider, but none was available.");
             turnState?.AddExecutionResult(failure);
-            if (stepIndex is int failedStepIndex)
+            if (stepIndex is int failedStepIndex && turnState is not null)
             {
                 turnState.UpdateExecutionStep(
                     failedStepIndex,
@@ -1024,15 +1213,40 @@ public sealed class ChatClientRuntimeAdapter(
                 StepSucceeded = false,
                 ExecutionResult = failure
             });
+            await TryLogCapabilityExecutionAsync(
+                    executionServiceProvider: null,
+                    turnState,
+                    capability,
+                    CapabilityResult.Failure(failure.Message),
+                    cancellationToken)
+                .ConfigureAwait(false);
             return failure.Message;
+        }
+
+        if (capability.RequiresApproval)
+        {
+            await TryLogCapabilityApprovalAsync(
+                    executionServiceProvider,
+                    turnState,
+                    capability,
+                    approved: true,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var capabilityResult = await _capabilityRegistry
             .ExecuteAsync(capability.ActionId, invocationArguments, executionServiceProvider, cancellationToken)
             .ConfigureAwait(false);
+        await TryLogCapabilityExecutionAsync(
+                executionServiceProvider,
+                turnState,
+                capability,
+                capabilityResult,
+                cancellationToken)
+            .ConfigureAwait(false);
         var executionResult = MapCapabilityResult(capability, capabilityResult);
         turnState?.AddExecutionResult(executionResult);
-        if (stepIndex is int completedStepIndex)
+        if (stepIndex is int completedStepIndex && turnState is not null)
         {
             turnState.UpdateExecutionStep(
                 completedStepIndex,
@@ -1120,7 +1334,8 @@ public sealed class ChatClientRuntimeAdapter(
             ToolArguments = invocationArguments
         });
 
-        var executionServiceProvider = ResolveExecutionServiceProvider();
+        using var executionProviderLease = LeaseExecutionServiceProvider();
+        var executionServiceProvider = executionProviderLease?.ServiceProvider;
         if (executionServiceProvider is null)
         {
             var unavailableResult = new ComponentActionExecutionResult(
@@ -1129,7 +1344,7 @@ public sealed class ChatClientRuntimeAdapter(
                 ActionOutcome.Failed,
                 "IServiceProvider not available for tool execution.");
             turnState?.AddExecutionResult(unavailableResult);
-            if (stepIndex is int unavailableStepIndex)
+            if (stepIndex is int unavailableStepIndex && turnState is not null)
             {
                 turnState.UpdateExecutionStep(
                     unavailableStepIndex,
@@ -1146,7 +1361,7 @@ public sealed class ChatClientRuntimeAdapter(
             ActionOutcome.Applied,
             result);
         turnState?.AddExecutionResult(executionResult);
-        if (stepIndex is int completedStepIndex)
+        if (stepIndex is int completedStepIndex && turnState is not null)
         {
             turnState.UpdateExecutionStep(
                 completedStepIndex,
@@ -1338,6 +1553,11 @@ public sealed class ChatClientRuntimeAdapter(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        const int maxToolNameLength = 64;
+        const int hashLength = 8;
+        const int prefixLength = 15;
+        const int separatorLength = 1;
+
         var builder = new StringBuilder(name.Length);
         foreach (var ch in name)
         {
@@ -1349,7 +1569,21 @@ public sealed class ChatClientRuntimeAdapter(
             builder.Insert(0, "tool_");
         }
 
-        return builder.ToString();
+        var normalized = builder.ToString();
+        if (normalized.Length <= maxToolNameLength)
+        {
+            return normalized;
+        }
+
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..hashLength];
+        var headLength = Math.Min(prefixLength, normalized.Length);
+        var tailLength = maxToolNameLength - headLength - (separatorLength * 2) - hashLength;
+        return string.Concat(
+            normalized[..headLength],
+            "_",
+            normalized[(normalized.Length - tailLength)..],
+            "_",
+            hash);
     }
 
     private AgentRegistration? ResolveAgentRegistration(
@@ -1720,10 +1954,231 @@ public sealed class ChatClientRuntimeAdapter(
                ?? _serviceProvider?.GetService(typeof(IPromptTraceStore)) as IPromptTraceStore;
     }
 
+    private ExecutionServiceProviderLease? LeaseExecutionServiceProvider()
+    {
+        var currentScopeProvider = _executionScopeAccessor?.Current;
+        if (IsUsableServiceProvider(currentScopeProvider))
+        {
+            return new ExecutionServiceProviderLease(currentScopeProvider!, Scope: null);
+        }
+
+        if (!IsUsableServiceProvider(_serviceProvider))
+        {
+            return null;
+        }
+
+        if (_serviceProvider!.GetService(typeof(IServiceScopeFactory)) is not IServiceScopeFactory scopeFactory)
+        {
+            return new ExecutionServiceProviderLease(_serviceProvider, Scope: null);
+        }
+
+        var scope = scopeFactory.CreateScope();
+        return new ExecutionServiceProviderLease(scope.ServiceProvider, scope);
+    }
+
+    private ExecutionServiceProviderLease? LeaseRunExecutionServiceProvider()
+    {
+        if (!IsUsableServiceProvider(_serviceProvider))
+        {
+            return null;
+        }
+
+        if (_serviceProvider!.GetService(typeof(IServiceScopeFactory)) is IServiceScopeFactory scopeFactory)
+        {
+            var scope = scopeFactory.CreateScope();
+            return new ExecutionServiceProviderLease(scope.ServiceProvider, scope);
+        }
+
+        var currentScopeProvider = _executionScopeAccessor?.Current;
+        if (IsUsableServiceProvider(currentScopeProvider))
+        {
+            return new ExecutionServiceProviderLease(currentScopeProvider!, Scope: null);
+        }
+
+        return new ExecutionServiceProviderLease(_serviceProvider, Scope: null);
+    }
+
     private IServiceProvider? ResolveExecutionServiceProvider()
     {
-        return _executionScopeAccessor?.Current ?? _serviceProvider;
+        var currentScopeProvider = _executionScopeAccessor?.Current;
+        if (IsUsableServiceProvider(currentScopeProvider))
+        {
+            return currentScopeProvider;
+        }
+
+        return IsUsableServiceProvider(_serviceProvider) ? _serviceProvider : null;
     }
+
+    private static bool IsUsableServiceProvider(IServiceProvider? serviceProvider)
+    {
+        if (serviceProvider is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = serviceProvider.GetService(typeof(IServiceScopeFactory));
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    private async Task TryLogCapabilityApprovalAsync(
+        IServiceProvider? serviceProvider,
+        TurnExecutionState? turnState,
+        AgentCapabilityActionDescriptor capability,
+        bool approved,
+        CancellationToken cancellationToken)
+    {
+        if (serviceProvider?.GetService(typeof(IAuditLogService)) is not IAuditLogService auditLog)
+        {
+            return;
+        }
+
+        var identity = ResolveAuditIdentity(serviceProvider, turnState);
+        var agentId = turnState?.AgentName ?? capability.CapabilityId;
+        var description = approved
+            ? $"Approved action '{capability.ActionId}' via agent '{agentId}'"
+            : $"Approval required for action '{capability.ActionId}' via agent '{agentId}'";
+        var eventType = approved
+            ? AuditEventType.ActionApproved
+            : AuditEventType.ActionApprovalRequested;
+
+        try
+        {
+            await auditLog.LogAsync(
+                    new AuditEvent(
+                        Guid.NewGuid().ToString(),
+                        DateTimeOffset.UtcNow,
+                        identity.UserId,
+                        identity.UserEmail,
+                        eventType,
+                        "action",
+                        capability.ActionId,
+                        description,
+                        identity.IpAddress,
+                        new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["actionId"] = capability.ActionId,
+                            ["agentId"] = agentId,
+                            ["sessionId"] = turnState?.SessionId,
+                            ["runId"] = turnState?.RunId,
+                            ["capabilityId"] = capability.CapabilityId,
+                            ["localActionId"] = capability.LocalActionId
+                        }),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _loggerFactory?
+                .CreateLogger<ChatClientRuntimeAdapter>()
+                .LogWarning(ex, "Failed to write capability approval audit event for {ActionId}", capability.ActionId);
+        }
+    }
+
+    private async Task TryLogCapabilityExecutionAsync(
+        IServiceProvider? executionServiceProvider,
+        TurnExecutionState? turnState,
+        AgentCapabilityActionDescriptor capability,
+        CapabilityResult capabilityResult,
+        CancellationToken cancellationToken)
+    {
+        if (executionServiceProvider?.GetService(typeof(IAuditLogService)) is not IAuditLogService auditLog)
+        {
+            return;
+        }
+
+        var identity = ResolveAuditIdentity(executionServiceProvider, turnState);
+        var agentId = turnState?.AgentName ?? capability.CapabilityId;
+        var errorMessage = capabilityResult.Succeeded
+            ? null
+            : capabilityResult.RequiresClarification
+                ? capabilityResult.ClarificationQuestion ?? capabilityResult.Summary
+                : capabilityResult.Summary;
+
+        try
+        {
+            await auditLog.LogActionAsync(
+                    identity.UserId,
+                    identity.UserEmail,
+                    capability.ActionId,
+                    agentId,
+                    capabilityResult.Succeeded,
+                    errorMessage,
+                    identity.IpAddress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _loggerFactory?
+                .CreateLogger<ChatClientRuntimeAdapter>()
+                .LogWarning(ex, "Failed to write capability execution audit event for {ActionId}", capability.ActionId);
+        }
+    }
+
+    private static AuditIdentity ResolveAuditIdentity(IServiceProvider serviceProvider, TurnExecutionState? turnState)
+    {
+        var userId = turnState?.SessionId ?? "anonymous";
+        string? userEmail = null;
+        string? ipAddress = null;
+        var accessorType = Type.GetType("Microsoft.AspNetCore.Http.IHttpContextAccessor, Microsoft.AspNetCore.Http.Abstractions");
+        if (accessorType is null)
+        {
+            return new AuditIdentity(userId, userEmail, ipAddress);
+        }
+
+        var accessor = serviceProvider.GetService(accessorType);
+        if (accessor is null)
+        {
+            return new AuditIdentity(userId, userEmail, ipAddress);
+        }
+
+        var httpContextProperty = accessorType.GetProperty("HttpContext");
+        if (httpContextProperty is null)
+        {
+            return new AuditIdentity(userId, userEmail, ipAddress);
+        }
+
+        var httpContext = httpContextProperty.GetValue(accessor);
+        var user = httpContext?.GetType().GetProperty("User")?.GetValue(httpContext) as ClaimsPrincipal;
+        if (user is not null)
+        {
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value
+                ?? user.Identity?.Name
+                ?? userId;
+            userEmail = user.FindFirst(ClaimTypes.Email)?.Value
+                ?? user.FindFirst("email")?.Value
+                ?? userEmail;
+        }
+
+        var connection = httpContext?.GetType().GetProperty("Connection")?.GetValue(httpContext);
+        var remoteIp = connection?.GetType().GetProperty("RemoteIpAddress")?.GetValue(connection);
+        ipAddress = remoteIp?.ToString();
+
+        return new AuditIdentity(userId, userEmail, ipAddress);
+    }
+
+    private readonly record struct ExecutionServiceProviderLease(
+        IServiceProvider ServiceProvider,
+        IServiceScope? Scope) : IDisposable
+    {
+        public void Dispose()
+        {
+            Scope?.Dispose();
+        }
+    }
+
+    private readonly record struct AuditIdentity(
+        string UserId,
+        string? UserEmail,
+        string? IpAddress);
 
     private void RecordInspectorRun(
         string agentName,
@@ -2053,6 +2508,168 @@ public sealed class ChatClientRuntimeAdapter(
         public AgentSession Session { get; } = session;
 
         public SemaphoreSlim Gate { get; } = new(1, 1);
+    }
+
+    private sealed class ActiveRunRegistration(
+        string runId,
+        CancellationTokenSource linkedCancellation,
+        ConcurrentDictionary<string, CancellationTokenSource> registry) : IDisposable
+    {
+        public CancellationToken Token => linkedCancellation.Token;
+
+        public void Dispose()
+        {
+            if (registry.TryGetValue(runId, out var current) &&
+                ReferenceEquals(current, linkedCancellation))
+            {
+                registry.TryRemove(runId, out _);
+            }
+
+            linkedCancellation.Dispose();
+        }
+    }
+
+    private sealed class ReconnectableRunState(string runId, string agentName)
+    {
+        private readonly object _gate = new();
+        private readonly List<AgentTurnStreamEvent> _events = [];
+        private readonly List<Channel<AgentTurnStreamEvent>> _subscribers = [];
+        private bool _completed;
+
+        public string RunId { get; } = runId;
+
+        public string AgentName { get; } = agentName;
+
+        public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
+
+        public DateTimeOffset? CompletedAt { get; private set; }
+
+        public bool IsCompleted
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _completed;
+                }
+            }
+        }
+
+        public DateTimeOffset SortKey => CompletedAt ?? CreatedAt;
+
+        public void Publish(AgentTurnStreamEvent streamEvent)
+        {
+            lock (_gate)
+            {
+                if (_completed)
+                {
+                    return;
+                }
+
+                _events.Add(streamEvent);
+                for (var i = _subscribers.Count - 1; i >= 0; i--)
+                {
+                    if (!_subscribers[i].Writer.TryWrite(streamEvent))
+                    {
+                        _subscribers.RemoveAt(i);
+                    }
+                }
+            }
+        }
+
+        public ReconnectSubscription CreateSubscription()
+        {
+            lock (_gate)
+            {
+                var replay = _events.ToArray();
+                if (_completed)
+                {
+                    return new ReconnectSubscription(replay, reader: null, channel: null, state: this, isCompleted: true);
+                }
+
+                var channel = Channel.CreateUnbounded<AgentTurnStreamEvent>(new UnboundedChannelOptions
+                {
+                    SingleReader = true,
+                    SingleWriter = false
+                });
+                _subscribers.Add(channel);
+                return new ReconnectSubscription(replay, channel.Reader, channel, this, isCompleted: false);
+            }
+        }
+
+        public void Complete()
+        {
+            lock (_gate)
+            {
+                if (_completed)
+                {
+                    return;
+                }
+
+                _completed = true;
+                CompletedAt = DateTimeOffset.UtcNow;
+                foreach (var subscriber in _subscribers)
+                {
+                    subscriber.Writer.TryComplete();
+                }
+
+                _subscribers.Clear();
+            }
+        }
+
+        public bool IsExpired(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                return _completed &&
+                       CompletedAt is { } completedAt &&
+                       now - completedAt > ReconnectRetention;
+            }
+        }
+
+        public void Unsubscribe(Channel<AgentTurnStreamEvent>? channel)
+        {
+            if (channel is null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _subscribers.Remove(channel);
+            }
+        }
+    }
+
+    private sealed class ReconnectSubscription(
+        IReadOnlyList<AgentTurnStreamEvent> replay,
+        ChannelReader<AgentTurnStreamEvent>? reader,
+        Channel<AgentTurnStreamEvent>? channel,
+        ReconnectableRunState state,
+        bool isCompleted) : IDisposable
+    {
+        public IReadOnlyList<AgentTurnStreamEvent> Replay { get; } = replay;
+
+        public bool IsCompleted { get; } = isCompleted;
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> ReadAllAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            if (reader is null)
+            {
+                yield break;
+            }
+
+            await foreach (var streamEvent in reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                yield return streamEvent;
+            }
+        }
+
+        public void Dispose()
+        {
+            state.Unsubscribe(channel);
+        }
     }
 
     private sealed class TurnExecutionState(

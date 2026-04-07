@@ -117,6 +117,7 @@
 
     <AgentDialog AgentId="response-orchestration-dialog"
                  Visible="@Workflow.IsPacketDialogOpen"
+                 OnConfirm="ConfirmPacketAsync"
                  VisibleChanged="OnPacketVisibilityChanged">
         <TitleContent>
             <MudText Typo="Typo.h6">Cross-system response packet</MudText>
@@ -249,6 +250,12 @@
     {
         Workflow.SetPacketDialogVisible(false);
         return Task.CompletedTask;
+    }
+
+    private Task<AgentBlazor.Runtime.ActionResult> ConfirmPacketAsync()
+    {
+        Workflow.SetPacketDialogVisible(false);
+        return Task.FromResult(AgentBlazor.Runtime.ActionResult.Applied("Approved the response packet dialog."));
     }
 
     private Task OnPacketVisibilityChanged(bool visible)

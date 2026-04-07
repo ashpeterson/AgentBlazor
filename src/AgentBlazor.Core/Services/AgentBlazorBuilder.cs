@@ -120,7 +120,7 @@ public sealed class AgentBlazorBuilder
             _store.CapabilityTypes.Add(capabilityType);
         }
 
-        Services.TryAddTransient(capabilityType, capabilityType);
+        Services.TryAddScoped(capabilityType, capabilityType);
 
         return this;
     }

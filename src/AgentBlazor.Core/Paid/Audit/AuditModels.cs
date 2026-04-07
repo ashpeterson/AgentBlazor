@@ -21,6 +21,7 @@ public record AuditEvent(
 public enum AuditEventType
 {
     ActionExecuted,
+    ActionApprovalRequested,
     ActionApproved,
     ActionDenied,
     ActionFailed,

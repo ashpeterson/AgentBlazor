@@ -75,7 +75,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
     private EventCallback<IReadOnlyCollection<T>?> _wrappedSelectedValuesChanged;
 
     [AgentReadable("Currently selected node id")]
-    public string? CurrentSelectedNodeId => GetNodeId(SelectedValue);
+    public string? CurrentSelectedNodeId => GetNodeId(GetSelectedValue());
 
     [AgentReadable("Currently selected node ids")]
     public string[] CurrentSelectedNodeIds => GetSelectedNodeIds();
@@ -117,7 +117,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
     public virtual RuntimeComponentState GetCurrentState() => new()
     {
-        ["selectedNodeId"] = GetNodeId(SelectedValue),
+        ["selectedNodeId"] = GetNodeId(GetSelectedValue()),
         ["selectedNodeIds"] = GetSelectedNodeIds(),
         ["expandedNodeIds"] = GetExpandedNodeIds(),
         ["nodeIds"] = GetAvailableNodeIds(),
@@ -248,7 +248,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
     private async Task HandleSelectedValueChangedAsync(T? value)
     {
-        SelectedValue = value;
+        await MudPrivateParameterStateAccessor.SetValueAsync(this, "_selectedValueState", value);
         await HandleCompatibilitySelectedValueChangedAsync(value);
 
         if (_externalSelectedValueChanged.HasDelegate && !_externalSelectedValueChanged.Equals(_wrappedSelectedValueChanged))
@@ -259,7 +259,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
     private async Task HandleSelectedValuesChangedAsync(IReadOnlyCollection<T>? values)
     {
-        SelectedValues = values;
+        await MudPrivateParameterStateAccessor.SetValueAsync(this, "_selectedValuesState", values);
 
         if (_externalSelectedValuesChanged.HasDelegate && !_externalSelectedValuesChanged.Equals(_wrappedSelectedValuesChanged))
         {
@@ -290,7 +290,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
         if (SelectionMode == SelectionMode.MultiSelection)
         {
-            var selected = new HashSet<T>(SelectedValues ?? Array.Empty<T>(), Comparer) { value };
+            var selected = new HashSet<T>(GetSelectedValues() ?? Array.Empty<T>(), Comparer) { value };
             ApplySelectionToItemData(selected);
             await HandleSelectedValuesChangedAsync(selected.ToArray());
             return;
@@ -319,7 +319,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
     private void ApplySelectionToItemData(T selectedValue)
     {
-        SelectedValue = selectedValue;
+        MudPrivateParameterStateAccessor.SetValue(this, "_selectedValueState", selectedValue);
 
         foreach (var item in GetItemDataRecursive(Items))
         {
@@ -329,7 +329,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
     private void ApplySelectionToItemData(HashSet<T> selectedValues)
     {
-        SelectedValues = selectedValues.ToArray();
+        MudPrivateParameterStateAccessor.SetValue(this, "_selectedValuesState", selectedValues.ToArray());
 
         foreach (var item in GetItemDataRecursive(Items))
         {
@@ -417,9 +417,10 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
     {
         if (SelectionMode == SelectionMode.MultiSelection)
         {
-            if (SelectedValues is { Count: > 0 })
+            var selectedValues = GetSelectedValues();
+            if (selectedValues is { Count: > 0 })
             {
-                return SelectedValues
+                return selectedValues
                     .Select(GetNodeId)
                     .Where(static key => !string.IsNullOrWhiteSpace(key))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -434,7 +435,7 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
                 .ToArray()!;
         }
 
-        var selectedNodeId = GetNodeId(SelectedValue);
+        var selectedNodeId = GetNodeId(GetSelectedValue());
         return string.IsNullOrWhiteSpace(selectedNodeId) ? [] : [selectedNodeId];
     }
 
@@ -608,10 +609,10 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
 
         if (ShouldApplySelectedNodeAlias())
         {
-            var selectedValue = SelectedValue as string;
+            var selectedValue = GetSelectedValue() as string;
             if (!string.Equals(selectedValue, SelectedNodeId, StringComparison.OrdinalIgnoreCase))
             {
-                SelectedValue = SelectedNodeId is null ? default : (T)(object)SelectedNodeId;
+                MudPrivateParameterStateAccessor.SetValue(this, "_selectedValueState", SelectedNodeId is null ? default(T) : (T)(object)SelectedNodeId);
             }
         }
     }
@@ -663,4 +664,9 @@ public class AgentTreeView<T> : MudTreeView<T>, IAgentControllable
             .ToArray()
             ?? [];
     }
+
+    private T? GetSelectedValue() => MudPrivateParameterStateAccessor.GetValue<T>(this, "_selectedValueState");
+
+    private IReadOnlyCollection<T>? GetSelectedValues()
+        => MudPrivateParameterStateAccessor.GetValue<IReadOnlyCollection<T>>(this, "_selectedValuesState");
 }

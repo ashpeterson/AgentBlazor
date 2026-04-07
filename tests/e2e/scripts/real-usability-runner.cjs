@@ -189,7 +189,8 @@ async function runScenario(browser, scenario) {
   const transcript = [];
   const interactions = {
     approvalsClicked: 0,
-    clarificationsSubmitted: 0
+    clarificationsSubmitted: 0,
+    stopsClicked: 0
   };
 
   let evidence;
@@ -200,17 +201,14 @@ async function runScenario(browser, scenario) {
     await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle", timeout: scenarioTimeoutMs });
 
     const chatSurface = await openAssistantChatSurface(page, 30000);
-    const promptInput = chatSurface.getByLabel("Message input");
-    await promptInput.waitFor({ state: "visible", timeout: 30000 });
+    const prompts = scenario.prompts?.length ? scenario.prompts : [scenario.prompt];
+    let currentChatSurface = chatSurface;
+    for (const prompt of prompts) {
+      const promptSpec = typeof prompt === "string" ? { text: prompt } : prompt;
+      currentChatSurface = await runPrompt(page, currentChatSurface, promptSpec, interactions, scenarioTimeoutMs);
+    }
 
-    await promptInput.fill(scenario.prompt);
-    await clickSend(chatSurface);
-
-    await waitForSettled(chatSurface, scenarioTimeoutMs);
-    await resolveHumanInLoop(chatSurface, interactions, scenarioTimeoutMs);
-    await waitForSettled(chatSurface, scenarioTimeoutMs);
-
-    evidence = await extractChatEvidence(chatSurface);
+    evidence = await extractChatEvidence(currentChatSurface);
     transcript.push(...evidence.transcript);
 
     afterDb = await snapshotDatabase();
@@ -236,7 +234,8 @@ async function runScenario(browser, scenario) {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
       route,
-      prompt: scenario.prompt,
+      prompt: scenario.prompt ?? prompts[0],
+      prompts,
       pass: evaluation.pass,
       failures: evaluation.failures,
       rootCauses: evaluation.rootCauses,
@@ -248,7 +247,8 @@ async function runScenario(browser, scenario) {
         executionOutcomeCount: evidence.executionOutcomes.length,
         clarificationCount: evidence.clarificationCount,
         approvalCount: evidence.approvalCount,
-        maxDeferredRepeat: evidence.maxDeferredRepeat
+        maxDeferredRepeat: evidence.maxDeferredRepeat,
+        stopsClicked: interactions.stopsClicked
       },
       databaseDiff: computeDatabaseDiff(beforeDb, afterDb),
       evidencePath: path.relative(repoRoot, path.join(scenarioDir, "evidence.json")),
@@ -261,7 +261,8 @@ async function runScenario(browser, scenario) {
       scenarioId: scenario.id,
       scenarioName: scenario.name,
       route,
-      prompt: scenario.prompt,
+      prompt: scenario.prompt ?? scenario.prompts?.[0] ?? "",
+      prompts: scenario.prompts ?? (scenario.prompt ? [scenario.prompt] : []),
       pass: false,
       failures: [{ code: "scenario_runtime_failure", message: error.message }],
       rootCauses: ["scenario_runtime_failure"],
@@ -273,7 +274,8 @@ async function runScenario(browser, scenario) {
         executionOutcomeCount: 0,
         clarificationCount: 0,
         approvalCount: 0,
-        maxDeferredRepeat: 0
+        maxDeferredRepeat: 0,
+        stopsClicked: interactions.stopsClicked
       },
       databaseDiff: {
         countDeltas: {}
@@ -289,10 +291,54 @@ async function runScenario(browser, scenario) {
   }
 }
 
-async function clickSend(chatSurface) {
+async function runPrompt(page, chatSurface, promptSpec, interactions, timeoutMs) {
+  const prompt = promptSpec.text ?? "";
+  const promptInput = chatSurface.getByLabel("Message input");
+  await promptInput.waitFor({ state: "visible", timeout: 30000 });
+  await promptInput.fill(prompt);
+  await clickSend(chatSurface, promptInput, timeoutMs);
+  if (promptSpec.cancelAfterStopVisible) {
+    await clickStop(chatSurface, interactions, timeoutMs);
+  }
+  if (promptSpec.reloadAfterStopVisible) {
+    await waitForStopVisible(chatSurface, timeoutMs);
+    await page.reload({ waitUntil: "networkidle", timeout: timeoutMs });
+    chatSurface = await openAssistantChatSurface(page, 30000);
+  }
+  await waitForSettled(chatSurface, timeoutMs);
+  await scrollChatSurfaceToBottom(chatSurface);
+  await resolveHumanInLoop(chatSurface, interactions, timeoutMs);
+  await waitForSettled(chatSurface, timeoutMs);
+  return chatSurface;
+}
+
+async function clickSend(chatSurface, promptInput, timeoutMs) {
   const sendButton = chatSurface.locator("button[aria-label*='Send']").first();
   await sendButton.waitFor({ state: "visible", timeout: 30000 });
-  await sendButton.click();
+  await sendButton.scrollIntoViewIfNeeded().catch(() => {});
+  try {
+    await sendButton.click({ force: true });
+  } catch {
+    await sendButton.evaluate((button) => button.click());
+  }
+  await waitForPromptSubmission(chatSurface, promptInput, timeoutMs);
+}
+
+async function clickStop(chatSurface, interactions, timeoutMs) {
+  const stopButton = chatSurface.locator("button[aria-label='Stop active run']").first();
+  await stopButton.waitFor({ state: "visible", timeout: timeoutMs });
+  await stopButton.scrollIntoViewIfNeeded().catch(() => {});
+  try {
+    await stopButton.click({ force: true });
+  } catch {
+    await stopButton.evaluate((button) => button.click());
+  }
+  interactions.stopsClicked++;
+}
+
+async function waitForStopVisible(chatSurface, timeoutMs) {
+  const stopButton = chatSurface.locator("button[aria-label='Stop active run']").first();
+  await stopButton.waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 async function waitForSettled(chatSurface, timeoutMs) {
@@ -301,9 +347,13 @@ async function waitForSettled(chatSurface, timeoutMs) {
 
   while (Date.now() < deadline) {
     const assistantCount = await chatSurface.locator(".ab-chat-surface__item--assistant").count();
+    const userCount = await chatSurface.locator(".ab-chat-surface__item--user").count();
+    const approvalCount = await chatSurface.locator(".ab-chat-surface__item--approval").count();
+    const clarificationCount = await chatSurface.locator(".ab-chat-surface__item--clarification").count();
     const thinkingCount = await chatSurface.locator(".ab-chat-surface__state--thinking").count();
 
-    if (assistantCount > 0 && thinkingCount === 0) {
+    if ((assistantCount > 0 || userCount > 0 || approvalCount > 0 || clarificationCount > 0) &&
+        thinkingCount === 0) {
       stableTicks++;
       if (stableTicks >= 3) {
         return;
@@ -321,9 +371,15 @@ async function waitForSettled(chatSurface, timeoutMs) {
 async function resolveHumanInLoop(chatSurface, interactions, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const approveButton = chatSurface.getByRole("button", { name: "Approve" }).first();
+    await scrollChatSurfaceToBottom(chatSurface);
+    const approveButton = chatSurface.locator(".ab-chat-surface__item--approval .ab-chat-surface__submit--approve").last();
+    await approveButton.scrollIntoViewIfNeeded().catch(() => {});
     if (await approveButton.isVisible().catch(() => false)) {
-      await approveButton.click();
+      try {
+        await approveButton.click({ force: true });
+      } catch {
+        await approveButton.evaluate((button) => button.click());
+      }
       interactions.approvalsClicked++;
       await waitForSettled(chatSurface, timeoutMs);
       continue;
@@ -334,7 +390,12 @@ async function resolveHumanInLoop(chatSurface, interactions, timeoutMs) {
       const input = clarificationPanel.locator("input").first();
       const submit = clarificationPanel.locator("button").first();
       await input.fill("Use default values and continue.");
-      await submit.click();
+      await submit.scrollIntoViewIfNeeded().catch(() => {});
+      try {
+        await submit.click({ force: true });
+      } catch {
+        await submit.evaluate((button) => button.click());
+      }
       interactions.clarificationsSubmitted++;
       await waitForSettled(chatSurface, timeoutMs);
       continue;
@@ -342,6 +403,39 @@ async function resolveHumanInLoop(chatSurface, interactions, timeoutMs) {
 
     return;
   }
+}
+
+async function scrollChatSurfaceToBottom(chatSurface) {
+  await chatSurface.evaluate((surface) => {
+    surface.scrollTop = surface.scrollHeight;
+    const timeline = surface.querySelector(".ab-chat-surface__timeline");
+    if (timeline) {
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+  }).catch(() => {});
+}
+
+async function waitForPromptSubmission(chatSurface, promptInput, timeoutMs) {
+  const deadline = Date.now() + Math.max(5000, Math.min(timeoutMs, 15000));
+
+  while (Date.now() < deadline) {
+    const currentValue = await promptInput.inputValue().catch(() => "");
+    const thinkingVisible = await chatSurface.locator(".ab-chat-surface__state--thinking").count();
+    const assistantItems = await chatSurface.locator(".ab-chat-surface__item--assistant").count();
+    const stopVisible = await chatSurface
+      .locator("button[aria-label='Stop active run']")
+      .first()
+      .isVisible()
+      .catch(() => false);
+
+    if (currentValue.length === 0 || thinkingVisible > 0 || assistantItems > 0 || stopVisible) {
+      return;
+    }
+
+    await sleep(250);
+  }
+
+  throw new Error("Prompt submission did not start.");
 }
 
 async function extractChatEvidence(chatSurface) {
@@ -548,6 +642,43 @@ function evaluateScenario(scenario, evidence, dbDiff, interactions) {
       message: `Approval interactions ${interactions.approvalsClicked} exceeded configured cap.`
     });
     rootCauses.add("approval_loop");
+  }
+
+  if (interactions.approvalsClicked < (scenario.minApprovalInteractions ?? 0)) {
+    failures.push({
+      code: "missing_approval_interaction",
+      message: `Approval interactions ${interactions.approvalsClicked} were below required minimum ${scenario.minApprovalInteractions}.`
+    });
+    rootCauses.add("missing_approval_interaction");
+  }
+
+  if ((scenario.maxStopInteractions ?? Number.MAX_SAFE_INTEGER) < interactions.stopsClicked) {
+    failures.push({
+      code: "stop_loop",
+      message: `Stop interactions ${interactions.stopsClicked} exceeded configured cap.`
+    });
+    rootCauses.add("stop_loop");
+  }
+
+  if (interactions.stopsClicked < (scenario.minStopInteractions ?? 0)) {
+    failures.push({
+      code: "missing_stop_interaction",
+      message: `Stop interactions ${interactions.stopsClicked} were below required minimum ${scenario.minStopInteractions}.`
+    });
+    rootCauses.add("missing_stop_interaction");
+  }
+
+  const transcriptText = evidence.transcript
+    .map((entry) => entry.text ?? "")
+    .join("\n");
+  for (const snippet of scenario.expectedTranscriptIncludes ?? []) {
+    if (!transcriptText.includes(snippet)) {
+      failures.push({
+        code: "missing_expected_text",
+        message: `Expected transcript to include '${snippet}'.`
+      });
+      rootCauses.add("missing_expected_text");
+    }
   }
 
   if (scenario.expectedDbDelta) {

@@ -6,7 +6,6 @@ using AgentBlazor.Core.Runtime.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using MudBlazor;
-
 namespace AgentBlazor.Components;
 
 public class AgentDialog : MudDialog, IAgentControllable, IDisposable
@@ -42,7 +41,7 @@ public class AgentDialog : MudDialog, IAgentControllable, IDisposable
     private ILogger? _logger;
 
     [AgentReadable("Whether the dialog is currently visible")]
-    public bool IsVisible => Visible;
+    public bool IsVisible => MudPrivateParameterStateAccessor.GetValue<bool>(this, "_visibleState");
 
     protected override void OnInitialized()
     {
@@ -75,7 +74,7 @@ public class AgentDialog : MudDialog, IAgentControllable, IDisposable
 
     public virtual ComponentState GetCurrentState() => new()
     {
-        ["visible"] = Visible
+        ["visible"] = MudPrivateParameterStateAccessor.GetValue<bool>(this, "_visibleState")
     };
 
     public virtual async Task<ActionResult> ExecuteActionAsync(
@@ -164,15 +163,13 @@ public class AgentDialog : MudDialog, IAgentControllable, IDisposable
         {
             await InvokeAsync(async () =>
             {
-                Visible = visible;
-                await VisibleChanged.InvokeAsync(visible);
+                await MudPrivateParameterStateAccessor.SetValueAsync(this, "_visibleState", visible);
                 StateHasChanged();
             });
         }
         catch (InvalidOperationException)
         {
-            Visible = visible;
-            await VisibleChanged.InvokeAsync(visible);
+            await MudPrivateParameterStateAccessor.SetValueAsync(this, "_visibleState", visible);
         }
     }
 

@@ -16,16 +16,24 @@
     <section class="guide-page__section">
         <MudText Typo="Typo.h5">1. Install</MudText>
         <pre class="guide-page__code"><code>dotnet add package AgentBlazor</code></pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            Optional discovery step: install the CLI and run <code>agentblazor init ./MySolution.sln --host MyBlazorApp</code> to generate <code>.agentblazor/AGENT.md</code>.
+        </MudText>
     </section>
 
     <section class="guide-page__section">
         <MudText Typo="Typo.h5">2. Register</MudText>
-        <pre class="guide-page__code"><code>builder.Services.AddAgentBlazor(options =&gt;
+        <pre class="guide-page__code"><code>using AgentBlazor;
+using MudBlazor.Services;
+
+builder.Services.AddMudServices();
+
+builder.Services.AddAgentBlazor(options =&gt;
 {
     // Use OpenAI (or UseOllama for local)
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: "gpt-4o-mini");
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
 
     // Optional: Enable Pro tier features
     // options.UseProLicense("AB-PRO-YOUR-KEY-HERE");
@@ -45,7 +53,38 @@
     </section>
 
     <section class="guide-page__section">
-        <MudText Typo="Typo.h5">3. Define Capabilities</MudText>
+        <MudText Typo="Typo.h5">3. Add The Host Shell</MudText>
+        <pre class="guide-page__code"><code>// Components/App.razor
+&lt;link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" /&gt;
+&lt;link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" /&gt;
+...
+&lt;script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"&gt;&lt;/script&gt;
+&lt;script src="@Assets[AgentBlazorAssetPaths.Js]"&gt;&lt;/script&gt;
+
+// MainLayout.razor
+&lt;MudThemeProvider /&gt;
+&lt;MudPopoverProvider /&gt;
+&lt;MudDialogProvider /&gt;
+&lt;MudSnackbarProvider /&gt;</code></pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            See the starter sample for the full runnable host shell.
+        </MudText>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">4. Map Endpoints</MudText>
+        <pre class="guide-page__code"><code>var app = builder.Build();
+
+app.MapRazorComponents&lt;App&gt;()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();</code></pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            The chat UI can render without this call, but the runtime will not respond.
+        </MudText>
+    </section>
+
+    <section class="guide-page__section">
+        <MudText Typo="Typo.h5">5. Define Capabilities</MudText>
         <pre class="guide-page__code"><code>using AgentBlazor.App;
 using AgentBlazor.Attributes;
 
@@ -76,23 +115,28 @@ public sealed class OperationsCapabilities(IOperationsService ops)
     </section>
 
     <section class="guide-page__section">
-        <MudText Typo="Typo.h5">4. Render</MudText>
-        <pre class="guide-page__code"><code>&lt;AgentChatWidget
+        <MudText Typo="Typo.h5">6. Render</MudText>
+        <pre class="guide-page__code"><code>@using AgentBlazor.Components
+
+&lt;AgentChatWidget
     Title="Operations"
     Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
     Width="30rem"
     Height="68vh" /&gt;</code></pre>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+            Use <code>AgentChatWidget</code> for a floating assistant or <code>AgentChatSurface</code> when the chat should live inside the page layout.
+        </MudText>
     </section>
 
     <section class="guide-page__section">
-        <MudText Typo="Typo.h5">5. Run</MudText>
+        <MudText Typo="Typo.h5">7. Run</MudText>
         <div class="guide-page__chips">
             <span>Assess the workflow</span>
             <span>Explain blockers</span>
             <span>Prepare the draft</span>
         </div>
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            See the <MudLink Href="/demo/components">component explorer</MudLink> for all 14 agentic components.
+            See the <MudLink Href="/demo/components">component explorer</MudLink> for all 14 agentic components and <MudLink Href="/docs">return to docs</MudLink> for the setup overview.
         </MudText>
     </section>
 
