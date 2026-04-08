@@ -9,7 +9,7 @@ app.Configure(config =>
     config.SetApplicationVersion("1.0.0");
 
     config.AddCommand<InitCommand>("init")
-        .WithDescription("Generate AGENT.md from a Blazor solution")
+        .WithDescription("Initialize AgentBlazor for an existing Blazor app and show the next installer steps")
         .WithExample("init")
         .WithExample("init", "./MySolution.sln")
         .WithExample("init", "--description", "My app description");
@@ -23,6 +23,18 @@ app.Configure(config =>
         .WithDescription("Watch for file changes and auto-regenerate")
         .WithExample("watch")
         .WithExample("watch", "--debounce", "1000");
+
+    config.AddCommand<DoctorCommand>("doctor")
+        .WithDescription("Inspect an existing Blazor app for baseline AgentBlazor wiring")
+        .WithExample("doctor")
+        .WithExample("doctor", "./MySolution.slnx", "--host", "MyBlazorApp");
+
+    config.AddCommand<ScaffoldCommand>("scaffold")
+        .WithDescription("Preview the baseline AgentBlazor install edits for an existing Blazor app")
+        .WithExample("scaffold")
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp")
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--diff")
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--approve");
 });
 
 return await app.RunAsync(args);

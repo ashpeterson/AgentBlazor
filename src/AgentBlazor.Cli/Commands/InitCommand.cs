@@ -4,6 +4,7 @@ using Spectre.Console.Cli;
 using AgentBlazor.Cli.Analysis;
 using AgentBlazor.Cli.Analysis.Generation;
 using AgentBlazor.Cli.Analysis.Models;
+using System.Text;
 
 namespace AgentBlazor.Cli.Commands;
 
@@ -15,7 +16,7 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
         [Description("Path to solution (.sln/.slnx) or project (.csproj) file")]
         public string? Path { get; init; }
 
-        [CommandOption("-h|--host <PROJECT>")]
+        [CommandOption("-p|--host <PROJECT>")]
         [Description("Name of the Blazor host project (auto-detected if not specified)")]
         public string? HostProject { get; init; }
 
@@ -37,7 +38,7 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
         try
         {
             // Find solution/project path
-            var path = await ResolvePath(settings.Path, settings.NonInteractive);
+            var path = await CommandPathResolver.ResolvePathAsync(settings.Path, settings.NonInteractive);
             if (path == null)
             {
                 AnsiConsole.MarkupLine("[red]No solution or project file found.[/]");
@@ -122,7 +123,13 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
             // Output path
             var agentMdPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, ".agentblazor", "AGENT.md");
             AnsiConsole.MarkupLine($"[green]Generated:[/] {agentMdPath}");
-            AnsiConsole.MarkupLine("[grey]Run 'agentblazor update' to refresh when code changes.[/]");
+
+            var readinessAnalyzer = new InstallReadinessAnalyzer();
+            var readiness = await readinessAnalyzer.AnalyzeAsync(path, model.BlazorHostProject);
+            var planner = new ExistingAppScaffoldPlanner();
+            var plan = await planner.PlanAsync(path, model.BlazorHostProject);
+
+            RenderSetupSummary(path, model.BlazorHostProject, readiness, plan);
 
             // Save config if requested
             if (settings.SaveConfig || (!settings.NonInteractive && config == null &&
@@ -172,66 +179,69 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
         }
     }
 
-    private static Task<string?> ResolvePath(string? path, bool nonInteractive)
+    private static void RenderSetupSummary(
+        string inputPath,
+        string hostProject,
+        InstallReadinessReport readiness,
+        ScaffoldPlan plan)
     {
-        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Rule("[blue]Setup Summary[/]").RuleStyle("blue"));
+        AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(hostProject)}");
+        AnsiConsole.MarkupLine($"[blue]Readiness:[/] {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
+
+        if (!plan.HasChanges)
         {
-            return Task.FromResult<string?>(System.IO.Path.GetFullPath(path));
+            AnsiConsole.MarkupLine("[green]Install status:[/] The baseline AgentBlazor wiring is already present.");
+            AnsiConsole.MarkupLine("[grey]Next step:[/] run `agentblazor doctor` any time you want to verify the current setup.");
+            AnsiConsole.MarkupLine("[grey]Refresh command:[/] run `agentblazor update` when code changes.");
+            return;
         }
 
-        // Search current directory
-        var currentDir = Directory.GetCurrentDirectory();
+        var updateCount = plan.Items.Count(item => item.Action == ScaffoldPlanAction.Update);
+        var createCount = plan.Items.Count(item => item.Action == ScaffoldPlanAction.Create);
+        var reviewCount = plan.Items.Count(item => item.Action == ScaffoldPlanAction.ManualReview);
 
-        // Look for solution files first
-        var slnFiles = Directory.GetFiles(currentDir, "*.sln")
-            .Concat(Directory.GetFiles(currentDir, "*.slnx"))
-            .ToList();
-
-        if (slnFiles.Count == 1)
+        if (updateCount > 0)
         {
-            return Task.FromResult<string?>(slnFiles[0]);
+            AnsiConsole.MarkupLine($"[yellow]Will update:[/] {updateCount} file(s)");
         }
 
-        if (slnFiles.Count > 1)
+        if (createCount > 0)
         {
-            if (nonInteractive)
-            {
-                return Task.FromResult<string?>(slnFiles[0]);
-            }
-
-            var solutionChoices = slnFiles
-                .Select(file => System.IO.Path.GetFileName(file) ?? file)
-                .ToList();
-
-            var selected = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Multiple solution files found. Select one:")
-                    .AddChoices(solutionChoices));
-
-            return Task.FromResult<string?>(slnFiles.First(f => System.IO.Path.GetFileName(f) == selected));
+            AnsiConsole.MarkupLine($"[yellow]Will create:[/] {createCount} file(s)");
         }
 
-        // Look for project files
-        var csprojFiles = Directory.GetFiles(currentDir, "*.csproj");
-        if (csprojFiles.Length == 1)
+        if (reviewCount > 0)
         {
-            return Task.FromResult<string?>(csprojFiles[0]);
+            AnsiConsole.MarkupLine($"[yellow]Needs review:[/] {reviewCount} item(s) may need host-specific attention");
         }
 
-        if (csprojFiles.Length > 1 && !nonInteractive)
-        {
-            var projectChoices = csprojFiles
-                .Select(file => System.IO.Path.GetFileName(file) ?? file)
-                .ToList();
-
-            var selected = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Multiple project files found. Select one:")
-                    .AddChoices(projectChoices));
-
-            return Task.FromResult<string?>(csprojFiles.First(f => System.IO.Path.GetFileName(f) == selected));
-        }
-
-        return Task.FromResult<string?>(null);
+        AnsiConsole.MarkupLine("[yellow]Needs your decision:[/] choose a model provider after the baseline scaffold is applied.");
+        AnsiConsole.MarkupLine($"[grey]Preview next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--diff")}");
+        AnsiConsole.MarkupLine($"[grey]Approve next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--approve")}");
+        AnsiConsole.MarkupLine($"[grey]Verify after apply:[/] {BuildCommand("doctor", inputPath, hostProject)}");
+        AnsiConsole.MarkupLine("[grey]Refresh command:[/] run `agentblazor update` when code changes.");
     }
+
+    private static string BuildCommand(string command, string inputPath, string hostProject, string? trailingFlag = null)
+    {
+        var builder = new StringBuilder("agentblazor ");
+        builder.Append(command);
+        builder.Append(' ');
+        builder.Append(QuoteIfNeeded(inputPath));
+        builder.Append(" --host ");
+        builder.Append(QuoteIfNeeded(hostProject));
+
+        if (!string.IsNullOrWhiteSpace(trailingFlag))
+        {
+            builder.Append(' ');
+            builder.Append(trailingFlag);
+        }
+
+        return $"`{builder}`";
+    }
+
+    private static string QuoteIfNeeded(string value)
+        => value.Contains(' ', StringComparison.Ordinal) ? $"\"{value}\"" : value;
 }
