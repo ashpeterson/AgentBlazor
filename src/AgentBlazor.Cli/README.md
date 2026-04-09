@@ -8,6 +8,14 @@
 4. `agentblazor doctor`
 5. `agentblazor validate`
 
+Current status as of 2026-04-09:
+
+- CLI analysis tests: `126/126`
+- CLI integration tests: `9/9`
+- standard existing Blazor hosts are scaffoldable end to end
+- standard hosted WebAssembly server+client hosts are scaffoldable end to end
+- advanced/custom hosts still fall back to review-first or blocked modes depending on how confidently the CLI can classify them
+
 ## Commands
 
 - `agentblazor init ./MySolution.slnx --host MyBlazorApp`

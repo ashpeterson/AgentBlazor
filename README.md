@@ -205,13 +205,22 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-03-31:
+As of 2026-04-09:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
 - normalized execution, approval, policy, and context-freshness contracts are in place
 - the old planner/runtime path is no longer the product center
 - the demo is now led by orchestration workflows instead of primitive component control
+- runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
+- middleware is now wired through both normal and streaming runtime turns
+- OpenAI-compatible endpoint validation now rejects non-HTTP(S) URI shapes such as `file:///...`
+- the full non-demo test matrix is currently green:
+  - `AgentBlazor.Core.Tests`: `261/261`
+  - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
+  - `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+  - `AgentBlazor.Cli.IntegrationTests`: `9/9`
+  - `AgentBlazor.IntegrationTests`: `104/104`
 
 The biggest remaining product gap is not UI execution. It is durable paid intelligence:
 

@@ -1,8 +1,24 @@
 # AgentBlazor Plan (Living Document)
 
-Last updated: 2026-02-18 (MudBlazor-first product pivot)
+Last updated: 2026-04-09
 Owner: AgentBlazor core team
-Status: Draft v1
+Status: Active working plan
+
+## Current Status Snapshot
+
+- Adapter-first runtime is the shipped default path.
+- Semantic capability workflows are the primary authoring and demo surface.
+- Existing-app CLI onboarding now supports `init`, `scaffold`, `doctor`, and `validate`.
+- The 2026-04-09 runtime review fixes are in place:
+  - execution scope is preserved across turns
+  - middleware runs in both normal and streaming turns
+  - OpenAI-compatible endpoint validation rejects non-HTTP(S) URIs
+- Current non-demo verification:
+  - `AgentBlazor.Core.Tests`: `261/261`
+  - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
+  - `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+  - `AgentBlazor.Cli.IntegrationTests`: `9/9`
+  - `AgentBlazor.IntegrationTests`: `104/104`
 
 ## 1. Project Intent
 

@@ -9,6 +9,12 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 
 The currently validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI and other providers still work as integrations, but OpenAI is the primary path to ship first.
 
+Status as of 2026-04-09:
+
+- the non-demo test matrix is green
+- the CLI now supports `init -> scaffold -> doctor -> validate`
+- standard hosted WebAssembly server+client installs are now part of the supported scaffold path
+
 ## Optional: Install The CLI
 
 The CLI can scaffold the standard runtime wiring for a standard Blazor host and the standard hosted WebAssembly server+client path, including a provider template, but you still need to supply the real configuration values for your environment.
@@ -79,8 +85,8 @@ In your main layout, add the MudBlazor providers:
 
 For a complete runnable shape, copy the host shell from:
 
-- [App.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/App.razor)
-- [MainLayout.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/Layout/MainLayout.razor)
+- [App.razor](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter/Components/App.razor)
+- [MainLayout.razor](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter/Components/Layout/MainLayout.razor)
 
 ## 4. Map Endpoints
 

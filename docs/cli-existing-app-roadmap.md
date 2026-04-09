@@ -44,9 +44,8 @@ What is implemented now:
   - supports `--approve`
   - supports `--provider openai|azure-openai|ollama`
   - keeps advanced and legacy Blazor hosts in review-first mode with safe additions plus manual-review items
-  - recognizes hosted WebAssembly server hosts as review-first instead of blocking them as unknown
   - infers companion hosted WebAssembly client projects from project references so server-plus-client scaffold can target the correct UI files
-  - can now preview/apply the standard hosted WebAssembly server `Program.cs` path plus safe client `_Imports.razor`, shell, layout, and page edits
+  - can now preview/apply the standard hosted WebAssembly server `Program.cs` path plus standard client `_Imports.razor`, shell, layout, and page edits
   - still stops early only when the CLI cannot classify the host into a supported Blazor scaffold path
   - writes `.agentblazor/scaffold-manifest.json` on apply
   - supports local-source evaluation via `--use-local-source`
@@ -55,16 +54,18 @@ What is implemented now:
 What is validated now:
 
 - CLI analysis tests are green: `126/126`
+- CLI integration tests are green: `9/9`
 - `init --help` and `scaffold --help` are correct
 - fresh standard Blazor app smoke test under `/Users/...` succeeds through:
   - `init`
   - `scaffold --approve`
   - `dotnet build`
   - `doctor`
+- hosted WebAssembly server+client scaffold is now verified through preview/apply/validate
 
 What is not done yet:
 
-- safe patching for nonstandard hosts such as Oqtane
+- safe auto-patching for nonstandard hosts such as Oqtane
 - interactive provider selection and config generation
 - `diff` as a standalone command
 - additive commands such as `add workflow`, `add memory-source`, and `add mcp-server`
@@ -78,23 +79,27 @@ If someone else picks this up, the key point is:
 
 Primary implementation files:
 
-- [CommandPathResolver.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli/CommandPathResolver.cs)
-- [InitCommand.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli/Commands/InitCommand.cs)
-- [DoctorCommand.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli/Commands/DoctorCommand.cs)
-- [ScaffoldCommand.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli/Commands/ScaffoldCommand.cs)
-- [Program.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli/Program.cs)
-- [InstallReadinessAnalyzer.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/InstallReadinessAnalyzer.cs)
-- [ExistingAppScaffoldPlanner.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/ExistingAppScaffoldPlanner.cs)
-- [ExistingAppScaffoldApplier.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/ExistingAppScaffoldApplier.cs)
-- [InstallReadinessReport.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/InstallReadinessReport.cs)
-- [ScaffoldPlan.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldPlan.cs)
-- [ScaffoldPreviewResult.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldPreviewResult.cs)
-- [ScaffoldApplyResult.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldApplyResult.cs)
+- [CommandPathResolver.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/CommandPathResolver.cs)
+- [InitCommand.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/Commands/InitCommand.cs)
+- [DoctorCommand.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/Commands/DoctorCommand.cs)
+- [ScaffoldCommand.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/Commands/ScaffoldCommand.cs)
+- [ValidateCommand.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/Commands/ValidateCommand.cs)
+- [Program.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli/Program.cs)
+- [InstallReadinessAnalyzer.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/InstallReadinessAnalyzer.cs)
+- [InstallValidationAnalyzer.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/InstallValidationAnalyzer.cs)
+- [ExistingAppScaffoldPlanner.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/ExistingAppScaffoldPlanner.cs)
+- [ExistingAppScaffoldApplier.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/ExistingAppScaffoldApplier.cs)
+- [InstallReadinessReport.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/InstallReadinessReport.cs)
+- [InstallValidationReport.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/InstallValidationReport.cs)
+- [ScaffoldPlan.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldPlan.cs)
+- [ScaffoldPreviewResult.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldPreviewResult.cs)
+- [ScaffoldApplyResult.cs](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Cli.Analysis/Models/ScaffoldApplyResult.cs)
 
 Primary tests:
 
-- [InstallReadinessAnalyzerTests.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/tests/AgentBlazor.Cli.Analysis.Tests/InstallReadinessAnalyzerTests.cs)
-- [ExistingAppScaffoldPlannerTests.cs](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/tests/AgentBlazor.Cli.Analysis.Tests/ExistingAppScaffoldPlannerTests.cs)
+- [InstallReadinessAnalyzerTests.cs](/home/ashdev/workspace/AgentBlazor/tests/AgentBlazor.Cli.Analysis.Tests/InstallReadinessAnalyzerTests.cs)
+- [InstallValidationAnalyzerTests.cs](/home/ashdev/workspace/AgentBlazor/tests/AgentBlazor.Cli.Analysis.Tests/InstallValidationAnalyzerTests.cs)
+- [ExistingAppScaffoldPlannerTests.cs](/home/ashdev/workspace/AgentBlazor/tests/AgentBlazor.Cli.Analysis.Tests/ExistingAppScaffoldPlannerTests.cs)
 
 ## Product Position
 

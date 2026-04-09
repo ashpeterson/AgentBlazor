@@ -1,5 +1,28 @@
 # AgentBlazor — Refactor Status
 
+Last updated: 2026-04-09
+
+This document is now mainly historical context for the earlier architecture transition.
+The current product/runtime status should be read from [docs/STATUS.md](/home/ashdev/workspace/AgentBlazor/docs/STATUS.md).
+
+## Current Verified Snapshot
+
+- The adapter-first runtime path is the only normal runtime path.
+- Execution scope now stays bound to the caller's pushed DI scope across multi-turn workflow execution.
+- Middleware now executes for both normal turns and streaming turns.
+- OpenAI-compatible custom endpoint validation now rejects non-HTTP(S) URI shapes.
+- Repo package source mapping now restores the full non-demo test matrix locally.
+
+Current non-demo test status:
+
+| Test Project | Passed | Skipped | Failed |
+|--------------|--------|---------|--------|
+| `AgentBlazor.Core.Tests` | 261 | 0 | 0 |
+| `AgentBlazor.Components.Tests` | 98 | 1 | 0 |
+| `AgentBlazor.Cli.Analysis.Tests` | 126 | 0 | 0 |
+| `AgentBlazor.Cli.IntegrationTests` | 9 | 0 | 0 |
+| `AgentBlazor.IntegrationTests` | 104 | 0 | 0 |
+
 ## What Was Done
 
 A complete architectural refactor of the AgentBlazor SDK. The goal was to match the simplicity of CopilotKit for .NET/Blazor: a single attribute to make any component agent-controllable, with no boilerplate JSON schema strings, no catalog registration, and no repair loops.
@@ -113,7 +136,7 @@ Removed entire subsystems that were adding complexity without value:
 
 ---
 
-## Current State
+## Historical Refactor Snapshot
 
 ### Test Results
 

@@ -198,6 +198,12 @@ public static class AgentProviderRegistrationExtensions
             throw new ArgumentException("Endpoint must be an absolute URI.", paramName);
         }
 
+        if (!string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Endpoint must use the http or https scheme.", paramName);
+        }
+
         return absoluteUri.AbsoluteUri.TrimEnd('/');
     }
 }

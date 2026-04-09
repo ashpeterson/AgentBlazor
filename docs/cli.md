@@ -1,5 +1,13 @@
 # CLI Guide
 
+Status as of 2026-04-09:
+
+- `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+- `AgentBlazor.Cli.IntegrationTests`: `9/9`
+- standard Blazor hosts are fully scaffoldable
+- standard hosted WebAssembly server+client hosts are fully scaffoldable
+- advanced/custom hosts remain review-first unless the CLI can safely classify and patch them
+
 The CLI is designed to take an existing Blazor app through a standard onboarding path:
 
 1. `agentblazor init`
@@ -214,6 +222,6 @@ The runnable reference app is:
 
 The most important files are:
 
-- [Program.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Program.cs)
-- [OpsReviewCapabilities.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Workflows/OpsReviewCapabilities.cs)
-- [OpsReview.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/Pages/OpsReview.razor)
+- [Program.cs](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter/Program.cs)
+- [OpsReviewCapabilities.cs](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter/Workflows/OpsReviewCapabilities.cs)
+- [OpsReview.razor](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter/Components/Pages/OpsReview.razor)

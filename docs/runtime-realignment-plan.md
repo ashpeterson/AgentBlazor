@@ -1,6 +1,23 @@
 # AgentBlazor Runtime Realignment Plan
 
-Last updated: 2026-03-20
+Last updated: 2026-04-09
+
+## Status Snapshot
+
+The runtime realignment is no longer only a plan. The default shipped path is now adapter-first and the major correctness issues found in the 2026-04-09 review have been fixed:
+
+- caller-owned execution scopes are preserved across adapter turns
+- middleware now runs in both non-streaming and streaming execution paths
+- provider endpoint validation rejects non-HTTP(S) custom URIs
+- the full non-demo test matrix currently passes
+
+Current verification:
+
+- `AgentBlazor.Core.Tests`: `261/261`
+- `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
+- `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+- `AgentBlazor.Cli.IntegrationTests`: `9/9`
+- `AgentBlazor.IntegrationTests`: `104/104`
 
 ## Goal
 

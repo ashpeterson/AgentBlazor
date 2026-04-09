@@ -24,6 +24,7 @@ public sealed class AgentBlazorRegistrationOptions
     private readonly List<AgentServiceTool> _serviceTools = [];
     private readonly List<Func<IServiceCollection, IServiceCollection>> _mcpRegistrations = [];
     private readonly List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>> _middlewares = [];
+    private readonly List<Type> _middlewareTypes = [];
 
     public void UseOpenAI(string apiKey, string model = "gpt-5.4-mini")
     {
@@ -190,13 +191,7 @@ public sealed class AgentBlazorRegistrationOptions
         where TMiddleware : class, IAgentTurnMiddleware
     {
         _serviceRegistration += services => services.TryAddTransient<TMiddleware>();
-        _middlewares.Add((ctx, next, ct) =>
-        {
-            // Resolved lazily via IServiceProvider captured in the pipeline factory
-            // We store a marker so ApplyProvider can inject it properly
-            throw new NotSupportedException(
-                "Type-based middleware must be resolved via the pipeline factory — use UseMiddleware(delegate) or register via UseMiddleware(Func<...>).");
-        });
+        _middlewareTypes.Add(typeof(TMiddleware));
         return this;
     }
 
@@ -258,10 +253,27 @@ public sealed class AgentBlazorRegistrationOptions
             reg(services);
 
         // Register middleware pipeline
-        if (_middlewares.Count > 0)
+        if (_middlewares.Count > 0 || _middlewareTypes.Count > 0)
         {
-            var captured = _middlewares.ToList();
-            services.Replace(ServiceDescriptor.Singleton(new AgentMiddlewarePipeline(captured)));
+            var inlineMiddlewares = _middlewares.ToList();
+            var typedMiddlewareTypes = _middlewareTypes.ToList();
+            services.Replace(ServiceDescriptor.Singleton(sp =>
+            {
+                var scopeAccessor = sp.GetRequiredService<IAgentExecutionScopeAccessor>();
+                var resolvedMiddlewares = new List<Func<AgentTurnContext, Func<CancellationToken, Task>, CancellationToken, Task>>(inlineMiddlewares);
+
+                foreach (var middlewareType in typedMiddlewareTypes)
+                {
+                    resolvedMiddlewares.Add((ctx, next, ct) =>
+                    {
+                        var serviceProvider = scopeAccessor.Current ?? sp;
+                        var middleware = (IAgentTurnMiddleware)serviceProvider.GetRequiredService(middlewareType);
+                        return middleware.InvokeAsync(ctx, next, ct);
+                    });
+                }
+
+                return new AgentMiddlewarePipeline(resolvedMiddlewares);
+            }));
         }
     }
 

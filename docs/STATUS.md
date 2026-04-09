@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-03-31
+Last updated: 2026-04-09
 
 ## Current Product Shape
 
@@ -45,6 +45,10 @@ The runtime realignment is now materially underway:
 - normalized execution, approval, policy, and context-freshness contracts now exist and are consumed by the adapter path
 - the remaining plan-oriented helper models now live under `Runtime/ExecutionPlans` rather than `Runtime/Planning`
 - supplier-compliance, file-audit, recipe-release, incident-escalation, response-orchestration, and release-dossier workflow validation now exist as focused integration proof, not only demo wiring
+- execution-scope handling has now been corrected so adapter execution respects the caller's pushed DI scope across multi-turn workflow runs
+- middleware now executes for both `RunTurnAsync` and `RunTurnStreamingAsync`
+- provider endpoint validation now rejects non-HTTP(S) custom endpoints
+- repo package source mapping now allows the full non-demo test matrix to restore and run locally
 
 ## Shipped and Working
 
@@ -199,10 +203,19 @@ Important limitation:
 
 Latest local verification:
 
-- `dotnet build demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj -c Release -nologo /p:UseSharedCompilation=false`
-- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj --filter "SharedStateStoreTests|PromptTracingTests|ComponentMockingTests|ComponentMockingReportTests|ServiceRegistrationTests" -c Release -nologo /p:UseSharedCompilation=false`
-- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj --filter "ResponseOrchestrationWorkflowIntegrationTests|ReleaseDossierWorkflowIntegrationTests|AgUiHostingIntegrationTests|AgentRuntimeIntegrationTests" -c Release -nologo /p:UseSharedCompilation=false`
-- `npm --prefix tests/e2e run test:e2e`
+- `dotnet test tests/AgentBlazor.Core.Tests/AgentBlazor.Core.Tests.csproj -nologo`
+- `dotnet test tests/AgentBlazor.Components.Tests/AgentBlazor.Components.Tests.csproj -nologo`
+- `dotnet test tests/AgentBlazor.Cli.Analysis.Tests/AgentBlazor.Cli.Analysis.Tests.csproj -nologo`
+- `dotnet test tests/AgentBlazor.Cli.IntegrationTests/AgentBlazor.Cli.IntegrationTests.csproj -nologo`
+- `dotnet test tests/AgentBlazor.IntegrationTests/AgentBlazor.IntegrationTests.csproj -nologo`
+
+Latest test status:
+
+- `AgentBlazor.Core.Tests`: `261/261`
+- `AgentBlazor.Components.Tests`: `98/99` passed, `1` skipped
+- `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+- `AgentBlazor.Cli.IntegrationTests`: `9/9`
+- `AgentBlazor.IntegrationTests`: `104/104`
 
 Latest browser status:
 
@@ -285,6 +298,11 @@ Coverage includes:
 4. Begin package/module split after demo/product proof is strong enough.
 
 Current note:
+- The runtime review pass from 2026-04-09 is now closed:
+  - execution scope is preserved correctly across adapter turns
+  - middleware runs through both standard and streaming turns
+  - OpenAI-compatible custom endpoints enforce `http`/`https`
+  - package source mapping no longer blocks `AgentBlazor.Components.Tests` or `AgentBlazor.Cli.IntegrationTests`
 - `AgentBlazorOptions.DefaultAgent` is now explicitly obsolete as a legacy compatibility surface; host apps should move toward explicit `AddAgent(...)` registration, and normal runtime resolution no longer synthesizes or prefers a built-in default agent.
 - Adapter-backed inspector and trace persistence now record normalized step-oriented execution data as the canonical devtools shape; remaining legacy action/result payloads should only survive where the legacy runtime path still needs them.
 - The landing page, workflow hub, and components explorer now reinforce a workflow-first journey, with the component surface positioned as a fallback reference rather than a default destination.

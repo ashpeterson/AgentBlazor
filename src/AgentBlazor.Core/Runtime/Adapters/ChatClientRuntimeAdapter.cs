@@ -14,6 +14,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Core.Runtime.Interfaces;
 using AgentBlazor.Core.Runtime.ExecutionPlans;
+using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Execution;
@@ -50,6 +51,7 @@ public sealed class ChatClientRuntimeAdapter(
     IAgentBlazorEntitlementService? entitlementService = null,
     IOptions<PromptTracingOptions>? promptTracingOptions = null,
     IAgentExecutionScopeAccessor? executionScopeAccessor = null,
+    AgentMiddlewarePipeline? middlewarePipeline = null,
     ILoggerFactory? loggerFactory = null,
     IServiceProvider? serviceProvider = null) : IAgentRuntimeAdapter
 {
@@ -79,6 +81,7 @@ public sealed class ChatClientRuntimeAdapter(
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
     private readonly IOptions<PromptTracingOptions>? _promptTracingOptions = promptTracingOptions;
     private readonly IAgentExecutionScopeAccessor? _executionScopeAccessor = executionScopeAccessor;
+    private readonly AgentMiddlewarePipeline? _middlewarePipeline = middlewarePipeline;
     private readonly ILoggerFactory? _loggerFactory = loggerFactory;
     private readonly IServiceProvider? _serviceProvider = serviceProvider;
     private readonly ConcurrentDictionary<string, Task<SessionState>> _sessions = new(StringComparer.OrdinalIgnoreCase);
@@ -94,6 +97,22 @@ public sealed class ChatClientRuntimeAdapter(
     public async Task<AgentTurnResponse> RunTurnAsync(
         AgentTurnRequest request,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (_middlewarePipeline?.HasMiddlewares is true)
+        {
+            return await _middlewarePipeline
+                .RunAsync(request, RunTurnCoreAsync, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return await RunTurnCoreAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<AgentTurnResponse> RunTurnCoreAsync(
+        AgentTurnRequest request,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -183,6 +202,108 @@ public sealed class ChatClientRuntimeAdapter(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var channel = Channel.CreateUnbounded<AgentTurnStreamEvent>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = true
+        });
+        var processTask = ProcessStreamingTurnAsync(request, channel.Writer, cancellationToken);
+
+        await foreach (var streamEvent in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return streamEvent;
+        }
+
+        await processTask.ConfigureAwait(false);
+    }
+
+    private async Task ProcessStreamingTurnAsync(
+        AgentTurnRequest request,
+        ChannelWriter<AgentTurnStreamEvent> writer,
+        CancellationToken cancellationToken)
+    {
+        var runId = ResolveOrCreateRunId(request);
+        var reconnectState = RegisterReconnectableRun(runId, request.AgentName ?? "AgentBlazor");
+        var coreInvoked = false;
+
+        try
+        {
+            AgentTurnResponse response;
+            if (_middlewarePipeline?.HasMiddlewares is true)
+            {
+                response = await _middlewarePipeline
+                    .RunAsync(request, async (innerRequest, innerCancellationToken) =>
+                    {
+                        coreInvoked = true;
+                        return await RunTurnStreamingCoreAsync(
+                                innerRequest,
+                                runId,
+                                reconnectState,
+                                writer,
+                                innerCancellationToken)
+                            .ConfigureAwait(false);
+                    }, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                coreInvoked = true;
+                response = await RunTurnStreamingCoreAsync(
+                        request,
+                        runId,
+                        reconnectState,
+                        writer,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!coreInvoked)
+            {
+                await EmitSyntheticResponseEventsAsync(
+                        response,
+                        runId,
+                        reconnectState,
+                        writer,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            await WriteReconnectEventAsync(
+                    reconnectState,
+                    new AgentTurnStreamEvent
+                    {
+                        Kind = AgentTurnStreamEventKind.RunFinished,
+                        RunId = runId,
+                        Sequence = reconnectState.NextSequence(),
+                        Timestamp = DateTimeOffset.UtcNow,
+                        AgentName = response.AgentName,
+                        Response = response
+                    },
+                    writer,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            writer.TryComplete();
+        }
+        catch (Exception ex)
+        {
+            writer.TryComplete(ex);
+            throw;
+        }
+        finally
+        {
+            reconnectState.Complete();
+        }
+    }
+
+    private async Task<AgentTurnResponse> RunTurnStreamingCoreAsync(
+        AgentTurnRequest request,
+        string runId,
+        ReconnectableRunState reconnectState,
+        ChannelWriter<AgentTurnStreamEvent> writer,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
         var traceBuilder = new PromptTraceBuilder(_promptTracingOptions)
             .RecordEntry(request)
             .StartStage();
@@ -190,56 +311,14 @@ public sealed class ChatClientRuntimeAdapter(
         if (registration is null)
         {
             var noAgentResponse = await BuildNoAgentResponseAsync(traceBuilder, request, cancellationToken).ConfigureAwait(false);
-            var noAgentRunId = ResolveOrCreateRunId(request);
-            var noAgentSequence = 0L;
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunStarted,
-                RunId = noAgentRunId,
-                Sequence = ++noAgentSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noAgentResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageStart,
-                RunId = noAgentRunId,
-                Sequence = ++noAgentSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noAgentResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageContent,
-                RunId = noAgentRunId,
-                Sequence = ++noAgentSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noAgentResponse.AgentName,
-                TextDelta = noAgentResponse.ResponseText
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageEnd,
-                RunId = noAgentRunId,
-                Sequence = ++noAgentSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noAgentResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunFinished,
-                RunId = noAgentRunId,
-                Sequence = ++noAgentSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noAgentResponse.AgentName,
-                Response = noAgentResponse
-            };
-            yield break;
+            await EmitSyntheticResponseEventsAsync(
+                    noAgentResponse,
+                    runId,
+                    reconnectState,
+                    writer,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return noAgentResponse;
         }
 
         traceBuilder.RecordEntry(request, registration.Name);
@@ -253,69 +332,24 @@ public sealed class ChatClientRuntimeAdapter(
                 capabilityPolicy,
                 request,
                 cancellationToken).ConfigureAwait(false);
-            var noActionsRunId = ResolveOrCreateRunId(request);
-            var noActionsSequence = 0L;
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunStarted,
-                RunId = noActionsRunId,
-                Sequence = ++noActionsSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noActionsResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageStart,
-                RunId = noActionsRunId,
-                Sequence = ++noActionsSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noActionsResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageContent,
-                RunId = noActionsRunId,
-                Sequence = ++noActionsSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noActionsResponse.AgentName,
-                TextDelta = noActionsResponse.ResponseText
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.TextMessageEnd,
-                RunId = noActionsRunId,
-                Sequence = ++noActionsSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noActionsResponse.AgentName
-            };
-
-            yield return new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunFinished,
-                RunId = noActionsRunId,
-                Sequence = ++noActionsSequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = noActionsResponse.AgentName,
-                Response = noActionsResponse
-            };
-            yield break;
+            await EmitSyntheticResponseEventsAsync(
+                    noActionsResponse,
+                    runId,
+                    reconnectState,
+                    writer,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return noActionsResponse;
         }
 
-        var runId = ResolveOrCreateRunId(request);
         using var activeRun = RegisterActiveRun(runId, cancellationToken);
         using var runExecutionProviderLease = LeaseRunExecutionServiceProvider();
         var runExecutionScope = runExecutionProviderLease is { ServiceProvider: { } runExecutionServiceProvider }
             ? _executionScopeAccessor?.Push(runExecutionServiceProvider)
             : null;
         var effectiveCancellationToken = activeRun.Token;
-        var reconnectState = RegisterReconnectableRun(runId, registration.Name);
         var sessionState = await GetOrCreateSessionStateAsync(registration, request, effectiveCancellationToken).ConfigureAwait(false);
         await sessionState.Gate.WaitAsync(effectiveCancellationToken).ConfigureAwait(false);
-        var sequence = 0L;
         var responseText = new StringBuilder();
         var openedTextMessage = false;
         var startedAt = DateTimeOffset.UtcNow;
@@ -334,14 +368,19 @@ public sealed class ChatClientRuntimeAdapter(
             ApplyContextSharedState(registration.Name, request, turnState.RunId);
             var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
-            yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunStarted,
-                RunId = runId,
-                Sequence = ++sequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = registration.Name
-            });
+            await WriteReconnectEventAsync(
+                    reconnectState,
+                    new AgentTurnStreamEvent
+                    {
+                        Kind = AgentTurnStreamEventKind.RunStarted,
+                        RunId = runId,
+                        Sequence = reconnectState.NextSequence(),
+                        Timestamp = DateTimeOffset.UtcNow,
+                        AgentName = registration.Name
+                    },
+                    writer,
+                    effectiveCancellationToken)
+                .ConfigureAwait(false);
 
             CurrentTurnState.Value = turnState;
             await foreach (var update in agent.RunStreamingAsync(
@@ -355,11 +394,10 @@ public sealed class ChatClientRuntimeAdapter(
                     var emitted = queuedEvent with
                     {
                         RunId = runId,
-                        Sequence = ++sequence,
+                        Sequence = reconnectState.NextSequence(),
                         AgentName = queuedEvent.AgentName ?? registration.Name
                     };
-                    reconnectState.Publish(emitted);
-                    yield return emitted;
+                    await WriteReconnectEventAsync(reconnectState, emitted, writer, effectiveCancellationToken).ConfigureAwait(false);
                 }
 
                 var text = update.Text;
@@ -371,37 +409,46 @@ public sealed class ChatClientRuntimeAdapter(
                 if (!openedTextMessage)
                 {
                     openedTextMessage = true;
-                    yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
-                    {
-                        Kind = AgentTurnStreamEventKind.TextMessageStart,
-                        RunId = runId,
-                        Sequence = ++sequence,
-                        Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
-                        AgentName = registration.Name
-                    });
+                    await WriteReconnectEventAsync(
+                            reconnectState,
+                            new AgentTurnStreamEvent
+                            {
+                                Kind = AgentTurnStreamEventKind.TextMessageStart,
+                                RunId = runId,
+                                Sequence = reconnectState.NextSequence(),
+                                Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
+                                AgentName = registration.Name
+                            },
+                            writer,
+                            effectiveCancellationToken)
+                        .ConfigureAwait(false);
                 }
 
                 responseText.Append(text);
-                yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
-                {
-                    Kind = AgentTurnStreamEventKind.TextMessageContent,
-                    RunId = runId,
-                    Sequence = ++sequence,
-                    Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
-                    AgentName = registration.Name,
-                    TextDelta = text
-                });
+                await WriteReconnectEventAsync(
+                        reconnectState,
+                        new AgentTurnStreamEvent
+                        {
+                            Kind = AgentTurnStreamEventKind.TextMessageContent,
+                            RunId = runId,
+                            Sequence = reconnectState.NextSequence(),
+                            Timestamp = update.CreatedAt ?? DateTimeOffset.UtcNow,
+                            AgentName = registration.Name,
+                            TextDelta = text
+                        },
+                        writer,
+                        effectiveCancellationToken)
+                    .ConfigureAwait(false);
 
                 foreach (var queuedEvent in turnState.DrainStreamEvents())
                 {
                     var emitted = queuedEvent with
                     {
                         RunId = runId,
-                        Sequence = ++sequence,
+                        Sequence = reconnectState.NextSequence(),
                         AgentName = queuedEvent.AgentName ?? registration.Name
                     };
-                    reconnectState.Publish(emitted);
-                    yield return emitted;
+                    await WriteReconnectEventAsync(reconnectState, emitted, writer, effectiveCancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -410,23 +457,27 @@ public sealed class ChatClientRuntimeAdapter(
                 var emitted = queuedEvent with
                 {
                     RunId = runId,
-                    Sequence = ++sequence,
+                    Sequence = reconnectState.NextSequence(),
                     AgentName = queuedEvent.AgentName ?? registration.Name
                 };
-                reconnectState.Publish(emitted);
-                yield return emitted;
+                await WriteReconnectEventAsync(reconnectState, emitted, writer, effectiveCancellationToken).ConfigureAwait(false);
             }
 
             if (openedTextMessage)
             {
-                yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
-                {
-                    Kind = AgentTurnStreamEventKind.TextMessageEnd,
-                    RunId = runId,
-                    Sequence = ++sequence,
-                    Timestamp = DateTimeOffset.UtcNow,
-                    AgentName = registration.Name
-                });
+                await WriteReconnectEventAsync(
+                        reconnectState,
+                        new AgentTurnStreamEvent
+                        {
+                            Kind = AgentTurnStreamEventKind.TextMessageEnd,
+                            RunId = runId,
+                            Sequence = reconnectState.NextSequence(),
+                            Timestamp = DateTimeOffset.UtcNow,
+                            AgentName = registration.Name
+                        },
+                        writer,
+                        effectiveCancellationToken)
+                    .ConfigureAwait(false);
             }
 
             var turnResponse = BuildTurnResponse(registration.Name, responseText.ToString(), request, turnState);
@@ -434,19 +485,10 @@ public sealed class ChatClientRuntimeAdapter(
             await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             await StoreTraceAsync(traceBuilder, turnState, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
             RecordInspectorRun(registration.Name, request, turnState, turnResponse, startedAt, succeeded: !turnState.HasFailures, errorMessage: turnState.HasFailures ? turnResponse.ResponseText : null);
-            yield return PublishReconnectEvent(reconnectState, new AgentTurnStreamEvent
-            {
-                Kind = AgentTurnStreamEventKind.RunFinished,
-                RunId = runId,
-                Sequence = ++sequence,
-                Timestamp = DateTimeOffset.UtcNow,
-                AgentName = registration.Name,
-                Response = turnResponse
-            });
+            return turnResponse;
         }
         finally
         {
-            reconnectState.Complete();
             runExecutionScope?.Dispose();
             CurrentTurnState.Value = null;
             sessionState.Gate.Release();
@@ -578,6 +620,78 @@ public sealed class ChatClientRuntimeAdapter(
     {
         reconnectState.Publish(streamEvent);
         return streamEvent;
+    }
+
+    private static async Task WriteReconnectEventAsync(
+        ReconnectableRunState reconnectState,
+        AgentTurnStreamEvent streamEvent,
+        ChannelWriter<AgentTurnStreamEvent> writer,
+        CancellationToken cancellationToken)
+    {
+        reconnectState.Publish(streamEvent);
+        await writer.WriteAsync(streamEvent, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task EmitSyntheticResponseEventsAsync(
+        AgentTurnResponse response,
+        string runId,
+        ReconnectableRunState reconnectState,
+        ChannelWriter<AgentTurnStreamEvent> writer,
+        CancellationToken cancellationToken)
+    {
+        await WriteReconnectEventAsync(
+                reconnectState,
+                new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.RunStarted,
+                    RunId = runId,
+                    Sequence = reconnectState.NextSequence(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    AgentName = response.AgentName
+                },
+                writer,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await WriteReconnectEventAsync(
+                reconnectState,
+                new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.TextMessageStart,
+                    RunId = runId,
+                    Sequence = reconnectState.NextSequence(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    AgentName = response.AgentName
+                },
+                writer,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await WriteReconnectEventAsync(
+                reconnectState,
+                new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.TextMessageContent,
+                    RunId = runId,
+                    Sequence = reconnectState.NextSequence(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    AgentName = response.AgentName,
+                    TextDelta = response.ResponseText
+                },
+                writer,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await WriteReconnectEventAsync(
+                reconnectState,
+                new AgentTurnStreamEvent
+                {
+                    Kind = AgentTurnStreamEventKind.TextMessageEnd,
+                    RunId = runId,
+                    Sequence = reconnectState.NextSequence(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    AgentName = response.AgentName
+                },
+                writer,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private void CleanupExpiredReconnectRuns()
@@ -1978,6 +2092,12 @@ public sealed class ChatClientRuntimeAdapter(
 
     private ExecutionServiceProviderLease? LeaseRunExecutionServiceProvider()
     {
+        var currentScopeProvider = _executionScopeAccessor?.Current;
+        if (IsUsableServiceProvider(currentScopeProvider))
+        {
+            return new ExecutionServiceProviderLease(currentScopeProvider!, Scope: null);
+        }
+
         if (!IsUsableServiceProvider(_serviceProvider))
         {
             return null;
@@ -1987,12 +2107,6 @@ public sealed class ChatClientRuntimeAdapter(
         {
             var scope = scopeFactory.CreateScope();
             return new ExecutionServiceProviderLease(scope.ServiceProvider, scope);
-        }
-
-        var currentScopeProvider = _executionScopeAccessor?.Current;
-        if (IsUsableServiceProvider(currentScopeProvider))
-        {
-            return new ExecutionServiceProviderLease(currentScopeProvider!, Scope: null);
         }
 
         return new ExecutionServiceProviderLease(_serviceProvider, Scope: null);
@@ -2534,6 +2648,7 @@ public sealed class ChatClientRuntimeAdapter(
         private readonly object _gate = new();
         private readonly List<AgentTurnStreamEvent> _events = [];
         private readonly List<Channel<AgentTurnStreamEvent>> _subscribers = [];
+        private long _sequence;
         private bool _completed;
 
         public string RunId { get; } = runId;
@@ -2556,6 +2671,8 @@ public sealed class ChatClientRuntimeAdapter(
         }
 
         public DateTimeOffset SortKey => CompletedAt ?? CreatedAt;
+
+        public long NextSequence() => Interlocked.Increment(ref _sequence);
 
         public void Publish(AgentTurnStreamEvent streamEvent)
         {
