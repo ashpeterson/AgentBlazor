@@ -11,11 +11,12 @@ The currently validated production path is OpenAI via `options.UseOpenAI(...)`. 
 
 ## Optional: Install The CLI
 
-The CLI generates `.agentblazor/AGENT.md` for your app, but it does not replace runtime wiring.
+The CLI can scaffold the standard runtime wiring for a standard Blazor host and the standard hosted WebAssembly server+client path, including a provider template, but you still need to supply the real configuration values for your environment.
 
 ```bash
 dotnet tool install --global AgentBlazor.Cli --prerelease
 agentblazor init ./MySolution.sln --host MyBlazorApp
+agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --approve
 ```
 
 ## 1. Install the Package

@@ -112,8 +112,10 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
                 }
                 """,
             appRazorBody: """
+                <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
                 <link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
                 <Routes />
+                <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
                 <script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
                 """,
             mainLayoutBody: """
@@ -263,6 +265,519 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains("AgentBlazor.Components/AgentBlazor.Components.csproj", projectChange.UpdatedContent, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PreviewAsync_WhenProviderIsSelected_ScaffoldsConcreteProviderRegistration()
+    {
+        var projectPath = CreateProject(
+            projectName: "ProviderApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+        var programChange = Assert.Single(
+            preview.Changes,
+            change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+
+        Assert.Contains(
+            "options.UseOpenAI(\n        apiKey: builder.Configuration[\"OpenAI:ApiKey\"]!,\n        model: builder.Configuration[\"OpenAI:Model\"] ?? \"gpt-5.4-mini\");",
+            programChange.UpdatedContent,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("// Recommended first path:", programChange.UpdatedContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenProviderIsNotSelected_AddsExplicitProviderGuidanceComments()
+    {
+        var projectPath = CreateProject(
+            projectName: "GuidanceApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan);
+        var programChange = Assert.Single(
+            preview.Changes,
+            change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+
+        Assert.Contains("// Recommended first path:", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("// options.UseOpenAI(", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("// options.UseAzureOpenAI(", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("// options.UseOllama(", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "\n    options.UseOpenAI(\n",
+            programChange.UpdatedContent,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PlanAsync_WhenOqtaneStyleHostIsDetected_DowngradesRiskyEditsToManualReview()
+    {
+        var projectPath = CreateProject(
+            projectName: "OqtaneHostApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Oqtane.Client" Version="6.0.0" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddServerSideBlazor();
+
+                var app = builder.Build();
+                app.MapBlazorHub();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        File.WriteAllText(
+            Path.Combine(Path.GetDirectoryName(projectPath)!, "Startup.cs"),
+            "public sealed class Startup { }");
+        var pagesDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "Pages");
+        Directory.CreateDirectory(pagesDirectory);
+        File.WriteAllText(Path.Combine(pagesDirectory, "_Host.cshtml"), "<html></html>");
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.False(plan.IsBlocked);
+        Assert.True(plan.HasChanges);
+        Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "workflow-file" && item.Action == ScaffoldPlanAction.Create);
+        Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "endpoint-mapping" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains("advanced Blazor host with Oqtane-style signals", plan.BlockReason, StringComparison.Ordinal);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Guidance is not null && item.Guidance.Contains("Oqtane host shell", StringComparison.Ordinal));
+        Assert.NotNull(plan.BlockSuggestedFix);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenOqtaneStyleHostIsDetected_ShowsOnlySafeFileEdits()
+    {
+        var projectPath = CreateProject(
+            projectName: "OqtanePreviewApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Oqtane.Client" Version="6.0.0" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddServerSideBlazor();
+
+                var app = builder.Build();
+                app.MapBlazorHub();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        File.WriteAllText(
+            Path.Combine(Path.GetDirectoryName(projectPath)!, "Startup.cs"),
+            "public sealed class Startup { }");
+        var pagesDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "Pages");
+        Directory.CreateDirectory(pagesDirectory);
+        File.WriteAllText(Path.Combine(pagesDirectory, "_Host.cshtml"), "<html></html>");
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        Assert.True(preview.HasChanges);
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith("OqtanePreviewApp.csproj", StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("Workflows", "AppCapabilities.cs"), StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith("App.razor", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith("MainLayout.razor", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith("Home.razor", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PlanAsync_WhenGenericLegacyHostIsDetected_DowngradesRiskyEditsToManualReview()
+    {
+        var projectPath = CreateProject(
+            projectName: "LegacyReviewApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddServerSideBlazor();
+
+                var app = builder.Build();
+                app.MapBlazorHub();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        File.WriteAllText(
+            Path.Combine(Path.GetDirectoryName(projectPath)!, "Startup.cs"),
+            "public sealed class Startup { }");
+        var pagesDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "Pages");
+        Directory.CreateDirectory(pagesDirectory);
+        File.WriteAllText(Path.Combine(pagesDirectory, "_Host.cshtml"), "<html></html>");
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.False(plan.IsBlocked);
+        Assert.True(plan.HasChanges);
+        Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "workflow-file" && item.Action == ScaffoldPlanAction.Create);
+        Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "endpoint-mapping" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains("legacy or custom Blazor host", plan.BlockReason, StringComparison.Ordinal);
+        Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.TargetPath.EndsWith("Startup.cs", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.TargetPath.EndsWith("Startup.cs", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "workflow-registration" && item.TargetPath.EndsWith("Startup.cs", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "endpoint-mapping" && item.TargetPath.EndsWith("Startup.cs", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.TargetPath.EndsWith(Path.Combine("Pages", "_Host.cshtml"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Guidance is not null && item.Guidance.Contains("_Host.cshtml", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PlanAsync_WhenHostedWebAssemblyServerIsDetected_UsesReviewFirstGuidance()
+    {
+        var projectPath = CreateProject(
+            projectName: "HostedWasmReviewApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\HostedWasmReviewClient\HostedWasmReviewClient.csproj" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorPages();
+
+                var app = builder.Build();
+                app.UseBlazorFrameworkFiles();
+                app.UseStaticFiles();
+                app.MapFallbackToFile("index.html");
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var clientProjectPath = CreateHostedWasmClientProject("HostedWasmReviewClient");
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.False(plan.IsBlocked);
+        Assert.True(plan.HasChanges);
+        Assert.Equal(HostFamily.HostedWebAssembly, plan.Readiness.HostShape.Family);
+        Assert.Equal(clientProjectPath, plan.Readiness.UiProjectPath);
+        Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "workflow-file" && item.Action == ScaffoldPlanAction.Create);
+        Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Action == ScaffoldPlanAction.Create);
+        Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "workflow-registration" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "endpoint-mapping" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.Update);
+        Assert.DoesNotContain(plan.Items, item => item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.TargetPath.EndsWith(Path.Combine("wwwroot", "index.html"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.TargetPath.EndsWith(Path.Combine("Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.TargetPath.EndsWith(Path.Combine("Pages", "Index.razor"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Guidance is not null && item.Guidance.Contains("wwwroot/index.html", StringComparison.Ordinal));
+        Assert.NotNull(plan.BlockReason);
+        Assert.Contains("hosted WebAssembly-style Blazor server host", plan.BlockReason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenHostedWebAssemblyServerIsDetected_ShowsClientProjectEdits()
+    {
+        var projectPath = CreateProject(
+            projectName: "HostedWasmPreviewApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\HostedWasmPreviewClient\HostedWasmPreviewClient.csproj" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorPages();
+
+                var app = builder.Build();
+                app.UseBlazorFrameworkFiles();
+                app.UseStaticFiles();
+                app.MapFallbackToFile("index.html");
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        CreateHostedWasmClientProject("HostedWasmPreviewClient");
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith("HostedWasmPreviewApp.csproj", StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewApp", "Program.cs"), StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("Workflows", "AppCapabilities.cs"), StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "_Imports.razor"), StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "wwwroot", "index.html"), StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Pages", "Index.razor"), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhenHostedWebAssemblyServerIsDetected_UpdatesClientFilesAndLeavesServerReviewItems()
+    {
+        var projectPath = CreateProject(
+            projectName: "HostedWasmApplyApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\HostedWasmApplyClient\HostedWasmApplyClient.csproj" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorPages();
+
+                var app = builder.Build();
+                app.UseBlazorFrameworkFiles();
+                app.UseStaticFiles();
+                app.MapFallbackToFile("index.html");
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var clientProjectPath = CreateHostedWasmClientProject("HostedWasmApplyClient");
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        var result = await applier.ApplyAsync(plan, preview, provider: ScaffoldProvider.OpenAI);
+        var readinessAnalyzer = new InstallReadinessAnalyzer();
+        var report = await readinessAnalyzer.AnalyzeAsync(projectPath, hostProjectName: null);
+
+        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "_Imports.razor"), StringComparison.Ordinal));
+        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "wwwroot", "index.html"), StringComparison.Ordinal));
+        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Pages", "Index.razor"), StringComparison.Ordinal));
+        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyApp", "Program.cs"), StringComparison.Ordinal));
+        Assert.Equal(clientProjectPath, report.UiProjectPath);
+        Assert.Contains(report.Checks, check => check.Id == "mud-services" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "agentblazor-services" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "workflow-registration" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "endpoint-mapping" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "mud-providers" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Pass);
+        Assert.True(report.IsReady);
+    }
+
+    [Fact]
+    public async Task PlanAsync_WhenHostCannotBeClassified_RemainsBlocked()
+    {
+        var projectPath = CreateProject(
+            projectName: "BlockedHostApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddControllers();
+
+                var app = builder.Build();
+                app.MapControllers();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.True(plan.IsBlocked);
+        Assert.False(plan.HasChanges);
+        Assert.Empty(plan.Items);
+        Assert.Contains("could not classify this host", plan.BlockReason, StringComparison.Ordinal);
+    }
+
     private string CreateProject(
         string projectName,
         string csprojBody,
@@ -306,5 +821,51 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         File.WriteAllText(Path.Combine(componentsDirectory, "AgentBlazor.Components.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
 
         return sourceRoot;
+    }
+
+    private string CreateHostedWasmClientProject(string projectName)
+    {
+        var projectDirectory = Path.Combine(_tempDir, projectName);
+        var sharedDirectory = Path.Combine(projectDirectory, "Shared");
+        var pagesDirectory = Path.Combine(projectDirectory, "Pages");
+        var wwwrootDirectory = Path.Combine(projectDirectory, "wwwroot");
+
+        Directory.CreateDirectory(projectDirectory);
+        Directory.CreateDirectory(sharedDirectory);
+        Directory.CreateDirectory(pagesDirectory);
+        Directory.CreateDirectory(wwwrootDirectory);
+
+        File.WriteAllText(
+            Path.Combine(projectDirectory, $"{projectName}.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <Nullable>enable</Nullable>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0-preview.1.25125.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(wwwrootDirectory, "index.html"),
+            """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8" />
+                <title>Hosted Client</title>
+            </head>
+            <body>
+                <div id="app">Loading...</div>
+            </body>
+            </html>
+            """);
+        File.WriteAllText(Path.Combine(sharedDirectory, "MainLayout.razor"), "@Body");
+        File.WriteAllText(Path.Combine(pagesDirectory, "Index.razor"), "@page \"/\"\n<h1>Hello client</h1>");
+
+        return Path.Combine(projectDirectory, $"{projectName}.csproj");
     }
 }

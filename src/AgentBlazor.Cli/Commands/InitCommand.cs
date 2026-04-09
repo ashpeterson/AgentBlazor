@@ -190,6 +190,33 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
         AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(hostProject)}");
         AnsiConsole.MarkupLine($"[blue]Readiness:[/] {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
 
+        if (plan.IsBlocked)
+        {
+            AnsiConsole.MarkupLine("[yellow]Scaffold status:[/] automatic scaffold is blocked for this host shape.");
+            if (!string.IsNullOrWhiteSpace(plan.BlockReason))
+            {
+                AnsiConsole.MarkupLine($"[grey]Reason:[/] {Markup.Escape(plan.BlockReason)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(plan.BlockSuggestedFix))
+            {
+                AnsiConsole.MarkupLine($"[grey]Next step:[/] {Markup.Escape(plan.BlockSuggestedFix)}");
+            }
+
+            AnsiConsole.MarkupLine($"[grey]Verify command:[/] {BuildCommand("doctor", inputPath, hostProject)}");
+            AnsiConsole.MarkupLine("[grey]Refresh command:[/] run `agentblazor update` when code changes.");
+            return;
+        }
+
+        if (readiness.HostShape.Kind == HostShapeKind.AdvancedReview)
+        {
+            AnsiConsole.MarkupLine("[yellow]Scaffold status:[/] advanced-host review mode.");
+            if (!string.IsNullOrWhiteSpace(plan.BlockReason))
+            {
+                AnsiConsole.MarkupLine($"[grey]Review mode:[/] {Markup.Escape(plan.BlockReason)}");
+            }
+        }
+
         if (!plan.HasChanges)
         {
             AnsiConsole.MarkupLine("[green]Install status:[/] The baseline AgentBlazor wiring is already present.");
@@ -217,9 +244,9 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
             AnsiConsole.MarkupLine($"[yellow]Needs review:[/] {reviewCount} item(s) may need host-specific attention");
         }
 
-        AnsiConsole.MarkupLine("[yellow]Needs your decision:[/] choose a model provider after the baseline scaffold is applied.");
-        AnsiConsole.MarkupLine($"[grey]Preview next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--diff")}");
-        AnsiConsole.MarkupLine($"[grey]Approve next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--approve")}");
+        AnsiConsole.MarkupLine("[yellow]Recommended provider:[/] use `--provider openai` for the validated path. `azure-openai` and `ollama` are also supported.");
+        AnsiConsole.MarkupLine($"[grey]Preview next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--provider openai --diff")}");
+        AnsiConsole.MarkupLine($"[grey]Approve next:[/] {BuildCommand("scaffold", inputPath, hostProject, "--provider openai --approve")}");
         AnsiConsole.MarkupLine($"[grey]Verify after apply:[/] {BuildCommand("doctor", inputPath, hostProject)}");
         AnsiConsole.MarkupLine("[grey]Refresh command:[/] run `agentblazor update` when code changes.");
     }

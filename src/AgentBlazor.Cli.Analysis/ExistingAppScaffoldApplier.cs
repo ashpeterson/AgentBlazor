@@ -12,6 +12,7 @@ public sealed class ExistingAppScaffoldApplier
     public async Task<ScaffoldPreviewResult> PreviewAsync(
         ScaffoldPlan plan,
         string? agentBlazorSourceRoot = null,
+        ScaffoldProvider? provider = null,
         CancellationToken ct = default)
     {
         var changes = new List<ScaffoldPreviewFile>();
@@ -21,45 +22,59 @@ public sealed class ExistingAppScaffoldApplier
         var rootNamespace = await ResolveRootNamespaceAsync(plan.HostProjectPath, projectName, ct).ConfigureAwait(false);
         var sourceReferences = ResolveSourceReferences(agentBlazorSourceRoot);
 
-        await PreviewProjectFileAsync(plan.HostProjectPath, sourceReferences, changes, ct).ConfigureAwait(false);
-
-        var importsPath = ResolveFirstExistingPath(projectDirectory,
-            Path.Combine("Components", "_Imports.razor"),
-            "_Imports.razor")
-            ?? Path.Combine(projectDirectory, "Components", "_Imports.razor");
-        await PreviewImportsAsync(importsPath, rootNamespace, changes, ct).ConfigureAwait(false);
-
-        var programPath = Path.Combine(projectDirectory, "Program.cs");
-        if (File.Exists(programPath))
+        if (ShouldApply(plan, "package-references"))
         {
-            await PreviewProgramAsync(programPath, rootNamespace, changes, ct).ConfigureAwait(false);
+            await PreviewProjectFileAsync(plan.HostProjectPath, sourceReferences, changes, ct).ConfigureAwait(false);
         }
 
-        var appShellPath = ResolveFirstExistingPath(projectDirectory, Path.Combine("Components", "App.razor"), "App.razor");
-        if (appShellPath is not null)
+        if (plan.Readiness.HostShape.Kind == HostShapeKind.Standard)
+        {
+            var importsPath = ResolveFirstExistingPath(projectDirectory,
+                Path.Combine("Components", "_Imports.razor"),
+                "_Imports.razor")
+                ?? Path.Combine(projectDirectory, "Components", "_Imports.razor");
+            await PreviewImportsAsync(importsPath, rootNamespace, changes, ct).ConfigureAwait(false);
+        }
+
+        var programPath = ResolveTargetPath(plan, "mud-services")
+            ?? ResolveTargetPath(plan, "agentblazor-services")
+            ?? ResolveTargetPath(plan, "workflow-registration")
+            ?? ResolveTargetPath(plan, "endpoint-mapping")
+            ?? Path.Combine(projectDirectory, "Program.cs");
+        if (File.Exists(programPath) && ShouldApply(plan, "mud-services", "agentblazor-services", "workflow-registration", "endpoint-mapping"))
+        {
+            await PreviewProgramAsync(programPath, rootNamespace, provider, changes, ct).ConfigureAwait(false);
+        }
+
+        var importsTargetPath = ResolveTargetPath(plan, "ui-imports");
+        if (importsTargetPath is not null && ShouldApply(plan, "ui-imports"))
+        {
+            await PreviewUiImportsAsync(importsTargetPath, changes, ct).ConfigureAwait(false);
+        }
+
+        var appShellPath = ResolveTargetPath(plan, "shell-assets");
+        if (appShellPath is not null && ShouldApply(plan, "shell-assets"))
         {
             await PreviewAppShellAsync(appShellPath, changes, ct).ConfigureAwait(false);
         }
 
-        var mainLayoutPath = ResolveFirstExistingPath(projectDirectory,
-            Path.Combine("Components", "Layout", "MainLayout.razor"),
-            Path.Combine("Shared", "MainLayout.razor"),
-            Path.Combine("Layout", "MainLayout.razor"));
-        if (mainLayoutPath is not null)
+        var mainLayoutPath = ResolveTargetPath(plan, "mud-providers");
+        if (mainLayoutPath is not null && ShouldApply(plan, "mud-providers"))
         {
             await PreviewMainLayoutAsync(mainLayoutPath, changes, ct).ConfigureAwait(false);
         }
 
-        var workflowPath = Path.Combine(projectDirectory, "Workflows", "AppCapabilities.cs");
-        await PreviewWorkflowFileAsync(workflowPath, rootNamespace, changes).ConfigureAwait(false);
+        var workflowPath = ResolveTargetPath(plan, "workflow-file") ?? Path.Combine(projectDirectory, "Workflows", "AppCapabilities.cs");
+        if (ShouldApply(plan, "workflow-file"))
+        {
+            await PreviewWorkflowFileAsync(workflowPath, rootNamespace, changes).ConfigureAwait(false);
+        }
 
-        var chatPagePath = ResolveFirstExistingPath(projectDirectory,
-            Path.Combine("Components", "Pages", "Home.razor"),
-            Path.Combine("Components", "Pages", "Index.razor"),
-            Path.Combine("Pages", "Home.razor"),
-            Path.Combine("Pages", "Index.razor"))
-            ?? Path.Combine(projectDirectory, "Components", "Pages", "Home.razor");
-        await PreviewChatSurfaceAsync(chatPagePath, changes, ct).ConfigureAwait(false);
+        var chatPagePath = ResolveTargetPath(plan, "chat-surface") ?? Path.Combine(projectDirectory, "Components", "Pages", "Home.razor");
+        if (ShouldApply(plan, "chat-surface"))
+        {
+            await PreviewChatSurfaceAsync(chatPagePath, changes, ct).ConfigureAwait(false);
+        }
 
         return new ScaffoldPreviewResult { Changes = changes };
     }
@@ -67,16 +82,18 @@ public sealed class ExistingAppScaffoldApplier
     public Task<ScaffoldApplyResult> ApplyAsync(
         ScaffoldPlan plan,
         string? agentBlazorSourceRoot = null,
+        ScaffoldProvider? provider = null,
         CancellationToken ct = default)
-        => ApplyAsync(plan, preview: null, agentBlazorSourceRoot, ct);
+        => ApplyAsync(plan, preview: null, agentBlazorSourceRoot, provider, ct);
 
     public async Task<ScaffoldApplyResult> ApplyAsync(
         ScaffoldPlan plan,
         ScaffoldPreviewResult? preview,
         string? agentBlazorSourceRoot = null,
+        ScaffoldProvider? provider = null,
         CancellationToken ct = default)
     {
-        preview ??= await PreviewAsync(plan, agentBlazorSourceRoot, ct).ConfigureAwait(false);
+        preview ??= await PreviewAsync(plan, agentBlazorSourceRoot, provider, ct).ConfigureAwait(false);
 
         foreach (var change in preview.Changes)
         {
@@ -236,7 +253,12 @@ public sealed class ExistingAppScaffoldApplier
             updated);
     }
 
-    private static async Task PreviewProgramAsync(string programPath, string rootNamespace, List<ScaffoldPreviewFile> changes, CancellationToken ct)
+    private static async Task PreviewProgramAsync(
+        string programPath,
+        string rootNamespace,
+        ScaffoldProvider? provider,
+        List<ScaffoldPreviewFile> changes,
+        CancellationToken ct)
     {
         var original = await File.ReadAllTextAsync(programPath, ct).ConfigureAwait(false);
         var updated = original;
@@ -247,18 +269,23 @@ public sealed class ExistingAppScaffoldApplier
 
         if (!updated.Contains("builder.Services.AddMudServices();", StringComparison.Ordinal))
         {
-            updated = InsertAfterStatementContaining(updated, "builder.Services.AddRazorComponents()", "builder.Services.AddMudServices();\n");
+            updated = InsertAfterFirstStatementContainingAny(
+                updated,
+                "builder.Services.AddMudServices();\n",
+                "builder.Services.AddRazorComponents(",
+                "builder.Services.AddRazorPages(",
+                "builder.Services.AddServerSideBlazor(",
+                "var builder = WebApplication.CreateBuilder(args);");
         }
 
         if (!updated.Contains("builder.Services.AddAgentBlazor(", StringComparison.Ordinal))
         {
-            const string marker = "builder.Services.AddMudServices();";
-            var agentBlazorBlock = """
+            var providerBlock = BuildProviderBlock(provider);
+            var agentBlazorBlock = $$"""
 
 builder.Services.AddAgentBlazor(options =>
 {
-    // Choose a runtime provider when you are ready to connect a model:
-    // options.UseOpenAI(apiKey: builder.Configuration["OpenAI:ApiKey"]!, model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+{{providerBlock}}
 
     if (builder.Environment.IsDevelopment())
     {
@@ -275,51 +302,145 @@ builder.Services.AddAgentBlazor(options =>
     });
 });
 """;
-            updated = InsertAfterStatementContaining(updated, marker, agentBlazorBlock.TrimStart('\n') + "\n");
+            updated = InsertAfterFirstStatementContainingAny(
+                updated,
+                agentBlazorBlock.TrimStart('\n') + "\n",
+                "builder.Services.AddMudServices();",
+                "builder.Services.AddRazorComponents(",
+                "builder.Services.AddRazorPages(",
+                "builder.Services.AddServerSideBlazor(");
         }
 
         if (!updated.Contains("app.MapAgentBlazorEndpoints();", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirst(updated, "app.Run();", "app.MapAgentBlazorEndpoints();\n");
+            updated = InsertBeforeFirstContainingAny(
+                updated,
+                "app.MapAgentBlazorEndpoints();\n",
+                "app.MapFallbackToFile(\"index.html\")",
+                "app.MapFallbackToPage(\"/_Host\")",
+                "app.Run();");
         }
 
         AddTextChange(
             changes,
             programPath,
-            "Added AgentBlazor startup wiring to Program.cs.",
+            provider is null
+                ? "Added AgentBlazor startup wiring to Program.cs with provider guidance."
+                : $"Added AgentBlazor startup wiring to Program.cs with {provider.Value.ToDisplayName()} configuration.",
             original,
             updated);
     }
+
+    private static string BuildProviderBlock(ScaffoldProvider? provider)
+        => provider switch
+        {
+            ScaffoldProvider.OpenAI => """
+    options.UseOpenAI(
+        apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+""",
+            ScaffoldProvider.AzureOpenAI => """
+    options.UseAzureOpenAI(
+        endpoint: builder.Configuration["AzureOpenAI:Endpoint"]!,
+        deploymentName: builder.Configuration["AzureOpenAI:DeploymentName"]!,
+        apiKey: builder.Configuration["AzureOpenAI:ApiKey"]);
+""",
+            ScaffoldProvider.Ollama => """
+    options.UseOllama(
+        model: builder.Configuration["Ollama:Model"] ?? "llama3.2",
+        endpoint: builder.Configuration["Ollama:Endpoint"] ?? "http://127.0.0.1:11434/v1",
+        apiKey: builder.Configuration["Ollama:ApiKey"]);
+""",
+            null => """
+    // Recommended first path:
+    // options.UseOpenAI(
+    //     apiKey: builder.Configuration["OpenAI:ApiKey"]!,
+    //     model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+    //
+    // Alternatives:
+    // options.UseAzureOpenAI(
+    //     endpoint: builder.Configuration["AzureOpenAI:Endpoint"]!,
+    //     deploymentName: builder.Configuration["AzureOpenAI:DeploymentName"]!,
+    //     apiKey: builder.Configuration["AzureOpenAI:ApiKey"]);
+    // options.UseOllama(
+    //     model: builder.Configuration["Ollama:Model"] ?? "llama3.2",
+    //     endpoint: builder.Configuration["Ollama:Endpoint"] ?? "http://127.0.0.1:11434/v1",
+    //     apiKey: builder.Configuration["Ollama:ApiKey"]);
+""",
+            _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
+        };
 
     private static async Task PreviewAppShellAsync(string appShellPath, List<ScaffoldPreviewFile> changes, CancellationToken ct)
     {
         var original = await File.ReadAllTextAsync(appShellPath, ct).ConfigureAwait(false);
         var updated = original;
+        var isStaticHtmlShell = Path.GetExtension(appShellPath).Equals(".html", StringComparison.OrdinalIgnoreCase);
 
         if (!updated.Contains("_content/MudBlazor/MudBlazor.min.css", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirst(updated, "</head>", "    <link rel=\"stylesheet\" href=\"@Assets[\"_content/MudBlazor/MudBlazor.min.css\"]\" />\n");
+            updated = InsertBeforeFirst(
+                updated,
+                "</head>",
+                isStaticHtmlShell
+                    ? "    <link rel=\"stylesheet\" href=\"_content/MudBlazor/MudBlazor.min.css\" />\n"
+                    : "    <link rel=\"stylesheet\" href=\"@Assets[\"_content/MudBlazor/MudBlazor.min.css\"]\" />\n");
         }
 
-        if (!updated.Contains("AgentBlazorAssetPaths.Css", StringComparison.Ordinal))
+        if (!updated.Contains("AgentBlazorAssetPaths.Css", StringComparison.Ordinal) &&
+            !updated.Contains("_content/AgentBlazor/AgentBlazor.min.css", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirst(updated, "</head>", "    <link rel=\"stylesheet\" href=\"@Assets[AgentBlazorAssetPaths.Css]\" />\n");
+            updated = InsertBeforeFirst(
+                updated,
+                "</head>",
+                isStaticHtmlShell
+                    ? "    <link rel=\"stylesheet\" href=\"_content/AgentBlazor/AgentBlazor.min.css\" />\n"
+                    : "    <link rel=\"stylesheet\" href=\"@Assets[AgentBlazorAssetPaths.Css]\" />\n");
         }
 
         if (!updated.Contains("_content/MudBlazor/MudBlazor.min.js", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirst(updated, "</body>", "    <script src=\"@Assets[\"_content/MudBlazor/MudBlazor.min.js\"]\"></script>\n");
+            updated = InsertBeforeFirst(
+                updated,
+                "</body>",
+                isStaticHtmlShell
+                    ? "    <script src=\"_content/MudBlazor/MudBlazor.min.js\"></script>\n"
+                    : "    <script src=\"@Assets[\"_content/MudBlazor/MudBlazor.min.js\"]\"></script>\n");
         }
 
-        if (!updated.Contains("AgentBlazorAssetPaths.Js", StringComparison.Ordinal))
+        if (!updated.Contains("AgentBlazorAssetPaths.Js", StringComparison.Ordinal) &&
+            !updated.Contains("_content/AgentBlazor/AgentBlazor.min.js", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirst(updated, "</body>", "    <script src=\"@Assets[AgentBlazorAssetPaths.Js]\"></script>\n");
+            updated = InsertBeforeFirst(
+                updated,
+                "</body>",
+                isStaticHtmlShell
+                    ? "    <script src=\"_content/AgentBlazor/AgentBlazor.min.js\"></script>\n"
+                    : "    <script src=\"@Assets[AgentBlazorAssetPaths.Js]\"></script>\n");
         }
 
         AddTextChange(
             changes,
             appShellPath,
             "Added MudBlazor and AgentBlazor shell asset references.",
+            original,
+            updated);
+    }
+
+    private static async Task PreviewUiImportsAsync(string importsPath, List<ScaffoldPreviewFile> changes, CancellationToken ct)
+    {
+        var exists = File.Exists(importsPath);
+        var original = exists ? await File.ReadAllTextAsync(importsPath, ct).ConfigureAwait(false) : string.Empty;
+        var updated = original;
+
+        updated = EnsureLine(updated, "@using AgentBlazor.Components");
+        updated = EnsureLine(updated, "@using MudBlazor");
+
+        AddTextChange(
+            changes,
+            importsPath,
+            exists
+                ? "Added AgentBlazor and MudBlazor UI imports."
+                : "Created _Imports.razor with AgentBlazor and MudBlazor UI imports.",
             original,
             updated);
     }
@@ -541,6 +662,25 @@ public sealed class AppCapabilities
         return content.Insert(statementEnd + 1, "\n" + block);
     }
 
+    private static string InsertAfterFirstStatementContainingAny(string content, string block, params string[] markers)
+    {
+        if (markers.Length == 0)
+        {
+            return content;
+        }
+
+        foreach (var marker in markers)
+        {
+            var updated = InsertAfterStatementContaining(content, marker, block);
+            if (!string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return updated;
+            }
+        }
+
+        return content;
+    }
+
     private static string InsertBeforeFirst(string content, string marker, string block)
     {
         var index = content.IndexOf(marker, StringComparison.Ordinal);
@@ -550,6 +690,25 @@ public sealed class AppCapabilities
         }
 
         return content.Insert(index, block);
+    }
+
+    private static string InsertBeforeFirstContainingAny(string content, string block, params string[] markers)
+    {
+        if (markers.Length == 0)
+        {
+            return content;
+        }
+
+        foreach (var marker in markers)
+        {
+            var updated = InsertBeforeFirst(content, marker, block);
+            if (!string.Equals(updated, content, StringComparison.Ordinal))
+            {
+                return updated;
+            }
+        }
+
+        return content;
     }
 
     private static string? ResolveFirstExistingPath(string projectDirectory, params string[] relativePaths)
@@ -565,6 +724,9 @@ public sealed class AppCapabilities
 
         return null;
     }
+
+    private static string? ResolveTargetPath(ScaffoldPlan plan, string itemId)
+        => plan.Items.FirstOrDefault(item => item.Id == itemId)?.TargetPath;
 
     private static async Task<string> ResolveRootNamespaceAsync(string projectPath, string fallbackProjectName, CancellationToken ct)
     {
@@ -607,6 +769,11 @@ public sealed class AppCapabilities
         throw new InvalidOperationException(
             $"Could not find the AgentBlazor source projects under '{normalizedRoot}'. Expected AgentBlazor.Core, AgentBlazor.Hosting, and AgentBlazor.Components.");
     }
+
+    private static bool ShouldApply(ScaffoldPlan plan, params string[] itemIds)
+        => plan.Items.Any(item =>
+            itemIds.Contains(item.Id, StringComparer.Ordinal) &&
+            item.Action != ScaffoldPlanAction.ManualReview);
 
     private sealed record ScaffoldManifest
     {

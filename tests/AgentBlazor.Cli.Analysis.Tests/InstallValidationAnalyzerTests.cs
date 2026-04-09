@@ -3,13 +3,13 @@ using AgentBlazor.Cli.Analysis.Models;
 
 namespace AgentBlazor.Cli.Analysis.Tests;
 
-public sealed class InstallReadinessAnalyzerTests : IDisposable
+public sealed class InstallValidationAnalyzerTests : IDisposable
 {
     private readonly string _tempDir;
 
-    public InstallReadinessAnalyzerTests()
+    public InstallValidationAnalyzerTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"agentblazor-doctor-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"agentblazor-validate-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
     }
 
@@ -22,10 +22,10 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenAgentBlazorIsNotInstalled_ReportsMissingBaselineChecks()
+    public async Task AnalyzeAsync_WhenScaffoldWasApplied_ReportsManifestAndTrackedFilesAsValid()
     {
         var projectPath = CreateProject(
-            projectName: "PlainApp",
+            projectName: "ValidateApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -33,15 +33,11 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
-                  <ItemGroup>
-                    <PackageReference Include="MudBlazor" Version="8.15.0" />
-                  </ItemGroup>
                 </Project>
                 """,
             programBody: """
                 var builder = WebApplication.CreateBuilder(args);
                 builder.Services.AddRazorComponents();
-                builder.Services.AddMudServices();
 
                 var app = builder.Build();
                 app.MapRazorComponents<App>();
@@ -51,8 +47,6 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                 <Routes />
                 """,
             mainLayoutBody: """
-                <MudThemeProvider />
-                <MudPopoverProvider />
                 @Body
                 """,
             homeBody: """
@@ -60,24 +54,25 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                 <h1>Hello</h1>
                 """);
 
-        var analyzer = new InstallReadinessAnalyzer();
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        await applier.ApplyAsync(plan);
 
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.Equal("PlainApp", report.HostProjectName);
-        Assert.True(report.MissingCount >= 4);
-        Assert.Contains(report.Checks, check => check.Id == "package-references" && check.Status == InstallReadinessStatus.Missing);
-        Assert.Contains(report.Checks, check => check.Id == "agentblazor-services" && check.Status == InstallReadinessStatus.Missing);
-        Assert.Contains(report.Checks, check => check.Id == "workflow-registration" && check.Status == InstallReadinessStatus.Missing);
-        Assert.Contains(report.Checks, check => check.Id == "endpoint-mapping" && check.Status == InstallReadinessStatus.Missing);
-        Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Warning);
+        Assert.False(report.HasBlockingIssues);
+        Assert.Contains(report.Checks, check => check.Id == "scaffold-manifest" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "manifest-host-match" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "manifest-files" && check.Status == InstallReadinessStatus.Pass);
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenBaselineWiringExists_ReportsProjectAsReady()
+    public async Task AnalyzeAsync_WhenInstallWasManual_WarnsThatManifestIsMissing()
     {
         var projectPath = CreateProject(
-            projectName: "ReadyApp",
+            projectName: "ManualInstallApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -134,25 +129,18 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                 <AgentChatWidget Title="Assistant" />
                 """);
 
-        var analyzer = new InstallReadinessAnalyzer();
-
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.True(report.IsReady);
-        Assert.Equal(0, report.MissingCount);
-        Assert.All(report.Checks.Where(check => check.Id is not "chat-surface" and not "shell-assets" and not "mud-providers"),
-            check => Assert.Equal(InstallReadinessStatus.Pass, check.Status));
-        Assert.Contains(report.Checks, check => check.Id == "host-shape" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "mud-providers" && check.Status == InstallReadinessStatus.Pass);
+        Assert.False(report.HasBlockingIssues);
+        Assert.Contains(report.Checks, check => check.Id == "scaffold-manifest" && check.Status == InstallReadinessStatus.Warning);
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenOqtaneStyleHostIsDetected_ReturnsAdvancedReviewShape()
+    public async Task AnalyzeAsync_WhenManifestReferencesMissingFiles_ReportsBlockingIssue()
     {
         var projectPath = CreateProject(
-            projectName: "OqtaneHostApp",
+            projectName: "BrokenManifestApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -160,9 +148,52 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
-                  <ItemGroup>
-                    <PackageReference Include="Oqtane.Client" Version="6.0.0" />
-                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        await applier.ApplyAsync(plan);
+        File.Delete(Path.Combine(Path.GetDirectoryName(projectPath)!, "Workflows", "AppCapabilities.cs"));
+
+        var analyzer = new InstallValidationAnalyzer();
+        var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
+
+        Assert.True(report.HasBlockingIssues);
+        Assert.Contains(report.Checks, check => check.Id == "manifest-files" && check.Status == InstallReadinessStatus.Missing);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WhenLegacyReviewItemsRemainIncomplete_ReportsManualReviewChecks()
+    {
+        var projectPath = CreateProject(
+            projectName: "LegacyReviewApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
                 </Project>
                 """,
             programBody: """
@@ -191,22 +222,28 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
         Directory.CreateDirectory(pagesDirectory);
         File.WriteAllText(Path.Combine(pagesDirectory, "_Host.cshtml"), "<html></html>");
 
-        var analyzer = new InstallReadinessAnalyzer();
-
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        var hostShape = Assert.Single(report.Checks, check => check.Id == "host-shape");
-        Assert.Equal(InstallReadinessStatus.Warning, hostShape.Status);
-        Assert.Equal(HostShapeKind.AdvancedReview, report.HostShape.Kind);
-        Assert.Contains("advanced Blazor host with Oqtane-style signals", hostShape.Message, StringComparison.Ordinal);
-        Assert.NotNull(hostShape.SuggestedFix);
+        Assert.True(report.HasBlockingIssues);
+        Assert.Contains(report.Checks, check =>
+            check.Id == "manual-review:mud-services" &&
+            check.Status == InstallReadinessStatus.Missing &&
+            check.FilePath is not null &&
+            check.FilePath.EndsWith("Startup.cs", StringComparison.Ordinal));
+        Assert.Contains(report.Checks, check =>
+            check.Id == "manual-review:shell-assets" &&
+            check.FilePath is not null &&
+            check.FilePath.EndsWith(Path.Combine("Pages", "_Host.cshtml"), StringComparison.Ordinal) &&
+            check.SuggestedFix is not null &&
+            check.SuggestedFix.Contains("_Host.cshtml", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenGenericLegacyHostIsDetected_ReturnsAdvancedReviewShape()
+    public async Task AnalyzeAsync_WhenLegacyHostShellAssetsAreCompleted_PassesThatManualReviewCheck()
     {
         var projectPath = CreateProject(
-            projectName: "LegacyHostApp",
+            projectName: "LegacyPartialApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -240,33 +277,33 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
             "public sealed class Startup { }");
         var pagesDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "Pages");
         Directory.CreateDirectory(pagesDirectory);
-        File.WriteAllText(Path.Combine(pagesDirectory, "_Host.cshtml"), "<html></html>");
+        File.WriteAllText(
+            Path.Combine(pagesDirectory, "_Host.cshtml"),
+            """
+            <html>
+            <head>
+                <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+                <link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
+            </head>
+            <body>
+                <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+                <script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+            </body>
+            </html>
+            """);
 
-        var analyzer = new InstallReadinessAnalyzer();
-
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.Equal(HostShapeKind.AdvancedReview, report.HostShape.Kind);
-        Assert.Contains("legacy or custom Blazor host", report.HostShape.Message, StringComparison.Ordinal);
-        Assert.Contains(report.Checks, check =>
-            check.Id == "mud-services" &&
-            check.FilePath is not null &&
-            check.FilePath.EndsWith("Startup.cs", StringComparison.Ordinal));
-        Assert.Contains(report.Checks, check =>
-            check.Id == "endpoint-mapping" &&
-            check.FilePath is not null &&
-            check.FilePath.EndsWith("Startup.cs", StringComparison.Ordinal));
-        Assert.Contains(report.Checks, check =>
-            check.Id == "shell-assets" &&
-            check.FilePath is not null &&
-            check.FilePath.EndsWith(Path.Combine("Pages", "_Host.cshtml"), StringComparison.Ordinal));
+        Assert.Contains(report.Readiness.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Pass);
+        Assert.DoesNotContain(report.Checks, check => check.Id == "manual-review:shell-assets");
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenHostedWebAssemblyServerIsDetected_ReturnsAdvancedReviewShape()
+    public async Task AnalyzeAsync_WhenHostedWebAssemblyReviewItemsRemainIncomplete_UsesHostedClientGuidance()
     {
         var projectPath = CreateProject(
-            projectName: "HostedWasmServerApp",
+            projectName: "HostedWasmValidateApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -275,7 +312,7 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
-                    <ProjectReference Include="..\HostedWasmClientApp\HostedWasmClientApp.csproj" />
+                    <ProjectReference Include="..\HostedWasmValidateClient\HostedWasmValidateClient.csproj" />
                   </ItemGroup>
                 </Project>
                 """,
@@ -300,36 +337,42 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                 <h1>Hello</h1>
                 """);
 
-        var clientProjectPath = CreateHostedWasmClientProject("HostedWasmClientApp");
+        CreateHostedWasmClientProject("HostedWasmValidateClient");
 
-        var analyzer = new InstallReadinessAnalyzer();
-
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.Equal(HostShapeKind.AdvancedReview, report.HostShape.Kind);
-        Assert.Equal(HostFamily.HostedWebAssembly, report.HostShape.Family);
-        Assert.Equal("HostedWasmClientApp", report.UiProjectName);
-        Assert.Equal(clientProjectPath, report.UiProjectPath);
-        Assert.Contains("hosted WebAssembly-style Blazor server host", report.HostShape.Message, StringComparison.Ordinal);
-        Assert.Contains(report.Checks, check =>
+        Assert.True(report.HasBlockingIssues);
+        Assert.DoesNotContain(report.Checks, check => check.Id.StartsWith("manual-review:", StringComparison.Ordinal));
+        Assert.Contains(report.Readiness.Checks, check =>
+            check.Id == "mud-services" &&
+            check.Status == InstallReadinessStatus.Missing &&
+            check.FilePath is not null &&
+            check.FilePath.EndsWith("Program.cs", StringComparison.Ordinal));
+        Assert.Contains(report.Readiness.Checks, check =>
+            check.Id == "endpoint-mapping" &&
+            check.Status == InstallReadinessStatus.Missing &&
+            check.SuggestedFix is not null &&
+            check.SuggestedFix.Contains("MapFallbackToFile(\"index.html\")", StringComparison.Ordinal));
+        Assert.Contains(report.Readiness.Checks, check =>
             check.Id == "shell-assets" &&
             check.FilePath is not null &&
             check.FilePath.EndsWith(Path.Combine("wwwroot", "index.html"), StringComparison.Ordinal));
-        Assert.Contains(report.Checks, check =>
+        Assert.Contains(report.Readiness.Checks, check =>
             check.Id == "mud-providers" &&
             check.FilePath is not null &&
             check.FilePath.EndsWith(Path.Combine("Shared", "MainLayout.razor"), StringComparison.Ordinal));
-        Assert.Contains(report.Checks, check =>
+        Assert.Contains(report.Readiness.Checks, check =>
             check.Id == "chat-surface" &&
             check.FilePath is not null &&
             check.FilePath.EndsWith(Path.Combine("Pages", "Index.razor"), StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task AnalyzeAsync_WhenHostCannotBeClassified_ReturnsUnsupportedShape()
+    public async Task AnalyzeAsync_WhenHostedWebAssemblyScaffoldWasApplied_ReportsNoBlockingIssues()
     {
         var projectPath = CreateProject(
-            projectName: "UnknownHostApp",
+            projectName: "HostedWasmAppliedApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -337,14 +380,19 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\HostedWasmAppliedClient\HostedWasmAppliedClient.csproj" />
+                  </ItemGroup>
                 </Project>
                 """,
             programBody: """
                 var builder = WebApplication.CreateBuilder(args);
-                builder.Services.AddControllers();
+                builder.Services.AddRazorPages();
 
                 var app = builder.Build();
-                app.MapControllers();
+                app.UseBlazorFrameworkFiles();
+                app.UseStaticFiles();
+                app.MapFallbackToFile("index.html");
                 app.Run();
                 """,
             appRazorBody: """
@@ -358,12 +406,22 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
                 <h1>Hello</h1>
                 """);
 
-        var analyzer = new InstallReadinessAnalyzer();
+        CreateHostedWasmClientProject("HostedWasmAppliedClient");
 
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+        await applier.ApplyAsync(plan, preview, provider: ScaffoldProvider.OpenAI);
+
+        var analyzer = new InstallValidationAnalyzer();
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.Equal(HostShapeKind.Unsupported, report.HostShape.Kind);
-        Assert.Contains("could not classify this host", report.HostShape.Message, StringComparison.Ordinal);
+        Assert.False(report.HasBlockingIssues);
+        Assert.Contains(report.Checks, check => check.Id == "scaffold-manifest" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "manifest-host-match" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "manifest-files" && check.Status == InstallReadinessStatus.Pass);
+        Assert.DoesNotContain(report.Checks, check => check.Id.StartsWith("manual-review:", StringComparison.Ordinal));
     }
 
     private string CreateProject(

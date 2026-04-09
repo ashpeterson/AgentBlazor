@@ -34,6 +34,10 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
         [Description("Use local AgentBlazor source projects instead of the AgentBlazor package reference")]
         public string? LocalSourcePath { get; init; }
 
+        [CommandOption("--provider <PROVIDER>")]
+        [Description("Scaffold provider registration: openai, azure-openai, or ollama")]
+        public string? Provider { get; init; }
+
         [CommandOption("-y|--non-interactive")]
         [Description("Skip interactive prompts and use defaults")]
         public bool NonInteractive { get; init; }
@@ -51,15 +55,23 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
             }
 
             var localSourcePath = ResolveLocalSourcePath(settings.LocalSourcePath);
+            var provider = ScaffoldProviders.ParseOrThrow(settings.Provider);
 
             var planner = new ExistingAppScaffoldPlanner();
             var plan = await planner.PlanAsync(path, settings.HostProject);
+
+            if (plan.IsBlocked)
+            {
+                RenderBlockedPlan(plan);
+                return 2;
+            }
+
             var applier = new ExistingAppScaffoldApplier();
-            var preview = await applier.PreviewAsync(plan, localSourcePath);
+            var preview = await applier.PreviewAsync(plan, localSourcePath, provider);
 
             if (!settings.Approve)
             {
-                RenderPreview(plan, preview, settings.DryRun, settings.Diff, localSourcePath);
+                RenderPreview(plan, preview, settings.DryRun, settings.Diff, localSourcePath, provider);
                 return 0;
             }
 
@@ -68,8 +80,8 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
                 RenderDiffs(preview);
             }
 
-            var result = await applier.ApplyAsync(plan, preview, localSourcePath);
-            RenderApplyResult(plan, result);
+            var result = await applier.ApplyAsync(plan, preview, localSourcePath, provider);
+            RenderApplyResult(plan, result, provider);
             return 0;
         }
         catch (InvalidOperationException ex)
@@ -103,15 +115,28 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
         ScaffoldPreviewResult preview,
         bool dryRun,
         bool showDiff,
-        string? localSourcePath)
+        string? localSourcePath,
+        ScaffoldProvider? provider)
     {
         AnsiConsole.Write(new Rule("[blue]AgentBlazor Scaffold Preview[/]").RuleStyle("blue"));
         AnsiConsole.MarkupLine($"[blue]Input:[/] {Markup.Escape(plan.InputPath)}");
         AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(plan.HostProjectName)}");
         AnsiConsole.MarkupLine($"[blue]Project:[/] {Markup.Escape(plan.HostProjectPath)}");
+        if (!string.IsNullOrWhiteSpace(plan.Readiness.UiProjectPath))
+        {
+            AnsiConsole.MarkupLine($"[blue]UI project:[/] {Markup.Escape(plan.Readiness.UiProjectPath!)}");
+        }
         if (!string.IsNullOrWhiteSpace(localSourcePath))
         {
             AnsiConsole.MarkupLine($"[blue]Local source:[/] {Markup.Escape(localSourcePath)}");
+        }
+        if (provider is { } providerChoice)
+        {
+            AnsiConsole.MarkupLine($"[blue]Provider:[/] {Markup.Escape(providerChoice.ToDisplayName())}");
+        }
+        if (plan.Readiness.HostShape.Kind == HostShapeKind.AdvancedReview && !string.IsNullOrWhiteSpace(plan.BlockReason))
+        {
+            AnsiConsole.MarkupLine($"[yellow]Advanced host:[/] {Markup.Escape(plan.BlockReason)}");
         }
         if (dryRun)
         {
@@ -128,29 +153,47 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
 
         AnsiConsole.WriteLine();
 
-        if (!preview.HasChanges)
+        if (!preview.HasChanges && !plan.Items.Any(item => item.Action == ScaffoldPlanAction.ManualReview))
         {
             AnsiConsole.MarkupLine("[green]No scaffold changes proposed.[/] The app already has the baseline AgentBlazor wiring.");
             return;
         }
 
-        var table = new Table().RoundedBorder();
-        table.AddColumn("File");
-        table.AddColumn("Change");
-
-        foreach (var change in preview.Changes)
+        if (preview.HasChanges)
         {
-            table.AddRow(
-                Markup.Escape(change.Path),
-                $"{GetChangeKindMarkup(change.ChangeKind)} {Markup.Escape(change.Summary)}");
+            var table = new Table().RoundedBorder();
+            table.AddColumn("File");
+            table.AddColumn("Change");
+
+            foreach (var change in preview.Changes)
+            {
+                table.AddRow(
+                    Markup.Escape(change.Path),
+                    $"{GetChangeKindMarkup(change.ChangeKind)} {Markup.Escape(change.Summary)}");
+            }
+
+            AnsiConsole.Write(table);
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[yellow]Proposed file changes:[/] {preview.ChangedFileCount}");
         }
 
-        AnsiConsole.Write(table);
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[yellow]Proposed file changes:[/] {preview.ChangedFileCount}");
-        AnsiConsole.MarkupLine("[yellow]Needs your decision:[/] choose a model provider after the baseline scaffold is applied.");
-        AnsiConsole.MarkupLine($"[grey]Preview command:[/] {BuildCommand(plan.InputPath, plan.HostProjectName, "--diff")}");
-        AnsiConsole.MarkupLine($"[grey]Approve command:[/] {BuildCommand(plan.InputPath, plan.HostProjectName, "--approve")}");
+        RenderManualReviewItems(plan);
+        if (provider is { } selectedProvider && WillScaffoldProvider(plan))
+        {
+            AnsiConsole.MarkupLine($"[green]Provider template:[/] {Markup.Escape(selectedProvider.ToDisplayName())} registration will be scaffolded into Program.cs.");
+            AnsiConsole.MarkupLine($"[grey]Config step:[/] {Markup.Escape(selectedProvider.GetConfigurationHint())}");
+        }
+        else if (provider is { } selectedProviderForManualReview)
+        {
+            AnsiConsole.MarkupLine($"[yellow]Provider selected:[/] {Markup.Escape(selectedProviderForManualReview.ToDisplayName())} was captured, but startup wiring is still manual review for this host.");
+            AnsiConsole.MarkupLine($"[grey]Config step:[/] {Markup.Escape(selectedProviderForManualReview.GetConfigurationHint())}");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[yellow]Needs your decision:[/] add `--provider openai` (recommended), `--provider azure-openai`, or `--provider ollama` for concrete runtime registration.");
+        }
+        AnsiConsole.MarkupLine($"[grey]Preview command:[/] {BuildCommand(plan.InputPath, plan.HostProjectName, "--diff", provider)}");
+        AnsiConsole.MarkupLine($"[grey]Approve command:[/] {BuildCommand(plan.InputPath, plan.HostProjectName, "--approve", provider)}");
         AnsiConsole.MarkupLine($"[grey]Verify command:[/] {BuildDoctorCommand(plan.InputPath, plan.HostProjectName)}");
 
         if (showDiff)
@@ -168,11 +211,89 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
             _ => "[grey]?[/]"
         };
 
-    private static void RenderApplyResult(ScaffoldPlan plan, ScaffoldApplyResult result)
+    private static bool WillScaffoldProvider(ScaffoldPlan plan)
+        => plan.Items.Any(item =>
+            item.Id == "agentblazor-services" &&
+            item.Action != ScaffoldPlanAction.ManualReview);
+
+    private static void RenderBlockedPlan(ScaffoldPlan plan)
+    {
+        AnsiConsole.Write(new Rule("[yellow]AgentBlazor Scaffold Blocked[/]").RuleStyle("yellow"));
+        AnsiConsole.MarkupLine($"[blue]Input:[/] {Markup.Escape(plan.InputPath)}");
+        AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(plan.HostProjectName)}");
+        AnsiConsole.MarkupLine($"[blue]Project:[/] {Markup.Escape(plan.HostProjectPath)}");
+        if (!string.IsNullOrWhiteSpace(plan.Readiness.UiProjectPath))
+        {
+            AnsiConsole.MarkupLine($"[blue]UI project:[/] {Markup.Escape(plan.Readiness.UiProjectPath!)}");
+        }
+        AnsiConsole.WriteLine();
+
+        if (!string.IsNullOrWhiteSpace(plan.BlockTitle))
+        {
+            AnsiConsole.MarkupLine($"[yellow]{Markup.Escape(plan.BlockTitle)}:[/] {Markup.Escape(plan.BlockReason ?? string.Empty)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(plan.BlockSuggestedFix))
+        {
+            AnsiConsole.MarkupLine($"[grey]Next step:[/] {Markup.Escape(plan.BlockSuggestedFix!)}");
+        }
+
+        AnsiConsole.MarkupLine($"[grey]Verify command:[/] {BuildDoctorCommand(plan.InputPath, plan.HostProjectName)}");
+    }
+
+    private static void RenderManualReviewItems(ScaffoldPlan plan)
+    {
+        var reviewItems = plan.Items
+            .Where(item => item.Action == ScaffoldPlanAction.ManualReview)
+            .ToArray();
+
+        if (reviewItems.Length == 0)
+        {
+            return;
+        }
+
+        var table = new Table().RoundedBorder();
+        table.AddColumn("Review");
+        table.AddColumn("Target");
+        table.AddColumn("Reason");
+
+        foreach (var item in reviewItems)
+        {
+            table.AddRow(
+                Markup.Escape(item.Summary),
+                Markup.Escape(item.TargetPath),
+                Markup.Escape(item.Reason));
+        }
+
+        AnsiConsole.MarkupLine($"[yellow]Manual review items:[/] {reviewItems.Length}");
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
+
+        foreach (var item in reviewItems.Where(item => !string.IsNullOrWhiteSpace(item.Guidance)))
+        {
+            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(item.Summary)}[/]");
+            AnsiConsole.MarkupLine($"[grey]Guidance:[/] {Markup.Escape(item.Guidance!)}");
+        }
+
+        if (reviewItems.Any(item => !string.IsNullOrWhiteSpace(item.Guidance)))
+        {
+            AnsiConsole.WriteLine();
+        }
+    }
+
+    private static void RenderApplyResult(ScaffoldPlan plan, ScaffoldApplyResult result, ScaffoldProvider? provider)
     {
         AnsiConsole.Write(new Rule("[green]AgentBlazor Scaffold Applied[/]").RuleStyle("green"));
         AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(plan.HostProjectName)}");
         AnsiConsole.MarkupLine($"[blue]Project:[/] {Markup.Escape(plan.HostProjectPath)}");
+        if (!string.IsNullOrWhiteSpace(plan.Readiness.UiProjectPath))
+        {
+            AnsiConsole.MarkupLine($"[blue]UI project:[/] {Markup.Escape(plan.Readiness.UiProjectPath!)}");
+        }
+        if (provider is { } providerChoice)
+        {
+            AnsiConsole.MarkupLine($"[blue]Provider:[/] {Markup.Escape(providerChoice.ToDisplayName())}");
+        }
         AnsiConsole.WriteLine();
 
         if (result.Changes.Count == 0)
@@ -199,8 +320,21 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
         {
             AnsiConsole.MarkupLine($"[green]Manifest:[/] {Markup.Escape(result.ManifestPath)}");
         }
+        RenderManualReviewItems(plan);
         AnsiConsole.MarkupLine($"[grey]Verify command:[/] {BuildDoctorCommand(plan.InputPath, plan.HostProjectName)}");
-        AnsiConsole.MarkupLine("[grey]Human step:[/] connect a model provider in Program.cs.");
+        if (provider is { } selectedProvider && WillScaffoldProvider(plan))
+        {
+            AnsiConsole.MarkupLine($"[grey]Config step:[/] {Markup.Escape(selectedProvider.GetConfigurationHint())}");
+        }
+        else if (provider is { } selectedProviderForManualReview)
+        {
+            AnsiConsole.MarkupLine($"[grey]Provider note:[/] startup wiring was not auto-applied for this host. Use {Markup.Escape(selectedProviderForManualReview.ToDisplayName())} when completing the manual service registration step.");
+            AnsiConsole.MarkupLine($"[grey]Config step:[/] {Markup.Escape(selectedProviderForManualReview.GetConfigurationHint())}");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[grey]Human step:[/] choose a provider with `--provider openai` (recommended), `--provider azure-openai`, or `--provider ollama` and rerun scaffold preview if you want concrete Program.cs registration.");
+        }
     }
 
     private static void RenderDiffs(ScaffoldPreviewResult preview)
@@ -328,8 +462,18 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
         return null;
     }
 
-    private static string BuildCommand(string inputPath, string hostProjectName, string trailingFlag)
-        => $"`agentblazor scaffold {QuoteIfNeeded(inputPath)} --host {QuoteIfNeeded(hostProjectName)} {trailingFlag}`";
+    private static string BuildCommand(
+        string inputPath,
+        string hostProjectName,
+        string trailingFlag,
+        ScaffoldProvider? provider)
+    {
+        var providerSegment = provider is null
+            ? string.Empty
+            : $" --provider {provider.Value.ToOptionValue()}";
+
+        return $"`agentblazor scaffold {QuoteIfNeeded(inputPath)} --host {QuoteIfNeeded(hostProjectName)}{providerSegment} {trailingFlag}`";
+    }
 
     private static string BuildDoctorCommand(string inputPath, string hostProjectName)
         => $"`agentblazor doctor {QuoteIfNeeded(inputPath)} --host {QuoteIfNeeded(hostProjectName)}`";

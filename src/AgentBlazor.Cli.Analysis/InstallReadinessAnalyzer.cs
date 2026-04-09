@@ -19,18 +19,31 @@ public sealed class InstallReadinessAnalyzer
 
         var csprojText = await File.ReadAllTextAsync(hostProjectPath, ct).ConfigureAwait(false);
         var csharpContents = await ReadProjectFilesAsync(hostProjectDirectory, ".cs", ct).ConfigureAwait(false);
-        var razorContents = await ReadProjectFilesAsync(hostProjectDirectory, ".razor", ct).ConfigureAwait(false);
+        var hostShape = AnalyzeHostShape(hostProjectPath, hostProjectDirectory, csprojText, csharpContents);
+        var uiProject = await ResolveUiProjectAsync(hostProjectPath, hostProject.Name, csprojText, hostShape, ct).ConfigureAwait(false);
+        var uiProjectPath = uiProject?.ProjectPath;
+        var uiProjectDirectory = Path.GetDirectoryName(uiProjectPath ?? hostProjectPath)
+            ?? throw new InvalidOperationException($"Could not determine the UI project directory for '{uiProjectPath ?? hostProjectPath}'.");
+        var razorContents = await ReadProjectFilesAsync(uiProjectDirectory, ".razor", ct).ConfigureAwait(false);
+        var cshtmlContents = await ReadProjectFilesAsync(uiProjectDirectory, ".cshtml", ct).ConfigureAwait(false);
+        var htmlContents = await ReadProjectFilesAsync(uiProjectDirectory, ".html", ct).ConfigureAwait(false);
+        var shellMarkupContents = razorContents.Concat(cshtmlContents).Concat(htmlContents).ToArray();
+        var startupPath = ResolveStartupPath(hostProjectDirectory, hostShape.Family);
+        var shellPath = ResolveShellPath(uiProjectDirectory, hostShape.Family);
+        var layoutPath = ResolveLayoutPath(uiProjectDirectory);
+        var chatSurfacePath = ResolveChatSurfacePath(uiProjectDirectory);
 
         var checks = new List<InstallReadinessCheck>
         {
+            BuildHostShapeCheck(hostShape),
             BuildPackageCheck(hostProjectPath, csprojText),
-            BuildMudServiceCheck(csharpContents),
-            BuildAddAgentBlazorCheck(csharpContents),
-            BuildWorkflowCheck(csharpContents),
-            BuildEndpointCheck(csharpContents),
-            BuildShellAssetsCheck(razorContents),
-            BuildMudProvidersCheck(razorContents),
-            BuildChatSurfaceCheck(razorContents)
+            BuildMudServiceCheck(csharpContents, startupPath, hostShape.Family),
+            BuildAddAgentBlazorCheck(csharpContents, startupPath, hostShape.Family),
+            BuildWorkflowCheck(csharpContents, startupPath, hostShape.Family),
+            BuildEndpointCheck(csharpContents, startupPath, hostShape.Family),
+            BuildShellAssetsCheck(shellMarkupContents, shellPath),
+            BuildMudProvidersCheck(razorContents, layoutPath),
+            BuildChatSurfaceCheck(razorContents, chatSurfacePath)
         };
 
         return new InstallReadinessReport
@@ -38,18 +51,224 @@ public sealed class InstallReadinessAnalyzer
             InputPath = solutionOrProjectPath,
             HostProjectName = hostProject.Name,
             HostProjectPath = hostProjectPath,
+            UiProjectName = uiProject?.Name,
+            UiProjectPath = uiProjectPath,
+            HostShape = hostShape,
             Checks = checks
         };
     }
 
-    private async Task<ResolvedHostProject> ResolveHostProjectAsync(string solutionOrProjectPath, string? hostProjectName, CancellationToken ct)
+    private static HostShapeAssessment AnalyzeHostShape(
+        string hostProjectPath,
+        string hostProjectDirectory,
+        string csprojText,
+        IReadOnlyList<ProjectFileSnapshot> csharpContents)
+    {
+        var reasons = new List<string>();
+        string? evidencePath = hostProjectPath;
+        var hasOqtaneSignals = false;
+        var hasLegacyServerSignals = false;
+        var hasHostedWebAssemblySignals = false;
+
+        if (ContainsToken(csprojText, "Oqtane") || csharpContents.Any(file => ContainsToken(file.Content, "Oqtane")))
+        {
+            hasOqtaneSignals = true;
+            reasons.Add("Detected Oqtane-specific references.");
+            evidencePath = csharpContents.FirstOrDefault(file => ContainsToken(file.Content, "Oqtane"))?.Path ?? hostProjectPath;
+        }
+
+        var startupPath = Path.Combine(hostProjectDirectory, "Startup.cs");
+        if (File.Exists(startupPath))
+        {
+            hasLegacyServerSignals = true;
+            reasons.Add("Detected Startup.cs in the host project.");
+            evidencePath = startupPath;
+        }
+
+        var programPath = Path.Combine(hostProjectDirectory, "Program.cs");
+        if (!File.Exists(programPath))
+        {
+            reasons.Add("Could not find Program.cs in the host project root.");
+        }
+
+        var hasAddRazorComponents = csharpContents.Any(file => file.Content.Contains("AddRazorComponents(", StringComparison.Ordinal));
+        var hasMapRazorComponents = csharpContents.Any(file => file.Content.Contains("MapRazorComponents<", StringComparison.Ordinal));
+        var hasAddServerSideBlazor = csharpContents.Any(file => file.Content.Contains("AddServerSideBlazor(", StringComparison.Ordinal));
+        var hasMapBlazorHub = csharpContents.Any(file => file.Content.Contains("MapBlazorHub(", StringComparison.Ordinal));
+        var hasAddRazorPages = csharpContents.Any(file => file.Content.Contains("AddRazorPages(", StringComparison.Ordinal));
+        var hasMapFallbackToHost = csharpContents.Any(file => file.Content.Contains("MapFallbackToPage(\"/_Host\")", StringComparison.Ordinal));
+        var hostedWasmSignalFile = csharpContents.FirstOrDefault(file =>
+            file.Content.Contains("UseBlazorFrameworkFiles(", StringComparison.Ordinal) ||
+            file.Content.Contains("MapFallbackToFile(\"index.html\")", StringComparison.Ordinal));
+        if (hostedWasmSignalFile is not null)
+        {
+            hasHostedWebAssemblySignals = true;
+            reasons.Add("Detected hosted WebAssembly server routing such as UseBlazorFrameworkFiles()/MapFallbackToFile(\"index.html\").");
+            evidencePath = hostedWasmSignalFile.Path;
+        }
+
+        if (hasAddServerSideBlazor || hasMapBlazorHub || hasAddRazorPages || hasMapFallbackToHost)
+        {
+            hasLegacyServerSignals = true;
+        }
+
+        if (!hasAddRazorComponents || !hasMapRazorComponents)
+        {
+            reasons.Add("Could not confirm the standard AddRazorComponents()/MapRazorComponents<App>() startup pattern.");
+        }
+
+        var hostPagePath = Path.Combine(hostProjectDirectory, "Pages", "_Host.cshtml");
+        if (File.Exists(hostPagePath))
+        {
+            hasLegacyServerSignals = true;
+            reasons.Add("Detected legacy _Host.cshtml host pages.");
+            evidencePath = hostPagePath;
+        }
+
+        if (reasons.Count == 0)
+        {
+            return new HostShapeAssessment
+            {
+                Kind = HostShapeKind.Standard,
+                Family = HostFamily.StandardWebApp,
+                Title = "Host shape",
+                Message = "Detected a standard Program.cs-based Blazor Web App host shape for scaffold.",
+                FilePath = programPath
+            };
+        }
+
+        if (hasOqtaneSignals)
+        {
+            return new HostShapeAssessment
+            {
+                Kind = HostShapeKind.AdvancedReview,
+                Family = HostFamily.OqtaneStyle,
+                Title = "Host shape",
+                Message = $"Detected an advanced Blazor host with Oqtane-style signals. Scaffold will keep safe file additions in preview/apply and downgrade startup, shell, layout, and route wiring to manual review. {string.Join(" ", reasons)}",
+                FilePath = evidencePath,
+                SuggestedFix = "Run scaffold preview to review the safe edits and the manual-review items, then patch the host-specific startup and shell files manually."
+            };
+        }
+
+        if (hasHostedWebAssemblySignals)
+        {
+            return new HostShapeAssessment
+            {
+                Kind = HostShapeKind.AdvancedReview,
+                Family = HostFamily.HostedWebAssembly,
+                Title = "Host shape",
+                Message = $"Detected a hosted WebAssembly-style Blazor server host. Scaffold can patch the standard server startup path plus safe companion client shell, layout, and page files when it can infer the client project, while leaving anything more host-specific in review-first mode. {string.Join(" ", reasons)}",
+                FilePath = evidencePath,
+                SuggestedFix = "Run scaffold preview to review the inferred server/client edits, then use scaffold apply for the safe path and finish any remaining host-specific work manually."
+            };
+        }
+
+        if (hasLegacyServerSignals)
+        {
+            return new HostShapeAssessment
+            {
+                Kind = HostShapeKind.AdvancedReview,
+                Family = HostFamily.LegacyServer,
+                Title = "Host shape",
+                Message = $"Detected a legacy or custom Blazor host that does not match the standard Program.cs-based Blazor Web App pattern. Scaffold will keep safe file additions in preview/apply and downgrade startup, shell, layout, and route wiring to manual review. {string.Join(" ", reasons)}",
+                FilePath = evidencePath,
+                SuggestedFix = "Run scaffold preview to review the safe edits and the manual-review items, then patch the legacy startup and shell files manually."
+            };
+        }
+
+        return new HostShapeAssessment
+        {
+            Kind = HostShapeKind.Unsupported,
+            Family = HostFamily.Unknown,
+            Title = "Host shape",
+            Message = $"Scaffold preview/apply could not classify this host into a supported Blazor scaffold path. {string.Join(" ", reasons)}",
+            FilePath = evidencePath,
+            SuggestedFix = "Run `agentblazor doctor` for a full gap report, then patch this host manually until advanced-host scaffold support is added."
+        };
+    }
+
+    private static InstallReadinessCheck BuildHostShapeCheck(HostShapeAssessment hostShape) =>
+        hostShape.Kind switch
+        {
+            HostShapeKind.Standard => Pass(
+                "host-shape",
+                hostShape.Title,
+                hostShape.Message,
+                hostShape.FilePath),
+            HostShapeKind.AdvancedReview => Warning(
+                "host-shape",
+                hostShape.Title,
+                hostShape.Message,
+                hostShape.FilePath,
+                hostShape.SuggestedFix),
+            HostShapeKind.Unsupported => Warning(
+                "host-shape",
+                hostShape.Title,
+                hostShape.Message,
+                hostShape.FilePath,
+                hostShape.SuggestedFix),
+            _ => throw new ArgumentOutOfRangeException(nameof(hostShape.Kind), hostShape.Kind, null)
+        };
+
+    private static async Task<ResolvedProject?> ResolveUiProjectAsync(
+        string hostProjectPath,
+        string hostProjectName,
+        string hostCsprojText,
+        HostShapeAssessment hostShape,
+        CancellationToken ct)
+    {
+        if (hostShape.Family != HostFamily.HostedWebAssembly)
+        {
+            return null;
+        }
+
+        foreach (var referencedProjectPath in EnumerateProjectReferences(hostProjectPath, hostCsprojText))
+        {
+            if (!File.Exists(referencedProjectPath))
+            {
+                continue;
+            }
+
+            var referencedProjectText = await File.ReadAllTextAsync(referencedProjectPath, ct).ConfigureAwait(false);
+            if (!LooksLikeHostedWebAssemblyClient(referencedProjectPath, referencedProjectText))
+            {
+                continue;
+            }
+
+            return new ResolvedProject(
+                Name: Path.GetFileNameWithoutExtension(referencedProjectPath),
+                ProjectPath: referencedProjectPath);
+        }
+
+        foreach (var inferredProjectPath in EnumerateHostedClientCandidates(hostProjectPath, hostProjectName))
+        {
+            if (!File.Exists(inferredProjectPath))
+            {
+                continue;
+            }
+
+            var referencedProjectText = await File.ReadAllTextAsync(inferredProjectPath, ct).ConfigureAwait(false);
+            if (!LooksLikeHostedWebAssemblyClient(inferredProjectPath, referencedProjectText))
+            {
+                continue;
+            }
+
+            return new ResolvedProject(
+                Name: Path.GetFileNameWithoutExtension(inferredProjectPath),
+                ProjectPath: inferredProjectPath);
+        }
+
+        return null;
+    }
+
+    private async Task<ResolvedProject> ResolveHostProjectAsync(string solutionOrProjectPath, string? hostProjectName, CancellationToken ct)
     {
         var isSolution = solutionOrProjectPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
             || solutionOrProjectPath.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase);
 
         if (!isSolution)
         {
-            return new ResolvedHostProject(
+            return new ResolvedProject(
                 Name: Path.GetFileNameWithoutExtension(solutionOrProjectPath),
                 ProjectPath: solutionOrProjectPath);
         }
@@ -64,7 +283,7 @@ public sealed class InstallReadinessAnalyzer
 
             if (explicitHost is not null)
             {
-                return new ResolvedHostProject(
+                return new ResolvedProject(
                     explicitHost.Name,
                     explicitHost.FilePath ?? throw new InvalidOperationException($"Could not determine the host project file for '{explicitHost.Name}'."));
             }
@@ -75,7 +294,7 @@ public sealed class InstallReadinessAnalyzer
 
         if (blazorProjects.Count == 1)
         {
-            return new ResolvedHostProject(
+            return new ResolvedProject(
                 blazorProjects[0].Name,
                 blazorProjects[0].FilePath ?? throw new InvalidOperationException($"Could not determine the host project file for '{blazorProjects[0].Name}'."));
         }
@@ -87,7 +306,7 @@ public sealed class InstallReadinessAnalyzer
                 project.Name.EndsWith(".Web", StringComparison.OrdinalIgnoreCase) ||
                 project.Name.EndsWith(".Server", StringComparison.OrdinalIgnoreCase)) ?? blazorProjects[0];
 
-            return new ResolvedHostProject(
+            return new ResolvedProject(
                 inferredHost.Name,
                 inferredHost.FilePath ?? throw new InvalidOperationException($"Could not determine the host project file for '{inferredHost.Name}'."));
         }
@@ -127,7 +346,7 @@ public sealed class InstallReadinessAnalyzer
             "Add the AgentBlazor package before wiring services and components.");
     }
 
-    private static InstallReadinessCheck BuildMudServiceCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents)
+    private static InstallReadinessCheck BuildMudServiceCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents, string? startupPath, HostFamily family)
     {
         var match = FindFirstContaining(csharpContents, "AddMudServices(");
         return match is null
@@ -135,8 +354,8 @@ public sealed class InstallReadinessAnalyzer
                 "mud-services",
                 "MudBlazor service registration",
                 "Could not find builder.Services.AddMudServices().",
-                null,
-                "Add builder.Services.AddMudServices() in the host startup path.")
+                startupPath,
+                GetMissingFix("mud-services", family))
             : Pass(
                 "mud-services",
                 "MudBlazor service registration",
@@ -144,7 +363,7 @@ public sealed class InstallReadinessAnalyzer
                 match.Path);
     }
 
-    private static InstallReadinessCheck BuildAddAgentBlazorCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents)
+    private static InstallReadinessCheck BuildAddAgentBlazorCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents, string? startupPath, HostFamily family)
     {
         var match = FindFirstContaining(csharpContents, "AddAgentBlazor(");
         return match is null
@@ -152,8 +371,8 @@ public sealed class InstallReadinessAnalyzer
                 "agentblazor-services",
                 "AgentBlazor service registration",
                 "Could not find builder.Services.AddAgentBlazor(...).",
-                null,
-                "Add builder.Services.AddAgentBlazor(...) in the host startup path.")
+                startupPath,
+                GetMissingFix("agentblazor-services", family))
             : Pass(
                 "agentblazor-services",
                 "AgentBlazor service registration",
@@ -161,7 +380,7 @@ public sealed class InstallReadinessAnalyzer
                 match.Path);
     }
 
-    private static InstallReadinessCheck BuildWorkflowCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents)
+    private static InstallReadinessCheck BuildWorkflowCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents, string? startupPath, HostFamily family)
     {
         var match = FindFirstContaining(csharpContents, "AddWorkflow<") ?? FindFirstContaining(csharpContents, ".AddWorkflow(");
         return match is null
@@ -169,8 +388,8 @@ public sealed class InstallReadinessAnalyzer
                 "workflow-registration",
                 "Workflow registration",
                 "Could not find AddWorkflow<T>() registration.",
-                null,
-                "Register at least one workflow inside options.ConfigureBuilder(...).")
+                startupPath,
+                GetMissingFix("workflow-registration", family))
             : Pass(
                 "workflow-registration",
                 "Workflow registration",
@@ -178,7 +397,7 @@ public sealed class InstallReadinessAnalyzer
                 match.Path);
     }
 
-    private static InstallReadinessCheck BuildEndpointCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents)
+    private static InstallReadinessCheck BuildEndpointCheck(IReadOnlyList<ProjectFileSnapshot> csharpContents, string? startupPath, HostFamily family)
     {
         var match = FindFirstContaining(csharpContents, "MapAgentBlazorEndpoints(");
         return match is null
@@ -186,8 +405,8 @@ public sealed class InstallReadinessAnalyzer
                 "endpoint-mapping",
                 "Endpoint mapping",
                 "Could not find app.MapAgentBlazorEndpoints().",
-                null,
-                "Map AgentBlazor endpoints after the Razor components route setup.")
+                startupPath,
+                GetMissingFix("endpoint-mapping", family))
             : Pass(
                 "endpoint-mapping",
                 "Endpoint mapping",
@@ -195,29 +414,35 @@ public sealed class InstallReadinessAnalyzer
                 match.Path);
     }
 
-    private static InstallReadinessCheck BuildShellAssetsCheck(IReadOnlyList<ProjectFileSnapshot> razorContents)
+    private static InstallReadinessCheck BuildShellAssetsCheck(IReadOnlyList<ProjectFileSnapshot> markupContents, string? shellPath)
     {
-        var cssMatch = FindFirstContaining(razorContents, "AgentBlazorAssetPaths.Css");
-        var jsMatch = FindFirstContaining(razorContents, "AgentBlazorAssetPaths.Js");
+        var mudCssMatch = FindFirstContaining(markupContents, "_content/MudBlazor/MudBlazor.min.css");
+        var agentCssMatch = FindFirstContaining(markupContents, "AgentBlazorAssetPaths.Css")
+            ?? FindFirstContaining(markupContents, "_content/AgentBlazor/AgentBlazor.min.css");
+        var mudJsMatch = FindFirstContaining(markupContents, "_content/MudBlazor/MudBlazor.min.js");
+        var agentJsMatch = FindFirstContaining(markupContents, "AgentBlazorAssetPaths.Js")
+            ?? FindFirstContaining(markupContents, "_content/AgentBlazor/AgentBlazor.min.js");
 
-        if (cssMatch is not null && jsMatch is not null)
+        if (mudCssMatch is not null && agentCssMatch is not null && mudJsMatch is not null && agentJsMatch is not null)
         {
             return Pass(
                 "shell-assets",
                 "Shell assets",
-                "Found AgentBlazor CSS and JS asset references.",
-                cssMatch.Path);
+                "Found MudBlazor and AgentBlazor CSS/JS asset references in the host shell.",
+                agentCssMatch.Path);
         }
+
+        var presentCount = new[] { mudCssMatch, agentCssMatch, mudJsMatch, agentJsMatch }.Count(match => match is not null);
 
         return Warning(
             "shell-assets",
             "Shell assets",
-            "Could not confirm both AgentBlazor CSS and JS asset references in the app shell.",
-            cssMatch?.Path ?? jsMatch?.Path,
-            "Add AgentBlazor CSS and JS asset references to App.razor or the equivalent host shell.");
+            $"Found {presentCount} of 4 expected MudBlazor and AgentBlazor shell asset references.",
+            mudCssMatch?.Path ?? agentCssMatch?.Path ?? mudJsMatch?.Path ?? agentJsMatch?.Path ?? shellPath,
+            "Add MudBlazor and AgentBlazor CSS/JS asset references to App.razor, Pages/_Host.cshtml, or the equivalent host shell.");
     }
 
-    private static InstallReadinessCheck BuildMudProvidersCheck(IReadOnlyList<ProjectFileSnapshot> razorContents)
+    private static InstallReadinessCheck BuildMudProvidersCheck(IReadOnlyList<ProjectFileSnapshot> razorContents, string? layoutPath)
     {
         var requiredTokens = new[]
         {
@@ -242,11 +467,11 @@ public sealed class InstallReadinessAnalyzer
             "mud-providers",
             "MudBlazor providers",
             $"Found {presentCount} of {requiredTokens.Length} expected MudBlazor providers.",
-            null,
+            layoutPath,
             "Ensure the main layout includes the Mud theme, popover, dialog, and snackbar providers.");
     }
 
-    private static InstallReadinessCheck BuildChatSurfaceCheck(IReadOnlyList<ProjectFileSnapshot> razorContents)
+    private static InstallReadinessCheck BuildChatSurfaceCheck(IReadOnlyList<ProjectFileSnapshot> razorContents, string? chatSurfacePath)
     {
         var match = FindFirstContaining(razorContents, "<AgentChatWidget")
             ?? FindFirstContaining(razorContents, "<AgentChatSurface")
@@ -257,7 +482,7 @@ public sealed class InstallReadinessAnalyzer
                 "chat-surface",
                 "Chat surface",
                 "Could not find an AgentBlazor chat surface in the host project.",
-                null,
+                chatSurfacePath,
                 "Add AgentChatWidget, AgentChatSurface, or AgentChatPanel to a layout or page.")
             : Pass(
                 "chat-surface",
@@ -265,6 +490,51 @@ public sealed class InstallReadinessAnalyzer
                 $"Found a chat surface in {Path.GetFileName(match.Path)}.",
                 match.Path);
     }
+
+    private static string? ResolveStartupPath(string projectDirectory, HostFamily family)
+        => family switch
+        {
+            HostFamily.LegacyServer => ResolveFirstExistingPath(projectDirectory, "Startup.cs", "Program.cs"),
+            _ => ResolveFirstExistingPath(projectDirectory, "Program.cs", "Startup.cs")
+        };
+
+    private static string? ResolveShellPath(string projectDirectory, HostFamily family)
+        => family switch
+        {
+            HostFamily.LegacyServer => ResolveFirstExistingPath(
+                projectDirectory,
+                Path.Combine("Pages", "_Host.cshtml"),
+                Path.Combine("Components", "App.razor"),
+                "App.razor"),
+            HostFamily.HostedWebAssembly => ResolveFirstExistingPath(
+                projectDirectory,
+                Path.Combine("wwwroot", "index.html"),
+                Path.Combine("Components", "App.razor"),
+                "App.razor"),
+            _ => ResolveFirstExistingPath(
+                projectDirectory,
+                Path.Combine("Components", "App.razor"),
+                "App.razor",
+                Path.Combine("Pages", "_Host.cshtml"))
+        };
+
+    private static string? ResolveLayoutPath(string projectDirectory)
+        => ResolveFirstExistingPath(
+            projectDirectory,
+            Path.Combine("Shared", "MainLayout.razor"),
+            Path.Combine("Layout", "MainLayout.razor"),
+            Path.Combine("Components", "Layout", "MainLayout.razor"),
+            Path.Combine("Pages", "MainLayout.razor"));
+
+    private static string? ResolveChatSurfacePath(string projectDirectory)
+        => ResolveFirstExistingPath(
+            projectDirectory,
+            Path.Combine("Pages", "Index.razor"),
+            Path.Combine("Pages", "Home.razor"),
+            "App.razor",
+            Path.Combine("Components", "Pages", "Home.razor"),
+            Path.Combine("Components", "Pages", "Index.razor"),
+            Path.Combine("Shared", "Index.razor"));
 
     private static async Task<IReadOnlyList<ProjectFileSnapshot>> ReadProjectFilesAsync(
         string projectDirectory,
@@ -307,6 +577,106 @@ public sealed class InstallReadinessAnalyzer
     private static ProjectFileSnapshot? FindFirstContaining(IEnumerable<ProjectFileSnapshot> files, string token) =>
         files.FirstOrDefault(file => file.Content.Contains(token, StringComparison.Ordinal));
 
+    private static bool ContainsToken(string content, string token)
+        => content.Contains(token, StringComparison.OrdinalIgnoreCase);
+
+    private static string GetMissingFix(string checkId, HostFamily family)
+        => (family, checkId) switch
+        {
+            (HostFamily.HostedWebAssembly, "mud-services") =>
+                "Add builder.Services.AddMudServices() in the hosted WebAssembly server Program.cs path, alongside AddRazorPages() and the static-file pipeline.",
+            (HostFamily.HostedWebAssembly, "agentblazor-services") =>
+                "Add builder.Services.AddAgentBlazor(...) in the hosted WebAssembly server Program.cs path, not in the client WebAssembly bootstrap.",
+            (HostFamily.HostedWebAssembly, "workflow-registration") =>
+                "Register at least one workflow inside the hosted WebAssembly server AddAgentBlazor(...).ConfigureBuilder(...) path.",
+            (HostFamily.HostedWebAssembly, "endpoint-mapping") =>
+                "Map AgentBlazor endpoints before MapFallbackToFile(\"index.html\") in the hosted WebAssembly server pipeline.",
+            (_, "mud-services") =>
+                "Add builder.Services.AddMudServices() in the host startup path.",
+            (_, "agentblazor-services") =>
+                "Add builder.Services.AddAgentBlazor(...) in the host startup path.",
+            (_, "workflow-registration") =>
+                "Register at least one workflow inside options.ConfigureBuilder(...).",
+            (_, "endpoint-mapping") =>
+                "Map AgentBlazor endpoints after the Razor components route setup.",
+            _ => "Review and complete the missing AgentBlazor install step."
+        };
+
+    private static IEnumerable<string> EnumerateProjectReferences(string hostProjectPath, string csprojText)
+    {
+        try
+        {
+            var document = XDocument.Parse(csprojText);
+            var projectDirectory = Path.GetDirectoryName(hostProjectPath)
+                ?? throw new InvalidOperationException($"Could not determine the project directory for '{hostProjectPath}'.");
+
+            return document.Descendants()
+                .Where(element => element.Name.LocalName == "ProjectReference")
+                .Select(element => element.Attribute("Include")?.Value)
+                .Where(include => !string.IsNullOrWhiteSpace(include))
+                .Select(include => include!
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar))
+                .Select(include => Path.GetFullPath(Path.Combine(projectDirectory, include)))
+                .ToArray();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static IEnumerable<string> EnumerateHostedClientCandidates(string hostProjectPath, string hostProjectName)
+    {
+        var projectDirectory = Path.GetDirectoryName(hostProjectPath)
+            ?? throw new InvalidOperationException($"Could not determine the project directory for '{hostProjectPath}'.");
+        var solutionDirectory = Directory.GetParent(projectDirectory)?.FullName ?? projectDirectory;
+        var candidates = new List<string>();
+
+        if (hostProjectName.EndsWith(".Server", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseName = hostProjectName[..^".Server".Length];
+            candidates.Add(Path.Combine(solutionDirectory, $"{baseName}.Client", $"{baseName}.Client.csproj"));
+            candidates.Add(Path.Combine(solutionDirectory, "Client", "Client.csproj"));
+        }
+
+        candidates.Add(Path.Combine(solutionDirectory, $"{hostProjectName}.Client", $"{hostProjectName}.Client.csproj"));
+        candidates.Add(Path.Combine(solutionDirectory, "Client", "Client.csproj"));
+
+        return candidates.Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeHostedWebAssemblyClient(string projectPath, string projectText)
+    {
+        if (projectText.Contains("Microsoft.NET.Sdk.BlazorWebAssembly", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (projectText.Contains("Microsoft.AspNetCore.Components.WebAssembly", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var projectDirectory = Path.GetDirectoryName(projectPath)
+            ?? throw new InvalidOperationException($"Could not determine the project directory for '{projectPath}'.");
+        return File.Exists(Path.Combine(projectDirectory, "wwwroot", "index.html"));
+    }
+
+    private static string? ResolveFirstExistingPath(string projectDirectory, params string[] relativePaths)
+    {
+        foreach (var relativePath in relativePaths)
+        {
+            var candidate = Path.Combine(projectDirectory, relativePath);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private static InstallReadinessCheck Pass(string id, string title, string message, string? filePath) =>
         new()
         {
@@ -341,5 +711,5 @@ public sealed class InstallReadinessAnalyzer
 
     private sealed record ProjectFileSnapshot(string Path, string Content);
 
-    private sealed record ResolvedHostProject(string Name, string ProjectPath);
+    private sealed record ResolvedProject(string Name, string ProjectPath);
 }

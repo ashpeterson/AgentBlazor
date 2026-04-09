@@ -6,7 +6,7 @@ using Spectre.Console.Cli;
 
 namespace AgentBlazor.Cli.Commands;
 
-public sealed class DoctorCommand : AsyncCommand<DoctorCommand.Settings>
+public sealed class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 {
     public sealed class Settings : CommandSettings
     {
@@ -34,12 +34,10 @@ public sealed class DoctorCommand : AsyncCommand<DoctorCommand.Settings>
                 return 1;
             }
 
-            var analyzer = new InstallReadinessAnalyzer();
+            var analyzer = new InstallValidationAnalyzer();
             var report = await analyzer.AnalyzeAsync(path, settings.HostProject);
-
             RenderReport(report);
-
-            return report.MissingCount > 0 ? 2 : 0;
+            return report.HasBlockingIssues ? 2 : 0;
         }
         catch (InvalidOperationException ex)
         {
@@ -67,46 +65,60 @@ public sealed class DoctorCommand : AsyncCommand<DoctorCommand.Settings>
         }
     }
 
-    private static void RenderReport(InstallReadinessReport report)
+    private static void RenderReport(InstallValidationReport report)
     {
-        AnsiConsole.Write(new Rule("[blue]AgentBlazor Readiness[/]").RuleStyle("blue"));
-        AnsiConsole.MarkupLine($"[blue]Input:[/] {Markup.Escape(report.InputPath)}");
-        AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(report.HostProjectName)}");
-        AnsiConsole.MarkupLine($"[blue]Project:[/] {Markup.Escape(report.HostProjectPath)}");
-        if (!string.IsNullOrWhiteSpace(report.UiProjectPath))
+        var readiness = report.Readiness;
+        AnsiConsole.Write(new Rule("[blue]AgentBlazor Validate[/]").RuleStyle("blue"));
+        AnsiConsole.MarkupLine($"[blue]Input:[/] {Markup.Escape(readiness.InputPath)}");
+        AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(readiness.HostProjectName)}");
+        AnsiConsole.MarkupLine($"[blue]Project:[/] {Markup.Escape(readiness.HostProjectPath)}");
+        if (!string.IsNullOrWhiteSpace(readiness.UiProjectPath))
         {
-            AnsiConsole.MarkupLine($"[blue]UI project:[/] {Markup.Escape(report.UiProjectPath)}");
+            AnsiConsole.MarkupLine($"[blue]UI project:[/] {Markup.Escape(readiness.UiProjectPath)}");
         }
         AnsiConsole.WriteLine();
 
-        var table = new Table().RoundedBorder();
-        table.AddColumn("Status");
-        table.AddColumn("Check");
-        table.AddColumn("Details");
+        var readinessTable = new Table().RoundedBorder();
+        readinessTable.AddColumn("Status");
+        readinessTable.AddColumn("Readiness Check");
+        readinessTable.AddColumn("Details");
 
-        foreach (var check in report.Checks)
+        foreach (var check in readiness.Checks)
         {
-            table.AddRow(
+            readinessTable.AddRow(
                 GetStatusMarkup(check.Status),
                 Markup.Escape(check.Title),
                 BuildDetailMarkup(check));
         }
 
-        AnsiConsole.Write(table);
+        AnsiConsole.Write(new Rule("[blue]Readiness[/]").RuleStyle("blue"));
+        AnsiConsole.Write(readinessTable);
         AnsiConsole.WriteLine();
 
-        var summaryColor = report.MissingCount > 0 ? "yellow" : "green";
-        AnsiConsole.MarkupLine(
-            $"[{summaryColor}]Summary:[/] {report.PassCount} passed, {report.WarningCount} warnings, {report.MissingCount} missing");
+        var validationTable = new Table().RoundedBorder();
+        validationTable.AddColumn("Status");
+        validationTable.AddColumn("Validation Check");
+        validationTable.AddColumn("Details");
 
-        if (report.MissingCount > 0)
+        foreach (var check in report.Checks)
         {
-            AnsiConsole.MarkupLine("[grey]Next step:[/] run `agentblazor scaffold --provider openai --diff` to preview the baseline wiring, or patch the missing items manually.");
+            validationTable.AddRow(
+                GetStatusMarkup(check.Status),
+                Markup.Escape(check.Title),
+                BuildDetailMarkup(check));
         }
 
-        if (report.HostShapeCheck?.Status == InstallReadinessStatus.Warning && !string.IsNullOrWhiteSpace(report.HostShapeCheck.SuggestedFix))
+        AnsiConsole.Write(new Rule("[blue]Validation[/]").RuleStyle("blue"));
+        AnsiConsole.Write(validationTable);
+        AnsiConsole.WriteLine();
+
+        var summaryColor = report.HasBlockingIssues ? "yellow" : "green";
+        AnsiConsole.MarkupLine(
+            $"[{summaryColor}]Summary:[/] readiness {readiness.PassCount}/{readiness.Checks.Count} pass with {readiness.WarningCount} warnings and {readiness.MissingCount} missing; validation {report.PassCount}/{report.Checks.Count} pass with {report.WarningCount} warnings and {report.MissingCount} missing");
+
+        if (report.HasBlockingIssues)
         {
-            AnsiConsole.MarkupLine($"[grey]Scaffold note:[/] {Markup.Escape(report.HostShapeCheck.SuggestedFix)}");
+            AnsiConsole.MarkupLine("[grey]Next step:[/] fix the missing readiness or validation items, then rerun `agentblazor validate`.");
         }
     }
 

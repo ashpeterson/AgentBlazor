@@ -12,6 +12,14 @@ public sealed record ScaffoldPlan
 
     public IReadOnlyList<ScaffoldPlanItem> Items { get; init; } = [];
 
+    public bool IsBlocked { get; init; }
+
+    public string? BlockTitle { get; init; }
+
+    public string? BlockReason { get; init; }
+
+    public string? BlockSuggestedFix { get; init; }
+
     public bool HasChanges => Items.Count > 0;
 }
 
@@ -28,6 +36,8 @@ public sealed record ScaffoldPlanItem
     public string Summary { get; init; } = string.Empty;
 
     public string Reason { get; init; } = string.Empty;
+
+    public string? Guidance { get; init; }
 }
 
 public enum ScaffoldPlanAction

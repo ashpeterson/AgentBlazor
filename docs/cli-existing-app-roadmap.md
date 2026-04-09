@@ -1,6 +1,6 @@
 # CLI Existing-App Roadmap
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 ## Goal
 
@@ -21,6 +21,7 @@ The CLI is no longer just an analyzer. It now supports the standard installer pa
 2. `agentblazor scaffold`
 3. `agentblazor scaffold --approve`
 4. `agentblazor doctor`
+5. `agentblazor validate`
 
 What is implemented now:
 
@@ -32,17 +33,28 @@ What is implemented now:
 - `doctor`
   - inspects an app for baseline AgentBlazor readiness
   - reports pass/warn/missing status for the baseline install surface
+  - reports when the host shape is outside the current standard scaffold path
+- `validate`
+  - runs the baseline readiness checks
+  - validates `.agentblazor/scaffold-manifest.json` when present
+  - confirms scaffold-tracked files still exist
 - `scaffold`
   - preview-first by default
   - supports `--diff`
   - supports `--approve`
+  - supports `--provider openai|azure-openai|ollama`
+  - keeps advanced and legacy Blazor hosts in review-first mode with safe additions plus manual-review items
+  - recognizes hosted WebAssembly server hosts as review-first instead of blocking them as unknown
+  - infers companion hosted WebAssembly client projects from project references so server-plus-client scaffold can target the correct UI files
+  - can now preview/apply the standard hosted WebAssembly server `Program.cs` path plus safe client `_Imports.razor`, shell, layout, and page edits
+  - still stops early only when the CLI cannot classify the host into a supported Blazor scaffold path
   - writes `.agentblazor/scaffold-manifest.json` on apply
   - supports local-source evaluation via `--use-local-source`
   - auto-detects the local AgentBlazor repo when run from this repository
 
 What is validated now:
 
-- CLI analysis tests are green: `106/106`
+- CLI analysis tests are green: `126/126`
 - `init --help` and `scaffold --help` are correct
 - fresh standard Blazor app smoke test under `/Users/...` succeeds through:
   - `init`
@@ -53,8 +65,7 @@ What is validated now:
 What is not done yet:
 
 - safe patching for nonstandard hosts such as Oqtane
-- provider selection as a guided CLI decision
-- `validate`
+- interactive provider selection and config generation
 - `diff` as a standalone command
 - additive commands such as `add workflow`, `add memory-source`, and `add mcp-server`
 
@@ -163,7 +174,8 @@ The first installable baseline should handle:
 
 Current limitation:
 
-- provider selection is still left as a human follow-up in `Program.cs`
+- scaffold can now write provider-specific registration, but environment-specific secrets and config values are still a human step
+- advanced-host support now includes a working hosted WebAssembly server+client path, but more exotic nonstandard hosts still fall back to review-first/manual work
 
 ## Safety Rules
 
@@ -250,7 +262,7 @@ Status:
 
 - substantially complete for standard Blazor hosts
 - preview, diff, approve, manifest, and local-source evaluation are implemented
-- remaining work is broadening host support and handling provider selection
+- remaining work is broadening host support and tightening provider/config guidance
 
 ### Phase 3: Incremental Add-ons
 
@@ -301,7 +313,7 @@ dotnet run --project src/AgentBlazor.Cli/AgentBlazor.Cli.csproj -- doctor /full/
 ## Known Constraints
 
 - Standard-host-first: `scaffold --approve` is intentionally conservative and is not yet safe for arbitrary complex hosts.
-- Provider decision missing: scaffold inserts the AgentBlazor startup block, but still leaves provider selection as a human step.
+- Provider config still needs a human: scaffold can insert provider registration, but secrets and environment-specific values are not generated.
 - Local-source evaluation is path-sensitive: verified under normal `/Users/...` paths. macOS `/tmp` symlink paths can distort `ProjectReference` resolution and are not the right evaluation path.
 - `doctor` currently treats local `ProjectReference`s as equivalent to package references, which is correct for local evaluation but should stay explicit in docs.
 
@@ -309,18 +321,19 @@ dotnet run --project src/AgentBlazor.Cli/AgentBlazor.Cli.csproj -- doctor /full/
 
 The next contributor should work in this order:
 
-1. Add provider guidance or provider selection to the scaffold flow.
-2. Improve nonstandard-host detection so scaffold can stop earlier and explain why.
-3. Add an explicit advanced-host path for solutions like Oqtane:
+1. Extend advanced-host support for solutions like Oqtane:
    - detect host shape
-   - downgrade risky edits to review-only items
+   - add safer patching where host structure is predictable
    - keep preview and diff strong
-4. Add `validate` as a higher-level post-install verification command.
-5. Start additive commands:
+2. Extend provider setup beyond registration guidance:
+   - environment variable and appsettings templates
+   - clearer host-specific configuration guidance
+3. Start additive commands:
    - `add workflow`
    - `add chat-widget`
    - `add memory-source`
    - `add mcp-server`
+4. Add `diff` as a standalone command.
 
 ## Worktree Notes
 

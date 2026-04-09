@@ -29,12 +29,17 @@ app.Configure(config =>
         .WithExample("doctor")
         .WithExample("doctor", "./MySolution.slnx", "--host", "MyBlazorApp");
 
+    config.AddCommand<ValidateCommand>("validate")
+        .WithDescription("Validate an AgentBlazor install using readiness checks plus scaffold audit data when available")
+        .WithExample("validate")
+        .WithExample("validate", "./MySolution.slnx", "--host", "MyBlazorApp");
+
     config.AddCommand<ScaffoldCommand>("scaffold")
         .WithDescription("Preview the baseline AgentBlazor install edits for an existing Blazor app")
         .WithExample("scaffold")
         .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp")
-        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--diff")
-        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--approve");
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--diff")
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--approve");
 });
 
 return await app.RunAsync(args);
