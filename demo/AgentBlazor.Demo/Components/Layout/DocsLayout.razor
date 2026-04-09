@@ -17,7 +17,12 @@
         </a>
 
         <nav class="docs-shell__nav" aria-label="Docs">
-            <a href="/docs" class="@(IsDocsHome || IsGettingStarted ? "is-active" : null)">Setup</a>
+            <a href="/docs" class="@(IsActive("/docs") ? "is-active" : null)" aria-current="@(IsActive("/docs") ? "page" : null)">Overview</a>
+            <a href="/docs/getting-started" class="@(IsActive("/docs/getting-started") ? "is-active" : null)" aria-current="@(IsActive("/docs/getting-started") ? "page" : null)">Getting Started</a>
+            <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)" aria-current="@(IsActive("/docs/cli") ? "page" : null)">CLI</a>
+            <a href="/docs/hosting-models" class="@(IsActive("/docs/hosting-models") ? "is-active" : null)" aria-current="@(IsActive("/docs/hosting-models") ? "page" : null)">Hosting</a>
+            <a href="/docs/workflows" class="@(IsActive("/docs/workflows") ? "is-active" : null)" aria-current="@(IsActive("/docs/workflows") ? "page" : null)">Workflows</a>
+            <a href="/docs/components" class="@(IsActive("/docs/components") ? "is-active" : null)" aria-current="@(IsActive("/docs/components") ? "page" : null)">Components</a>
         </nav>
 
         <div class="docs-shell__actions">
@@ -26,7 +31,56 @@
     </header>
 
     <main class="docs-shell__body">
-        @Body
+        <aside class="docs-shell__sidebar" aria-label="Documentation sections">
+            <div class="docs-shell__sidebar-card">
+                <p class="docs-shell__sidebar-label">Start Here</p>
+                <nav class="docs-shell__sidebar-nav">
+                    <a href="/docs" class="@(IsActive("/docs") ? "is-active" : null)">Docs Overview</a>
+                    <a href="/docs/getting-started" class="@(IsActive("/docs/getting-started") ? "is-active" : null)">Getting Started</a>
+                    <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)">CLI Guide</a>
+                </nav>
+            </div>
+
+            <div class="docs-shell__sidebar-card">
+                <p class="docs-shell__sidebar-label">Host Shapes</p>
+                <nav class="docs-shell__sidebar-nav">
+                    <a href="/docs/hosting-models" class="@(IsActive("/docs/hosting-models") ? "is-active" : null)">Hosting Models</a>
+                </nav>
+            </div>
+
+            <div class="docs-shell__sidebar-card">
+                <p class="docs-shell__sidebar-label">Authoring</p>
+                <nav class="docs-shell__sidebar-nav">
+                    <a href="/docs/workflows" class="@(IsActive("/docs/workflows") ? "is-active" : null)">Workflows</a>
+                    <a href="/docs/components" class="@(IsActive("/docs/components") ? "is-active" : null)">Components</a>
+                </nav>
+            </div>
+
+            <div class="docs-shell__sidebar-card">
+                <p class="docs-shell__sidebar-label">Operate</p>
+                <nav class="docs-shell__sidebar-nav">
+                    <a href="/docs/demo-tour" class="@(IsActive("/docs/demo-tour") ? "is-active" : null)">Demo Tour</a>
+                    <a href="/docs/troubleshooting" class="@(IsActive("/docs/troubleshooting") ? "is-active" : null)">Troubleshooting</a>
+                </nav>
+            </div>
+
+            <div class="docs-shell__sidebar-card">
+                <p class="docs-shell__sidebar-label">Plans</p>
+                <nav class="docs-shell__sidebar-nav">
+                    <a href="/docs/pricing" class="@(IsActive("/docs/pricing") ? "is-active" : null)">Pricing & Tiers</a>
+                </nav>
+            </div>
+
+            <div class="docs-shell__sidebar-callout">
+                <span>Validated Path</span>
+                <strong>OpenAI on a standard Blazor host is the primary production path today.</strong>
+                <small>Hosted WebAssembly server+client scaffold is supported. Advanced hosts stay review-first when automatic wiring would be risky.</small>
+            </div>
+        </aside>
+
+        <section class="docs-shell__content">
+            @Body
+        </section>
     </main>
 </div>
 
@@ -55,6 +109,9 @@
 
     private string CurrentPath => new Uri(NavigationManager.Uri).AbsolutePath.TrimEnd('/');
 
-    private bool IsDocsHome => string.Equals(CurrentPath, "/docs", StringComparison.OrdinalIgnoreCase);
-    private bool IsGettingStarted => string.Equals(CurrentPath, "/docs/getting-started", StringComparison.OrdinalIgnoreCase);
+    private bool IsActive(string path)
+    {
+        var normalizedPath = path.TrimEnd('/');
+        return string.Equals(CurrentPath, normalizedPath, StringComparison.OrdinalIgnoreCase);
+    }
 }

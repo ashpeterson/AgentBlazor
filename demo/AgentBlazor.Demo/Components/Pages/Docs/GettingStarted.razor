@@ -4,43 +4,74 @@
 
 <PageTitle>Getting Started — AgentBlazor Docs</PageTitle>
 
-<div class="guide-page">
-    <section class="guide-page__hero">
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Getting Started</MudChip>
-        <MudText Typo="Typo.h3" Class="mt-4 mb-2">From empty app to first workflow.</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary">
-            One package. One workflow. One route. One chat surface.
-        </MudText>
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Getting Started</p>
+        <h1 class="docs-hero__title">From package install to a route-scoped workflow.</h1>
+        <p class="docs-hero__lede">
+            The shortest successful path is still one package, one workflow, one route, and one chat surface.
+            If you want the fastest baseline install, use the CLI first. If you want full control, wire the runtime by hand.
+        </p>
+
+        <div class="docs-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/cli">Use the CLI path</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">See the live workflow demo</MudButton>
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">1. Install</MudText>
-        <pre class="guide-page__code"><code>dotnet add package AgentBlazor</code></pre>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            Optional discovery step: install the CLI and run <code>agentblazor init ./MySolution.sln --host MyBlazorApp</code> to generate <code>.agentblazor/AGENT.md</code>.
-        </MudText>
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>1. Optional CLI-first path</h2>
+                <p>Use this when you want preview-first install guidance and scaffolded baseline wiring.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --prerelease
+agentblazor init ./MySolution.slnx --host MyBlazorApp
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
+agentblazor doctor ./MySolution.slnx --host MyBlazorApp
+agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
+
+        <div class="docs-note">
+            <strong>Important:</strong> scaffold can write provider registration and baseline files, but you still supply the actual API keys
+            and environment-specific configuration values yourself.
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">2. Register</MudText>
-        <pre class="guide-page__code"><code>using AgentBlazor;
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>2. Install the package</h2>
+                <p>This is the manual runtime path and remains the cleanest way to understand the surface area.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet add package AgentBlazor</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>3. Configure services</h2>
+                <p>The primary validated production path today is OpenAI via <code>options.UseOpenAI(...)</code>.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>using AgentBlazor;
 using MudBlazor.Services;
 
 builder.Services.AddMudServices();
 
 builder.Services.AddAgentBlazor(options =&gt;
 {
-    // Use OpenAI (or UseOllama for local)
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
         model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
 
-    // Optional: Enable Pro tier features
-    // options.UseProLicense("AB-PRO-YOUR-KEY-HERE");
-
     options.ConfigureBuilder(agentBuilder =&gt;
     {
-        // Register your workflow capability
         agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;(
             "Operations Agent",
             agent =&gt;
@@ -50,42 +81,79 @@ builder.Services.AddAgentBlazor(options =&gt;
             });
     });
 });</code></pre>
+
+        <div class="docs-note">
+            <strong>Other providers:</strong> <code>UseAzureOpenAI(...)</code> and <code>UseOllama(...)</code> are supported,
+            but OpenAI is the primary path to validate first in a real app.
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">3. Add The Host Shell</MudText>
-        <pre class="guide-page__code"><code>// Components/App.razor
-&lt;link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" /&gt;
-&lt;link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" /&gt;
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>4. Add the host shell</h2>
+                <p>The exact files vary by host shape. Standard Blazor Web App and hosted WebAssembly are the main automatic paths today.</p>
+            </div>
+        </div>
+
+        <div class="docs-callout-grid">
+            <div class="docs-callout">
+                <h3>Standard Blazor Web App</h3>
+                <pre class="docs-code"><code>// Components/App.razor
+&lt;link rel="stylesheet" href="@@Assets["_content/MudBlazor/MudBlazor.min.css"]" /&gt;
+&lt;link rel="stylesheet" href="@@Assets[AgentBlazorAssetPaths.Css]" /&gt;
 ...
-&lt;script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"&gt;&lt;/script&gt;
-&lt;script src="@Assets[AgentBlazorAssetPaths.Js]"&gt;&lt;/script&gt;
+&lt;script src="@@Assets["_content/MudBlazor/MudBlazor.min.js"]"&gt;&lt;/script&gt;
+&lt;script src="@@Assets[AgentBlazorAssetPaths.Js]"&gt;&lt;/script&gt;
 
 // MainLayout.razor
 &lt;MudThemeProvider /&gt;
 &lt;MudPopoverProvider /&gt;
 &lt;MudDialogProvider /&gt;
 &lt;MudSnackbarProvider /&gt;</code></pre>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            See the starter sample for the full runnable host shell.
-        </MudText>
+            </div>
+            <div class="docs-callout">
+                <h3>Hosted WebAssembly server + client</h3>
+                <p>The CLI can infer the companion client project from server <code>ProjectReference</code> entries and patch the standard server
+                startup path plus safe client files such as <code>_Imports.razor</code>, <code>wwwroot/index.html</code>, layout, and page files.</p>
+            </div>
+            <div class="docs-callout">
+                <h3>Advanced hosts</h3>
+                <p>Legacy <code>_Host.cshtml</code> server apps and other recognizable custom hosts stay review-first. The CLI will add safe files,
+                then tell you which startup, shell, or layout locations still need manual wiring.</p>
+            </div>
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">4. Map Endpoints</MudText>
-        <pre class="guide-page__code"><code>var app = builder.Build();
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>5. Map endpoints</h2>
+                <p>The runtime endpoint must be mapped after the app is built or the chat UI will render without a working backend.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>var app = builder.Build();
 
 app.MapRazorComponents&lt;App&gt;()
     .AddInteractiveServerRenderMode();
 app.MapAgentBlazorEndpoints();</code></pre>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            The chat UI can render without this call, but the runtime will not respond.
-        </MudText>
+
+        <div class="docs-note">
+            <strong>Hosted WebAssembly note:</strong> the same server-side endpoint mapping still matters. The client UI files live in the companion
+            client project, but the runtime endpoint is still exposed from the server host.
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">5. Define Capabilities</MudText>
-        <pre class="guide-page__code"><code>using AgentBlazor.App;
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>6. Define one capability class</h2>
+                <p>Use attributes for semantic actions and let the runtime handle approvals, structured results, and next-step suggestions.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>using AgentBlazor.App;
 using AgentBlazor.Attributes;
 
 [AgentCapability("operations",
@@ -114,38 +182,48 @@ public sealed class OperationsCapabilities(IOperationsService ops)
 }</code></pre>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">6. Render</MudText>
-        <pre class="guide-page__code"><code>@using AgentBlazor.Components
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>7. Render a chat surface</h2>
+                <p>Use the floating widget for ambient help or the full surface when chat should be part of the page layout.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>@@using AgentBlazor.Components
 
 &lt;AgentChatWidget
     Title="Operations"
     Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
     Width="30rem"
     Height="68vh" /&gt;</code></pre>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            Use <code>AgentChatWidget</code> for a floating assistant or <code>AgentChatSurface</code> when the chat should live inside the page layout.
-        </MudText>
+
+        <div class="docs-note">
+            <strong>Use <code>AgentChatSurface</code> instead</strong> when you want the chat to stay embedded inside a workflow page or dashboard layout.
+        </div>
     </section>
 
-    <section class="guide-page__section">
-        <MudText Typo="Typo.h5">7. Run</MudText>
-        <div class="guide-page__chips">
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>8. Verify the install</h2>
+                <p>Use the runtime and CLI checks together.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet run
+agentblazor doctor ./MySolution.slnx --host MyBlazorApp
+agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
+
+        <div class="docs-inline-list">
             <span>Assess the workflow</span>
             <span>Explain blockers</span>
             <span>Prepare the draft</span>
         </div>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            See the <MudLink Href="/demo/components">component explorer</MudLink> for all 14 agentic components and <MudLink Href="/docs">return to docs</MudLink> for the setup overview.
-        </MudText>
-    </section>
 
-    <section class="guide-page__footer">
-        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs">
-            Back
-        </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
-            Open live demo
-        </MudButton>
+        <div class="docs-note">
+            See the <MudLink Href="/demo/components">component explorer</MudLink> for the current deterministic UI wrappers and return to the
+            <MudLink Href="/docs">docs overview</MudLink> for the install map.
+        </div>
     </section>
 </div>

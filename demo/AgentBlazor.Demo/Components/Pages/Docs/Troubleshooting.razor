@@ -1,0 +1,119 @@
+@page "/docs/troubleshooting"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Troubleshooting — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Troubleshooting</p>
+        <h1 class="docs-hero__title">Check the runtime path before guessing.</h1>
+        <p class="docs-hero__lede">
+            Most setup failures are not mysterious. They usually reduce to provider configuration, missing runtime registration,
+            missing endpoint mapping, absent shell assets, or a host shape the scaffold path is intentionally refusing to guess about.
+        </p>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>First commands to run</h2>
+                <p>These are the fastest checks for an existing app.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>agentblazor doctor ./MySolution.slnx --host MyBlazorApp
+agentblazor validate ./MySolution.slnx --host MyBlazorApp
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Agent UI renders but nothing responds</h2>
+                <p>The host shell and endpoint path are the first things to verify.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Confirm <code>AddMudServices()</code> is registered.</li>
+            <li>Confirm <code>AddAgentBlazor(...)</code> runs before <code>builder.Build()</code>.</li>
+            <li>Confirm <code>app.MapAgentBlazorEndpoints()</code> is called after the app is built.</li>
+            <li>Confirm the MudBlazor and AgentBlazor CSS and JS assets are mounted in the host shell.</li>
+            <li>Confirm the layout includes <code>MudThemeProvider</code>, <code>MudPopoverProvider</code>, <code>MudDialogProvider</code>, and <code>MudSnackbarProvider</code>.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Actions do not appear</h2>
+                <p>This is usually a workflow registration or route-scoping issue.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Check the class has <code>[AgentCapability("...")]</code>.</li>
+            <li>Check the methods are marked with <code>[AgentAction(...)]</code>.</li>
+            <li>Check the capability class is registered with <code>AddWorkflow&lt;T&gt;()</code>.</li>
+            <li>Check <code>WithRoutePrefixes(...)</code> actually matches the current page route.</li>
+            <li>Keep the capability semantic. Do not expect every page control to become an action automatically.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Scaffold stops early or stays review-first</h2>
+                <p>That usually means the CLI recognized a nonstandard host and chose safety over blind edits.</p>
+            </div>
+        </div>
+
+        <div class="docs-callout-grid">
+            <div class="docs-callout">
+                <h3>Standard host</h3>
+                <p>Full scaffold/apply path for package references, startup wiring, shell files, layout, workflow, and chat entry point.</p>
+            </div>
+            <div class="docs-callout">
+                <h3>Recognizable advanced host</h3>
+                <p>Legacy server, hosted WebAssembly variants, and other custom Blazor hosts may stay review-first for the risky parts.</p>
+            </div>
+            <div class="docs-callout">
+                <h3>Unclassified host</h3>
+                <p>The CLI blocks instead of guessing. That is a safety feature, not a partial failure.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Provider issues</h2>
+                <p>The current validated production path is OpenAI. Provider configuration is still a human step.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Verify your OpenAI API key is present and non-empty.</li>
+            <li>Verify <code>OpenAI:Model</code> resolves to a tool-capable model such as <code>gpt-5.4-mini</code>.</li>
+            <li>If using scaffold, remember <code>--provider</code> writes registration code but not your real secrets.</li>
+            <li>Azure OpenAI and Ollama remain supported, but they are secondary validation targets today.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Pro feature issues</h2>
+                <p>Paid features are service-oriented and depend on <code>UseProLicense()</code>.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Confirm the host calls <code>options.UseProLicense("AB-PRO-...")</code>.</li>
+            <li>Confirm the SQLite data directory is writable when you override it.</li>
+            <li>Use <code>/demo/dashboard</code> as the reference surface for the Pro dashboard.</li>
+            <li>Do not expect the free runtime to include durable analytics or audit storage automatically.</li>
+        </ul>
+    </section>
+</div>

@@ -1,0 +1,91 @@
+@page "/docs/hosting-models"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Hosting Models — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Hosting Models</p>
+        <h1 class="docs-hero__title">Install behavior depends on the host shape.</h1>
+        <p class="docs-hero__lede">
+            AgentBlazor is meant to cover Blazor apps broadly, but the safest automatic edits are still host-shape dependent.
+            The CLI now distinguishes standard hosts, hosted WebAssembly server+client solutions, advanced recognizable hosts, and fully unclassified hosts.
+        </p>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Standard Blazor Web App</h2>
+                <p>This is the cleanest automatic install path today.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>What scaffold can patch</strong>
+                <p><code>Program.cs</code>, <code>App.razor</code>, main layout providers, starter workflow file, and a chat entry page.</p>
+            </div>
+            <div class="docs-card">
+                <strong>What you still do</strong>
+                <p>Supply real provider configuration values and adapt the starter workflow to your app’s real services and routes.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Hosted WebAssembly server + client</h2>
+                <p>The CLI now supports the standard server-plus-client path instead of treating it as unsupported.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>The server project remains the host entry point for CLI commands.</li>
+            <li>The CLI infers the companion client project from <code>ProjectReference</code> entries and common hosted naming patterns.</li>
+            <li>Server startup wiring can be patched in the standard <code>Program.cs</code> path.</li>
+            <li>Safe client files such as <code>_Imports.razor</code>, <code>wwwroot/index.html</code>, layout, and page files can be patched automatically.</li>
+            <li><code>doctor</code> and <code>validate</code> now surface the inferred UI project when relevant.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Advanced recognizable hosts</h2>
+                <p>These paths are supported, but intentionally review-first when the automatic path would be brittle.</p>
+            </div>
+        </div>
+
+        <div class="docs-callout-grid">
+            <div class="docs-callout">
+                <h3>Legacy Blazor Server</h3>
+                <p>Signals like <code>Startup.cs</code>, <code>_Host.cshtml</code>, <code>AddServerSideBlazor()</code>, and <code>MapBlazorHub()</code>
+                move the CLI into a safer review-first mode with targeted manual guidance.</p>
+            </div>
+            <div class="docs-callout">
+                <h3>Oqtane-style custom hosts</h3>
+                <p>Safe file additions still preview or apply, but composition-layer, shell, and routing changes stay manual because the host architecture is intentionally nonstandard.</p>
+            </div>
+            <div class="docs-callout">
+                <h3>What validate does here</h3>
+                <p><code>validate</code> now treats unresolved manual-review items as real install gaps so review-first hosts are not falsely reported as complete.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>When scaffold blocks entirely</h2>
+                <p>The CLI only stops early when it cannot classify the app into a supported Blazor scaffold path.</p>
+            </div>
+        </div>
+
+        <div class="docs-note">
+            <strong>Design rule:</strong> failing early is safer than inventing startup, shell, or endpoint edits in a host shape the CLI does not understand well enough yet.
+        </div>
+    </section>
+</div>

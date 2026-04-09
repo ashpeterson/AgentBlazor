@@ -1,0 +1,130 @@
+@page "/docs/components"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Components — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Component Reference</p>
+        <h1 class="docs-hero__title">Chat surfaces first, deterministic wrappers where they help.</h1>
+        <p class="docs-hero__lede">
+            AgentBlazor is not meant to turn an app into chat-driven clicking. The main UI surface is usually a route-scoped workflow plus
+            either <code>AgentChatWidget</code> or <code>AgentChatSurface</code>. Deterministic wrappers are there when the host wants the agent
+            to interact with specific MudBlazor-friendly controls safely.
+        </p>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Primary chat surfaces</h2>
+                <p>These are the main host-facing components most apps start with.</p>
+            </div>
+        </div>
+
+        <div class="docs-definition-grid">
+            <div class="docs-definition">
+                <strong><code>AgentChatWidget</code></strong>
+                <p>Floating assistant for ambient help, route-scoped prompts, and lightweight operator workflows.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>AgentChatSurface</code></strong>
+                <p>Embedded chat panel for dashboards, workflow pages, and layouts where the assistant should stay visible.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Current deterministic UI wrappers</h2>
+                <p>The demo component explorer focuses on the runtime wrappers that are already useful as host-owned control surfaces.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card"><strong><code>AgentDataGrid</code></strong><p>Sort, filter, page, and focus grid rows through deterministic actions.</p></div>
+            <div class="docs-card"><strong><code>AgentForm</code></strong><p>Validate, reset, and submit a host-owned form model.</p></div>
+            <div class="docs-card"><strong><code>AgentDialog</code></strong><p>Open, confirm, and close dialogs while the host still owns the content.</p></div>
+            <div class="docs-card"><strong><code>AgentNavMenu</code></strong><p>Expose safe route navigation actions from a host-defined menu.</p></div>
+            <div class="docs-card"><strong><code>AgentTabs</code></strong><p>Move between host-owned tabs without replacing the tab surface.</p></div>
+            <div class="docs-card"><strong><code>AgentSelect</code></strong><p>Set or clear values from a known option list.</p></div>
+            <div class="docs-card"><strong><code>AgentAutocomplete</code></strong><p>Drive query text and option selection in autocomplete surfaces.</p></div>
+            <div class="docs-card"><strong><code>AgentDatePicker</code></strong><p>Set one date from typed or natural-language input.</p></div>
+            <div class="docs-card"><strong><code>AgentDateRangePicker</code></strong><p>Apply a start and end date through one component contract.</p></div>
+            <div class="docs-card"><strong><code>AgentTreeView</code></strong><p>Expand, collapse, and select nodes inside a hierarchical host-owned tree.</p></div>
+            <div class="docs-card"><strong><code>AgentStepper</code></strong><p>Advance or jump through structured workflow steps.</p></div>
+            <div class="docs-card"><strong><code>AgentCommandBar</code></strong><p>Map natural-language requests onto a curated command surface.</p></div>
+            <div class="docs-card"><strong><code>AgentFileUpload</code></strong><p>Attach, remove, and inspect files while preserving workflow policy.</p></div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>When to use them</h2>
+                <p>Keep the wrappers subordinate to the workflow model.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Start with one workflow capability plus one chat surface.</li>
+            <li>Add deterministic wrappers when the agent must safely manipulate a specific host-owned control.</li>
+            <li>Prefer semantic workflow actions over exposing every possible control interaction directly.</li>
+            <li>Use the component explorer as a reference surface after the workflow story is clear.</li>
+        </ul>
+
+        <div class="docs-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/components">Open Component Explorer</MudButton>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Selection rules</h2>
+                <p>Choose the lightest surface that preserves host control.</p>
+            </div>
+        </div>
+
+        <div class="docs-check-grid">
+            <div class="docs-check">
+                <strong>Use chat surfaces when</strong>
+                <ul>
+                    <li>The workflow is primarily semantic.</li>
+                    <li>The page already has its own host-owned UI.</li>
+                    <li>You want route-scoped agent help without redesigning the screen.</li>
+                </ul>
+            </div>
+            <div class="docs-check">
+                <strong>Use deterministic wrappers when</strong>
+                <ul>
+                    <li>The agent must safely manipulate a specific control.</li>
+                    <li>The host needs deterministic filtering, selection, or navigation actions.</li>
+                    <li>You want proof of UI execution without handing over the full UI surface.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Read next</h2>
+                <p>Go deeper into the live component reference or back up to workflow authoring.</p>
+            </div>
+        </div>
+
+        <div class="docs-next-grid">
+            <a href="/demo/components" class="docs-next-card">
+                <strong>Component Explorer</strong>
+                <p>Inspect each deterministic wrapper in a focused live example.</p>
+            </a>
+            <a href="/docs/workflows" class="docs-next-card">
+                <strong>Workflows</strong>
+                <p>Return to the primary authoring model for route-scoped agent behavior.</p>
+            </a>
+        </div>
+    </section>
+</div>

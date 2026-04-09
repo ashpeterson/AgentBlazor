@@ -5,7 +5,113 @@
     scroll-behavior: smooth;
 }
 
+.landing-page__section {
+    width: min(76rem, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 0 0 3.25rem;
+    position: relative;
+}
+
+.landing-page__section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.landing-page__section-head h2 {
+    margin: 0.45rem 0 0;
+    color: #f3f8ff;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    line-height: 1.1;
+}
+
+.landing-page__eyebrow {
+    margin: 0;
+    color: rgba(214, 228, 247, 0.72);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.landing-page__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.95rem;
+}
+
+.landing-page__grid--demo {
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.landing-page__card {
+    display: grid;
+    gap: 0.55rem;
+    padding: 1.15rem;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 1.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(155deg, rgba(12, 22, 34, 0.86), rgba(8, 15, 24, 0.96));
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    position: relative;
+    overflow: hidden;
+}
+
+.landing-page__card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(110, 168, 254, 0.28);
+    background: linear-gradient(155deg, rgba(14, 26, 40, 0.92), rgba(9, 16, 27, 0.98));
+}
+
+.landing-page__card::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(110, 168, 254, 0.58), rgba(255, 106, 61, 0.28), transparent 72%);
+}
+
+.landing-page__card--featured {
+    border-color: rgba(255, 130, 94, 0.28);
+    background:
+        radial-gradient(circle at top right, rgba(255, 106, 61, 0.12), transparent 34%),
+        linear-gradient(150deg, rgba(17, 30, 45, 0.92), rgba(10, 17, 27, 0.98));
+}
+
+.landing-page__card strong {
+    color: #f3f8ff;
+    font-size: 1rem;
+}
+
+.landing-page__card p {
+    margin: 0;
+    color: rgba(217, 229, 245, 0.78);
+    line-height: 1.55;
+}
+
+.landing-page__card code {
+    color: #eef6ff;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.92em;
+}
+
 /* Smooth scroll for anchor links */
 html {
     scroll-behavior: smooth;
+}
+
+@media (max-width: 700px) {
+    .landing-page__section {
+        width: min(76rem, calc(100% - 1.25rem));
+        padding-bottom: 2.5rem;
+    }
+
+    .landing-page__section-head {
+        display: block;
+    }
 }

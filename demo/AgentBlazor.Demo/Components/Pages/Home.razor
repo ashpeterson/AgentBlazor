@@ -2,9 +2,99 @@
 @layout LandingLayout
 @using AgentBlazor.Demo.Components.Layout
 @using AgentBlazor.Demo.Components.Shared
+@using MudBlazor
 
 <PageTitle>AgentBlazor — Agent-first Blazor UI</PageTitle>
 
 <div class="landing-page">
     <LandingHero />
+
+    <section class="landing-page__section">
+        <div class="landing-page__section-head">
+            <div>
+                <p class="landing-page__eyebrow">Documentation Surface</p>
+                <h2>Move from setup to proof without leaving the site.</h2>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs">
+                Open docs
+            </MudButton>
+        </div>
+
+        <div class="landing-page__grid">
+            <a href="/docs/getting-started" class="landing-page__card">
+                <strong>Getting Started</strong>
+                <p>Manual runtime install, host shell wiring, endpoint mapping, and first workflow registration.</p>
+            </a>
+            <a href="/docs/cli" class="landing-page__card">
+                <strong>CLI Guide</strong>
+                <p>Preview-first <code>init</code>, <code>scaffold</code>, <code>doctor</code>, and <code>validate</code> flow for existing apps.</p>
+            </a>
+            <a href="/docs/hosting-models" class="landing-page__card">
+                <strong>Hosting Models</strong>
+                <p>Standard Blazor Web App, hosted WebAssembly server+client, and review-first advanced hosts.</p>
+            </a>
+            <a href="/docs/troubleshooting" class="landing-page__card">
+                <strong>Troubleshooting</strong>
+                <p>Provider, runtime endpoint, shell asset, and host-shape checks for real install failures.</p>
+            </a>
+        </div>
+    </section>
+
+    <section class="landing-page__section">
+        <div class="landing-page__section-head">
+            <div>
+                <p class="landing-page__eyebrow">Live Proofs</p>
+                <h2>See the workflow story first, then inspect the supporting surfaces.</h2>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
+                Open featured workflow
+            </MudButton>
+        </div>
+
+        <div class="landing-page__grid landing-page__grid--demo">
+            <a href="/demo/workflows/response-orchestration?reset=true" class="landing-page__card landing-page__card--featured">
+                <strong>Response Orchestration</strong>
+                <p>The primary workflow-first proof: supplier risk, audit evidence, and incident escalation in one route-scoped flow.</p>
+            </a>
+            <a href="/demo/workflows/release-dossier?reset=true" class="landing-page__card">
+                <strong>Release Dossier</strong>
+                <p>Secondary orchestration proof that shows guided subsystem progression and handoff preparation in another shape.</p>
+            </a>
+            <a href="/demo/components" class="landing-page__card">
+                <strong>Component Explorer</strong>
+                <p>The deterministic UI wrapper reference surface for MudBlazor-friendly host-owned controls.</p>
+            </a>
+            <a href="/demo/dashboard" class="landing-page__card">
+                <strong>Pro Dashboard</strong>
+                <p>The paid intelligence surface for analytics, audit, and durable operational feedback loops.</p>
+            </a>
+        </div>
+    </section>
+
+    <section class="landing-page__section">
+        <div class="landing-page__section-head">
+            <div>
+                <p class="landing-page__eyebrow">Current Boundary</p>
+                <h2>Free should look shippable. Paid should look compounding.</h2>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/pricing">
+                View pricing
+            </MudButton>
+        </div>
+
+        <div class="landing-page__grid">
+            <a href="/docs/pricing" class="landing-page__card">
+                <strong>Free</strong>
+                <p>Runtime, workflow authoring, built-in chat surfaces, and deterministic wrappers for proving value quickly in a real Blazor app.</p>
+            </a>
+            <a href="/demo/dashboard" class="landing-page__card">
+                <strong>Pro</strong>
+                <p>Analytics, audit, durable history, and smarter suggestions that make the app more useful over time.</p>
+            </a>
+            <a href="/docs/troubleshooting" class="landing-page__card">
+                <strong>Production posture</strong>
+                <p>OpenAI on a standard Blazor host is the first validated production path. Advanced hosts stay conservative and review-first.</p>
+            </a>
+        </div>
+    </section>
 </div>

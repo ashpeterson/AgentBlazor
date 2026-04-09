@@ -36,7 +36,7 @@
     z-index: 1;
     width: min(76rem, 100%);
     display: grid;
-    gap: 1.4rem;
+    gap: 1.55rem;
 }
 
 .landing-hero__intro {
@@ -116,6 +116,9 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: linear-gradient(155deg, rgba(12, 22, 34, 0.86), rgba(8, 15, 24, 0.96));
     box-shadow: 0 24px 52px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(12px);
+    position: relative;
+    overflow: hidden;
 }
 
 .landing-hero__proof-card--primary {
@@ -123,6 +126,16 @@
     background:
         radial-gradient(circle at top right, rgba(255, 106, 61, 0.12), transparent 32%),
         linear-gradient(150deg, rgba(17, 30, 45, 0.92), rgba(10, 17, 27, 0.98));
+}
+
+.landing-hero__proof-card::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(110, 168, 254, 0.52), rgba(255, 106, 61, 0.22), transparent 72%);
+    opacity: 0.85;
 }
 
 .landing-hero__proof-card p {
@@ -152,6 +165,11 @@
     color: rgba(214, 228, 247, 0.72);
     font-size: 0.88rem;
     font-weight: 600;
+    padding: 1rem 1.1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(7, 13, 24, 0.56);
+    backdrop-filter: blur(10px);
 }
 
 .landing-hero__plan-strip strong {

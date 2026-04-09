@@ -4,34 +4,161 @@
 
 <PageTitle>Docs — AgentBlazor</PageTitle>
 
-<div class="docs-page">
-    <section class="docs-page__hero">
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Docs</MudChip>
-        <MudText Typo="Typo.h3" Class="mt-4 mb-2">Build one workflow.</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Secondary">
-            Install. Register. Map. Render. Run.
-        </MudText>
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Documentation</p>
+        <h1 class="docs-hero__title">Accurate setup and authoring guidance for real Blazor apps.</h1>
+        <p class="docs-hero__lede">
+            AgentBlazor is a Blazor-native workflow runtime with in-app chat surfaces, deterministic component actions, approvals,
+            and route-scoped workflow registration. The validated provider path today is OpenAI via <code>options.UseOpenAI(...)</code>.
+        </p>
 
-        <div class="docs-page__hero-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">
-                Open setup
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">
-                Open demo
-            </MudButton>
+        <div class="docs-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">Getting Started</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">Open CLI Guide</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">Open Live Demo</MudButton>
         </div>
 
-        <div class="docs-page__prompt-strip">
-            <span>Install</span>
-            <span>Register</span>
-            <span>Map</span>
-            <span>Expose</span>
-            <span>Run</span>
+        <div class="docs-chip-row">
+            <span>OpenAI is the primary validated provider path</span>
+            <span>CLI is preview-first before apply</span>
+            <span>Hosted WebAssembly server+client scaffold is supported</span>
+            <span>Advanced hosts stay review-first when patching is risky</span>
         </div>
 
-        <pre class="guide-page__code docs-page__code mt-4"><code>dotnet add package AgentBlazor</code></pre>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-            Optional: run <code>agentblazor init ./MySolution.sln --host MyBlazorApp</code> to generate <code>.agentblazor/AGENT.md</code>.
-        </MudText>
+        <div class="docs-kpi-grid">
+            <div class="docs-kpi">
+                <strong>5-step flow</strong>
+                <span><code>init</code> -> <code>scaffold</code> -> <code>doctor</code> -> <code>validate</code></span>
+            </div>
+            <div class="docs-kpi">
+                <strong>3 provider flags</strong>
+                <span><code>openai</code>, <code>azure-openai</code>, and <code>ollama</code></span>
+            </div>
+            <div class="docs-kpi">
+                <strong>Review-first hosts</strong>
+                <span>Legacy server, hosted WebAssembly variants, and other recognizable nonstandard Blazor hosts</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Recommended run order</h2>
+                <p>The CLI onboarding flow is explicit and now matches the repository docs.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --prerelease
+agentblazor init ./MySolution.slnx --host MyBlazorApp
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
+agentblazor doctor ./MySolution.slnx --host MyBlazorApp
+agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
+
+        <div class="docs-note">
+            <strong>What still stays manual:</strong> provider secrets, environment-specific configuration values, and host-specific wiring
+            on advanced Blazor hosts where automatic patching would be unsafe.
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Choose the right path</h2>
+                <p>The docs are split by install flow and host shape, not by demo copy.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>Manual runtime install</strong>
+                <p>Use the package, runtime registration, host shell assets, endpoint mapping, and one workflow capability when you want to wire the app by hand.</p>
+                <small>Start on the Getting Started page.</small>
+            </div>
+            <div class="docs-card">
+                <strong>CLI-assisted install</strong>
+                <p>Use preview-first scaffold for the fastest baseline setup, then confirm the result with <code>doctor</code> and <code>validate</code>.</p>
+                <small>Best fit for standard Blazor hosts and the standard hosted WebAssembly server+client shape.</small>
+            </div>
+            <div class="docs-card">
+                <strong>Advanced review-first install</strong>
+                <p>Recognizable nonstandard hosts still get safe additions and targeted manual-review guidance instead of blind file edits.</p>
+                <small>Examples include legacy <code>_Host.cshtml</code> server apps and Oqtane-style hosts.</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Current product status</h2>
+                <p>The documentation site should make the current product boundary obvious.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>Ready now</strong>
+                <p>Workflow-first runtime, built-in chat surfaces, deterministic wrappers, preview-first CLI flow, and the featured live workflow routes.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Validated first</strong>
+                <p>OpenAI on a standard Blazor host is the primary production path. Hosted WebAssembly server+client scaffold is also now supported.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Still conservative</strong>
+                <p>Advanced hosts remain review-first when automatic startup, shell, or routing edits would be brittle or unsafe.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Paid value</strong>
+                <p>Analytics, audit, durable history, and smarter guidance over time, not gating baseline component actions.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Docs map</h2>
+                <p>These pages now track the current repo guidance instead of a demo-only setup story.</p>
+            </div>
+        </div>
+
+        <div class="docs-link-grid">
+            <a href="/docs/getting-started" class="docs-link-card">
+                <strong>Getting Started</strong>
+                <p>Manual install, service registration, host shell wiring, chat surfaces, and verification.</p>
+            </a>
+            <a href="/docs/cli" class="docs-link-card">
+                <strong>CLI Guide</strong>
+                <p>Command order, provider flags, preview/apply flow, and install verification.</p>
+            </a>
+            <a href="/docs/hosting-models" class="docs-link-card">
+                <strong>Hosting Models</strong>
+                <p>Standard Blazor Web App, hosted WebAssembly server+client, and review-first advanced hosts.</p>
+            </a>
+            <a href="/docs/workflows" class="docs-link-card">
+                <strong>Workflows</strong>
+                <p><code>AddWorkflow&lt;T&gt;()</code>, route scoping, approvals, and capability authoring.</p>
+            </a>
+            <a href="/docs/components" class="docs-link-card">
+                <strong>Components</strong>
+                <p>Chat surfaces plus the deterministic UI wrappers available in the runtime and demo explorer.</p>
+            </a>
+            <a href="/docs/demo-tour" class="docs-link-card">
+                <strong>Demo Tour</strong>
+                <p>The current live routes, why the funnel is intentionally narrow, and where each proof belongs.</p>
+            </a>
+            <a href="/docs/troubleshooting" class="docs-link-card">
+                <strong>Troubleshooting</strong>
+                <p>What to check when the agent does not respond, actions do not appear, or scaffold stops early.</p>
+            </a>
+            <a href="/docs/pricing" class="docs-link-card">
+                <strong>Pricing & Tiers</strong>
+                <p>The current free, Pro, and Enterprise boundary and where the paid value actually lives.</p>
+            </a>
+        </div>
     </section>
 </div>

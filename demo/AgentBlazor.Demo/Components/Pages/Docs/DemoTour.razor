@@ -1,0 +1,103 @@
+@page "/docs/demo-tour"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Demo Tour — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Demo Tour</p>
+        <h1 class="docs-hero__title">The demo is a funnel, not a route zoo.</h1>
+        <p class="docs-hero__lede">
+            The current demo surface is intentionally narrow. It should teach the product story, prove the workflow-first path,
+            and only then expose the component explorer and paid dashboard as supporting surfaces.
+        </p>
+
+        <div class="docs-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">Open featured workflow</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/components">Open component explorer</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/dashboard">Open Pro dashboard</MudButton>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Visible funnel</h2>
+                <p>These are the primary routes that currently matter to the public-facing story.</p>
+            </div>
+        </div>
+
+        <div class="docs-definition-grid">
+            <div class="docs-definition">
+                <strong><code>/</code></strong>
+                <p>The landing page explains the platform and points people into docs or the featured live workflow.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>/docs</code></strong>
+                <p>The developer-facing setup and reference site.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>/demo</code></strong>
+                <p>A launch route that immediately redirects into the featured response-orchestration workflow.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>/demo/workflows/response-orchestration?reset=true</code></strong>
+                <p>The primary proof of the workflow-first product story.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>/demo/workflows/release-dossier?reset=true</code></strong>
+                <p>The secondary workflow proof that shows cross-surface orchestration in another shape.</p>
+            </div>
+            <div class="docs-definition">
+                <strong><code>/demo/components</code></strong>
+                <p>The supporting component reference surface, not the opening act.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>What each surface proves</h2>
+                <p>The demo should map clearly to the product claims.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>Landing page</strong>
+                <p>AgentBlazor is a Blazor-native workflow layer, not a generic chat shell.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Featured workflow</strong>
+                <p>One prompt can assess, advance, and prepare a real app workflow with approvals and guided state changes.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Components explorer</strong>
+                <p>Deterministic UI wrappers exist for host-owned controls when workflow actions are not enough.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Pro dashboard</strong>
+                <p>Paid value is service-oriented: analytics, audit, durable history, and smarter suggestions over time.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Supporting routes</h2>
+                <p>These are useful proof routes, but they are not the top-level funnel.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li><code>/demo/workflows/supplier-compliance</code> for focused risk review.</li>
+            <li><code>/demo/workflows/file-audit-bundle</code> for file policy and remote-handoff workflow state.</li>
+            <li><code>/demo/workflows/incident-escalation</code> for escalation and recovery scenarios.</li>
+            <li><code>/demo/workflows/runtime-probe</code> for runtime stop/reconnect validation.</li>
+            <li><code>/demo/dashboard</code> for the paid dashboard surface.</li>
+        </ul>
+    </section>
+</div>

@@ -1,0 +1,117 @@
+@page "/docs/pricing"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Pricing & Tiers — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Pricing & Tiers</p>
+        <h1 class="docs-hero__title">Free ships the workflow. Pro makes the app smarter with use.</h1>
+        <p class="docs-hero__lede">
+            The current product boundary is no longer about gating basic component actions. The free tier should be enough to prove
+            value in a real Blazor app, while paid value is concentrated in durable intelligence, analytics, and audit-oriented services.
+        </p>
+
+        <div class="docs-chip-row">
+            <span>Free: runtime + components + chat surfaces</span>
+            <span>Pro: analytics + audit + durable history + smart suggestions</span>
+            <span>Enterprise: governance + support + org-scale requirements</span>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Current tiers</h2>
+                <p>The current pricing model is straightforward.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>Free</strong>
+                <p>$0 for solo developers, proof-of-concepts, and the first production validation pass.</p>
+                <small>Full runtime, built-in components, dev tools, and the workflow-first authoring path.</small>
+            </div>
+            <div class="docs-card">
+                <strong>Pro</strong>
+                <p>$29 per seat per month for teams that want durable intelligence and operational visibility.</p>
+                <small>Persistent history, analytics, audit, and smarter suggestions.</small>
+            </div>
+            <div class="docs-card">
+                <strong>Enterprise</strong>
+                <p>Custom pricing for larger organizations with governance, SSO, SLA, and support requirements.</p>
+                <small>The team and compliance layer.</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>What free includes</h2>
+                <p>The free tier is meant to feel shippable, not crippled.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Deterministic runtime execution.</li>
+            <li>Built-in agentic components and chat surfaces.</li>
+            <li>Workflow registration through <code>AddWorkflow&lt;T&gt;()</code>.</li>
+            <li>AG-UI hosting and development tooling.</li>
+            <li>The drop-in component action surface that is already shipped today.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>What Pro enables today</h2>
+                <p>Paid value currently comes from services, persistence, and operational feedback loops.</p>
+            </div>
+        </div>
+
+        <div class="docs-definition-grid">
+            <div class="docs-definition">
+                <strong>Action history</strong>
+                <p>Durable SQLite-backed history instead of the free null implementation.</p>
+            </div>
+            <div class="docs-definition">
+                <strong>Adaptive suggestions</strong>
+                <p>Smarter next-step guidance instead of static defaults.</p>
+            </div>
+            <div class="docs-definition">
+                <strong>Proactive insights</strong>
+                <p>Operational hints that surface without waiting for a prompt-first workflow.</p>
+            </div>
+            <div class="docs-definition">
+                <strong>Inspector persistence</strong>
+                <p>Durable inspector storage rather than development-only transient behavior.</p>
+            </div>
+        </div>
+
+        <div class="docs-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/dashboard">Open Pro dashboard demo</MudButton>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Enable Pro</h2>
+                <p>The paid path is still one registration call in the host.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>builder.Services.AddAgentBlazor(options =&gt;
+{
+    options.UseOpenAI(apiKey, "gpt-5.4-mini");
+    options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
+});</code></pre>
+
+        <div class="docs-note">
+            <strong>Important:</strong> the inspector itself is not a paid-only capability. Paid value is the durable intelligence and storage layer around the workflow.
+        </div>
+    </section>
+</div>

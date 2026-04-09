@@ -1,0 +1,148 @@
+@page "/docs/workflows"
+@layout DocsLayout
+@using MudBlazor
+
+<PageTitle>Workflows — AgentBlazor Docs</PageTitle>
+
+<div class="docs-article">
+    <section class="docs-hero">
+        <p class="docs-hero__eyebrow">Workflow Authoring</p>
+        <h1 class="docs-hero__title">Workflows are the primary authoring surface.</h1>
+        <p class="docs-hero__lede">
+            AgentBlazor is workflow-first. The typical host registers one workflow capability class with
+            <code>AddWorkflow&lt;TCapability&gt;()</code>, scopes it to one or more routes, and lets semantic actions drive the app with approvals and deterministic UI execution.
+        </p>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Register a workflow</h2>
+                <p>The standard pattern is one route-scoped agent backed by one capability class.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>options.ConfigureBuilder(agentBuilder =&gt;
+{
+    agentBuilder.AddWorkflow&lt;OpsReviewCapabilities&gt;("ops", agent =&gt;
+    {
+        agent.WithDescription("Guide the operator through the ops review workflow and explain the approval step.");
+        agent.WithRoutePrefixes("/ops-review");
+    });
+});</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Capability class shape</h2>
+                <p>Use semantic actions instead of exposing low-level UI clicks as your primary integration model.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>[AgentCapability("ops_review", Name = "Ops Review", Description = "Starter workflow for a route-scoped review flow.")]
+public sealed class OpsReviewCapabilities(OpsReviewService reviewService)
+{
+    [AgentAction("Assess the current review workflow")]
+    public Task&lt;CapabilityResult&gt; AssessAsync()
+        =&gt; reviewService.AssessAsync();
+
+    [AgentAction("Prepare the review draft", RequiresApproval = true)]
+    public Task&lt;CapabilityResult&gt; PrepareDraftAsync()
+        =&gt; reviewService.PrepareDraftAsync();
+}</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>What matters most</h2>
+                <p>Keep the capability model semantic, narrow, and route-aware.</p>
+            </div>
+        </div>
+
+        <div class="docs-card-grid">
+            <div class="docs-card">
+                <strong>Route scoping</strong>
+                <p>Use <code>WithRoutePrefixes(...)</code> so the agent is active only where the workflow makes sense.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Approval boundaries</strong>
+                <p>Set <code>RequiresApproval = true</code> on actions that mutate real state, submit work, or cross a governance boundary.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Structured results</strong>
+                <p>Return <code>CapabilityResult</code> so the runtime can surface success, warnings, blocked states, and next actions consistently.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Host-owned services</strong>
+                <p>Inject your own application services and keep business logic there. Capabilities should orchestrate, not own the domain.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Return patterns</h2>
+                <p>These are the main response shapes the runtime expects.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>return CapabilityResult.Success("Operation completed.");
+return CapabilityResult.Success("Completed.").WithWarning("One item was skipped.");
+return CapabilityResult.Success("Draft prepared.").WithNextActions("Review the draft", "Approve the submission");
+return CapabilityResult.Blocked("Select a record first.");
+return CapabilityResult.Failure("The operation could not be completed.");</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Authoring checklist</h2>
+                <p>A small number of rules keeps workflows readable and production-friendly.</p>
+            </div>
+        </div>
+
+        <div class="docs-check-grid">
+            <div class="docs-check">
+                <strong>Do</strong>
+                <ul>
+                    <li>Keep actions semantic and user-facing.</li>
+                    <li>Use route prefixes to scope the workflow to the right pages.</li>
+                    <li>Mark mutating or risky actions with approval requirements.</li>
+                    <li>Return structured results with next actions when possible.</li>
+                </ul>
+            </div>
+            <div class="docs-check">
+                <strong>Do not</strong>
+                <ul>
+                    <li>Treat every low-level UI click as the main authoring model.</li>
+                    <li>Hide domain logic in capability classes.</li>
+                    <li>Leave routes unscoped if the workflow is page-specific.</li>
+                    <li>Use chat as a substitute for the normal UI when the normal UI should remain primary.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Read next</h2>
+                <p>Move from workflow authoring into chat surfaces or component-level control.</p>
+            </div>
+        </div>
+
+        <div class="docs-next-grid">
+            <a href="/docs/components" class="docs-next-card">
+                <strong>Components</strong>
+                <p>See when to stay at the workflow level and when to add deterministic wrappers.</p>
+            </a>
+            <a href="/demo/workflows/response-orchestration?reset=true" class="docs-next-card">
+                <strong>Featured Workflow Demo</strong>
+                <p>See the workflow-first story on the primary live route.</p>
+            </a>
+        </div>
+    </section>
+</div>
