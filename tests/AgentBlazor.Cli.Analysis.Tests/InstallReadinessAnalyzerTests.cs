@@ -81,7 +81,7 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
+                    <TargetFramework>net8.0</TargetFramework>
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
@@ -146,6 +146,53 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
         Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "mud-providers" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check =>
+            check.Id == "target-framework-support" &&
+            check.Status == InstallReadinessStatus.Pass &&
+            check.Message.Contains("net8.0", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WhenHostTargetsUnsupportedFramework_ReportsMissingTargetFrameworkSupport()
+    {
+        var projectPath = CreateProject(
+            projectName: "UnsupportedTfmApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net7.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var analyzer = new InstallReadinessAnalyzer();
+
+        var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
+
+        Assert.Contains(report.Checks, check =>
+            check.Id == "target-framework-support" &&
+            check.Status == InstallReadinessStatus.Missing &&
+            check.Message.Contains("net7.0", StringComparison.Ordinal));
     }
 
     [Fact]

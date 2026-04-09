@@ -118,5 +118,5 @@ agentblazor validate
 - Earlier `0.1.0-preview.3` clean-app validation passed, but real-app runtime smoke exposed an open dependency-range issue where NuGet could float Microsoft Agents packages to an incompatible API. Use `0.1.0-preview.9` or later for private-preview testing.
 - Real-app tester checklist: `docs/private-preview-validation.md`.
 - Once real-project validation is complete, move to `nuget.org` for normal public installation.
-- The package currently targets `net10.0`.
+- The package currently targets `net8.0` through `net10.0`.
 - The current preview story should lead with the workflow-first app-layer positioning, not the removed planner/runtime architecture.

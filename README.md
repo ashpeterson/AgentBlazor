@@ -8,6 +8,8 @@ AgentBlazor is the Blazor-native execution and UX layer for agent workflows. It 
 
 Today, the most validated production provider path is OpenAI-compatible chat tools via `options.UseOpenAI(...)`. Azure OpenAI is also supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path; other providers remain secondary validation targets until they have matching real-app proof.
 
+The shipped AgentBlazor packages target `net8.0` through `net10.0`. The repo itself currently uses the .NET 10 SDK for local development, demo work, and package builds.
+
 ## What It Is
 
 - Semantic workflow execution for Blazor apps

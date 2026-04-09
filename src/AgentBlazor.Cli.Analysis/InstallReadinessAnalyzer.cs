@@ -18,10 +18,17 @@ public sealed class InstallReadinessAnalyzer
             ?? throw new InvalidOperationException($"Could not determine the host project directory for '{hostProject.Name}'.");
 
         var csprojText = await File.ReadAllTextAsync(hostProjectPath, ct).ConfigureAwait(false);
+        var hostTargetFrameworks = TargetFrameworkSupport.ReadTargetFrameworks(csprojText);
         var csharpContents = await ReadProjectFilesAsync(hostProjectDirectory, ".cs", ct).ConfigureAwait(false);
         var hostShape = AnalyzeHostShape(hostProjectPath, hostProjectDirectory, csprojText, csharpContents);
         var uiProject = await ResolveUiProjectAsync(hostProjectPath, hostProject.Name, csprojText, hostShape, ct).ConfigureAwait(false);
         var uiProjectPath = uiProject?.ProjectPath;
+        var uiProjectText = uiProjectPath is null
+            ? null
+            : await File.ReadAllTextAsync(uiProjectPath, ct).ConfigureAwait(false);
+        var uiTargetFrameworks = uiProjectText is null
+            ? Array.Empty<string>()
+            : TargetFrameworkSupport.ReadTargetFrameworks(uiProjectText).ToArray();
         var uiProjectDirectory = Path.GetDirectoryName(uiProjectPath ?? hostProjectPath)
             ?? throw new InvalidOperationException($"Could not determine the UI project directory for '{uiProjectPath ?? hostProjectPath}'.");
         var shellProjectDirectory = hostShape.Family == HostFamily.HostedWebAssembly
@@ -41,6 +48,7 @@ public sealed class InstallReadinessAnalyzer
 
         var checks = new List<InstallReadinessCheck>
         {
+            BuildTargetFrameworkSupportCheck(hostProjectPath, hostTargetFrameworks, uiProjectPath, uiTargetFrameworks),
             BuildHostShapeCheck(hostShape),
             BuildPackageCheck(hostProjectPath, csprojText),
             BuildMudServiceCheck(csharpContents, startupPath, hostShape.Family),
@@ -318,6 +326,72 @@ public sealed class InstallReadinessAnalyzer
         }
 
         throw new InvalidOperationException("No Blazor host project could be detected in the supplied solution.");
+    }
+
+    private static InstallReadinessCheck BuildTargetFrameworkSupportCheck(
+        string hostProjectPath,
+        IReadOnlyList<string> hostTargetFrameworks,
+        string? uiProjectPath,
+        IReadOnlyList<string> uiTargetFrameworks)
+    {
+        var unsupportedHostFrameworks = hostTargetFrameworks
+            .Where(targetFramework => !TargetFrameworkSupport.IsSupported(targetFramework))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var unsupportedUiFrameworks = uiTargetFrameworks
+            .Where(targetFramework => !TargetFrameworkSupport.IsSupported(targetFramework))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (hostTargetFrameworks.Count == 0)
+        {
+            return Missing(
+                "target-framework-support",
+                "Target framework support",
+                "Could not determine the host project's target framework.",
+                hostProjectPath,
+                $"Retarget the app to {TargetFrameworkSupport.DescribeSupportRange()} before installing AgentBlazor.");
+        }
+
+        if (unsupportedHostFrameworks.Length > 0)
+        {
+            return Missing(
+                "target-framework-support",
+                "Target framework support",
+                $"The host project targets unsupported framework(s): {string.Join(", ", unsupportedHostFrameworks)}. AgentBlazor currently supports {TargetFrameworkSupport.DescribeSupportRange()}.",
+                hostProjectPath,
+                $"Retarget the host project to {TargetFrameworkSupport.DescribeSupportRange()} before running scaffold or install.");
+        }
+
+        if (uiProjectPath is not null && uiTargetFrameworks.Count == 0)
+        {
+            return Missing(
+                "target-framework-support",
+                "Target framework support",
+                "Could not determine the hosted WebAssembly client project's target framework.",
+                uiProjectPath,
+                $"Retarget the client project to {TargetFrameworkSupport.DescribeSupportRange()} before installing AgentBlazor.");
+        }
+
+        if (unsupportedUiFrameworks.Length > 0)
+        {
+            return Missing(
+                "target-framework-support",
+                "Target framework support",
+                $"The hosted WebAssembly client project targets unsupported framework(s): {string.Join(", ", unsupportedUiFrameworks)}. AgentBlazor currently supports {TargetFrameworkSupport.DescribeSupportRange()}.",
+                uiProjectPath,
+                $"Retarget the client project to {TargetFrameworkSupport.DescribeSupportRange()} before running scaffold or install.");
+        }
+
+        var message = uiProjectPath is null
+            ? $"The host project targets supported framework(s): {string.Join(", ", hostTargetFrameworks)}."
+            : $"The host and UI projects target supported framework(s): host {string.Join(", ", hostTargetFrameworks)}; UI {string.Join(", ", uiTargetFrameworks)}.";
+
+        return Pass(
+            "target-framework-support",
+            "Target framework support",
+            message,
+            uiProjectPath ?? hostProjectPath);
     }
 
     private static InstallReadinessCheck BuildPackageCheck(string projectPath, string csprojText)

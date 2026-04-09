@@ -19,6 +19,22 @@ public sealed class ExistingAppScaffoldPlanner
         var canAutoPatchUi = !usesWebAssemblyClientUi;
         var canAutoPatchAdvancedUi = hostShape.Family == HostFamily.HostedWebAssembly && !string.IsNullOrWhiteSpace(readiness.UiProjectPath) && canAutoPatchUi;
         var canAutoPatchAdvancedStartup = hostShape.Family == HostFamily.HostedWebAssembly;
+        var targetFrameworkCheck = readiness.Checks.FirstOrDefault(check => check.Id == "target-framework-support");
+
+        if (targetFrameworkCheck?.Status == InstallReadinessStatus.Missing)
+        {
+            return new ScaffoldPlan
+            {
+                InputPath = solutionOrProjectPath,
+                HostProjectName = readiness.HostProjectName,
+                HostProjectPath = readiness.HostProjectPath,
+                Readiness = readiness,
+                IsBlocked = true,
+                BlockTitle = targetFrameworkCheck.Title,
+                BlockReason = targetFrameworkCheck.Message,
+                BlockSuggestedFix = targetFrameworkCheck.SuggestedFix
+            };
+        }
 
         if (hostShape.Kind == HostShapeKind.Unsupported)
         {
@@ -96,6 +112,17 @@ public sealed class ExistingAppScaffoldPlanner
 
         if (ShouldAddUiImports(readiness))
         {
+            items.Add(new ScaffoldPlanItem
+            {
+                Id = "ui-package-references",
+                Title = "Patch UI project references",
+                Action = ScaffoldPlanAction.Update,
+                TargetPath = readiness.UiProjectPath!,
+                Summary = "Add missing AgentBlazor and MudBlazor package references to the client UI project.",
+                Reason = "Client-side layout, shell, and chat changes need the AgentBlazor and MudBlazor assemblies referenced by the UI project.",
+                Guidance = BuildGuidance(hostShape.Family, "ui-package-references")
+            });
+
             items.Add(new ScaffoldPlanItem
             {
                 Id = "ui-imports",
@@ -229,6 +256,8 @@ public sealed class ExistingAppScaffoldPlanner
                 "Mount `AgentChatWidget` or `AgentChatSurface` on a page/component that is reachable from the legacy `_Host`-based app shell.",
             (HostFamily.HostedWebAssembly, "ui-imports") =>
                 "Review the hosted WebAssembly client `_Imports.razor` manually. For the browser-safe remote path, add the `AgentBlazor.Client` package to the client project and import `AgentBlazor.Client.Chat` before placing remote chat components.",
+            (HostFamily.HostedWebAssembly, "ui-package-references") =>
+                "Review the hosted WebAssembly client project references manually. For the browser-safe remote path, prefer the `AgentBlazor.Client` package; add `MudBlazor` only if the client app already depends on MudBlazor-compatible browser UI.",
             (HostFamily.HostedWebAssembly, "mud-services") =>
                 "Add MudBlazor services in the hosted WebAssembly server startup path, typically `Program.cs`, alongside the API/static file pipeline that serves the client app.",
             (HostFamily.HostedWebAssembly, "agentblazor-services") =>

@@ -92,6 +92,7 @@ Before publishing:
 - confirm the package contains `README.md`
 - confirm the package contains the internal AgentBlazor assemblies under `lib/net10.0/`
 - confirm `AgentBlazor.Cli` installs from the same package version and reports that version with `agentblazor --version`
+- confirm the package contains the internal AgentBlazor assemblies under `lib/net8.0/`, `lib/net9.0/`, and `lib/net10.0/`
 - confirm docs and README describe the current parity scope honestly
 
 Private preview reference:

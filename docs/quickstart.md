@@ -4,7 +4,8 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 
 ## Prerequisites
 
-- .NET 10 SDK
+- AgentBlazor packages support `net8.0` through `net10.0`
+- use the .NET 10 SDK when working from this repo or running the included demo/sample apps
 - An OpenAI API key, or an Azure OpenAI resource endpoint, deployment name, and API key or Azure credential
 
 The most validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI is supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path.

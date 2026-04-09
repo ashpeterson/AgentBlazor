@@ -21,11 +21,19 @@ public sealed class ExistingAppScaffoldApplier
             ?? throw new InvalidOperationException($"Could not determine the host project directory for '{plan.HostProjectPath}'.");
         var projectName = Path.GetFileNameWithoutExtension(plan.HostProjectPath);
         var rootNamespace = await ResolveRootNamespaceAsync(plan.HostProjectPath, projectName, ct).ConfigureAwait(false);
-        var sourceReferences = ResolveSourceReferences(agentBlazorSourceRoot);
+        var hostSourceReferences = ResolveHostSourceReferences(agentBlazorSourceRoot);
+        var uiSourceReferences = ResolveUiSourceReferences(agentBlazorSourceRoot);
 
         if (ShouldApply(plan, "package-references"))
         {
-            await PreviewProjectFileAsync(plan.HostProjectPath, sourceReferences, changes, ct).ConfigureAwait(false);
+            await PreviewProjectFileAsync(plan.HostProjectPath, hostSourceReferences, changes, ct).ConfigureAwait(false);
+        }
+
+        if (ShouldApply(plan, "ui-package-references") &&
+            !string.IsNullOrWhiteSpace(plan.Readiness.UiProjectPath) &&
+            !string.Equals(plan.Readiness.UiProjectPath, plan.HostProjectPath, StringComparison.OrdinalIgnoreCase))
+        {
+            await PreviewProjectFileAsync(plan.Readiness.UiProjectPath!, uiSourceReferences, changes, ct).ConfigureAwait(false);
         }
 
         if (plan.Readiness.HostShape.Kind == HostShapeKind.Standard)
@@ -1135,7 +1143,7 @@ public sealed class AppCapabilities
         }
     }
 
-    private static IReadOnlyList<string> ResolveSourceReferences(string? agentBlazorSourceRoot)
+    private static IReadOnlyList<string> ResolveHostSourceReferences(string? agentBlazorSourceRoot)
     {
         if (string.IsNullOrWhiteSpace(agentBlazorSourceRoot))
         {
@@ -1157,6 +1165,25 @@ public sealed class AppCapabilities
 
         throw new InvalidOperationException(
             $"Could not find the AgentBlazor source projects under '{normalizedRoot}'. Expected AgentBlazor.Core, AgentBlazor.Hosting, and AgentBlazor.Components.");
+    }
+
+    private static IReadOnlyList<string> ResolveUiSourceReferences(string? agentBlazorSourceRoot)
+    {
+        if (string.IsNullOrWhiteSpace(agentBlazorSourceRoot))
+        {
+            return [];
+        }
+
+        var normalizedRoot = Path.GetFullPath(agentBlazorSourceRoot);
+        var componentsProject = Path.Combine(normalizedRoot, "src", "AgentBlazor.Components", "AgentBlazor.Components.csproj");
+
+        if (File.Exists(componentsProject))
+        {
+            return [componentsProject];
+        }
+
+        throw new InvalidOperationException(
+            $"Could not find the AgentBlazor components project under '{normalizedRoot}'. Expected AgentBlazor.Components.");
     }
 
     private static bool ShouldApply(ScaffoldPlan plan, params string[] itemIds)

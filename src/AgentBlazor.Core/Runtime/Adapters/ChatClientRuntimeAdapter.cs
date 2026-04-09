@@ -1825,7 +1825,8 @@ public sealed class ChatClientRuntimeAdapter(
             return normalized;
         }
 
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..hashLength];
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))
+            .ToLowerInvariant()[..hashLength];
         var headLength = Math.Min(prefixLength, normalized.Length);
         var tailLength = maxToolNameLength - headLength - (separatorLength * 2) - hashLength;
         return string.Concat(

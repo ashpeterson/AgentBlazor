@@ -25,7 +25,7 @@ public static class AgentActionDiscovery
 
     // Cache reflection results per component type to avoid repeated scanning
     private static readonly Dictionary<Type, DiscoveryCacheEntry> Cache = new();
-    private static readonly Lock CacheLock = new();
+    private static readonly object CacheLock = new();
     private static readonly NullabilityInfoContext NullabilityContext = new();
 
     /// <summary>

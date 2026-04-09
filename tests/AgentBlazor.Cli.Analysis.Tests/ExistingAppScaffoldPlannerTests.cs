@@ -1100,6 +1100,8 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "workflow-file" && item.Action == ScaffoldPlanAction.Create);
         Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "ui-package-references" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Action == ScaffoldPlanAction.ManualReview);
         Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "workflow-registration" && item.Action == ScaffoldPlanAction.Update);
@@ -1165,9 +1167,13 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
 
         Assert.Contains(preview.Changes, change => change.Path.EndsWith("HostedWasmPreviewApp.csproj", StringComparison.Ordinal));
+        Assert.Contains(preview.Changes, change => change.Path.EndsWith("HostedWasmPreviewClient.csproj", StringComparison.Ordinal));
         Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewApp", "Program.cs"), StringComparison.Ordinal));
         Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("Workflows", "AppCapabilities.cs"), StringComparison.Ordinal));
-        Assert.DoesNotContain(preview.Changes, change => change.Path.Contains("HostedWasmPreviewClient", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "_Imports.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "wwwroot", "index.html"), StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Pages", "Index.razor"), StringComparison.Ordinal));
         Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
     }
 
@@ -1273,7 +1279,11 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var readinessAnalyzer = new InstallReadinessAnalyzer();
         var report = await readinessAnalyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.DoesNotContain(result.Changes, change => change.Path.Contains("HostedWasmApplyClient", StringComparison.Ordinal));
+        Assert.Contains(result.Changes, change => change.Path.EndsWith("HostedWasmApplyClient.csproj", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "_Imports.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "wwwroot", "index.html"), StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Pages", "Index.razor"), StringComparison.Ordinal));
         Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyApp", "Program.cs"), StringComparison.Ordinal));
         Assert.Equal(clientProjectPath, report.UiProjectPath);
         Assert.Contains(report.Checks, check => check.Id == "mud-services" && check.Status == InstallReadinessStatus.Pass);
@@ -1327,6 +1337,49 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.False(plan.HasChanges);
         Assert.Empty(plan.Items);
         Assert.Contains("could not classify this host", plan.BlockReason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PlanAsync_WhenTargetFrameworkIsUnsupported_BlocksBeforeScaffolding()
+    {
+        var projectPath = CreateProject(
+            projectName: "UnsupportedFrameworkHostApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net7.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.True(plan.IsBlocked);
+        Assert.Empty(plan.Items);
+        Assert.Equal("Target framework support", plan.BlockTitle);
+        Assert.Contains("net7.0", plan.BlockReason, StringComparison.Ordinal);
     }
 
     private string CreateProject(
