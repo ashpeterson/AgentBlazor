@@ -1,6 +1,6 @@
 # AgentBlazor Runtime Realignment Plan
 
-Last updated: 2026-04-09
+Last updated: 2026-04-13
 
 ## Status Snapshot
 
@@ -15,9 +15,9 @@ Current verification:
 
 - `AgentBlazor.Core.Tests`: `261/261`
 - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-- `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+- `AgentBlazor.Cli.Analysis.Tests`: `131/131`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-- `AgentBlazor.IntegrationTests`: `104/104`
+- `AgentBlazor.IntegrationTests`: `105/105`
 
 ## Goal
 

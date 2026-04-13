@@ -1,14 +1,15 @@
 # NuGet Prerelease Checklist
 
-Last updated: 2026-03-20
+Last updated: 2026-04-13
 
-Use this before publishing an `AgentBlazor` prerelease for real-project validation.
+Use this before publishing `AgentBlazor` and `AgentBlazor.Cli` prerelease packages for real-project validation.
 
 ## Goal
 
 Ship a package that:
 
 - restores cleanly in a fresh Blazor app
+- installs the matching `agentblazor` CLI tool from the same package version
 - exposes the expected static assets and component assemblies
 - does not overclaim full MudBlazor parity before richer real-project proof exists
 
@@ -21,10 +22,15 @@ Ship a package that:
    - `npm --prefix tests/e2e run test:e2e`
 3. Pack the prerelease:
    - `dotnet pack src/AgentBlazor.Components/AgentBlazor.Components.csproj -nologo -c Release /p:UseSharedCompilation=false /p:PackageVersion=0.1.0-preview.N`
+   - `dotnet pack src/AgentBlazor.Cli/AgentBlazor.Cli.csproj -nologo -c Release /p:UseSharedCompilation=false /p:PackageVersion=0.1.0-preview.N`
 4. Run the local consumer smoke test:
-   - `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.N`
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-local-package.ps1 -Pack -PackageVersion 0.1.0-preview.N`
    - add `-OpenAIApiKey $env:OPENAI_API_KEY` to include a live AG-UI workflow run
    - add `-KeepScratch` if you want to inspect the generated consumer app after the build
+5. After the package is published, repeat the clean-app install using the published feed:
+   - install `AgentBlazor` from the feed
+   - install `AgentBlazor.Cli` from the same feed
+   - run `agentblazor --version`, `agentblazor scaffold --diff`, `agentblazor scaffold --approve`, `dotnet restore`, `dotnet build`, `agentblazor doctor`, and `agentblazor validate`
 
 ## What The Smoke Test Proves
 
@@ -45,6 +51,7 @@ This catches packaging regressions such as:
 - broken compile-time imports in a fresh consumer app
 - missing host-shell assets or endpoint wiring in the documented setup
 - CLI packaging regressions that would break `agentblazor init`
+- CLI/runtime package-version drift that would scaffold a different `AgentBlazor` version than the installed CLI package
 
 ## Current Release Position
 
@@ -67,6 +74,7 @@ Before publishing:
 
 - confirm the package contains `README.md`
 - confirm the package contains the internal AgentBlazor assemblies under `lib/net10.0/`
+- confirm `AgentBlazor.Cli` installs from the same package version and reports that version with `agentblazor --version`
 - confirm docs and README describe the current parity scope honestly
 
 Private preview reference:

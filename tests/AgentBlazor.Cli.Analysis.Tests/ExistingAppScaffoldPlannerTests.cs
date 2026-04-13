@@ -139,6 +139,59 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
     }
 
     [Fact]
+    public async Task ApplyAsync_WhenAgentBlazorPackageExistsButMudBlazorPackageIsMissing_AddsMudBlazorReference()
+    {
+        var projectPath = CreateProject(
+            projectName: "PackageFirstApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.2" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        var preview = await applier.PreviewAsync(plan);
+
+        await applier.ApplyAsync(plan, preview);
+        var projectText = await File.ReadAllTextAsync(projectPath);
+        var report = await new InstallReadinessAnalyzer().AnalyzeAsync(projectPath, hostProjectName: null);
+
+        Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.2" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="MudBlazor" Version="9.0.0" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains(report.Checks, check => check.Id == "package-references" && check.Status == InstallReadinessStatus.Pass);
+    }
+
+    [Fact]
     public async Task ApplyAsync_WhenProjectIsMissingBaselineWiring_MakesProjectReady()
     {
         var projectPath = CreateProject(
@@ -196,14 +249,16 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var readinessAnalyzer = new InstallReadinessAnalyzer();
         var report = await readinessAnalyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.True(preview.HasChanges);
+        Assert.True(
+            preview.HasChanges,
+            string.Join(Environment.NewLine, plan.Items.Select(item => $"{item.Id}: {item.Action} -> {item.TargetPath}")));
         Assert.Contains(preview.Changes, change =>
             change.Path.EndsWith("Program.cs", StringComparison.Ordinal) &&
             change.UpdatedContent.Contains("AddAgentBlazor(", StringComparison.Ordinal));
         Assert.True(result.ChangedFileCount > 0);
         Assert.NotNull(result.ManifestPath);
         Assert.True(File.Exists(result.ManifestPath));
-        Assert.True(report.IsReady);
+        Assert.True(report.IsReady, string.Join(Environment.NewLine, report.Checks.Select(check => $"{check.Id}: {check.Status} - {check.Message}")));
         Assert.Equal(0, report.MissingCount);
         Assert.All(report.Checks.Where(check => check.Status != InstallReadinessStatus.Warning),
             check => Assert.Equal(InstallReadinessStatus.Pass, check.Status));
@@ -217,10 +272,10 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
     }
 
     [Fact]
-    public async Task PreviewAsync_WhenLocalSourceRootIsProvided_UsesProjectReferences()
+    public async Task PreviewAsync_WhenProjectUsesQuickGrid_DoesNotAddGlobalMudBlazorImport()
     {
         var projectPath = CreateProject(
-            projectName: "LocalSourceApp",
+            projectName: "QuickGridApp",
             csprojBody: """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
                   <PropertyGroup>
@@ -228,6 +283,199 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Microsoft.AspNetCore.Components.QuickGrid" Version="10.0.0" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        var importsChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "_Imports.razor"), StringComparison.Ordinal));
+        var layoutChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Layout", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain("@using MudBlazor", importsChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("@using MudBlazor", layoutChange.UpdatedContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenProjectUsesRunAsyncAndNonstandardRootPage_MapsEndpointAndMountsExistingRootPage()
+    {
+        var projectPath = CreateProject(
+            projectName: "RunAsyncRootPageApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                await app.RunAsync().ConfigureAwait(false);
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/old-home"
+                <h1>Old home</h1>
+                """);
+        var projectDirectory = Path.GetDirectoryName(projectPath)!;
+        var rootPageDirectory = Path.Combine(projectDirectory, "Pages", "Admin");
+        Directory.CreateDirectory(rootPageDirectory);
+        File.WriteAllText(
+            Path.Combine(rootPageDirectory, "Landing.razor"),
+            """
+            @page "/"
+            <h1>Dashboard</h1>
+            """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        var programChange = Assert.Single(preview.Changes, change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+        Assert.Contains("app.MapAgentBlazorEndpoints();\nawait app.RunAsync().ConfigureAwait(false);", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains(preview.Changes, change =>
+            change.Path.EndsWith(Path.Combine("Pages", "Admin", "Landing.razor"), StringComparison.Ordinal) &&
+            change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change =>
+            change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal) &&
+            change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenMudServicesAreRegisteredOutsideProgram_DoesNotDuplicateMudRegistration()
+    {
+        var projectPath = CreateProject(
+            projectName: "ExternalMudServicesApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="MudBlazor" Version="9.0.0" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services
+                    .AddApplication()
+                    .AddInfrastructure(builder.Configuration)
+                    .AddServerUI(builder.Configuration);
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                <MudThemeProvider />
+                <MudPopoverProvider />
+                <MudDialogProvider />
+                <MudSnackbarProvider />
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+        File.WriteAllText(
+            Path.Combine(Path.GetDirectoryName(projectPath)!, "ServiceRegistration.cs"),
+            """
+            using Microsoft.Extensions.DependencyInjection;
+            using MudBlazor.Services;
+
+            namespace ExternalMudServicesApp;
+
+            public static class ServiceRegistration
+            {
+                public static IServiceCollection AddServerUI(this IServiceCollection services, IConfiguration config)
+                {
+                    services.AddRazorComponents()
+                        .AddInteractiveServerComponents();
+                    services.AddMudServices(config => { });
+                    return services;
+                }
+            }
+            """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        Assert.DoesNotContain(plan.Items, item => item.Id == "mud-services");
+        var programChange = Assert.Single(preview.Changes, change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain("builder.Services.AddMudServices();", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("using MudBlazor.Services;", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("builder.Services.AddAgentBlazor(", programChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.True(
+            programChange.UpdatedContent.IndexOf("builder.Services.AddAgentBlazor(", StringComparison.Ordinal) >
+            programChange.UpdatedContent.IndexOf(".AddServerUI(builder.Configuration);", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenLocalSourceRootIsProvided_UsesProjectReferences()
+    {
+        var projectPath = CreateProject(
+            projectName: "LocalSourceApp",
+            csprojBody: """
+                <?xml version="1.0" encoding="utf-8"?>
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <Target Name="CopyGeneratedFiles">
+                    <Copy SourceFiles="@(GeneratedFiles)" DestinationFiles="@(GeneratedFiles->'$(OutputPath)%(RecursiveDir)%(Filename)%(Extension)')" />
+                  </Target>
                 </Project>
                 """,
             programBody: """
@@ -263,6 +511,9 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains("AgentBlazor.Core/AgentBlazor.Core.csproj", projectChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("AgentBlazor.Hosting/AgentBlazor.Hosting.csproj", projectChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("AgentBlazor.Components/AgentBlazor.Components.csproj", projectChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"utf-8\"?>", projectChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("GeneratedFiles->'$(OutputPath)%(RecursiveDir)%(Filename)%(Extension)'", projectChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("GeneratedFiles-&gt;", projectChange.UpdatedContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -599,15 +850,14 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Equal(clientProjectPath, plan.Readiness.UiProjectPath);
         Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "workflow-file" && item.Action == ScaffoldPlanAction.Create);
-        Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Action == ScaffoldPlanAction.Create);
+        Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Action == ScaffoldPlanAction.ManualReview);
         Assert.Contains(plan.Items, item => item.Id == "mud-services" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "agentblazor-services" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "workflow-registration" && item.Action == ScaffoldPlanAction.Update);
         Assert.Contains(plan.Items, item => item.Id == "endpoint-mapping" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.Update);
-        Assert.DoesNotContain(plan.Items, item => item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
         Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.TargetPath.EndsWith(Path.Combine("wwwroot", "index.html"), StringComparison.Ordinal));
         Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.TargetPath.EndsWith(Path.Combine("Shared", "MainLayout.razor"), StringComparison.Ordinal));
         Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.TargetPath.EndsWith(Path.Combine("Pages", "Index.razor"), StringComparison.Ordinal));
@@ -617,7 +867,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
     }
 
     [Fact]
-    public async Task PreviewAsync_WhenHostedWebAssemblyServerIsDetected_ShowsClientProjectEdits()
+    public async Task PreviewAsync_WhenHostedWebAssemblyServerIsDetected_LeavesClientUiEditsForManualReview()
     {
         var projectPath = CreateProject(
             projectName: "HostedWasmPreviewApp",
@@ -665,14 +915,66 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains(preview.Changes, change => change.Path.EndsWith("HostedWasmPreviewApp.csproj", StringComparison.Ordinal));
         Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewApp", "Program.cs"), StringComparison.Ordinal));
         Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("Workflows", "AppCapabilities.cs"), StringComparison.Ordinal));
-        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "_Imports.razor"), StringComparison.Ordinal));
-        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "wwwroot", "index.html"), StringComparison.Ordinal));
-        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
-        Assert.Contains(preview.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmPreviewClient", "Pages", "Index.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change => change.Path.Contains("HostedWasmPreviewClient", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
     }
 
     [Fact]
-    public async Task ApplyAsync_WhenHostedWebAssemblyServerIsDetected_UpdatesClientFilesAndLeavesServerReviewItems()
+    public async Task PlanAsync_WhenStandardWebAppUsesCompanionWebAssemblyClient_LeavesClientUiForManualReview()
+    {
+        var projectPath = CreateProject(
+            projectName: "InteractiveWasmWebApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="..\InteractiveWasmWebApp.Client\InteractiveWasmWebApp.Client.csproj" />
+                  </ItemGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveWebAssemblyComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveWebAssemblyRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes @rendermode="InteractiveWebAssembly" />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello server</h1>
+                """);
+
+        var clientProjectPath = CreateHostedWasmClientProject("InteractiveWasmWebApp.Client");
+
+        var planner = new ExistingAppScaffoldPlanner();
+
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+
+        Assert.Equal(HostFamily.StandardWebApp, plan.Readiness.HostShape.Family);
+        Assert.Equal(clientProjectPath, plan.Readiness.UiProjectPath);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Action == ScaffoldPlanAction.Update);
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.TargetPath.EndsWith(Path.Combine("InteractiveWasmWebApp", "Components", "App.razor"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Action == ScaffoldPlanAction.ManualReview);
+        Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.TargetPath.EndsWith(Path.Combine("InteractiveWasmWebApp.Client", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.TargetPath.EndsWith(Path.Combine("InteractiveWasmWebApp.Client", "Pages", "Index.razor"), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_WhenHostedWebAssemblyServerIsDetected_LeavesClientUiReviewItems()
     {
         var projectPath = CreateProject(
             projectName: "HostedWasmApplyApp",
@@ -719,19 +1021,16 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var readinessAnalyzer = new InstallReadinessAnalyzer();
         var report = await readinessAnalyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
-        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "_Imports.razor"), StringComparison.Ordinal));
-        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "wwwroot", "index.html"), StringComparison.Ordinal));
-        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Shared", "MainLayout.razor"), StringComparison.Ordinal));
-        Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyClient", "Pages", "Index.razor"), StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Changes, change => change.Path.Contains("HostedWasmApplyClient", StringComparison.Ordinal));
         Assert.Contains(result.Changes, change => change.Path.EndsWith(Path.Combine("HostedWasmApplyApp", "Program.cs"), StringComparison.Ordinal));
         Assert.Equal(clientProjectPath, report.UiProjectPath);
         Assert.Contains(report.Checks, check => check.Id == "mud-services" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "agentblazor-services" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "workflow-registration" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "endpoint-mapping" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "mud-providers" && check.Status == InstallReadinessStatus.Pass);
-        Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Pass);
+        Assert.Contains(report.Checks, check => check.Id == "shell-assets" && check.Status == InstallReadinessStatus.Warning);
+        Assert.Contains(report.Checks, check => check.Id == "mud-providers" && check.Status == InstallReadinessStatus.Warning);
+        Assert.Contains(report.Checks, check => check.Id == "chat-surface" && check.Status == InstallReadinessStatus.Warning);
         Assert.True(report.IsReady);
     }
 

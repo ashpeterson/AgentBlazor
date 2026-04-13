@@ -24,12 +24,18 @@ public sealed class InstallReadinessAnalyzer
         var uiProjectPath = uiProject?.ProjectPath;
         var uiProjectDirectory = Path.GetDirectoryName(uiProjectPath ?? hostProjectPath)
             ?? throw new InvalidOperationException($"Could not determine the UI project directory for '{uiProjectPath ?? hostProjectPath}'.");
+        var shellProjectDirectory = hostShape.Family == HostFamily.HostedWebAssembly
+            ? uiProjectDirectory
+            : hostProjectDirectory;
         var razorContents = await ReadProjectFilesAsync(uiProjectDirectory, ".razor", ct).ConfigureAwait(false);
-        var cshtmlContents = await ReadProjectFilesAsync(uiProjectDirectory, ".cshtml", ct).ConfigureAwait(false);
-        var htmlContents = await ReadProjectFilesAsync(uiProjectDirectory, ".html", ct).ConfigureAwait(false);
-        var shellMarkupContents = razorContents.Concat(cshtmlContents).Concat(htmlContents).ToArray();
+        var shellRazorContents = string.Equals(shellProjectDirectory, uiProjectDirectory, StringComparison.OrdinalIgnoreCase)
+            ? razorContents
+            : await ReadProjectFilesAsync(shellProjectDirectory, ".razor", ct).ConfigureAwait(false);
+        var shellCshtmlContents = await ReadProjectFilesAsync(shellProjectDirectory, ".cshtml", ct).ConfigureAwait(false);
+        var shellHtmlContents = await ReadProjectFilesAsync(shellProjectDirectory, ".html", ct).ConfigureAwait(false);
+        var shellMarkupContents = shellRazorContents.Concat(shellCshtmlContents).Concat(shellHtmlContents).ToArray();
         var startupPath = ResolveStartupPath(hostProjectDirectory, hostShape.Family);
-        var shellPath = ResolveShellPath(uiProjectDirectory, hostShape.Family);
+        var shellPath = ResolveShellPath(shellProjectDirectory, hostShape.Family);
         var layoutPath = ResolveLayoutPath(uiProjectDirectory);
         var chatSurfacePath = ResolveChatSurfacePath(uiProjectDirectory);
 
@@ -217,7 +223,7 @@ public sealed class InstallReadinessAnalyzer
         HostShapeAssessment hostShape,
         CancellationToken ct)
     {
-        if (hostShape.Family != HostFamily.HostedWebAssembly)
+        if (hostShape.Family is not (HostFamily.HostedWebAssembly or HostFamily.StandardWebApp))
         {
             return null;
         }
@@ -527,14 +533,21 @@ public sealed class InstallReadinessAnalyzer
             Path.Combine("Pages", "MainLayout.razor"));
 
     private static string? ResolveChatSurfacePath(string projectDirectory)
-        => ResolveFirstExistingPath(
-            projectDirectory,
+    {
+        var knownPagePaths = new[]
+        {
             Path.Combine("Pages", "Index.razor"),
             Path.Combine("Pages", "Home.razor"),
             "App.razor",
             Path.Combine("Components", "Pages", "Home.razor"),
             Path.Combine("Components", "Pages", "Index.razor"),
-            Path.Combine("Shared", "Index.razor"));
+            Path.Combine("Shared", "Index.razor")
+        };
+
+        return ResolveFirstExistingPathMatching(projectDirectory, IsRootRazorPage, knownPagePaths)
+            ?? ResolveFirstRootRazorPagePath(projectDirectory)
+            ?? ResolveFirstExistingPath(projectDirectory, knownPagePaths);
+    }
 
     private static async Task<IReadOnlyList<ProjectFileSnapshot>> ReadProjectFilesAsync(
         string projectDirectory,
@@ -676,6 +689,32 @@ public sealed class InstallReadinessAnalyzer
 
         return null;
     }
+
+    private static string? ResolveFirstExistingPathMatching(string projectDirectory, Func<string, bool> predicate, params string[] relativePaths)
+    {
+        foreach (var relativePath in relativePaths)
+        {
+            var candidate = Path.Combine(projectDirectory, relativePath);
+            if (File.Exists(candidate) && predicate(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveFirstRootRazorPagePath(string projectDirectory)
+        => Directory
+            .EnumerateFiles(projectDirectory, "*.razor", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => path.Count(character => character == Path.DirectorySeparatorChar))
+            .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(IsRootRazorPage);
+
+    private static bool IsRootRazorPage(string path)
+        => File.ReadAllText(path).Contains("@page \"/\"", StringComparison.Ordinal);
 
     private static InstallReadinessCheck Pass(string id, string title, string message, string? filePath) =>
         new()

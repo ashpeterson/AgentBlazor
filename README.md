@@ -205,7 +205,7 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-04-09:
+As of 2026-04-13:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
@@ -218,9 +218,9 @@ As of 2026-04-09:
 - the full non-demo test matrix is currently green:
   - `AgentBlazor.Core.Tests`: `261/261`
   - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-  - `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+  - `AgentBlazor.Cli.Analysis.Tests`: `131/131`
   - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-  - `AgentBlazor.IntegrationTests`: `104/104`
+  - `AgentBlazor.IntegrationTests`: `105/105`
 
 The biggest remaining product gap is not UI execution. It is durable paid intelligence:
 

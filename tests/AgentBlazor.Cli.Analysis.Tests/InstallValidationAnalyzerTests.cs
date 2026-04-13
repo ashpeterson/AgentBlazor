@@ -343,7 +343,9 @@ public sealed class InstallValidationAnalyzerTests : IDisposable
         var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
 
         Assert.True(report.HasBlockingIssues);
-        Assert.DoesNotContain(report.Checks, check => check.Id.StartsWith("manual-review:", StringComparison.Ordinal));
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:shell-assets");
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:mud-providers");
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:chat-surface");
         Assert.Contains(report.Readiness.Checks, check =>
             check.Id == "mud-services" &&
             check.Status == InstallReadinessStatus.Missing &&
@@ -421,7 +423,9 @@ public sealed class InstallValidationAnalyzerTests : IDisposable
         Assert.Contains(report.Checks, check => check.Id == "scaffold-manifest" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "manifest-host-match" && check.Status == InstallReadinessStatus.Pass);
         Assert.Contains(report.Checks, check => check.Id == "manifest-files" && check.Status == InstallReadinessStatus.Pass);
-        Assert.DoesNotContain(report.Checks, check => check.Id.StartsWith("manual-review:", StringComparison.Ordinal));
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:shell-assets" && check.Status == InstallReadinessStatus.Warning);
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:mud-providers" && check.Status == InstallReadinessStatus.Warning);
+        Assert.Contains(report.Checks, check => check.Id == "manual-review:chat-surface" && check.Status == InstallReadinessStatus.Warning);
     }
 
     private string CreateProject(

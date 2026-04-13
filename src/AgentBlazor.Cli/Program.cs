@@ -1,12 +1,19 @@
+using System.Reflection;
 using Spectre.Console.Cli;
 using AgentBlazor.Cli.Commands;
 
 var app = new CommandApp();
+var version = typeof(ScaffoldCommand).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+    ?.InformationalVersion
+    ?? typeof(ScaffoldCommand).Assembly.GetName().Version?.ToString()
+    ?? "0.1.0-preview.2";
+version = version.Split('+', 2)[0];
 
 app.Configure(config =>
 {
     config.SetApplicationName("agentblazor");
-    config.SetApplicationVersion("1.0.0");
+    config.SetApplicationVersion(version);
 
     config.AddCommand<InitCommand>("init")
         .WithDescription("Initialize AgentBlazor for an existing Blazor app and show the next installer steps")

@@ -496,6 +496,91 @@ public class ProviderAdapterIntegrationTests
     }
 
     [Fact]
+    public async Task OpenAiProvider_RunTurnAsync_BlockedRecoveryWorkflow_RetriesAfterRecovery_WhenApiKeyAvailable()
+    {
+        var openAiApiKey = ResolveOpenAiApiKey();
+        if (string.IsNullOrWhiteSpace(openAiApiKey))
+        {
+            return;
+        }
+
+        var openAiModel = ResolveOpenAiModel();
+        var services = new ServiceCollection();
+        services.AddSingleton<LiveOpenAiRecoveryProbeState>();
+        services.AddOpenAIProvider(openAiModel, openAiApiKey);
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddWorkflow<LiveOpenAiRecoveryCapabilities>("live-openai-recovery");
+
+        using var provider = services.BuildServiceProvider();
+        var runtimeAdapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+
+        var approvalResponse = await runtimeAdapter.RunTurnAsync(
+            new AgentTurnRequest(
+                "Call the submit live OpenAI recovery probe workflow tool now.",
+                AgentName: "live-openai-recovery",
+                SessionId: "live-openai-recovery"),
+            cts.Token);
+
+        Assert.True(approvalResponse.RequiresApproval);
+        var approvalStep = Assert.Single(approvalResponse.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.ApprovalRequired, approvalStep.Status);
+        Assert.Equal("live_openai_recovery", approvalStep.TargetId);
+        Assert.Equal("submit_probe", approvalStep.ActionId);
+
+        var blockedResponse = await runtimeAdapter.RunTurnAsync(
+            new AgentTurnRequest(
+                "Call the submit live OpenAI recovery probe workflow tool now.",
+                AgentName: "live-openai-recovery",
+                SessionId: "live-openai-recovery",
+                Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["agentblazor.approvals"] = "live_openai_recovery.submit_probe"
+                }),
+            cts.Token);
+
+        Assert.False(blockedResponse.RequiresApproval);
+        var blockedStep = Assert.Single(blockedResponse.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Blocked, blockedStep.Status);
+        Assert.Equal("live_openai_recovery", blockedStep.TargetId);
+        Assert.Equal("submit_probe", blockedStep.ActionId);
+        Assert.Contains("blocked", blockedStep.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        var recoveryResponse = await runtimeAdapter.RunTurnAsync(
+            new AgentTurnRequest(
+                "Call the apply live OpenAI recovery playbook workflow tool now.",
+                AgentName: "live-openai-recovery",
+                SessionId: "live-openai-recovery"),
+            cts.Token);
+
+        Assert.False(recoveryResponse.RequiresApproval);
+        var recoveryStep = Assert.Single(recoveryResponse.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Completed, recoveryStep.Status);
+        Assert.Equal("live_openai_recovery", recoveryStep.TargetId);
+        Assert.Equal("apply_recovery_playbook", recoveryStep.ActionId);
+        Assert.Equal("LIVE_OPENAI_RECOVERY_APPLIED", recoveryStep.Outputs!["recovery"]);
+
+        var retriedResponse = await runtimeAdapter.RunTurnAsync(
+            new AgentTurnRequest(
+                "Call the submit live OpenAI recovery probe workflow tool now.",
+                AgentName: "live-openai-recovery",
+                SessionId: "live-openai-recovery",
+                Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["agentblazor.approvals"] = "live_openai_recovery.submit_probe"
+                }),
+            cts.Token);
+
+        Assert.False(retriedResponse.RequiresApproval);
+        var retriedStep = Assert.Single(retriedResponse.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Completed, retriedStep.Status);
+        Assert.Equal("live_openai_recovery", retriedStep.TargetId);
+        Assert.Equal("submit_probe", retriedStep.ActionId);
+        Assert.Equal("LIVE_OPENAI_RECOVERY_READY", retriedStep.Outputs!["status"]);
+    }
+
+    [Fact]
     public async Task OpenAiProvider_RunTurnAsync_ConcurrentWorkflowRuns_ForDifferentSessions_CanOverlap_WhenApiKeyAvailable()
     {
         var openAiApiKey = ResolveOpenAiApiKey();
@@ -905,6 +990,32 @@ public class ProviderAdapterIntegrationTests
                 .WithOutput("approval", "LIVE_OPENAI_APPROVED");
     }
 
+    [AgentCapability("live_openai_recovery", Name = "Live OpenAI Recovery")]
+    private sealed class LiveOpenAiRecoveryCapabilities(LiveOpenAiRecoveryProbeState probeState)
+    {
+        [AgentAction("Submit the live OpenAI recovery probe", ActionId = "submit_probe", RequiresApproval = true)]
+        public CapabilityResult SubmitProbe()
+        {
+            if (probeState.Blocked)
+            {
+                return CapabilityResult.Blocked("Live OpenAI recovery probe is blocked until the recovery playbook runs.")
+                    .WithWarning("Recovery playbook has not been applied.")
+                    .WithNextActions("Apply the live OpenAI recovery playbook");
+            }
+
+            return CapabilityResult.Success("Live OpenAI recovery probe submitted after recovery.")
+                .WithOutput("status", "LIVE_OPENAI_RECOVERY_READY");
+        }
+
+        [AgentAction("Apply the live OpenAI recovery playbook", ActionId = "apply_recovery_playbook")]
+        public CapabilityResult ApplyRecoveryPlaybook()
+        {
+            probeState.Blocked = false;
+            return CapabilityResult.Success("Live OpenAI recovery playbook applied.")
+                .WithOutput("recovery", "LIVE_OPENAI_RECOVERY_APPLIED");
+        }
+    }
+
     [AgentCapability("live_openai_session_probe", Name = "Live OpenAI Session Probe")]
     private sealed class LiveOpenAiSessionProbeCapabilities(LiveOpenAiSessionProbeState probeState)
     {
@@ -956,6 +1067,11 @@ public class ProviderAdapterIntegrationTests
 
         public int Record(string sessionId)
             => _turnCounts.AddOrUpdate(sessionId, 1, static (_, current) => current + 1);
+    }
+
+    private sealed class LiveOpenAiRecoveryProbeState
+    {
+        public bool Blocked { get; set; } = true;
     }
 
     private sealed class LiveOpenAiConcurrentProbeState

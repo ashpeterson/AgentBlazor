@@ -1,8 +1,8 @@
 # CLI Guide
 
-Status as of 2026-04-09:
+Status as of 2026-04-13:
 
-- `AgentBlazor.Cli.Analysis.Tests`: `126/126`
+- `AgentBlazor.Cli.Analysis.Tests`: `131/131`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
 - standard Blazor hosts are fully scaffoldable
 - standard hosted WebAssembly server+client hosts are fully scaffoldable

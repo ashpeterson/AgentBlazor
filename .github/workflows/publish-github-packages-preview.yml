@@ -88,16 +88,25 @@ jobs:
           --name github
           "https://nuget.pkg.github.com/ashpeterson/index.json"
 
-      - name: Publish package to GitHub Packages
+      - name: Publish runtime package to GitHub Packages
         run: >
           dotnet nuget push
           "src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg"
           --source github
           --skip-duplicate
 
-      - name: Upload published package artifact
+      - name: Publish CLI tool package to GitHub Packages
+        run: >
+          dotnet nuget push
+          "src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg"
+          --source github
+          --skip-duplicate
+
+      - name: Upload published package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agentblazor-${{ inputs.package_version }}
-          path: src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg
+          name: agentblazor-packages-${{ inputs.package_version }}
+          path: |
+            src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg
+            src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg
           if-no-files-found: error

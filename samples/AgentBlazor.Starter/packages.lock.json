@@ -4,9 +4,9 @@
     "net10.0": {
       "Microsoft.AspNetCore.App.Internal.Assets": {
         "type": "Direct",
-        "requested": "[10.0.5, )",
-        "resolved": "10.0.5",
-        "contentHash": "Oxw9Ps1/nd6c/EMCAI13AeJFEqXezAvCEOshMjUWmL7LeGirHJNzytR2e/3jINYg0j2TmPvNUowGHf+gp8zDSQ=="
+        "requested": "[10.0.4, )",
+        "resolved": "10.0.4",
+        "contentHash": "M942X5Vy726SlvFBuoAC4cDczEMlPAFt1mmyFlrkw/QcpdVwVU0DkF4P9JabxX6eWNm9RvaYZHe25FN7oXoxpQ=="
       },
       "MudBlazor": {
         "type": "Direct",
@@ -175,7 +175,7 @@
       "agentblazor.core": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Licensing": "[1.0.0, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.2, )",
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Data.Sqlite": "[10.0.5, )"
         }
@@ -183,9 +183,9 @@
       "agentblazor.hosting": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )",
-          "AgentBlazor.Licensing": "[1.0.0, )",
-          "AgentBlazor.ProviderAdapters": "[1.0.0, )",
+          "AgentBlazor.Core": "[0.1.0-preview.2, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.2, )",
+          "AgentBlazor.ProviderAdapters": "[0.1.0-preview.2, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.0.0-preview.260209.1, )"
         }
       },
@@ -195,7 +195,7 @@
       "agentblazor.provideradapters": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[1.0.0, )",
+          "AgentBlazor.Core": "[0.1.0-preview.2, )",
           "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
           "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )"
         }

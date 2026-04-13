@@ -15,7 +15,9 @@ public sealed class ExistingAppScaffoldPlanner
         var targetFiles = ResolveTargetFiles(readiness);
         var items = new List<ScaffoldPlanItem>();
         var hostShape = readiness.HostShape;
-        var canAutoPatchAdvancedUi = hostShape.Family == HostFamily.HostedWebAssembly && !string.IsNullOrWhiteSpace(readiness.UiProjectPath);
+        var usesWebAssemblyClientUi = UsesWebAssemblyClientUi(readiness);
+        var canAutoPatchUi = !usesWebAssemblyClientUi;
+        var canAutoPatchAdvancedUi = hostShape.Family == HostFamily.HostedWebAssembly && !string.IsNullOrWhiteSpace(readiness.UiProjectPath) && canAutoPatchUi;
         var canAutoPatchAdvancedStartup = hostShape.Family == HostFamily.HostedWebAssembly;
 
         if (hostShape.Kind == HostShapeKind.Unsupported)
@@ -33,7 +35,7 @@ public sealed class ExistingAppScaffoldPlanner
             };
         }
 
-        AddIfMissing(readiness, "package-references", () =>
+        AddIfMissingOrWarning(readiness, "package-references", () =>
         {
             items.Add(new ScaffoldPlanItem
             {
@@ -98,13 +100,13 @@ public sealed class ExistingAppScaffoldPlanner
             {
                 Id = "ui-imports",
                 Title = "Patch UI imports",
-                Action = targetFiles.ImportsPath is null ? ScaffoldPlanAction.ManualReview : File.Exists(targetFiles.ImportsPath)
+                Action = !canAutoPatchUi || targetFiles.ImportsPath is null ? ScaffoldPlanAction.ManualReview : File.Exists(targetFiles.ImportsPath)
                     ? ScaffoldPlanAction.Update
                     : ScaffoldPlanAction.Create,
                 TargetPath = targetFiles.ImportsPath ?? targetFiles.ProjectDirectory,
-                Summary = "Add AgentBlazor and MudBlazor imports to the client UI project.",
-                Reason = "Client-side shell, layout, and chat surface changes need the AgentBlazor component and MudBlazor namespaces available.",
-                Guidance = BuildGuidance(hostShape.Family, "ui-imports")
+                Summary = "Add AgentBlazor component imports to the client UI project.",
+                Reason = "Client-side AgentBlazor surfaces need the AgentBlazor component namespace available without adding broad UI-library imports globally.",
+                Guidance = BuildUiGuidance(hostShape.Family, "ui-imports", usesWebAssemblyClientUi)
             });
         }
 
@@ -130,13 +132,13 @@ public sealed class ExistingAppScaffoldPlanner
             {
                 Id = "mud-providers",
                 Title = "Patch layout providers",
-                Action = (hostShape.Kind == HostShapeKind.AdvancedReview && !canAutoPatchAdvancedUi) || targetFiles.MainLayoutPath is null
+                Action = !canAutoPatchUi || (hostShape.Kind == HostShapeKind.AdvancedReview && !canAutoPatchAdvancedUi) || targetFiles.MainLayoutPath is null
                     ? ScaffoldPlanAction.ManualReview
                     : ScaffoldPlanAction.Update,
                 TargetPath = targetFiles.MainLayoutPath ?? targetFiles.ProjectDirectory,
                 Summary = "Ensure the main layout includes the standard MudBlazor provider set.",
                 Reason = "MudBlazor-backed AgentBlazor surfaces rely on the theme, popover, dialog, and snackbar providers.",
-                Guidance = BuildGuidance(hostShape.Family, "mud-providers")
+                Guidance = BuildUiGuidance(hostShape.Family, "mud-providers", usesWebAssemblyClientUi)
             });
         });
 
@@ -146,7 +148,7 @@ public sealed class ExistingAppScaffoldPlanner
             {
                 Id = "chat-surface",
                 Title = "Add chat entry point",
-                Action = hostShape.Kind == HostShapeKind.AdvancedReview && !canAutoPatchAdvancedUi
+                Action = !canAutoPatchUi || hostShape.Kind == HostShapeKind.AdvancedReview && !canAutoPatchAdvancedUi
                     ? ScaffoldPlanAction.ManualReview
                     : targetFiles.ChatPagePath is null
                         ? ScaffoldPlanAction.Create
@@ -154,7 +156,7 @@ public sealed class ExistingAppScaffoldPlanner
                 TargetPath = targetFiles.ChatPagePath ?? targetFiles.FallbackChatPagePath,
                 Summary = "Mount AgentChatWidget on a standard page so the runtime is reachable in the UI.",
                 Reason = "An installed runtime is difficult to validate if the app has no visible chat surface.",
-                Guidance = BuildGuidance(hostShape.Family, "chat-surface")
+                Guidance = BuildUiGuidance(hostShape.Family, "chat-surface", usesWebAssemblyClientUi)
             });
         });
 
@@ -226,7 +228,7 @@ public sealed class ExistingAppScaffoldPlanner
             (HostFamily.LegacyServer, "chat-surface") =>
                 "Mount `AgentChatWidget` or `AgentChatSurface` on a page/component that is reachable from the legacy `_Host`-based app shell.",
             (HostFamily.HostedWebAssembly, "ui-imports") =>
-                "Add `@using AgentBlazor.Components` and `@using MudBlazor` in the hosted WebAssembly client `_Imports.razor` so client-side layout and chat patches compile cleanly.",
+                "Review the hosted WebAssembly client `_Imports.razor` manually. The current source package boundary is server-first, so client-side AgentBlazor UI edits need a browser-safe package split or a remote-client integration path before auto-scaffold can write them safely.",
             (HostFamily.HostedWebAssembly, "mud-services") =>
                 "Add MudBlazor services in the hosted WebAssembly server startup path, typically `Program.cs`, alongside the API/static file pipeline that serves the client app.",
             (HostFamily.HostedWebAssembly, "agentblazor-services") =>
@@ -238,9 +240,9 @@ public sealed class ExistingAppScaffoldPlanner
             (HostFamily.HostedWebAssembly, "shell-assets") =>
                 "Add the AgentBlazor and MudBlazor CSS/JS asset references in the hosted WebAssembly client shell, commonly `wwwroot/index.html` in the client project.",
             (HostFamily.HostedWebAssembly, "mud-providers") =>
-                "Ensure the hosted WebAssembly client layout includes the Mud theme, popover, dialog, and snackbar providers.",
+                "Review the hosted WebAssembly client layout manually before adding Mud providers; client-side provider edits also require the client project to reference browser-compatible UI dependencies.",
             (HostFamily.HostedWebAssembly, "chat-surface") =>
-                "Mount `AgentChatWidget` or `AgentChatSurface` in the hosted WebAssembly client app on a reachable page or layout component.",
+                "Use a remote/server-backed chat integration for hosted WebAssembly clients. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
             (HostFamily.OqtaneStyle, "mud-services") =>
                 "Add MudBlazor services in the Oqtane host startup path where platform service registration is composed, not by assuming a standard standalone Blazor `Program.cs` layout.",
             (HostFamily.OqtaneStyle, "agentblazor-services") =>
@@ -258,6 +260,20 @@ public sealed class ExistingAppScaffoldPlanner
             _ => null
         };
 
+    private static string? BuildUiGuidance(HostFamily family, string itemId, bool usesWebAssemblyClientUi)
+        => usesWebAssemblyClientUi
+            ? itemId switch
+            {
+                "ui-imports" =>
+                    "Review the WebAssembly client `_Imports.razor` manually. The current AgentBlazor source package boundary is server-first, so client-side AgentBlazor UI edits need a browser-safe package split or remote-client integration path before auto-scaffold can write them safely.",
+                "mud-providers" =>
+                    "Review the WebAssembly client layout manually before adding Mud providers; client-side provider edits also require the client project to reference browser-compatible UI dependencies.",
+                "chat-surface" =>
+                    "Use a remote/server-backed chat integration for WebAssembly clients. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
+                _ => BuildGuidance(family, itemId)
+            }
+            : BuildGuidance(family, itemId);
+
     private static ScaffoldTargetFiles ResolveTargetFiles(InstallReadinessReport readiness)
     {
         var hostProjectDirectory = Path.GetDirectoryName(readiness.HostProjectPath)
@@ -267,19 +283,16 @@ public sealed class ExistingAppScaffoldPlanner
             ?? throw new InvalidOperationException($"Could not determine the project directory for '{uiProjectPath}'.");
 
         var startupPath = ResolveStartupPath(hostProjectDirectory, readiness.HostShape.Family);
-        var appShellPath = ResolveAppShellPath(uiProjectDirectory, readiness.HostShape.Family);
+        var shellProjectDirectory = readiness.HostShape.Family == HostFamily.HostedWebAssembly
+            ? uiProjectDirectory
+            : hostProjectDirectory;
+        var appShellPath = ResolveAppShellPath(shellProjectDirectory, readiness.HostShape.Family);
         var mainLayoutPath = ResolveFirstExistingPath(
             uiProjectDirectory,
             Path.Combine("Shared", "MainLayout.razor"),
             Path.Combine("Components", "Layout", "MainLayout.razor"),
             Path.Combine("Layout", "MainLayout.razor"));
-        var chatPagePath = ResolveFirstExistingPath(
-            uiProjectDirectory,
-            Path.Combine("Pages", "Index.razor"),
-            Path.Combine("Pages", "Home.razor"),
-            Path.Combine("Components", "Pages", "Home.razor"),
-            Path.Combine("Components", "Pages", "Index.razor"),
-            Path.Combine("Shared", "Index.razor"));
+        var chatPagePath = ResolveChatSurfacePath(uiProjectDirectory);
 
         return new ScaffoldTargetFiles(
             ProjectDirectory: hostProjectDirectory,
@@ -327,11 +340,18 @@ public sealed class ExistingAppScaffoldPlanner
             ?? Path.Combine(projectDirectory, "_Imports.razor");
 
     private static bool ShouldAddUiImports(InstallReadinessReport readiness)
-        => readiness.HostShape.Family == HostFamily.HostedWebAssembly &&
-           !string.IsNullOrWhiteSpace(readiness.UiProjectPath) &&
+        => UsesCompanionUiProject(readiness) &&
            readiness.Checks.Any(check =>
                check.Id is "mud-providers" or "chat-surface" &&
                check.Status != InstallReadinessStatus.Pass);
+
+    private static bool UsesWebAssemblyClientUi(InstallReadinessReport readiness)
+        => UsesCompanionUiProject(readiness) &&
+           readiness.HostShape.Family is HostFamily.HostedWebAssembly or HostFamily.StandardWebApp;
+
+    private static bool UsesCompanionUiProject(InstallReadinessReport readiness)
+        => !string.IsNullOrWhiteSpace(readiness.UiProjectPath) &&
+           !string.Equals(readiness.UiProjectPath, readiness.HostProjectPath, StringComparison.OrdinalIgnoreCase);
 
     private static string? ResolveFirstExistingPath(string projectDirectory, params string[] relativePaths)
     {
@@ -346,6 +366,50 @@ public sealed class ExistingAppScaffoldPlanner
 
         return null;
     }
+
+    private static string? ResolveChatSurfacePath(string projectDirectory)
+    {
+        var knownPagePaths = new[]
+        {
+            Path.Combine("Pages", "Index.razor"),
+            Path.Combine("Pages", "Home.razor"),
+            Path.Combine("Pages", "Public", "Index.razor"),
+            Path.Combine("Pages", "Dashboard", "Dashboard.razor"),
+            Path.Combine("Components", "Pages", "Home.razor"),
+            Path.Combine("Components", "Pages", "Index.razor"),
+            Path.Combine("Shared", "Index.razor")
+        };
+
+        return ResolveFirstExistingPathMatching(projectDirectory, IsRootRazorPage, knownPagePaths)
+            ?? ResolveFirstRootRazorPagePath(projectDirectory)
+            ?? ResolveFirstExistingPath(projectDirectory, knownPagePaths);
+    }
+
+    private static string? ResolveFirstExistingPathMatching(string projectDirectory, Func<string, bool> predicate, params string[] relativePaths)
+    {
+        foreach (var relativePath in relativePaths)
+        {
+            var candidate = Path.Combine(projectDirectory, relativePath);
+            if (File.Exists(candidate) && predicate(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveFirstRootRazorPagePath(string projectDirectory)
+        => Directory
+            .EnumerateFiles(projectDirectory, "*.razor", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => path.Count(character => character == Path.DirectorySeparatorChar))
+            .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(IsRootRazorPage);
+
+    private static bool IsRootRazorPage(string path)
+        => File.ReadAllText(path).Contains("@page \"/\"", StringComparison.Ordinal);
 
     private sealed record ScaffoldTargetFiles(
         string ProjectDirectory,

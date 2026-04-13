@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Xml.Linq;
 using AgentBlazor.Cli.Analysis.Models;
@@ -6,7 +7,6 @@ namespace AgentBlazor.Cli.Analysis;
 
 public sealed class ExistingAppScaffoldApplier
 {
-    private const string DefaultAgentBlazorVersion = "1.0.0";
     private const string DefaultMudBlazorVersion = "9.0.0";
 
     public async Task<ScaffoldPreviewResult> PreviewAsync(
@@ -33,7 +33,7 @@ public sealed class ExistingAppScaffoldApplier
                 Path.Combine("Components", "_Imports.razor"),
                 "_Imports.razor")
                 ?? Path.Combine(projectDirectory, "Components", "_Imports.razor");
-            await PreviewImportsAsync(importsPath, rootNamespace, changes, ct).ConfigureAwait(false);
+            await PreviewImportsAsync(importsPath, changes, ct).ConfigureAwait(false);
         }
 
         var programPath = ResolveTargetPath(plan, "mud-services")
@@ -43,7 +43,15 @@ public sealed class ExistingAppScaffoldApplier
             ?? Path.Combine(projectDirectory, "Program.cs");
         if (File.Exists(programPath) && ShouldApply(plan, "mud-services", "agentblazor-services", "workflow-registration", "endpoint-mapping"))
         {
-            await PreviewProgramAsync(programPath, rootNamespace, provider, changes, ct).ConfigureAwait(false);
+            await PreviewProgramAsync(
+                programPath,
+                rootNamespace,
+                provider,
+                patchMudServices: ShouldApply(plan, "mud-services"),
+                patchAgentBlazorRegistration: ShouldApply(plan, "agentblazor-services", "workflow-registration"),
+                patchEndpointMapping: ShouldApply(plan, "endpoint-mapping"),
+                changes,
+                ct).ConfigureAwait(false);
         }
 
         var importsTargetPath = ResolveTargetPath(plan, "ui-imports");
@@ -128,24 +136,24 @@ public sealed class ExistingAppScaffoldApplier
         CancellationToken ct)
     {
         var original = await File.ReadAllTextAsync(projectPath, ct).ConfigureAwait(false);
-        var document = XDocument.Parse(original);
-        var root = document.Root ?? throw new InvalidOperationException($"Could not parse project file '{projectPath}'.");
-        var projectDirectory = Path.GetDirectoryName(projectPath)
-            ?? throw new InvalidOperationException($"Could not determine the project directory for '{projectPath}'.");
-        var changed = false;
+        var updated = original;
 
         if (sourceReferences.Count > 0)
         {
-            changed |= EnsureAgentBlazorProjectReferences(root, sourceReferences);
+            foreach (var sourceReference in sourceReferences)
+            {
+                var normalizedPath = Path.GetFullPath(sourceReference).Replace('\\', '/');
+                updated = EnsureProjectReference(updated, normalizedPath);
+            }
         }
         else
         {
-            changed |= EnsurePackageReference(root, "AgentBlazor", DefaultAgentBlazorVersion);
+            updated = EnsurePackageReference(updated, "AgentBlazor", ResolveDefaultAgentBlazorVersion());
         }
 
-        changed |= EnsurePackageReference(root, "MudBlazor", DefaultMudBlazorVersion);
+        updated = EnsurePackageReference(updated, "MudBlazor", DefaultMudBlazorVersion);
 
-        if (!changed)
+        if (string.Equals(original, updated, StringComparison.Ordinal))
         {
             return;
         }
@@ -157,98 +165,166 @@ public sealed class ExistingAppScaffoldApplier
                 ? "Added local AgentBlazor project references and any missing MudBlazor package reference."
                 : "Added missing AgentBlazor and/or MudBlazor package references.",
             original,
-            document.ToString());
+            updated);
     }
 
-    private static bool EnsurePackageReference(XElement root, string packageId, string version)
+    private static string EnsurePackageReference(string content, string packageId, string version)
     {
-        var hasReference = root.Descendants()
-            .Where(element => element.Name.LocalName == "PackageReference")
-            .Any(element => string.Equals(element.Attribute("Include")?.Value, packageId, StringComparison.OrdinalIgnoreCase));
-
-        if (hasReference)
+        if (HasXmlReference(content, "PackageReference", packageId, normalizePath: false))
         {
-            return false;
+            return content;
         }
 
-        var itemGroup = root.Elements().FirstOrDefault(element =>
-            element.Name.LocalName == "ItemGroup" &&
-            element.Elements().Any(child => child.Name.LocalName == "PackageReference"));
-
-        if (itemGroup is null)
-        {
-            itemGroup = new XElement(root.GetDefaultNamespace() + "ItemGroup");
-            root.Add(itemGroup);
-        }
-
-        var reference = new XElement(root.GetDefaultNamespace() + "PackageReference");
-        reference.SetAttributeValue("Include", packageId);
-        reference.SetAttributeValue("Version", version);
-        itemGroup.Add(reference);
-        return true;
+        return InsertXmlReference(
+            content,
+            "PackageReference",
+            $"<PackageReference Include=\"{EscapeXmlAttribute(packageId)}\" Version=\"{EscapeXmlAttribute(version)}\" />");
     }
 
-    private static bool EnsureAgentBlazorProjectReferences(XElement root, IReadOnlyList<string> sourceReferences)
+    private static string ResolveDefaultAgentBlazorVersion()
     {
-        var changed = false;
-        foreach (var sourceReference in sourceReferences)
-        {
-            var normalizedPath = Path.GetFullPath(sourceReference).Replace('\\', '/');
-            changed |= EnsureProjectReference(root, normalizedPath);
-        }
+        var version = typeof(ExistingAppScaffoldApplier).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? typeof(ExistingAppScaffoldApplier).Assembly.GetName().Version?.ToString()
+            ?? "0.1.0-preview.2";
 
-        return changed;
+        return version.Split('+', 2)[0];
     }
 
-    private static bool EnsureProjectReference(XElement root, string includePath)
+    private static string EnsureProjectReference(string content, string includePath)
     {
-        var hasReference = root.Descendants()
-            .Where(element => element.Name.LocalName == "ProjectReference")
-            .Any(element => string.Equals(
-                element.Attribute("Include")?.Value?.Replace('\\', '/'),
-                includePath,
-                StringComparison.OrdinalIgnoreCase));
-
-        if (hasReference)
+        if (HasXmlReference(content, "ProjectReference", includePath, normalizePath: true))
         {
-            return false;
+            return content;
         }
 
-        var itemGroup = root.Elements().FirstOrDefault(element =>
-            element.Name.LocalName == "ItemGroup" &&
-            element.Elements().Any(child => child.Name.LocalName == "ProjectReference"));
-
-        if (itemGroup is null)
-        {
-            itemGroup = new XElement(root.GetDefaultNamespace() + "ItemGroup");
-            root.Add(itemGroup);
-        }
-
-        var reference = new XElement(root.GetDefaultNamespace() + "ProjectReference");
-        reference.SetAttributeValue("Include", includePath);
-        itemGroup.Add(reference);
-        return true;
+        return InsertXmlReference(
+            content,
+            "ProjectReference",
+            $"<ProjectReference Include=\"{EscapeXmlAttribute(includePath)}\" />");
     }
 
-    private static async Task PreviewImportsAsync(string importsPath, string rootNamespace, List<ScaffoldPreviewFile> changes, CancellationToken ct)
+    private static bool HasXmlReference(string content, string elementName, string includeValue, bool normalizePath)
+    {
+        try
+        {
+            var document = XDocument.Parse(content);
+            return document.Descendants()
+                .Where(element => element.Name.LocalName == elementName)
+                .Any(element =>
+                {
+                    var include = element.Attribute("Include")?.Value ?? string.Empty;
+                    if (normalizePath)
+                    {
+                        include = include.Replace('\\', '/');
+                    }
+
+                    return string.Equals(include, includeValue, StringComparison.OrdinalIgnoreCase);
+                });
+        }
+        catch
+        {
+            return content.Contains($"<{elementName}", StringComparison.OrdinalIgnoreCase) &&
+                content.Contains($"Include=\"{includeValue}\"", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string InsertXmlReference(string content, string elementName, string referenceLine)
+    {
+        var newLine = DetectNewLine(content);
+        var searchIndex = 0;
+
+        while (true)
+        {
+            var itemGroupStart = content.IndexOf("<ItemGroup", searchIndex, StringComparison.Ordinal);
+            if (itemGroupStart < 0)
+            {
+                break;
+            }
+
+            var itemGroupClose = content.IndexOf("</ItemGroup>", itemGroupStart, StringComparison.Ordinal);
+            if (itemGroupClose < 0)
+            {
+                break;
+            }
+
+            var itemGroup = content[itemGroupStart..itemGroupClose];
+            if (itemGroup.Contains($"<{elementName}", StringComparison.Ordinal))
+            {
+                var closeLineStart = content.LastIndexOf('\n', itemGroupClose);
+                closeLineStart = closeLineStart < 0 ? itemGroupClose : closeLineStart + 1;
+                var closeIndent = GetLineIndent(content, closeLineStart);
+                var childIndent = InferChildIndent(itemGroup, elementName, closeIndent + "  ");
+                return content.Insert(closeLineStart, $"{childIndent}{referenceLine}{newLine}");
+            }
+
+            searchIndex = itemGroupClose + "</ItemGroup>".Length;
+        }
+
+        var projectClose = content.LastIndexOf("</Project>", StringComparison.Ordinal);
+        if (projectClose < 0)
+        {
+            return EnsureLine(content, referenceLine);
+        }
+
+        var closeLineStartIndex = content.LastIndexOf('\n', projectClose);
+        closeLineStartIndex = closeLineStartIndex < 0 ? projectClose : closeLineStartIndex + 1;
+        var projectCloseIndent = GetLineIndent(content, closeLineStartIndex);
+        var itemGroupIndent = projectCloseIndent + "  ";
+        var childIndentForNewGroup = itemGroupIndent + "  ";
+        var block = $"{itemGroupIndent}<ItemGroup>{newLine}{childIndentForNewGroup}{referenceLine}{newLine}{itemGroupIndent}</ItemGroup>{newLine}";
+        return content.Insert(closeLineStartIndex, block);
+    }
+
+    private static string DetectNewLine(string content)
+        => content.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+
+    private static string GetLineIndent(string content, int lineStart)
+    {
+        var index = lineStart;
+        while (index < content.Length && content[index] is ' ' or '\t')
+        {
+            index++;
+        }
+
+        return content[lineStart..index];
+    }
+
+    private static string InferChildIndent(string itemGroup, string elementName, string fallback)
+    {
+        var elementIndex = itemGroup.IndexOf($"<{elementName}", StringComparison.Ordinal);
+        if (elementIndex < 0)
+        {
+            return fallback;
+        }
+
+        var lineStart = itemGroup.LastIndexOf('\n', elementIndex);
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        return GetLineIndent(itemGroup, lineStart);
+    }
+
+    private static string EscapeXmlAttribute(string value)
+        => value
+            .Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("\"", "&quot;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal)
+            .Replace(">", "&gt;", StringComparison.Ordinal);
+
+    private static async Task PreviewImportsAsync(string importsPath, List<ScaffoldPreviewFile> changes, CancellationToken ct)
     {
         var exists = File.Exists(importsPath);
         var original = exists ? await File.ReadAllTextAsync(importsPath, ct).ConfigureAwait(false) : string.Empty;
         var updated = original;
 
-        updated = EnsureLine(updated, "@using AgentBlazor");
-        updated = EnsureLine(updated, "@using AgentBlazor.App");
-        updated = EnsureLine(updated, "@using AgentBlazor.Attributes");
         updated = EnsureLine(updated, "@using AgentBlazor.Components");
-        updated = EnsureLine(updated, $"@using {rootNamespace}.Workflows");
-        updated = EnsureLine(updated, "@using MudBlazor");
 
         AddTextChange(
             changes,
             importsPath,
             exists
-                ? "Added AgentBlazor and MudBlazor imports."
-                : "Created _Imports.razor with AgentBlazor and MudBlazor imports.",
+                ? "Added AgentBlazor component imports."
+                : "Created _Imports.razor with AgentBlazor component imports.",
             original,
             updated);
     }
@@ -257,17 +333,31 @@ public sealed class ExistingAppScaffoldApplier
         string programPath,
         string rootNamespace,
         ScaffoldProvider? provider,
+        bool patchMudServices,
+        bool patchAgentBlazorRegistration,
+        bool patchEndpointMapping,
         List<ScaffoldPreviewFile> changes,
         CancellationToken ct)
     {
         var original = await File.ReadAllTextAsync(programPath, ct).ConfigureAwait(false);
         var updated = original;
 
-        updated = EnsureUsing(updated, "AgentBlazor");
-        updated = EnsureUsing(updated, "MudBlazor.Services");
-        updated = EnsureUsing(updated, $"{rootNamespace}.Workflows");
+        if (patchAgentBlazorRegistration || patchEndpointMapping)
+        {
+            updated = EnsureUsing(updated, "AgentBlazor");
+        }
 
-        if (!updated.Contains("builder.Services.AddMudServices();", StringComparison.Ordinal))
+        if (patchMudServices)
+        {
+            updated = EnsureUsing(updated, "MudBlazor.Services");
+        }
+
+        if (patchAgentBlazorRegistration)
+        {
+            updated = EnsureUsing(updated, $"{rootNamespace}.Workflows");
+        }
+
+        if (patchMudServices && !updated.Contains("AddMudServices(", StringComparison.Ordinal))
         {
             updated = InsertAfterFirstStatementContainingAny(
                 updated,
@@ -278,7 +368,7 @@ public sealed class ExistingAppScaffoldApplier
                 "var builder = WebApplication.CreateBuilder(args);");
         }
 
-        if (!updated.Contains("builder.Services.AddAgentBlazor(", StringComparison.Ordinal))
+        if (patchAgentBlazorRegistration && !updated.Contains("AddAgentBlazor(", StringComparison.Ordinal))
         {
             var providerBlock = BuildProviderBlock(provider);
             var agentBlazorBlock = $$"""
@@ -308,16 +398,22 @@ builder.Services.AddAgentBlazor(options =>
                 "builder.Services.AddMudServices();",
                 "builder.Services.AddRazorComponents(",
                 "builder.Services.AddRazorPages(",
-                "builder.Services.AddServerSideBlazor(");
+                "builder.Services.AddServerSideBlazor(",
+                ".AddServerUI(",
+                ".AddInfrastructure(",
+                ".AddApplication(",
+                "var builder = WebApplication.CreateBuilder(args);");
         }
 
-        if (!updated.Contains("app.MapAgentBlazorEndpoints();", StringComparison.Ordinal))
+        if (patchEndpointMapping && !updated.Contains("MapAgentBlazorEndpoints(", StringComparison.Ordinal))
         {
-            updated = InsertBeforeFirstContainingAny(
+            updated = InsertBeforeLineContainingAny(
                 updated,
                 "app.MapAgentBlazorEndpoints();\n",
                 "app.MapFallbackToFile(\"index.html\")",
                 "app.MapFallbackToPage(\"/_Host\")",
+                "await app.RunAsync(",
+                "app.RunAsync(",
                 "app.Run();");
         }
 
@@ -433,14 +529,13 @@ builder.Services.AddAgentBlazor(options =>
         var updated = original;
 
         updated = EnsureLine(updated, "@using AgentBlazor.Components");
-        updated = EnsureLine(updated, "@using MudBlazor");
 
         AddTextChange(
             changes,
             importsPath,
             exists
-                ? "Added AgentBlazor and MudBlazor UI imports."
-                : "Created _Imports.razor with AgentBlazor and MudBlazor UI imports.",
+                ? "Added AgentBlazor component UI imports."
+                : "Created _Imports.razor with AgentBlazor component UI imports.",
             original,
             updated);
     }
@@ -450,6 +545,7 @@ builder.Services.AddAgentBlazor(options =>
         var original = await File.ReadAllTextAsync(mainLayoutPath, ct).ConfigureAwait(false);
         var updated = original;
 
+        updated = EnsureMarkupLine(updated, "@using MudBlazor");
         updated = EnsureMarkupLine(updated, "<MudThemeProvider />");
         updated = EnsureMarkupLine(updated, "<MudPopoverProvider />");
         updated = EnsureMarkupLine(updated, "<MudDialogProvider />");
@@ -546,6 +642,8 @@ public sealed class AppCapabilities
             return;
         }
 
+        updated = PreserveUtf8BomIfPresent(path, updated);
+
         changes.Add(new ScaffoldPreviewFile
         {
             Path = path,
@@ -556,6 +654,21 @@ public sealed class AppCapabilities
             OriginalContent = original,
             UpdatedContent = updated
         });
+    }
+
+    private static string PreserveUtf8BomIfPresent(string path, string updated)
+    {
+        if (!File.Exists(path) || updated.Length == 0 || updated[0] == '\uFEFF')
+        {
+            return updated;
+        }
+
+        Span<byte> buffer = stackalloc byte[3];
+        using var stream = File.OpenRead(path);
+        var read = stream.Read(buffer);
+        return read == 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF
+            ? "\uFEFF" + updated
+            : updated;
     }
 
     private static async Task<string> WriteManifestAsync(
@@ -706,6 +819,28 @@ public sealed class AppCapabilities
             {
                 return updated;
             }
+        }
+
+        return content;
+    }
+
+    private static string InsertBeforeLineContainingAny(string content, string block, params string[] markers)
+    {
+        if (markers.Length == 0)
+        {
+            return content;
+        }
+
+        foreach (var marker in markers)
+        {
+            var index = content.IndexOf(marker, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            var lineStart = content.LastIndexOf('\n', index);
+            return content.Insert(lineStart < 0 ? 0 : lineStart + 1, block);
         }
 
         return content;
