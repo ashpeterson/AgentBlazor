@@ -16,5 +16,6 @@
     <RepositoryType>git</RepositoryType>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>Initial preview release of AgentBlazor - a Blazor-first agentic UI framework.</PackageReleaseNotes>
+    <AgentBlazorPackageVersion Condition="'$(AgentBlazorPackageVersion)' == ''">$(Version)</AgentBlazorPackageVersion>
   </PropertyGroup>
 </Project>

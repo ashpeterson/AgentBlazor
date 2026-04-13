@@ -15,16 +15,11 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseLocalAgentBlazorSource)' != 'true'">
-    <PackageReference Include="AgentBlazor" Version="$(AgentBlazorPackageVersion)" />
+    <PackageReference Include="AgentBlazor" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="MudBlazor" />
   </ItemGroup>
-
-  <Target Name="EnsurePackageVersionWhenUsingPackageReference" BeforeTargets="Restore"
-          Condition="'$(UseLocalAgentBlazorSource)' != 'true' and '$(AgentBlazorPackageVersion)' == ''">
-    <Error Text="Set AgentBlazorPackageVersion when UseLocalAgentBlazorSource is false. Example: dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview" />
-  </Target>
 
 </Project>
