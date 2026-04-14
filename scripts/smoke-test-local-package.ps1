@@ -116,6 +116,15 @@ function Clear-LocalPackageCache {
         [string]$Version
     )
 
+    $homePath = $env:USERPROFILE
+    if ([string]::IsNullOrWhiteSpace($homePath)) {
+        $homePath = $env:HOME
+    }
+
+    if ([string]::IsNullOrWhiteSpace($homePath)) {
+        throw "Unable to resolve the user home directory for NuGet package cache cleanup."
+    }
+
     $packageIds = @(
         "agentblazor",
         "agentblazor.core",
@@ -126,7 +135,7 @@ function Clear-LocalPackageCache {
     )
 
     foreach ($packageId in $packageIds) {
-        $path = Join-Path $env:USERPROFILE ".nuget\packages\$packageId\$Version"
+        $path = Join-Path $homePath ".nuget/packages/$packageId/$Version"
         if (Test-Path $path) {
             Remove-Item -Recurse -Force $path
         }
