@@ -231,6 +231,14 @@ Invoke-Step "Preparing local package feed" {
                 "/p:UseSharedCompilation=false",
                 "/p:PackageVersion=$PackageVersion"
             )
+
+            $packedPackagePath = Join-Path $localFeed "$($definition.Id).$PackageVersion.nupkg"
+            if (-not (Test-Path $packedPackagePath)) {
+                throw "Expected packed package '$packedPackagePath' does not exist."
+            }
+
+            New-Item -ItemType Directory -Force $definition.OutputDir | Out-Null
+            Copy-Item -LiteralPath $packedPackagePath -Destination $definition.OutputDir -Force
         }
     }
     else {
