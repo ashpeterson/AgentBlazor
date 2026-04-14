@@ -5,9 +5,9 @@ test.describe("Components explorer", () => {
   test("renders the docs-style overview with catalog and contents rails", async ({ page }) => {
     await page.goto("/demo/components", { waitUntil: "networkidle" });
 
-    await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Workflow Hub", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Component Kit", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Docs", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Components", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Workflows", exact: true })).toBeVisible();
     await expect(page.locator(".components-page__catalog-card").first()).toContainText("Component Catalog");
     await expect(page.locator("#catalog").getByRole("heading", { name: "Current drop-in components" })).toBeVisible();
     await expect(page.locator(".components-page__catalog-nav")).toContainText("AgentDataGrid");
