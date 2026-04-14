@@ -1,6 +1,6 @@
 # GitHub Packages Private Preview
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 
 Use this flow when you want to publish `AgentBlazor` and `AgentBlazor.Cli` privately and install them in a separate Blazor app as a test user.
 
@@ -95,7 +95,9 @@ agentblazor validate
 ## Notes
 
 - This is the right path for private preview testing.
-- Published-feed validation is currently pending. Local preflight on 2026-04-13 found no `NUGET_API_KEY`, `GITHUB_TOKEN`, `GH_TOKEN`, or logged-in `gh` session on the validation machine, so the next verification requires dispatching the GitHub Actions workflow or providing authenticated feed credentials.
+- `0.1.0-preview.3` has been published and validated from the GitHub Packages feed. Workflow run `24420548131` passed on commit `193ccdfc92f2b6e618b7dafa6e6228cfe2597171` and uploaded artifact `agentblazor-packages-0.1.0-preview.3`.
+- Published-feed validation used a clean Blazor Web App, isolated NuGet cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and a runtime HTTP smoke with a placeholder `OpenAI__ApiKey`.
+- Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, so use `0.1.0-preview.3` for private-preview testing.
 - Once real-project validation is complete, move to `nuget.org` for normal public installation.
 - The package currently targets `net10.0`.
 - The current preview story should lead with the workflow-first app-layer positioning, not the removed planner/runtime architecture.

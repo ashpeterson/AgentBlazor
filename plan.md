@@ -1,6 +1,6 @@
 # AgentBlazor Plan (Living Document)
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 Owner: AgentBlazor core team
 Status: Active working plan
 
@@ -14,8 +14,8 @@ Status: Active working plan
 - External hosted WebAssembly validation now confirms that split on a real server+client OSS app; server host scaffold/build/manifest validation passes while browser-client providers/chat stay manual-review.
 - Existing-app scaffold now handles composed service-chain startup paths such as `.AddServerUI(...)`, avoids duplicate MudBlazor service registration, maps endpoints before async `RunAsync`, targets discovered existing root pages, and preserves UTF-8 BOMs on edited existing files.
 - Project-file scaffold now uses minimal package/project reference insertion instead of reserializing `.csproj` files, preserving XML declarations and MSBuild target expressions.
-- CLI scaffold package references and CLI display version now derive from assembly package metadata and align to `0.1.0-preview.2` for the current build instead of the stale `1.0.0` value.
-- Private-preview GitHub Packages publishing now covers both the runtime package and CLI tool package.
+- CLI scaffold package references and CLI display version now derive from assembly package metadata and align to `0.1.0-preview.3` for the current build instead of the stale `1.0.0` value.
+- Private-preview GitHub Packages publishing now covers both the runtime package and CLI tool package, and `0.1.0-preview.3` has passed published-feed clean-app validation.
 - The 2026-04-09 runtime review fixes are in place:
   - execution scope is preserved across turns
   - middleware runs in both normal and streaming turns
@@ -28,14 +28,14 @@ Status: Active working plan
   - `AgentBlazor.IntegrationTests`: `105/105`
 - Current real-provider validation:
   - `ProviderAdapterIntegrationTests`: `30/30` with real OpenAI provider config from `demo/AgentBlazor.Demo/appsettings.Development.json`; coverage includes chat response, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
-- Current local package validation:
+- Current package validation:
+  - GitHub Packages workflow `publish-github-packages-preview` run `24420548131` passed on commit `193ccdfc92f2b6e618b7dafa6e6228cfe2597171` for `0.1.0-preview.3`
+  - clean Blazor Web App install from `https://nuget.pkg.github.com/ashpeterson/index.json` passed `AgentBlazor` package install, `AgentBlazor.Cli` tool install, `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor` `9/9`, and `validate` `3/3` with no repo-local package feed
+  - runtime HTTP smoke from the published package passed with a placeholder `OpenAI__ApiKey`, rendering the home page, `AgentChatWidget`, and AgentBlazor/MudBlazor static assets
+  - earlier GitHub Packages `0.1.0-preview.2` runtime package validation found a stale immutable package, so `0.1.0-preview.3` is the validated private-preview package
   - packed `AgentBlazor.0.1.0-preview.2.nupkg`, `AgentBlazor.Cli.0.1.0-preview.2.nupkg`, and internal dependency packages
   - clean Blazor Web App install from local package source passed CLI tool install, `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor` `9/9`, and `validate` `3/3` with no repo-local project references
   - previous `0.1.0-preview.1` packaged runtime smoke runner referenced `AgentBlazor` only and completed real OpenAI-backed normal and streaming semantic workflow calls with `PACKAGE_SMOKE_OK`
-- Current published-feed validation:
-  - target feed is `https://nuget.pkg.github.com/ashpeterson/index.json`
-  - local validation is blocked because no `NUGET_API_KEY`, `GITHUB_TOKEN`, or `GH_TOKEN` is available and `gh auth status` reports no logged-in GitHub host
-  - next step is to dispatch `.github/workflows/publish-github-packages-preview.yml` or provide authenticated feed credentials, then install both `AgentBlazor` and `AgentBlazor.Cli` from the feed in a clean app
 - Current real-app CLI validation:
   - fresh standard Blazor Web App: build passed, `doctor` `9/9`, `validate` `3/3`
   - official Microsoft `dotnet/blazor-samples/10.0/BlazorSample_BlazorWebApp`: baseline build passed, scaffold/build passed, `doctor` `9/9`, `validate` `3/3`
@@ -47,7 +47,7 @@ Status: Active working plan
 
 ## Production Readiness Plan
 
-Current readiness: private preview / published-feed validation.
+Current readiness: private preview / published-feed validated.
 
 1. Validate against real apps:
    - standard Blazor Web App - fresh app and official Microsoft sample passed
@@ -65,8 +65,8 @@ Current readiness: private preview / published-feed validation.
 3. Verify packaging:
    - passed local preview package pack/install/build/doctor/validate/runtime smoke
    - GitHub Packages workflow now publishes both `AgentBlazor` and `AgentBlazor.Cli`
-   - publish preview package
-   - install from clean machine/project using the published feed package and CLI tool
+   - published `0.1.0-preview.3`
+   - passed clean-project install using the published feed package and CLI tool
    - remove repo-local source assumptions from public quickstart paths
 4. Verify release surface:
    - CLI `init -> scaffold --diff -> scaffold --approve -> doctor -> validate`
