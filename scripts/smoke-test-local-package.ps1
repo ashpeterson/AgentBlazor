@@ -176,8 +176,8 @@ function Test-AllPackagesAvailable {
 
 function Resolve-AgentBlazorToolPath {
     $candidates = @(
-        Join-Path $toolPath "agentblazor",
-        Join-Path $toolPath "agentblazor.exe"
+        (Join-Path $toolPath "agentblazor"),
+        (Join-Path $toolPath "agentblazor.exe")
     )
 
     foreach ($candidate in $candidates) {
