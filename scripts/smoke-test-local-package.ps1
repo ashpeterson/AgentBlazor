@@ -174,6 +174,21 @@ function Test-AllPackagesAvailable {
     return $true
 }
 
+function Resolve-AgentBlazorToolPath {
+    $candidates = @(
+        Join-Path $toolPath "agentblazor",
+        Join-Path $toolPath "agentblazor.exe"
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    throw "AgentBlazor CLI executable was not found in '$toolPath'."
+}
+
 function Write-TextFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -556,7 +571,7 @@ Invoke-Step "Installing the local CLI package" {
 }
 
 Invoke-Step "Generating AGENT.md with the CLI" {
-    $cliExe = Join-Path $toolPath "agentblazor.exe"
+    $cliExe = Resolve-AgentBlazorToolPath
     & $cliExe init $solutionPath --host $ProjectName --non-interactive
     if ($LASTEXITCODE -ne 0) {
         throw "agentblazor init failed."
