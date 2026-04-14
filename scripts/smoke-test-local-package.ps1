@@ -241,6 +241,7 @@ Invoke-Step "Writing isolated NuGet configuration" {
   <packageSourceMapping>
     <packageSource key="local-agentblazor">
       <package pattern="AgentBlazor*" />
+      <package pattern="agentblazor*" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
@@ -550,7 +551,7 @@ Invoke-Step "Installing the local CLI package" {
         "AgentBlazor.Cli",
         "--version", $PackageVersion,
         "--tool-path", $toolPath,
-        "--add-source", $localFeed
+        "--configfile", $nugetConfigPath
     ) -WorkingDirectory $scratchRoot
 }
 
