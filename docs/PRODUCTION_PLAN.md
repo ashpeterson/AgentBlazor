@@ -109,7 +109,7 @@ Exit criteria:
 
 ### 1.1 NuGet Package Prep
 - [x] Create package metadata (description, tags, icon)
-- [x] Set up package versioning (0.1.0-preview.2 in Directory.Build.props)
+- [x] Set up package versioning (0.1.0-preview.3 in Directory.Build.props)
 - [x] Configure GitHub Actions for publish (publish-github-packages-preview.yml)
 - [x] Configure GitHub Actions to publish both `AgentBlazor` and `AgentBlazor.Cli`
 - [x] Test install from locally packed preview package in a clean project
@@ -129,7 +129,7 @@ Exit criteria:
 - [ ] Add a provider configuration checklist for OpenAI, Azure OpenAI, and Ollama
 
 ### 1.3 Preview Ship
-- [ ] Run publish workflow with version 0.1.0-preview.2
+- [ ] Run publish workflow with version 0.1.0-preview.3
 - [ ] Share with a small validation group
 - [ ] Do not announce as production-ready until Phase 2 exits cleanly
 

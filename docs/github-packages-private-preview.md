@@ -26,7 +26,7 @@ How to run it:
 2. Go to `Actions`.
 3. Open `publish-github-packages-preview`.
 4. Click `Run workflow`.
-5. Enter a prerelease version such as `0.1.0-preview.2`.
+5. Enter a prerelease version such as `0.1.0-preview.3`.
 
 What the workflow does:
 
@@ -77,7 +77,7 @@ agentblazor --version
 Expected for the current preview:
 
 ```text
-0.1.0-preview.2
+0.1.0-preview.3
 ```
 
 Then run the clean-app validation sequence:

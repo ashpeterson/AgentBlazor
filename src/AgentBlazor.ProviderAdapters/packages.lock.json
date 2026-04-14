@@ -255,7 +255,7 @@
       "agentblazor.core": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Licensing": "[0.1.0-preview.2, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.3, )",
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Data.Sqlite": "[10.0.5, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )",

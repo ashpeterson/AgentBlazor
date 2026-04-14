@@ -165,7 +165,7 @@
       "agentblazor.core": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Licensing": "[0.1.0-preview.2, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.3, )",
           "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
           "Microsoft.Data.Sqlite": "[10.0.5, )"
         }
@@ -176,7 +176,7 @@
       "agentblazor.provideradapters": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[0.1.0-preview.2, )",
+          "AgentBlazor.Core": "[0.1.0-preview.3, )",
           "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
           "Microsoft.Agents.AI.OpenAI": "[1.0.0-preview.260209.1, )"
         }

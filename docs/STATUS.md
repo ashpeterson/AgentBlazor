@@ -67,7 +67,7 @@ The runtime realignment is now materially underway:
 - middleware now executes for both `RunTurnAsync` and `RunTurnStreamingAsync`
 - provider endpoint validation now rejects non-HTTP(S) custom endpoints
 - real OpenAI-backed adapter validation now covers runtime tool execution, approval gating, blocked/recovery/retry behavior, streaming/reconnect, cancellation, concurrency, and session-state continuity
-- local package validation now proves the packed `AgentBlazor` package and packed `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to `0.1.0-preview.2` for the current build
+- local package validation now proves the packed `AgentBlazor` package and packed `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to `0.1.0-preview.3` for the current build
 - the private-preview GitHub Packages workflow now publishes both the runtime package and CLI tool package; local published-feed validation is blocked until authenticated feed access is available
 - repo package source mapping now allows the full non-demo test matrix to restore and run locally
 - existing-app scaffold now keeps MudBlazor imports scoped to the patched layout provider file instead of adding `@using MudBlazor` globally, avoiding QuickGrid `PropertyColumn` tag collisions found in the official `dotnet/blazor-samples` Blazor Web App
