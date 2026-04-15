@@ -81,7 +81,8 @@ Validation log:
 - 2026-04-13 GitHub Packages published-feed preflight confirmed the target feed is `https://nuget.pkg.github.com/ashpeterson/index.json`, but the local environment had no feed credentials at that time. The publish workflow was hardened to publish both `AgentBlazor` and `AgentBlazor.Cli`.
 - 2026-04-14 GitHub Packages workflow `publish-github-packages-preview` run `24420548131` passed on commit `193ccdfc92f2b6e618b7dafa6e6228cfe2597171` for `0.1.0-preview.3` and uploaded artifact `agentblazor-packages-0.1.0-preview.3`. A clean Blazor Web App in `/tmp/agentblazor-github-consumer-validation-preview3-20260414201600/PackageConsumer` installed `AgentBlazor` and `AgentBlazor.Cli` from the GitHub Packages feed with isolated NuGet cache/tool paths, confirmed `agentblazor --version` reported `0.1.0-preview.3`, ran `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, and `dotnet build` with `0` warnings and `0` errors, then passed `doctor` readiness `9/9` and `validate` readiness `9/9`, validation `3/3`. Runtime HTTP smoke passed with a placeholder `OpenAI__ApiKey`, rendering the home page, `AgentChatWidget`, and AgentBlazor/MudBlazor static assets. The earlier published `0.1.0-preview.2` runtime package was stale and immutable, so `0.1.0-preview.3` is the validated private-preview package.
 - 2026-04-15 real-app package validation against `neozhu/CleanArchitectureWithBlazorServer` exposed that `0.1.0-preview.3` used open lower-bound Microsoft Agents dependency ranges. The app restored `Microsoft.Agents.AI` `1.1.0`, causing startup to fail with `TypeLoadException` for `SerializeSessionCoreAsync`. Current source pins the Microsoft Agents package family to the exact API version AgentBlazor is compiled against.
-- 2026-04-15 GitHub Packages workflow run `24440492708` succeeded for `0.1.0-preview.4`, but published-feed validation proved the feed version was an older immutable package from commit `45da291b84441c75e50af4c16cbed33ccb31cc5d`. The stale package lacked current `AgentBlazor.App` semantic workflow APIs and failed real-app scaffold build. The publish workflow now fails on duplicate package versions instead of using `--skip-duplicate`; `0.1.0-preview.5` is the next validation version.
+- 2026-04-15 GitHub Packages workflow run `24440492708` succeeded for `0.1.0-preview.4`, but published-feed validation proved the feed version was an older immutable package from commit `45da291b84441c75e50af4c16cbed33ccb31cc5d`. The stale package lacked current `AgentBlazor.App` semantic workflow APIs and failed real-app scaffold build. The publish workflow now fails on duplicate package versions instead of using `--skip-duplicate`; `0.1.0-preview.6` is the next validation version.
+- 2026-04-15 published-feed validation for `0.1.0-preview.5` confirmed the package was current, but `neozhu/CleanArchitectureWithBlazorServer` already depends on `Microsoft.Agents.AI.OpenAI` `1.1.0`; the exact `1.0.0-preview.260209.1` pin caused `NU1107`. Current source moved to the Microsoft Agents 1.1 API family and implements the new async session serializer.
 
 Exit criteria:
 
@@ -112,7 +113,7 @@ Exit criteria:
 
 ### 1.1 NuGet Package Prep
 - [x] Create package metadata (description, tags, icon)
-- [x] Set up package versioning (0.1.0-preview.5 in Directory.Build.props)
+- [x] Set up package versioning (0.1.0-preview.6 in Directory.Build.props)
 - [x] Configure GitHub Actions for publish (publish-github-packages-preview.yml)
 - [x] Configure GitHub Actions to publish both `AgentBlazor` and `AgentBlazor.Cli`
 - [x] Test install from locally packed preview package in a clean project
@@ -132,7 +133,7 @@ Exit criteria:
 - [x] Add a provider configuration checklist for OpenAI, Azure OpenAI, and Ollama
 
 ### 1.3 Preview Ship
-- [ ] Run publish workflow with version 0.1.0-preview.5
+- [ ] Run publish workflow with version 0.1.0-preview.6
 - [ ] Share with a small validation group
 - [ ] Do not announce as production-ready until Phase 2 exits cleanly
 

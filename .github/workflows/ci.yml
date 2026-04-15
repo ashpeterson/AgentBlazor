@@ -55,7 +55,7 @@ jobs:
       - name: Local Package Smoke Test
         shell: pwsh
         run: |
-          ./scripts/smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.5
+          ./scripts/smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.6
 
       - name: Install E2E Dependencies
         working-directory: tests/e2e

@@ -31,8 +31,8 @@ dotnet build path/to/App.csproj --no-restore -nologo
 4. Install the package and CLI from the feed:
 
 ```bash
-dotnet add path/to/App.csproj package AgentBlazor --version 0.1.0-preview.5
-dotnet tool install AgentBlazor.Cli --version 0.1.0-preview.5 --tool-path .agentblazor-tool
+dotnet add path/to/App.csproj package AgentBlazor --version 0.1.0-preview.6
+dotnet tool install AgentBlazor.Cli --version 0.1.0-preview.6 --tool-path .agentblazor-tool
 .agentblazor-tool/agentblazor --version
 ```
 

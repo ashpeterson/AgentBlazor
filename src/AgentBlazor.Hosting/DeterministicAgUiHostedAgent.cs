@@ -51,12 +51,14 @@ internal sealed class DeterministicAgUiHostedAgent(
         return ValueTask.FromResult<AgentSession>(new HostedAgentSession());
     }
 
-    protected override JsonElement SerializeSessionCore(
+    protected override ValueTask<JsonElement> SerializeSessionCoreAsync(
         AgentSession session,
-        JsonSerializerOptions? jsonSerializerOptions = null)
+        JsonSerializerOptions? jsonSerializerOptions = null,
+        CancellationToken cancellationToken = default)
     {
         _ = session;
-        return JsonSerializer.SerializeToElement(new Dictionary<string, object?>(), jsonSerializerOptions);
+        _ = cancellationToken;
+        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new Dictionary<string, object?>(), jsonSerializerOptions));
     }
 
     protected override ValueTask<AgentSession> DeserializeSessionCoreAsync(

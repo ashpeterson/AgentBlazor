@@ -151,7 +151,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.5" />
+                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.6" />
                   </ItemGroup>
                 </Project>
                 """,
@@ -186,7 +186,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var report = await new InstallReadinessAnalyzer().AnalyzeAsync(projectPath, hostProjectName: null);
 
         Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.5" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.6" />""", projectText, StringComparison.Ordinal);
         Assert.Contains("""<PackageReference Include="MudBlazor" Version="9.0.0" />""", projectText, StringComparison.Ordinal);
         Assert.Contains(report.Checks, check => check.Id == "package-references" && check.Status == InstallReadinessStatus.Pass);
     }
