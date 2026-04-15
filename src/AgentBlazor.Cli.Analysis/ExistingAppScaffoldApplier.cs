@@ -187,7 +187,7 @@ public sealed class ExistingAppScaffoldApplier
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
             ?? typeof(ExistingAppScaffoldApplier).Assembly.GetName().Version?.ToString()
-            ?? "0.1.0-preview.6";
+            ?? "0.1.0-preview.7";
 
         return version.Split('+', 2)[0];
     }
@@ -471,6 +471,8 @@ builder.Services.AddAgentBlazor(options =>
         var original = await File.ReadAllTextAsync(appShellPath, ct).ConfigureAwait(false);
         var updated = original;
         var isStaticHtmlShell = Path.GetExtension(appShellPath).Equals(".html", StringComparison.OrdinalIgnoreCase);
+        var linkNonceAttribute = FindExistingNonceAttribute(original, "link");
+        var scriptNonceAttribute = FindExistingNonceAttribute(original, "script");
 
         if (!updated.Contains("_content/MudBlazor/MudBlazor.min.css", StringComparison.Ordinal))
         {
@@ -478,8 +480,8 @@ builder.Services.AddAgentBlazor(options =>
                 updated,
                 "</head>",
                 isStaticHtmlShell
-                    ? "    <link rel=\"stylesheet\" href=\"_content/MudBlazor/MudBlazor.min.css\" />\n"
-                    : "    <link rel=\"stylesheet\" href=\"@Assets[\"_content/MudBlazor/MudBlazor.min.css\"]\" />\n");
+                    ? BuildStylesheetTag("_content/MudBlazor/MudBlazor.min.css", linkNonceAttribute)
+                    : BuildStylesheetTag("@Assets[\"_content/MudBlazor/MudBlazor.min.css\"]", linkNonceAttribute));
         }
 
         if (!updated.Contains("AgentBlazorAssetPaths.Css", StringComparison.Ordinal) &&
@@ -489,8 +491,8 @@ builder.Services.AddAgentBlazor(options =>
                 updated,
                 "</head>",
                 isStaticHtmlShell
-                    ? "    <link rel=\"stylesheet\" href=\"_content/AgentBlazor/AgentBlazor.min.css\" />\n"
-                    : "    <link rel=\"stylesheet\" href=\"@Assets[AgentBlazorAssetPaths.Css]\" />\n");
+                    ? BuildStylesheetTag("_content/AgentBlazor/AgentBlazor.min.css", linkNonceAttribute)
+                    : BuildStylesheetTag("@Assets[AgentBlazorAssetPaths.Css]", linkNonceAttribute));
         }
 
         if (!updated.Contains("_content/MudBlazor/MudBlazor.min.js", StringComparison.Ordinal))
@@ -499,8 +501,8 @@ builder.Services.AddAgentBlazor(options =>
                 updated,
                 "</body>",
                 isStaticHtmlShell
-                    ? "    <script src=\"_content/MudBlazor/MudBlazor.min.js\"></script>\n"
-                    : "    <script src=\"@Assets[\"_content/MudBlazor/MudBlazor.min.js\"]\"></script>\n");
+                    ? BuildScriptTag("_content/MudBlazor/MudBlazor.min.js", scriptNonceAttribute)
+                    : BuildScriptTag("@Assets[\"_content/MudBlazor/MudBlazor.min.js\"]", scriptNonceAttribute));
         }
 
         if (!updated.Contains("AgentBlazorAssetPaths.Js", StringComparison.Ordinal) &&
@@ -510,8 +512,8 @@ builder.Services.AddAgentBlazor(options =>
                 updated,
                 "</body>",
                 isStaticHtmlShell
-                    ? "    <script src=\"_content/AgentBlazor/AgentBlazor.min.js\"></script>\n"
-                    : "    <script src=\"@Assets[AgentBlazorAssetPaths.Js]\"></script>\n");
+                    ? BuildScriptTag("_content/AgentBlazor/AgentBlazor.min.js", scriptNonceAttribute)
+                    : BuildScriptTag("@Assets[AgentBlazorAssetPaths.Js]", scriptNonceAttribute));
         }
 
         AddTextChange(
@@ -520,6 +522,105 @@ builder.Services.AddAgentBlazor(options =>
             "Added MudBlazor and AgentBlazor shell asset references.",
             original,
             updated);
+    }
+
+    private static string BuildStylesheetTag(string href, string? nonceAttribute)
+        => $"    <link rel=\"stylesheet\" href=\"{href}\"{nonceAttribute ?? string.Empty} />\n";
+
+    private static string BuildScriptTag(string src, string? nonceAttribute)
+        => $"    <script src=\"{src}\"{nonceAttribute ?? string.Empty}></script>\n";
+
+    private static string? FindExistingNonceAttribute(string markup, string tagName)
+    {
+        var search = $"<{tagName}";
+        var index = 0;
+
+        while (index < markup.Length)
+        {
+            var tagStart = markup.IndexOf(search, index, StringComparison.OrdinalIgnoreCase);
+            if (tagStart < 0)
+            {
+                return null;
+            }
+
+            var tagEnd = markup.IndexOf('>', tagStart);
+            if (tagEnd < 0)
+            {
+                return null;
+            }
+
+            var tag = markup.Substring(tagStart, tagEnd - tagStart);
+            var nonceIndex = FindAttributeNameIndex(tag, "nonce");
+            if (nonceIndex >= 0)
+            {
+                return ExtractAttribute(tag, nonceIndex);
+            }
+
+            index = tagEnd + 1;
+        }
+
+        return null;
+    }
+
+    private static int FindAttributeNameIndex(string tag, string attributeName)
+    {
+        var search = $"{attributeName}=";
+        var index = 0;
+
+        while (index < tag.Length)
+        {
+            var candidate = tag.IndexOf(search, index, StringComparison.OrdinalIgnoreCase);
+            if (candidate < 0)
+            {
+                return -1;
+            }
+
+            if (candidate == 0 || char.IsWhiteSpace(tag[candidate - 1]) || tag[candidate - 1] == '<')
+            {
+                return candidate;
+            }
+
+            index = candidate + search.Length;
+        }
+
+        return -1;
+    }
+
+    private static string? ExtractAttribute(string tag, int attributeNameIndex)
+    {
+        var attributeStart = attributeNameIndex > 0 && char.IsWhiteSpace(tag[attributeNameIndex - 1])
+            ? attributeNameIndex - 1
+            : attributeNameIndex;
+        var valueStart = attributeNameIndex + "nonce=".Length;
+        if (valueStart >= tag.Length)
+        {
+            return null;
+        }
+
+        int attributeEnd;
+        var quote = tag[valueStart];
+        if (quote is '"' or '\'')
+        {
+            var valueEnd = tag.IndexOf(quote, valueStart + 1);
+            if (valueEnd < 0)
+            {
+                return null;
+            }
+
+            attributeEnd = valueEnd + 1;
+        }
+        else
+        {
+            attributeEnd = valueStart;
+            while (attributeEnd < tag.Length &&
+                   !char.IsWhiteSpace(tag[attributeEnd]) &&
+                   tag[attributeEnd] is not '>')
+            {
+                attributeEnd++;
+            }
+        }
+
+        return tag.Substring(attributeStart, attributeEnd - attributeStart);
     }
 
     private static async Task PreviewUiImportsAsync(string importsPath, List<ScaffoldPreviewFile> changes, CancellationToken ct)

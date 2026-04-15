@@ -151,7 +151,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.6" />
+                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.7" />
                   </ItemGroup>
                 </Project>
                 """,
@@ -186,7 +186,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var report = await new InstallReadinessAnalyzer().AnalyzeAsync(projectPath, hostProjectName: null);
 
         Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.6" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.7" />""", projectText, StringComparison.Ordinal);
         Assert.Contains("""<PackageReference Include="MudBlazor" Version="9.0.0" />""", projectText, StringComparison.Ordinal);
         Assert.Contains(report.Checks, check => check.Id == "package-references" && check.Status == InstallReadinessStatus.Pass);
     }
@@ -269,6 +269,75 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.True(root.GetProperty("changedFiles").GetArrayLength() >= result.ChangedFileCount);
         Assert.Contains(root.GetProperty("changedFiles").EnumerateArray(),
             file => string.Equals(file.GetProperty("relativePath").GetString(), "Program.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenShellUsesCspNonces_CopiesNonceToInsertedAssets()
+    {
+        var projectPath = CreateProject(
+            projectName: "NonceApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="utf-8" />
+                    <base href="/" />
+                    <link rel="stylesheet" href="@Assets["app.css"]" nonce="@Nonce" />
+                </head>
+                <body>
+                    <Routes />
+                    <script src="@Assets["_framework/blazor.web.js"]" nonce="@Nonce"></script>
+                </body>
+                </html>
+                @code
+                {
+                    public string? Nonce => HttpContextAccessor?.HttpContext?.GetNonce();
+                }
+                """,
+            mainLayoutBody: """
+                @inherits LayoutComponentBase
+
+                <main>
+                    @Body
+                </main>
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan);
+
+        var appShellChange = Assert.Single(
+            preview.Changes,
+            change => change.Path.EndsWith(Path.Combine("Components", "App.razor"), StringComparison.Ordinal));
+        Assert.Contains("""<link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" nonce="@Nonce" />""", appShellChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("""<link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" nonce="@Nonce" />""", appShellChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("""<script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]" nonce="@Nonce"></script>""", appShellChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("""<script src="@Assets[AgentBlazorAssetPaths.Js]" nonce="@Nonce"></script>""", appShellChange.UpdatedContent, StringComparison.Ordinal);
     }
 
     [Fact]
