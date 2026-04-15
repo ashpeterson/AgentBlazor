@@ -1,6 +1,6 @@
 # GitHub Packages Private Preview
 
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 
 Use this flow when you want to publish `AgentBlazor` and `AgentBlazor.Cli` privately and install them in a separate Blazor app as a test user.
 
@@ -26,7 +26,7 @@ How to run it:
 2. Go to `Actions`.
 3. Open `publish-github-packages-preview`.
 4. Click `Run workflow`.
-5. Enter a prerelease version such as `0.1.0-preview.3`.
+5. Enter a prerelease version such as `0.1.0-preview.4`.
 
 What the workflow does:
 
@@ -77,7 +77,7 @@ agentblazor --version
 Expected for the current preview:
 
 ```text
-0.1.0-preview.3
+0.1.0-preview.4
 ```
 
 Then run the clean-app validation sequence:
@@ -95,9 +95,11 @@ agentblazor validate
 ## Notes
 
 - This is the right path for private preview testing.
-- `0.1.0-preview.3` has been published and validated from the GitHub Packages feed. Workflow run `24420548131` passed on commit `193ccdfc92f2b6e618b7dafa6e6228cfe2597171` and uploaded artifact `agentblazor-packages-0.1.0-preview.3`.
-- Published-feed validation used a clean Blazor Web App, isolated NuGet cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and a runtime HTTP smoke with a placeholder `OpenAI__ApiKey`.
-- Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, so use `0.1.0-preview.3` for private-preview testing.
+- Use `0.1.0-preview.4` or later for real-app private-preview testing. `0.1.0-preview.4` pins Microsoft Agents dependencies exactly so consumers cannot float to an incompatible Agents API.
+- Published-feed validation should use a clean Blazor Web App or real app, isolated NuGet cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and a runtime HTTP smoke with a placeholder `OpenAI__ApiKey`.
+- Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, and `0.1.0-preview.3` later exposed a real-app dependency-range issue. Use `0.1.0-preview.4` or later for private-preview testing.
+- Earlier `0.1.0-preview.3` clean-app validation passed, but real-app runtime smoke exposed an open dependency-range issue where NuGet could float Microsoft Agents packages to an incompatible API. Use `0.1.0-preview.4` instead.
+- Real-app tester checklist: `docs/private-preview-validation.md`.
 - Once real-project validation is complete, move to `nuget.org` for normal public installation.
 - The package currently targets `net10.0`.
 - The current preview story should lead with the workflow-first app-layer positioning, not the removed planner/runtime architecture.

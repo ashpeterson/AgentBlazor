@@ -14,7 +14,7 @@
       },
       "Microsoft.Agents.AI.OpenAI": {
         "type": "Direct",
-        "requested": "[1.0.0-preview.260209.1, )",
+        "requested": "[1.0.0-preview.260209.1, 1.0.0-preview.260209.1]",
         "resolved": "1.0.0-preview.260209.1",
         "contentHash": "C6J1EqVBOzlFNnwNSyUrPWWgnug9xFiqSUzb248VwHIoWmMmH+ILSJiwL+fLJPTzAkOGHCFwxd/lCg6DeyXc9w==",
         "dependencies": {
@@ -51,16 +51,6 @@
           "Microsoft.Bcl.AsyncInterfaces": "8.0.0",
           "System.ClientModel": "1.8.0",
           "System.Memory.Data": "8.0.1"
-        }
-      },
-      "Microsoft.Agents.AI.Abstractions": {
-        "type": "Transitive",
-        "resolved": "1.0.0-preview.260209.1",
-        "contentHash": "FCEsI4WOoBUIrhf/xYFHYcVigRBoVbSe8ul2p5Nnz9RhR8cpL3SRWtYQaDnKnU34FlhTZboBiSdeejIFZ7Z8sg==",
-        "dependencies": {
-          "Microsoft.Extensions.AI.Abstractions": "10.2.0",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.2"
         }
       },
       "Microsoft.Bcl.AsyncInterfaces": {
@@ -255,8 +245,8 @@
       "agentblazor.core": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Licensing": "[0.1.0-preview.3, )",
-          "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.4, )",
+          "Microsoft.Agents.AI": "[1.0.0-preview.260209.1, 1.0.0-preview.260209.1]",
           "Microsoft.Data.Sqlite": "[10.0.5, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.2, )",
           "Microsoft.Extensions.Options": "[10.0.2, )"
@@ -270,7 +260,7 @@
       },
       "Microsoft.Agents.AI": {
         "type": "CentralTransitive",
-        "requested": "[1.0.0-preview.260209.1, )",
+        "requested": "[1.0.0-preview.260209.1, 1.0.0-preview.260209.1]",
         "resolved": "1.0.0-preview.260209.1",
         "contentHash": "O3emfGfIqeHHZK98j6iifq2kSncekg7Rn2JFcgA80jgMzXf30SNaxn3vBN1NO30Rg0cPVv6cZZlqtvm61C9Xfw==",
         "dependencies": {
@@ -280,6 +270,17 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
           "Microsoft.Extensions.Logging.Abstractions": "10.0.2",
           "Microsoft.Extensions.VectorData.Abstractions": "9.7.0"
+        }
+      },
+      "Microsoft.Agents.AI.Abstractions": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0-preview.260209.1, 1.0.0-preview.260209.1]",
+        "resolved": "1.0.0-preview.260209.1",
+        "contentHash": "FCEsI4WOoBUIrhf/xYFHYcVigRBoVbSe8ul2p5Nnz9RhR8cpL3SRWtYQaDnKnU34FlhTZboBiSdeejIFZ7Z8sg==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "10.2.0",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.2",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.2"
         }
       },
       "Microsoft.Data.Sqlite": {
