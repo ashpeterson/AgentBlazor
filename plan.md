@@ -14,8 +14,9 @@ Status: Active working plan
 - External hosted WebAssembly validation now confirms that split on a real server+client OSS app; server host scaffold/build/manifest validation passes while browser-client providers/chat stay manual-review.
 - Existing-app scaffold now handles composed service-chain startup paths such as `.AddServerUI(...)`, avoids duplicate MudBlazor service registration, maps endpoints before async `RunAsync`, targets discovered existing root pages, and preserves UTF-8 BOMs on edited existing files.
 - Project-file scaffold now uses minimal package/project reference insertion instead of reserializing `.csproj` files, preserving XML declarations and MSBuild target expressions.
-- CLI scaffold package references and CLI display version now derive from assembly package metadata and align to `0.1.0-preview.6` for the current build instead of the stale `1.0.0` value.
-- Private-preview GitHub Packages publishing covers both the runtime package and CLI tool package; `0.1.0-preview.6` is the current validated package after real-app validation exposed dependency float in `0.1.0-preview.3`, a stale immutable `0.1.0-preview.4` feed package, and a `0.1.0-preview.5` conflict with apps already on Microsoft Agents `1.1.0`.
+- CLI scaffold package references and CLI display version now derive from assembly package metadata and align to `0.1.0-preview.7` for the current build instead of the stale `1.0.0` value.
+- Private-preview GitHub Packages publishing covers both the runtime package and CLI tool package; `0.1.0-preview.7` is the current validated package after real-app validation exposed dependency float in `0.1.0-preview.3`, a stale immutable `0.1.0-preview.4` feed package, a `0.1.0-preview.5` conflict with apps already on Microsoft Agents `1.1.0`, and a `0.1.0-preview.6` CSP nonce gap in nonce-aware host shells.
+- Existing-app scaffold now preserves existing `nonce="..."` attributes when it inserts MudBlazor and AgentBlazor CSS/JS asset tags, verified against an external CSP-enabled Blazor Web App.
 - The 2026-04-09 runtime review fixes are in place:
   - execution scope is preserved across turns
   - middleware runs in both normal and streaming turns
@@ -23,18 +24,21 @@ Status: Active working plan
 - Current non-demo verification:
   - `AgentBlazor.Core.Tests`: `261/261`
   - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-  - `AgentBlazor.Cli.Analysis.Tests`: `131/131`
+  - `AgentBlazor.Cli.Analysis.Tests`: `132/132`
   - `AgentBlazor.Cli.IntegrationTests`: `9/9`
   - `AgentBlazor.IntegrationTests`: `105/105`
 - Current real-provider validation:
   - `ProviderAdapterIntegrationTests`: `30/30` with real OpenAI provider config from `demo/AgentBlazor.Demo/appsettings.Development.json`; coverage includes chat response, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
 - Current package validation:
+  - GitHub Packages workflow `publish-github-packages-preview` run `24443709690` passed on commit `5809ddcfda282e5a70bd89649a901e9599d89ac4` for `0.1.0-preview.7`
+  - published real-app package validation against `damienbod/BlazorSecurityNet10` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.7` from GitHub Packages with isolated NuGet/tool paths; baseline build, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor` `9/9`, `validate` `3/3`, and runtime HTTP smoke all passed
+  - runtime smoke against `damienbod/BlazorSecurityNet10` confirmed scaffolded MudBlazor and AgentBlazor static assets render with the host-generated CSP nonce
   - GitHub Packages workflow `publish-github-packages-preview` run `24441459326` passed on commit `13336a8779c761a340472ad2f1530dd3bdb68c12` for `0.1.0-preview.6`
   - published package inspection confirmed current commit metadata, Microsoft Agents 1.1 dependency family, the AG-UI host `SerializeSessionCoreAsync` implementation, and current semantic workflow APIs such as `AgentBlazor.App`
   - published real-app package validation against `CleanArchitectureWithBlazorServer` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.6` from GitHub Packages with isolated NuGet/tool paths; `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor` `9/9`, `validate` `3/3`, and runtime HTTP smoke all passed
   - clean Blazor Web App install from `https://nuget.pkg.github.com/ashpeterson/index.json` passed `AgentBlazor` package install, `AgentBlazor.Cli` tool install, `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor` `9/9`, and `validate` `3/3` with no repo-local package feed
   - runtime HTTP smoke from the published package passed with a placeholder `OpenAI__ApiKey`, rendering the home page, `AgentChatWidget`, and AgentBlazor/MudBlazor static assets
-  - earlier GitHub Packages `0.1.0-preview.2` runtime package validation found a stale immutable package, `0.1.0-preview.3` later exposed a real-app dependency-range issue, `0.1.0-preview.4` was an older immutable feed package, and `0.1.0-preview.5` conflicted with apps already on Microsoft Agents `1.1.0`; use `0.1.0-preview.6` or later for private-preview testing
+  - earlier GitHub Packages `0.1.0-preview.2` runtime package validation found a stale immutable package, `0.1.0-preview.3` later exposed a real-app dependency-range issue, `0.1.0-preview.4` was an older immutable feed package, `0.1.0-preview.5` conflicted with apps already on Microsoft Agents `1.1.0`, and `0.1.0-preview.6` missed CSP nonce preservation for inserted assets; use `0.1.0-preview.7` or later for private-preview testing
   - packed `AgentBlazor.0.1.0-preview.2.nupkg`, `AgentBlazor.Cli.0.1.0-preview.2.nupkg`, and internal dependency packages
   - clean Blazor Web App install from local package source passed CLI tool install, `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor` `9/9`, and `validate` `3/3` with no repo-local project references
   - previous `0.1.0-preview.1` packaged runtime smoke runner referenced `AgentBlazor` only and completed real OpenAI-backed normal and streaming semantic workflow calls with `PACKAGE_SMOKE_OK`
@@ -67,8 +71,8 @@ Current readiness: private preview / published-feed validated.
 3. Verify packaging:
    - passed local preview package pack/install/build/doctor/validate/runtime smoke
    - GitHub Packages workflow now publishes both `AgentBlazor` and `AgentBlazor.Cli`
-   - published and validated `0.1.0-preview.6` from GitHub Packages
-   - real-app published-feed validation passed against `CleanArchitectureWithBlazorServer`
+   - published and validated `0.1.0-preview.7` from GitHub Packages
+   - real-app published-feed validation passed against `CleanArchitectureWithBlazorServer` and `damienbod/BlazorSecurityNet10`
    - remove repo-local source assumptions from public quickstart paths
 4. Verify release surface:
    - CLI `init -> scaffold --diff -> scaffold --approve -> doctor -> validate`
@@ -310,13 +314,11 @@ Exit criteria:
 
 ## 10. Immediate Next Actions (Now)
 
-1. Create initial .NET solution/project structure.
-2. Implement `AgentBlazorOptions`, `DefaultAgentOptions`, `ComponentCapabilityCatalog`.
-3. Implement `AddAgentBlazorServices(...)` with provider + default agent wiring.
-4. Define MudBlazor v1 capability profile (initially: `MudTable`/`MudDataGrid`, dialogs, forms, navigation).
-5. Add first demo page showing built-in agent controlling MudBlazor components.
-6. Add integration tests validating policy-safe MudBlazor action execution through framework tools.
-7. Track execution backlog in `docs/mudblazor-pivot-checklist.md`.
+1. Keep `0.1.0-preview.7` as the current private-preview package baseline for external validation.
+2. Route any new real-app findings into focused CLI/runtime issues before publishing another preview version.
+3. Use the generated `.agentblazor/AGENT.md` snapshot from 2026-04-15 as the current route/action inventory.
+4. Do not claim broad production readiness until the small external validation group and production pilot gates in `docs/PRODUCTION_PLAN.md` are complete.
+5. Keep demo/e2e validation separate from the non-demo matrix when the public demo site is part of the release.
 
 ## 11. Risks and Mitigations
 

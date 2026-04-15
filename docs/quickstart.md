@@ -9,11 +9,13 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 
 The currently validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI and other providers still work as integrations, but OpenAI is the primary path to ship first.
 
-Status as of 2026-04-09:
+Status as of 2026-04-15:
 
 - the non-demo test matrix is green
 - the CLI now supports `init -> scaffold -> doctor -> validate`
 - standard hosted WebAssembly server+client installs are now part of the supported scaffold path
+- `0.1.0-preview.7` is the current validated private-preview package
+- scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
 
 ## Optional: Install The CLI
 

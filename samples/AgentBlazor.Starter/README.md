@@ -1,5 +1,7 @@
 # AgentBlazor Starter
 
+Last updated: 2026-04-15
+
 This is the current golden-path free starter for AgentBlazor.
 
 It is intentionally small:
@@ -35,10 +37,10 @@ dotnet add package AgentBlazor
 
 Then copy the shape from:
 
-- [Program.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Program.cs)
-- [OpsReviewCapabilities.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Workflows/OpsReviewCapabilities.cs)
-- [OpsReviewService.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Services/OpsReviewService.cs)
-- [OpsReview.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/Pages/OpsReview.razor)
+- [Program.cs](Program.cs)
+- [OpsReviewCapabilities.cs](Workflows/OpsReviewCapabilities.cs)
+- [OpsReviewService.cs](Services/OpsReviewService.cs)
+- [OpsReview.razor](Components/Pages/OpsReview.razor)
 
 The package-first path is the public path. The local source-project mode exists only so this repo can build and validate the sample before packages are published.
 
@@ -64,10 +66,10 @@ $env:OLLAMA_ENDPOINT="http://127.0.0.1:11434/v1"
 
 When copying this into a real app, replace these in order:
 
-1. [OpsReviewCapabilities.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Workflows/OpsReviewCapabilities.cs)
-2. [OpsReviewService.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Services/OpsReviewService.cs)
-3. [OpsReview.razor](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Components/Pages/OpsReview.razor)
-4. the route prefix and agent description in [Program.cs](C:/Git/repos/agentblazor/samples/AgentBlazor.Starter/Program.cs)
+1. [OpsReviewCapabilities.cs](Workflows/OpsReviewCapabilities.cs)
+2. [OpsReviewService.cs](Services/OpsReviewService.cs)
+3. [OpsReview.razor](Components/Pages/OpsReview.razor)
+4. the route prefix and agent description in [Program.cs](Program.cs)
 
 ## What It Proves
 

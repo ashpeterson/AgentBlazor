@@ -1,11 +1,12 @@
 # CLI Guide
 
-Status as of 2026-04-13:
+Status as of 2026-04-15:
 
-- `AgentBlazor.Cli.Analysis.Tests`: `131/131`
+- `AgentBlazor.Cli.Analysis.Tests`: `132/132`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
 - standard Blazor hosts are fully scaffoldable
 - standard hosted WebAssembly server+client hosts are fully scaffoldable
+- scaffolded MudBlazor and AgentBlazor assets preserve existing `nonce="..."` attributes in CSP-aware shells
 - advanced/custom hosts remain review-first unless the CLI can safely classify and patch them
 
 The CLI is designed to take an existing Blazor app through a standard onboarding path:

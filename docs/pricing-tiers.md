@@ -1,6 +1,6 @@
 # Pricing Tiers
 
-Last updated: 2026-03-31
+Last updated: 2026-04-15
 
 This document describes the tier model, pricing strategy, and implementation status.
 
@@ -279,13 +279,13 @@ The current product funnel should stay simple:
 
 Current truth:
 
-- Free tier is production-ready and shippable
-- Pro tier is production-ready with durable SQLite persistence
+- Free tier is private-preview ready and package-validated, not yet broad-production ready
+- Pro tier has durable SQLite persistence and dashboard surface, but still needs realistic multi-user validation before production claims
 - All component actions are free (correct product boundary)
 - Paid differentiation is intelligence-driven, not feature-gated
 
 Go-to-market readiness:
 
-- Free: Ready to ship to NuGet
-- Pro ($29/seat/mo): Ready to ship
-- Enterprise: Ready after SSO/audit log implementation
+- Free: Ready for controlled private-preview validation from GitHub Packages
+- Pro ($29/seat/mo): Feature-complete preview, not production-proven
+- Enterprise: Future tier after SSO, deeper governance, and operational support are real

@@ -8,12 +8,13 @@
 4. `agentblazor doctor`
 5. `agentblazor validate`
 
-Current status as of 2026-04-09:
+Current status as of 2026-04-15:
 
-- CLI analysis tests: `126/126`
+- CLI analysis tests: `132/132`
 - CLI integration tests: `9/9`
 - standard existing Blazor hosts are scaffoldable end to end
 - standard hosted WebAssembly server+client hosts are scaffoldable end to end
+- CSP nonce-aware app shells are preserved when scaffold inserts MudBlazor and AgentBlazor assets
 - advanced/custom hosts still fall back to review-first or blocked modes depending on how confidently the CLI can classify them
 
 ## Commands

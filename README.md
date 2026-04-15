@@ -1,5 +1,7 @@
 # AgentBlazor
 
+Last updated: 2026-04-15
+
 Make your Blazor app agent-capable.
 
 AgentBlazor is the Blazor-native execution and UX layer for agent workflows. It gives external or host-provided agents live app context, deterministic UI execution, approvals, and in-app workflow surfaces without turning your app into a chat-for-clicking gimmick.
@@ -205,20 +207,22 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-04-13:
+As of 2026-04-15:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
 - normalized execution, approval, policy, and context-freshness contracts are in place
 - the old planner/runtime path is no longer the product center
 - the demo is now led by orchestration workflows instead of primitive component control
+- `0.1.0-preview.7` is the current validated private-preview package from GitHub Packages
+- published-feed validation now covers CSP nonce-aware host shells as well as Clean Architecture-style real apps
 - runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
 - middleware is now wired through both normal and streaming runtime turns
 - OpenAI-compatible endpoint validation now rejects non-HTTP(S) URI shapes such as `file:///...`
 - the full non-demo test matrix is currently green:
   - `AgentBlazor.Core.Tests`: `261/261`
   - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-  - `AgentBlazor.Cli.Analysis.Tests`: `131/131`
+  - `AgentBlazor.Cli.Analysis.Tests`: `132/132`
   - `AgentBlazor.Cli.IntegrationTests`: `9/9`
   - `AgentBlazor.IntegrationTests`: `105/105`
 

@@ -1,6 +1,6 @@
 # CLI Existing-App Roadmap
 
-Last updated: 2026-04-09
+Last updated: 2026-04-15
 
 ## Goal
 
@@ -50,10 +50,11 @@ What is implemented now:
   - writes `.agentblazor/scaffold-manifest.json` on apply
   - supports local-source evaluation via `--use-local-source`
   - auto-detects the local AgentBlazor repo when run from this repository
+  - preserves existing CSP nonce attributes when inserting MudBlazor and AgentBlazor assets
 
 What is validated now:
 
-- CLI analysis tests are green: `131/131`
+- CLI analysis tests are green: `132/132`
 - CLI integration tests are green: `9/9`
 - `init --help` and `scaffold --help` are correct
 - fresh standard Blazor app smoke test under `/Users/...` succeeds through:
@@ -342,10 +343,4 @@ The next contributor should work in this order:
 
 ## Worktree Notes
 
-At the time of this update there are unrelated dirty lockfile changes in the repository that are not part of the CLI handoff:
-
-- [packages.lock.json](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/demo/AgentBlazor.Demo/packages.lock.json)
-- [packages.lock.json](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/src/AgentBlazor.Hosting/packages.lock.json)
-- [packages.lock.json](/Users/ashleypetetson/Documents/GitHub/AgentBlazor/tests/AgentBlazor.IntegrationTests/packages.lock.json)
-
-Do not assume those files are part of the CLI changes.
+At the time of this update, the active local documentation sync is the only known worktree change set. The previous unrelated lockfile note is obsolete.

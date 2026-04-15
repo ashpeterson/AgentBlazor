@@ -1,6 +1,6 @@
 # AgentBlazor — Refactor Status
 
-Last updated: 2026-04-09
+Last updated: 2026-04-15
 
 This document is now mainly historical context for the earlier architecture transition.
 The current product/runtime status should be read from [docs/STATUS.md](/home/ashdev/workspace/AgentBlazor/docs/STATUS.md).
@@ -19,9 +19,9 @@ Current non-demo test status:
 |--------------|--------|---------|--------|
 | `AgentBlazor.Core.Tests` | 261 | 0 | 0 |
 | `AgentBlazor.Components.Tests` | 98 | 1 | 0 |
-| `AgentBlazor.Cli.Analysis.Tests` | 126 | 0 | 0 |
+| `AgentBlazor.Cli.Analysis.Tests` | 132 | 0 | 0 |
 | `AgentBlazor.Cli.IntegrationTests` | 9 | 0 | 0 |
-| `AgentBlazor.IntegrationTests` | 104 | 0 | 0 |
+| `AgentBlazor.IntegrationTests` | 105 | 0 | 0 |
 
 ## What Was Done
 

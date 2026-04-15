@@ -13,7 +13,7 @@ Production gates:
 - Validate CLI scaffold/doctor/validate on at least three external Blazor apps. The standard, hosted-WebAssembly, and review-first custom-host lanes now have real-app coverage.
 - Add more independent real-world OSS validation beyond templates and official samples. `CleanArchitectureWithBlazorServer` now covers the larger auth/custom-layout/multi-project path; `whisper.net` now covers hosted WebAssembly; `oqtane.framework` now covers the materially different custom/Oqtane-style review-first path.
 - Real OpenAI-backed workflow validation is now covered by `ProviderAdapterIntegrationTests`: simple chat, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity.
-- Published-feed package validation is complete for `AgentBlazor` and `AgentBlazor.Cli` version `0.1.0-preview.6`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, and `0.1.0-preview.5` downgrade-conflict findings with a Microsoft Agents 1.1-compatible package that passes clean-app and real-app validation.
+- Published-feed package validation is complete for `AgentBlazor` and `AgentBlazor.Cli` version `0.1.0-preview.7`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, `0.1.0-preview.5` downgrade-conflict, and `0.1.0-preview.6` CSP nonce findings with a Microsoft Agents 1.1-compatible package that passes clean-app and real-app validation.
 - Finish the browser-safe WebAssembly client story: current CLI behavior detects companion WebAssembly UI projects and leaves client layout/chat work in manual review because the current AgentBlazor UI surface is server-first.
 - Validate the exact preview package with a small external test group before production claims.
 - Document supported host shapes and review-first/unsupported host behavior.
@@ -67,9 +67,9 @@ The runtime realignment is now materially underway:
 - middleware now executes for both `RunTurnAsync` and `RunTurnStreamingAsync`
 - provider endpoint validation now rejects non-HTTP(S) custom endpoints
 - real OpenAI-backed adapter validation now covers runtime tool execution, approval gating, blocked/recovery/retry behavior, streaming/reconnect, cancellation, concurrency, and session-state continuity
-- local package validation now proves the `AgentBlazor` package and `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to `0.1.0-preview.6` for the current build
-- the private-preview GitHub Packages workflow now publishes both the runtime package and CLI tool package; workflow run `24441459326` published and archived `0.1.0-preview.6` from commit `13336a8779c761a340472ad2f1530dd3bdb68c12`
-- the published `0.1.0-preview.6` package was inspected from GitHub Packages and confirmed to contain the current commit metadata, Microsoft Agents 1.1 dependency family, `SerializeSessionCoreAsync` AG-UI host implementation, and semantic workflow APIs such as `AgentBlazor.App`
+- local package validation now proves the `AgentBlazor` package and `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to `0.1.0-preview.7` for the current build
+- the private-preview GitHub Packages workflow now publishes both the runtime package and CLI tool package; workflow run `24443709690` published and archived `0.1.0-preview.7` from commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
+- published `0.1.0-preview.7` validation confirms Microsoft Agents 1.1 compatibility, the AG-UI async session serializer, semantic workflow APIs, and CSP nonce preservation for scaffolded MudBlazor/AgentBlazor assets
 - repo package source mapping now allows the full non-demo test matrix to restore and run locally
 - existing-app scaffold now keeps MudBlazor imports scoped to the patched layout provider file instead of adding `@using MudBlazor` globally, avoiding QuickGrid `PropertyColumn` tag collisions found in the official `dotnet/blazor-samples` Blazor Web App
 - modern Blazor Web Apps with companion WebAssembly client projects are detected as standard hosts with a separate UI project; server startup/shell edits are safe, while client layout/chat edits remain review-first
@@ -240,7 +240,7 @@ Latest test status:
 
 - `AgentBlazor.Core.Tests`: `261/261`
 - `AgentBlazor.Components.Tests`: `98/99` passed, `1` skipped
-- `AgentBlazor.Cli.Analysis.Tests`: `131/131`
+- `AgentBlazor.Cli.Analysis.Tests`: `132/132`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
 - `AgentBlazor.IntegrationTests`: `105/105`
 
@@ -256,6 +256,11 @@ Latest real-app CLI validation:
 
 Latest published-feed real-app validation:
 
+- GitHub Packages workflow `publish-github-packages-preview` run `24443709690` passed for `0.1.0-preview.7` on commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`.
+- Independent external OSS `damienbod/BlazorSecurityNet10` at `682213b40201f3ce8000b10287492de4b6242d66`, target `BlazorApp/BlazorApp.csproj`, installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.7` from `https://nuget.pkg.github.com/ashpeterson/index.json` using isolated NuGet cache/tool paths.
+- Published CLI validation passed `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, post-scaffold `dotnet restore`, post-scaffold `dotnet build`, `doctor` readiness `9/9`, and `validate` readiness `9/9`, validation `3/3`.
+- Runtime HTTP smoke passed after forcing `dotnet run --no-launch-profile --urls http://127.0.0.1:5292`; the rendered home page contained AgentBlazor and MudBlazor static assets with the same generated CSP nonce used by the host shell. The app returned a `Content-Security-Policy` header with nonce-only script allowance, so this specifically verifies the nonce-preservation fix.
+- Validation workdir: `/tmp/agentblazor-published-preview7-damienbod/BlazorApp`.
 - GitHub Packages workflow `publish-github-packages-preview` run `24441459326` passed for `0.1.0-preview.6` on commit `13336a8779c761a340472ad2f1530dd3bdb68c12`.
 - Independent real-world OSS `neozhu/CleanArchitectureWithBlazorServer` at `4ef0b7c599be97d93049028e7b9a641f237cc5c7`, target `src/Server.UI/Server.UI.csproj`, installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.6` from `https://nuget.pkg.github.com/ashpeterson/index.json` using isolated NuGet cache/tool paths.
 - Package inspection confirmed `AgentBlazor` `0.1.0-preview.6` came from commit `13336a8779c761a340472ad2f1530dd3bdb68c12`, depends on the Microsoft Agents 1.1 API family, contains `SerializeSessionCoreAsync`, and includes current semantic workflow APIs.
@@ -271,6 +276,8 @@ Latest real-provider validation:
 
 Latest package validation:
 
+- GitHub Packages workflow `publish-github-packages-preview` run `24443709690` passed on commit `5809ddcfda282e5a70bd89649a901e9599d89ac4` for `0.1.0-preview.7`. The workflow passed restore, build, tests, e2e, local package smoke, runtime package publish, CLI package publish, and artifact upload.
+- Published-feed real-app validation for `0.1.0-preview.7` passed against `damienbod/BlazorSecurityNet10`: baseline restore/build, package install, CLI install, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor`, `validate`, and deterministic runtime HTTP smoke all passed. This validation exposed and verified the CSP nonce fix for scaffolded assets.
 - GitHub Packages workflow `publish-github-packages-preview` run `24441459326` passed on commit `13336a8779c761a340472ad2f1530dd3bdb68c12` for `0.1.0-preview.6`. Published-feed package inspection confirmed current commit metadata, Microsoft Agents 1.1 dependencies, the AG-UI host async session serializer, and current semantic workflow APIs.
 - Published-feed real-app validation for `0.1.0-preview.6` passed against `neozhu/CleanArchitectureWithBlazorServer`: package install, CLI install, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor`, `validate`, and deterministic runtime HTTP smoke all passed.
 - Local package smoke for `0.1.0-preview.4` passed in `/tmp/agentblazor-preview4-local-smoke-20260415064042`: installed `AgentBlazor` and `AgentBlazor.Cli` from a local feed with NuGet.org available for dependencies, confirmed `agentblazor --version` reported `0.1.0-preview.4`, ran `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, and `validate`. Build passed with `0` warnings and `0` errors; `doctor` readiness passed `9/9`; `validate` readiness passed `9/9`, validation `3/3`; runtime HTTP smoke with placeholder `OpenAI__ApiKey` rendered the home page, `AgentChatWidget`, and AgentBlazor static assets.
@@ -282,14 +289,14 @@ Latest package validation:
 - Published-feed `agentblazor --version` reported `0.1.0-preview.3`; `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, and `dotnet build` passed with `0` warnings and `0` errors.
 - Published-feed `doctor` readiness passed `9/9`; `validate` readiness passed `9/9`, validation `3/3`.
 - Runtime startup was smoke-tested from the published package with a placeholder `OpenAI__ApiKey`; the clean app served the home page, `AgentChatWidget`, and AgentBlazor/MudBlazor static assets. Live model calls were not run in this published-feed consumer smoke.
-- Earlier GitHub Packages `0.1.0-preview.2` runtime package validation found a stale immutable package build that did not contain current scaffold/runtime symbols. `0.1.0-preview.3` later passed clean-app validation but failed real-app runtime compatibility. Use `0.1.0-preview.6` or later for private-preview testing.
+- Earlier GitHub Packages `0.1.0-preview.2` runtime package validation found a stale immutable package build that did not contain current scaffold/runtime symbols. `0.1.0-preview.3` later passed clean-app validation but failed real-app runtime compatibility. `0.1.0-preview.6` passed Clean Architecture validation but `damienbod/BlazorSecurityNet10` exposed that scaffolded assets did not preserve CSP nonces. Use `0.1.0-preview.7` or later for private-preview testing.
 - Packed `AgentBlazor.0.1.0-preview.2.nupkg`, `AgentBlazor.Cli.0.1.0-preview.2.nupkg`, and internal dependency packages to `/tmp/agentblazor-package-validation-preview2-20260413/packages`.
 - Clean Blazor Web App `/tmp/agentblazor-package-validation-preview2-20260413/work/PackageSmoke` installed the local `AgentBlazor` package and `AgentBlazor.Cli` tool with no repo-local `ProjectReference` entries; `agentblazor --version` reported `0.1.0-preview.2`.
 - Package-installed app `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, and `dotnet build` passed; build had `0` warnings and `0` errors.
 - Package-installed app `doctor` readiness passed `9/9`; `validate` readiness passed `9/9`, validation `3/3`.
 - The package validation exposed and fixed the stale CLI scaffold/display version, which previously used `1.0.0`, and a package-first onboarding gap where an app with `AgentBlazor` already installed still needed a direct `MudBlazor` package reference added by scaffold.
 - Previous `0.1.0-preview.1` packaged runtime smoke runner `/tmp/agentblazor-package-validation-20260413/work/PackageRuntimeSmoke` referenced `AgentBlazor` only and completed real OpenAI-backed normal and streaming semantic workflow calls with `PACKAGE_SMOKE_OK`; streaming produced `24` events.
-- The earlier GitHub Packages published-feed preflight was blocked by missing local credentials; that is now resolved by the authenticated `gh` session and the `0.1.0-preview.6` validation above.
+- The earlier GitHub Packages published-feed preflight was blocked by missing local credentials; that is now resolved by the authenticated `gh` session and the `0.1.0-preview.7` validation above.
 
 Latest browser status:
 

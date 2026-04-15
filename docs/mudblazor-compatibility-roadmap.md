@@ -1,6 +1,6 @@
 # MudBlazor Compatibility Roadmap
 
-Last updated: 2026-03-20
+Last updated: 2026-04-15
 
 ## Goal
 
@@ -24,6 +24,7 @@ Completed or materially completed:
 - rendered parity tests exist in `AgentBlazor.Components.Tests`
 - Playwright covers the proof routes in the public demo app
 - the component explorer now sits behind the workflow hub as a supporting reference surface instead of the primary product-story entry point
+- the existing-app scaffold now preserves CSP nonce attributes when inserting MudBlazor and AgentBlazor static assets
 
 Still outstanding:
 

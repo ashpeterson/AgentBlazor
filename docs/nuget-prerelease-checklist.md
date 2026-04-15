@@ -1,6 +1,6 @@
 # NuGet Prerelease Checklist
 
-Last updated: 2026-04-13
+Last updated: 2026-04-15
 
 Use this before publishing `AgentBlazor` and `AgentBlazor.Cli` prerelease packages for real-project validation.
 
@@ -54,6 +54,13 @@ This catches packaging regressions such as:
 - CLI/runtime package-version drift that would scaffold a different `AgentBlazor` version than the installed CLI package
 
 ## Current Release Position
+
+Current validated private-preview package:
+
+- `0.1.0-preview.7`
+- GitHub Packages workflow run `24443709690`
+- source commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
+- published-feed real-app validation passed against `damienbod/BlazorSecurityNet10`, including CSP nonce preservation for scaffolded assets
 
 The current package should be described as:
 

@@ -1,6 +1,6 @@
 # AgentBlazor Architecture
 
-Last updated: 2026-03-20
+Last updated: 2026-04-15
 
 ## Purpose
 
@@ -21,6 +21,8 @@ src/
   AgentBlazor.Hosting
   AgentBlazor.ProviderAdapters
   AgentBlazor.Licensing
+  AgentBlazor.Cli
+  AgentBlazor.Cli.Analysis
 
 demo/
   AgentBlazor.Demo
@@ -28,6 +30,8 @@ demo/
 tests/
   AgentBlazor.Core.Tests
   AgentBlazor.Components.Tests
+  AgentBlazor.Cli.Analysis.Tests
+  AgentBlazor.Cli.IntegrationTests
   AgentBlazor.IntegrationTests
   e2e/
 ```

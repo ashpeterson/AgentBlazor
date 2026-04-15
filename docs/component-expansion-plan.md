@@ -1,6 +1,6 @@
 # Product Expansion Plan
 
-Last updated: 2026-03-20
+Last updated: 2026-04-15
 
 ## Goal
 
@@ -34,6 +34,7 @@ That means:
 - the workflow hub now includes production-style orchestration routes such as `response-orchestration` and `release-dossier`
 - the landing page and workflow hub now lead with fast-launch orchestration flows and minimal supporting copy for repeatable recordings
 - Agentic Components demonstrates drop-in components as a supporting reference surface
+- `.agentblazor/AGENT.md` was regenerated on 2026-04-15 and currently reports 23 routes and 196 actions
 
 ### Agentic Components
 
