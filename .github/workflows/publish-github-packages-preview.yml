@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       package_version:
-        description: "Preview package version to publish (example: 0.1.0-preview.4)"
+        description: "Preview package version to publish (example: 0.1.0-preview.5)"
         required: true
         type: string
 
@@ -37,7 +37,7 @@ jobs:
         run: |
           $version = "${{ inputs.package_version }}"
           if ($version -notmatch '^\d+\.\d+\.\d+-.+$') {
-            throw "package_version must be a prerelease SemVer string like 0.1.0-preview.4"
+            throw "package_version must be a prerelease SemVer string like 0.1.0-preview.5"
           }
 
       - name: Validate Central Package Pinning
@@ -94,7 +94,6 @@ jobs:
           "src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg"
           --source "https://nuget.pkg.github.com/ashpeterson/index.json"
           --api-key "${{ secrets.GITHUB_TOKEN }}"
-          --skip-duplicate
           --timeout 120
 
       - name: Publish CLI tool package to GitHub Packages
@@ -103,7 +102,6 @@ jobs:
           "src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg"
           --source "https://nuget.pkg.github.com/ashpeterson/index.json"
           --api-key "${{ secrets.GITHUB_TOKEN }}"
-          --skip-duplicate
           --timeout 120
 
       - name: Upload published package artifacts
