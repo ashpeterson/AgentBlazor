@@ -57,11 +57,11 @@ dotnet build path/to/App.csproj --no-restore -nologo
 8. Run a startup smoke with a non-empty placeholder provider key to catch runtime assembly/configuration failures before live-model testing:
 
 ```bash
-OpenAI__ApiKey=placeholder-key dotnet run --project path/to/App.csproj --urls http://127.0.0.1:5288
+OpenAI__ApiKey=placeholder-key dotnet run --project path/to/App.csproj --no-launch-profile --urls http://127.0.0.1:5288
 curl -fsS http://127.0.0.1:5288/
 ```
 
-9. Confirm the response contains AgentBlazor static assets and a chat surface.
+9. Confirm the response contains AgentBlazor static assets and a chat surface. Use `--no-launch-profile` or an app-specific known URL so the probed port is the actual bound port.
 10. Record all warnings separately as upstream app warnings, AgentBlazor warnings, or manual-review host-shape warnings.
 
 ## Provider Configuration Checklist

@@ -20,6 +20,13 @@ Workflow:
 
 - `.github/workflows/publish-github-packages-preview.yml`
 
+Current validated private-preview version:
+
+- `0.1.0-preview.6`
+- workflow run `24441459326`
+- source commit `13336a8779c761a340472ad2f1530dd3bdb68c12`
+- package feed: `https://nuget.pkg.github.com/ashpeterson/index.json`
+
 How to run it:
 
 1. Open the repository in GitHub.
@@ -95,8 +102,10 @@ agentblazor validate
 ## Notes
 
 - This is the right path for private preview testing.
+- `0.1.0-preview.6` has been validated from GitHub Packages against a clean Blazor Web App and the real-world `neozhu/CleanArchitectureWithBlazorServer` app at commit `4ef0b7c599be97d93049028e7b9a641f237cc5c7`.
 - Use `0.1.0-preview.6` or later for real-app private-preview testing. `0.1.0-preview.6` aligns AgentBlazor to the Microsoft Agents 1.1 API family so consumers do not float to an incompatible runtime API and apps already using `Microsoft.Agents.AI.OpenAI` `1.1.0` do not hit a downgrade conflict.
 - Published-feed validation should use a clean Blazor Web App or real app, isolated NuGet cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and a runtime HTTP smoke with a placeholder `OpenAI__ApiKey`.
+- For deterministic runtime smoke, prefer `dotnet run --no-launch-profile --urls http://127.0.0.1:5288` or another known free port; otherwise app launch profiles can bind a different port than the one being probed.
 - Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, `0.1.0-preview.3` later exposed a real-app dependency-range issue, the `0.1.0-preview.4` feed version was already occupied by an older immutable build, and `0.1.0-preview.5` was too strict for apps that already depend on Microsoft Agents `1.1.0`. Use `0.1.0-preview.6` or later for private-preview testing.
 - Earlier `0.1.0-preview.3` clean-app validation passed, but real-app runtime smoke exposed an open dependency-range issue where NuGet could float Microsoft Agents packages to an incompatible API. Use `0.1.0-preview.6` instead.
 - Real-app tester checklist: `docs/private-preview-validation.md`.
