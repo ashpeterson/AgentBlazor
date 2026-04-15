@@ -57,10 +57,13 @@ This catches packaging regressions such as:
 
 Current validated private-preview package:
 
+- `0.1.0-preview.8` is the current source package candidate and should be the next publish/validation version
 - `0.1.0-preview.7`
 - GitHub Packages workflow run `24443709690`
 - source commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
 - published-feed real-app validation passed against `damienbod/BlazorSecurityNet10`, including CSP nonce preservation for scaffolded assets
+
+Before publishing `0.1.0-preview.8`, confirm the generated scaffold workflow compiles in a clean consumer app without manual references to bundled internal assemblies. The scaffolded `AppCapabilities.cs` file imports `AgentBlazor.App`, so the restored `AgentBlazor` package must expose `AgentBlazor.Core.dll` as a compile asset.
 
 The current package should be described as:
 

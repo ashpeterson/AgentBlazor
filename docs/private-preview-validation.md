@@ -17,7 +17,7 @@ Use this checklist when validating AgentBlazor in a real Blazor app from the pri
 
 ## Real-App CLI Validation Checklist
 
-Record the repository URL, commit SHA, target project path, SDK version, and package version before changing anything.
+Record the repository URL, commit SHA, target project path, SDK version, CLI version, and runtime package version before changing anything. The CLI and runtime package must be the same AgentBlazor preview version because scaffolded workflow files use `AgentBlazor.App` semantic capability APIs from the runtime package.
 
 1. Clone a fresh copy of the app and check out the validation commit.
 2. Run baseline restore and build:
@@ -31,8 +31,8 @@ dotnet build path/to/App.csproj --no-restore -nologo
 4. Install the package and CLI from the feed:
 
 ```bash
-dotnet add path/to/App.csproj package AgentBlazor --version 0.1.0-preview.7
-dotnet tool install AgentBlazor.Cli --version 0.1.0-preview.7 --tool-path .agentblazor-tool
+dotnet add path/to/App.csproj package AgentBlazor --version 0.1.0-preview.8
+dotnet tool install AgentBlazor.Cli --version 0.1.0-preview.8 --tool-path .agentblazor-tool
 .agentblazor-tool/agentblazor --version
 ```
 
@@ -63,6 +63,17 @@ curl -fsS http://127.0.0.1:5288/
 
 9. Confirm the response contains AgentBlazor static assets and a chat surface. Use `--no-launch-profile` or an app-specific known URL so the probed port is the actual bound port.
 10. Record all warnings separately as upstream app warnings, AgentBlazor warnings, or manual-review host-shape warnings.
+
+## Version Mismatch Check
+
+If the app fails after scaffold with missing `AgentBlazor.App`, `CapabilityResult`, `AgentCapability`, or `AddWorkflow`, verify that the restored package assets match the CLI version:
+
+```bash
+dotnet list path/to/App.csproj package --include-transitive
+dotnet restore path/to/App.csproj --force --force-evaluate
+```
+
+Then inspect `obj/project.assets.json` and confirm `AgentBlazor.Core.dll` appears in the `compile` assets for the selected `AgentBlazor` package version. If it does not, delete the cached `agentblazor` package folder, delete `bin`/`obj`, and restore again.
 
 ## Provider Configuration Checklist
 

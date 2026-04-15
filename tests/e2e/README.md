@@ -16,7 +16,7 @@ npm run test:paid-dashboard
 
 This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
 
-Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`. Local e2e runs still require a configured OpenAI or Ollama provider.
+Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI or Ollama provider.
 
 Use `npm run test:e2e:headed` when you want to watch the browser, and `npm run test:e2e:ui` when you want Playwright's interactive runner.
 

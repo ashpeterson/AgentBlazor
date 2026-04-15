@@ -21,17 +21,27 @@ That flow is meant to be predictable for any existing Blazor app. A developer sh
 
 ## Install
 
+For private-preview testing, install an exact CLI version from the same feed/version as the runtime package you add to the app. This avoids a CLI/runtime mismatch where scaffold generates `AgentBlazor.App` workflow code but the app restores an older runtime package.
+
 ```bash
-dotnet tool install --global AgentBlazor.Cli --prerelease
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 If you already have it:
 
 ```bash
-dotnet tool update --global AgentBlazor.Cli --prerelease
+dotnet tool update --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+```
+
+Add the matching runtime package to the host app before or during scaffold validation:
+
+```bash
+dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 ## Standard Flow
+
+The standard flow assumes the app and CLI are on the same AgentBlazor preview version.
 
 Start with `init`:
 
@@ -202,18 +212,29 @@ If the CLI detects an advanced or legacy Blazor host, scaffold now stays review-
 
 ## What The CLI Is Not For
 
-- it does not add the AgentBlazor package
+- it does not guarantee the runtime package and CLI versions match unless you install/pin them explicitly
 - it does not yet patch arbitrary nonstandard hosts safely
 - it does not generate provider secrets or environment-specific configuration for you
 
+## Version Mismatch Symptoms
+
+If a scaffolded app fails with errors such as:
+
+- `The type or namespace name 'App' does not exist in the namespace 'AgentBlazor'`
+- `The type or namespace name 'CapabilityResult' could not be found`
+- `AgentBlazorBuilder does not contain a definition for AddWorkflow`
+
+then the app is compiling against a stale or mismatched AgentBlazor package. Pin `AgentBlazor` and `AgentBlazor.Cli` to the same preview version, delete `bin`/`obj`, clear the cached `agentblazor` package folder, and restore with `--force-evaluate`.
+
 ## Recommended Workflow
 
-1. Run `agentblazor init` to generate `.agentblazor/AGENT.md` and get the next setup commands.
-2. Run `agentblazor scaffold --provider openai` to preview the baseline install edits with the validated provider path.
-3. Run `agentblazor scaffold --provider openai --approve` once you are satisfied with the preview.
-4. Run `agentblazor doctor` to verify the resulting setup.
-5. Run `agentblazor validate` to verify the install state and scaffold audit trail.
-6. Use `agentblazor update` as your app changes.
+1. Install matching `AgentBlazor` and `AgentBlazor.Cli` package versions.
+2. Run `agentblazor init` to generate `.agentblazor/AGENT.md` and get the next setup commands.
+3. Run `agentblazor scaffold --provider openai` to preview the baseline install edits with the validated provider path.
+4. Run `agentblazor scaffold --provider openai --approve` once you are satisfied with the preview.
+5. Run `agentblazor doctor` to verify the resulting setup.
+6. Run `agentblazor validate` to verify the install state and scaffold audit trail.
+7. Use `agentblazor update` as your app changes.
 
 ## Example
 

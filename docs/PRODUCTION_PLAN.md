@@ -31,6 +31,7 @@ Recent hardening complete:
 - real OpenAI-backed adapter validation now covers simple chat, semantic workflow tool invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
 - local and published-feed package validation now prove `AgentBlazor` and `AgentBlazor.Cli` can be installed into a clean app without repo-local project references, built, and checked by `doctor`/`validate`
 - CLI scaffold/package version output now derives from assembly package metadata and matches the preview package version instead of the previous hardcoded `1.0.0`
+- current source is now `0.1.0-preview.8`; it updates SDK roll-forward for newer .NET 10 preview SDKs and needs a publish/validation run before replacing `0.1.0-preview.7` as the latest published-feed validated version
 - GitHub Packages private-preview workflow now publishes both the runtime package and CLI tool package and uploads both package artifacts; workflow run `24443709690` passed for `0.1.0-preview.7` from commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
 - published-feed real-app validation now proves `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.7` install from GitHub Packages, scaffold, restore, build, pass `doctor`/`validate`, and render AgentBlazor assets in external Blazor apps including CSP/nonce-aware shells
 - WebAssembly companion-client UI paths are detected and left review-first instead of auto-writing browser-client AgentBlazor chat code into browser-only projects
@@ -87,6 +88,7 @@ Validation log:
 - 2026-04-15 GitHub Packages workflow run `24441459326` passed for `0.1.0-preview.6` on commit `13336a8779c761a340472ad2f1530dd3bdb68c12`. Published-feed validation inspected the downloaded package and confirmed current commit metadata, Microsoft Agents 1.1 dependencies, `SerializeSessionCoreAsync`, and current semantic workflow APIs. `neozhu/CleanArchitectureWithBlazorServer` at `4ef0b7c599be97d93049028e7b9a641f237cc5c7` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.6` from GitHub Packages with isolated cache/tool paths; `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, post-scaffold restore/build, `doctor` readiness `9/9`, and `validate` readiness `9/9`, validation `3/3` passed. Runtime HTTP smoke passed with `dotnet run --no-launch-profile --urls http://127.0.0.1:5197` and confirmed AgentBlazor static assets in the rendered home page. Build retained upstream app warnings but had `0` errors. Workdir: `/tmp/agentblazor-published-realapp-cleanarch-preview6-20260415071751/CleanArchitectureWithBlazorServer`.
 - 2026-04-15 external GitHub project validation against `https://github.com/damienbod/BlazorSecurityNet10.git` at `682213b40201f3ce8000b10287492de4b6242d66` exposed a CSP nonce gap in `0.1.0-preview.6`: the app's shell used nonce-aware assets and returned a nonce-only `script-src` policy, but scaffolded MudBlazor/AgentBlazor assets did not copy the existing nonce. The CLI now preserves existing `nonce="..."` attributes on inserted link/script assets.
 - 2026-04-15 GitHub Packages workflow run `24443709690` passed for `0.1.0-preview.7` on commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`. Published-feed validation against `damienbod/BlazorSecurityNet10` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.7`, confirmed `agentblazor --version`, ran `init`, `scaffold --diff`, `scaffold --approve`, post-scaffold restore/build, `doctor` readiness `9/9`, and `validate` readiness `9/9`, validation `3/3`. Runtime HTTP smoke passed with `dotnet run --no-launch-profile --urls http://127.0.0.1:5292`; rendered MudBlazor and AgentBlazor static assets carried the generated CSP nonce and the response included the nonce-based `Content-Security-Policy` header. Workdir: `/tmp/agentblazor-published-preview7-damienbod/BlazorApp`.
+- 2026-04-15 source commit `c288c21666beba430ebf21980c3e96488721316c` bumped the next preview to `0.1.0-preview.8`, changed SDK roll-forward to `latestMinor`, and updated `Microsoft.AspNetCore.App.Internal.Assets` lockfiles to `10.0.5`. This is the next package candidate; run the GitHub Packages workflow and published-feed real-app validation before marking it complete.
 
 Exit criteria:
 
@@ -117,7 +119,7 @@ Exit criteria:
 
 ### 1.1 NuGet Package Prep
 - [x] Create package metadata (description, tags, icon)
-- [x] Set up package versioning (0.1.0-preview.7 in Directory.Build.props)
+- [x] Set up package versioning (0.1.0-preview.8 in Directory.Build.props)
 - [x] Configure GitHub Actions for publish (publish-github-packages-preview.yml)
 - [x] Configure GitHub Actions to publish both `AgentBlazor` and `AgentBlazor.Cli`
 - [x] Test install from locally packed preview package in a clean project
@@ -138,6 +140,7 @@ Exit criteria:
 
 ### 1.3 Preview Ship
 - [x] Run publish workflow with version 0.1.0-preview.7
+- [ ] Run publish workflow with version 0.1.0-preview.8
 - [ ] Share with a small validation group (external coordination gate; not a local code task)
 - [ ] Do not announce as production-ready until Phase 2 exits cleanly (release governance gate)
 

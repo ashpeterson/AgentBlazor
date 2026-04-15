@@ -88,5 +88,5 @@ Inside this repo, the starter defaults to local source-project references so the
 To validate the package-first path from inside the repo:
 
 ```powershell
-dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.7
+dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.8
 ```

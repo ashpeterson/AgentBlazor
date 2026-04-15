@@ -173,6 +173,7 @@ The first installable baseline should handle:
 - `builder.Services.AddAgentBlazor(...)`
 - `ConfigureBuilder(... AddWorkflow<T> ...)`
 - `app.MapAgentBlazorEndpoints()`
+- matching `AgentBlazor` and `AgentBlazor.Cli` package versions so generated `AgentBlazor.App` workflow code compiles against the restored runtime package
 - host shell assets in `App.razor`
 - Mud providers in layout
 - one chat surface

@@ -14,15 +14,19 @@ Status as of 2026-04-15:
 - the non-demo test matrix is green
 - the CLI now supports `init -> scaffold -> doctor -> validate`
 - standard hosted WebAssembly server+client installs are now part of the supported scaffold path
-- `0.1.0-preview.7` is the current validated private-preview package
+- `0.1.0-preview.8` is the current source/package version
+- `0.1.0-preview.7` is the latest GitHub Packages published-feed version with full external real-app validation
 - scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
 
 ## Optional: Install The CLI
 
 The CLI can scaffold the standard runtime wiring for a standard Blazor host and the standard hosted WebAssembly server+client path, including a provider template, but you still need to supply the real configuration values for your environment.
 
+For private-preview installs, pin the CLI and runtime package to the same version. Do not rely on a broad `--prerelease` install when testing scaffolded workflow code because the generated `AppCapabilities.cs` file uses semantic workflow APIs from `AgentBlazor.App`.
+
 ```bash
-dotnet tool install --global AgentBlazor.Cli --prerelease
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
 agentblazor init ./MySolution.sln --host MyBlazorApp
 agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --approve
 ```
@@ -30,7 +34,7 @@ agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --app
 ## 1. Install the Package
 
 ```bash
-dotnet add package AgentBlazor
+dotnet add package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 ## 2. Configure Services
@@ -323,6 +327,24 @@ AgentBlazor includes 14 agentic components:
 1. Ensure methods are marked with `[AgentAction]`
 2. Check the class has `[AgentCapability("agent-name")]`
 3. Verify the route prefix matches the current page
+
+### `AgentBlazor.App`, `CapabilityResult`, or `AgentCapability` cannot be found
+
+This means the app is compiling against an AgentBlazor package that does not expose the semantic workflow APIs used by the scaffolded `Workflows/AppCapabilities.cs` file.
+
+1. Pin both `AgentBlazor` and `AgentBlazor.Cli` to the same preview version.
+2. Delete `bin`, `obj`, and the cached AgentBlazor package folder.
+3. Restore with `--force-evaluate`.
+4. Confirm `obj/project.assets.json` lists `AgentBlazor.Core.dll` under the `AgentBlazor` compile assets.
+
+PowerShell reset:
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.nuget\packages\agentblazor" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .\bin, .\obj -ErrorAction SilentlyContinue
+dotnet restore .\MyBlazorApp.csproj --force --force-evaluate
+dotnet build .\MyBlazorApp.csproj
+```
 
 ### Component state not visible to agent
 
