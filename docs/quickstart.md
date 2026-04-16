@@ -5,9 +5,9 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 ## Prerequisites
 
 - .NET 10 SDK
-- An OpenAI API key
+- An OpenAI API key, or an Azure OpenAI resource endpoint, deployment name, and API key or Azure credential
 
-The currently validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI and other providers still work as integrations, but OpenAI is the primary path to ship first.
+The most validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI is supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path.
 
 Status as of 2026-04-15:
 
@@ -30,6 +30,8 @@ dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-
 agentblazor init ./MySolution.sln --host MyBlazorApp
 agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --approve
 ```
+
+Use `--provider azure-openai` instead when the host app should be scaffolded for Azure OpenAI configuration.
 
 ## 1. Install the Package
 
@@ -63,6 +65,32 @@ builder.Services.AddAgentBlazor(options =>
             agent.WithRoutePrefixes("/"); // Active on all routes
         });
     });
+});
+```
+
+Azure OpenAI API key configuration:
+
+```csharp
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseAzureOpenAI(
+        endpoint: builder.Configuration["AzureOpenAI:Endpoint"]!,
+        deploymentName: builder.Configuration["AzureOpenAI:DeploymentName"]!,
+        apiKey: builder.Configuration["AzureOpenAI:ApiKey"]);
+});
+```
+
+Azure identity or managed identity configuration:
+
+```csharp
+using Azure.Identity;
+
+builder.Services.AddAgentBlazor(options =>
+{
+    options.UseAzureOpenAI(
+        endpoint: builder.Configuration["AzureOpenAI:Endpoint"]!,
+        deploymentName: builder.Configuration["AzureOpenAI:DeploymentName"]!,
+        credential: new DefaultAzureCredential());
 });
 ```
 

@@ -8,6 +8,7 @@ using AgentBlazor.Execution;
 using AgentBlazor.Options;
 using AgentBlazor.ProviderAdapters;
 using AgentBlazor.Services;
+using Azure.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -106,6 +107,100 @@ public class ProviderAdapterIntegrationTests
         Assert.NotNull(chatClient);
     }
 
+    [Fact]
+    public void AddAgentBlazor_WithUseAzureOpenAIApiKey_RegistersFrameworkChatClient()
+    {
+        var services = new ServiceCollection();
+
+        AgentBlazorServiceExtensions.AddAgentBlazor(
+            services,
+            options => options.UseAzureOpenAI(
+                "https://example.openai.azure.com/",
+                "agentblazor-chat",
+                "demo-api-key"));
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var chatClient = provider.GetService<IChatClient>();
+
+        Assert.Equal(AgentProviderKind.AzureOpenAI, options.Provider.Kind);
+        Assert.Equal("https://example.openai.azure.com", options.Provider.Endpoint);
+        Assert.Equal("agentblazor-chat", options.Provider.DeploymentName);
+        Assert.Equal("demo-api-key", options.Provider.ApiKey);
+        Assert.Equal("ApiKey", options.Provider.AdditionalSettings["Auth"]);
+        Assert.NotNull(chatClient);
+    }
+
+    [Fact]
+    public void AddAgentBlazor_WithUseAzureOpenAITokenCredential_RegistersFrameworkChatClient()
+    {
+        var services = new ServiceCollection();
+
+        AgentBlazorServiceExtensions.AddAgentBlazor(
+            services,
+            options => options.UseAzureOpenAI(
+                "https://example.openai.azure.com/",
+                "agentblazor-chat",
+                new StaticTokenCredential()));
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var chatClient = provider.GetService<IChatClient>();
+
+        Assert.Equal(AgentProviderKind.AzureOpenAI, options.Provider.Kind);
+        Assert.Equal("https://example.openai.azure.com", options.Provider.Endpoint);
+        Assert.Equal("agentblazor-chat", options.Provider.DeploymentName);
+        Assert.Null(options.Provider.ApiKey);
+        Assert.Equal("TokenCredential", options.Provider.AdditionalSettings["Auth"]);
+        Assert.NotNull(chatClient);
+    }
+
+    [Fact]
+    public void AzureOpenAiProvider_WithApiKey_RegistersFrameworkChatClient()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAzureOpenAIProvider(
+            "https://example.openai.azure.com/",
+            "agentblazor-chat",
+            "demo-api-key");
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var chatClient = provider.GetService<IChatClient>();
+
+        Assert.Equal(AgentProviderKind.AzureOpenAI, options.Provider.Kind);
+        Assert.Equal("https://example.openai.azure.com", options.Provider.Endpoint);
+        Assert.Equal("agentblazor-chat", options.Provider.DeploymentName);
+        Assert.Equal("demo-api-key", options.Provider.ApiKey);
+        Assert.Equal("ApiKey", options.Provider.AdditionalSettings["Auth"]);
+        Assert.NotNull(chatClient);
+    }
+
+    [Fact]
+    public void AzureOpenAiProvider_WithTokenCredential_RegistersFrameworkChatClient()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAzureOpenAIProvider(
+            "https://example.openai.azure.com/",
+            "agentblazor-chat",
+            new StaticTokenCredential());
+        services.AddAgentBlazorServices();
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+        var chatClient = provider.GetService<IChatClient>();
+
+        Assert.Equal(AgentProviderKind.AzureOpenAI, options.Provider.Kind);
+        Assert.Equal("https://example.openai.azure.com", options.Provider.Endpoint);
+        Assert.Equal("agentblazor-chat", options.Provider.DeploymentName);
+        Assert.Null(options.Provider.ApiKey);
+        Assert.Equal("TokenCredential", options.Provider.AdditionalSettings["Auth"]);
+        Assert.NotNull(chatClient);
+    }
+
     [Theory]
     [InlineData(null, "demo-api-key")]
     [InlineData("", "demo-api-key")]
@@ -136,6 +231,42 @@ public class ProviderAdapterIntegrationTests
         Assert.ThrowsAny<ArgumentException>(() =>
         {
             services.AddOpenAIProvider(DefaultOpenAiModel, "demo-api-key", endpoint!);
+        });
+    }
+
+    [Theory]
+    [InlineData(null, "agentblazor-chat", "demo-api-key")]
+    [InlineData("", "agentblazor-chat", "demo-api-key")]
+    [InlineData("   ", "agentblazor-chat", "demo-api-key")]
+    [InlineData("not-a-uri", "agentblazor-chat", "demo-api-key")]
+    [InlineData("/openai", "agentblazor-chat", "demo-api-key")]
+    [InlineData("https://example.openai.azure.com", null, "demo-api-key")]
+    [InlineData("https://example.openai.azure.com", "", "demo-api-key")]
+    [InlineData("https://example.openai.azure.com", "   ", "demo-api-key")]
+    public void AzureOpenAiProvider_WithApiKey_ThrowsForInvalidRequiredSettings(
+        string? endpoint,
+        string? deploymentName,
+        string? apiKey)
+    {
+        var services = new ServiceCollection();
+
+        Assert.ThrowsAny<ArgumentException>(() =>
+        {
+            services.AddAzureOpenAIProvider(endpoint!, deploymentName!, apiKey);
+        });
+    }
+
+    [Fact]
+    public void AzureOpenAiProvider_WithTokenCredential_ThrowsForNullCredential()
+    {
+        var services = new ServiceCollection();
+
+        Assert.Throws<ArgumentNullException>(() =>
+        {
+            services.AddAzureOpenAIProvider(
+                "https://example.openai.azure.com",
+                "agentblazor-chat",
+                credential: null!);
         });
     }
 
@@ -970,6 +1101,17 @@ public class ProviderAdapterIntegrationTests
         Assert.NotNull(step.Outputs);
         Assert.True(step.Outputs!.TryGetValue(outputKey, out var outputValue));
         return Assert.IsType<string>(outputValue);
+    }
+
+    private sealed class StaticTokenCredential : TokenCredential
+    {
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+            => new("test-token", DateTimeOffset.UtcNow.AddHours(1));
+
+        public override ValueTask<AccessToken> GetTokenAsync(
+            TokenRequestContext requestContext,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(GetToken(requestContext, cancellationToken));
     }
 
     [AgentCapability("live_openai_probe", Name = "Live OpenAI Probe")]

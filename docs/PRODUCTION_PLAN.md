@@ -29,6 +29,7 @@ Recent hardening complete:
 - independent real-world Oqtane framework validation now passes baseline build and review-first safe scaffold/rebuild while preserving manual-review guidance for host-specific startup and UI wiring
 - independent real-world hosted WebAssembly validation now passes baseline build, server-host scaffold, rebuild, `doctor`, and `validate` with expected client UI manual-review warnings
 - real OpenAI-backed adapter validation now covers simple chat, semantic workflow tool invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
+- Azure OpenAI provider registration now uses the Microsoft Azure OpenAI client on the same `IChatClient` runtime path, with API-key and `TokenCredential` coverage; live Azure deployment validation remains a per-app gate
 - local and published-feed package validation now prove `AgentBlazor` and `AgentBlazor.Cli` can be installed into a clean app without repo-local project references, built, and checked by `doctor`/`validate`
 - CLI scaffold/package version output now derives from assembly package metadata and matches the preview package version instead of the previous hardcoded `1.0.0`
 - current source is now `0.1.0-preview.8`; it updates SDK roll-forward for newer .NET 10 preview SDKs and needs a publish/validation run before replacing `0.1.0-preview.7` as the latest published-feed validated version

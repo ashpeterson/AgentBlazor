@@ -8,6 +8,7 @@ namespace AgentBlazor.Cli.Analysis;
 public sealed class ExistingAppScaffoldApplier
 {
     private const string DefaultMudBlazorVersion = "9.0.0";
+    private const string DefaultChatWidgetMarkup = """<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""";
 
     public async Task<ScaffoldPreviewResult> PreviewAsync(
         ScaffoldPlan plan,
@@ -137,6 +138,8 @@ public sealed class ExistingAppScaffoldApplier
     {
         var original = await File.ReadAllTextAsync(projectPath, ct).ConfigureAwait(false);
         var updated = original;
+        var centralPackageFile = await ResolveCentralPackageFileAsync(projectPath, ct).ConfigureAwait(false);
+        var centralPackageVersions = new List<(string PackageId, string Version)>();
 
         if (sourceReferences.Count > 0)
         {
@@ -148,13 +151,24 @@ public sealed class ExistingAppScaffoldApplier
         }
         else
         {
-            updated = EnsurePackageReference(updated, "AgentBlazor", ResolveDefaultAgentBlazorVersion());
+            updated = EnsurePackageReference(
+                updated,
+                "AgentBlazor",
+                ResolveDefaultAgentBlazorVersion(),
+                centralPackageFile is not null,
+                centralPackageVersions);
         }
 
-        updated = EnsurePackageReference(updated, "MudBlazor", DefaultMudBlazorVersion);
+        updated = EnsurePackageReference(
+            updated,
+            "MudBlazor",
+            DefaultMudBlazorVersion,
+            centralPackageFile is not null,
+            centralPackageVersions);
 
         if (string.Equals(original, updated, StringComparison.Ordinal))
         {
+            await PreviewCentralPackageVersionsAsync(centralPackageFile, centralPackageVersions, changes, ct).ConfigureAwait(false);
             return;
         }
 
@@ -166,19 +180,111 @@ public sealed class ExistingAppScaffoldApplier
                 : "Added missing AgentBlazor and/or MudBlazor package references.",
             original,
             updated);
+
+        await PreviewCentralPackageVersionsAsync(centralPackageFile, centralPackageVersions, changes, ct).ConfigureAwait(false);
     }
 
-    private static string EnsurePackageReference(string content, string packageId, string version)
+    private static string EnsurePackageReference(
+        string content,
+        string packageId,
+        string version,
+        bool useCentralPackageManagement = false,
+        List<(string PackageId, string Version)>? centralPackageVersions = null)
     {
         if (HasXmlReference(content, "PackageReference", packageId, normalizePath: false))
         {
             return content;
         }
 
+        if (useCentralPackageManagement)
+        {
+            centralPackageVersions?.Add((packageId, version));
+        }
+
         return InsertXmlReference(
             content,
             "PackageReference",
-            $"<PackageReference Include=\"{EscapeXmlAttribute(packageId)}\" Version=\"{EscapeXmlAttribute(version)}\" />");
+            useCentralPackageManagement
+                ? $"<PackageReference Include=\"{EscapeXmlAttribute(packageId)}\" />"
+                : $"<PackageReference Include=\"{EscapeXmlAttribute(packageId)}\" Version=\"{EscapeXmlAttribute(version)}\" />");
+    }
+
+    private static async Task PreviewCentralPackageVersionsAsync(
+        CentralPackageFile? centralPackageFile,
+        IReadOnlyList<(string PackageId, string Version)> packageVersions,
+        List<ScaffoldPreviewFile> changes,
+        CancellationToken ct)
+    {
+        if (centralPackageFile is null || packageVersions.Count == 0)
+        {
+            return;
+        }
+
+        var updated = centralPackageFile.Content;
+        foreach (var (packageId, version) in packageVersions)
+        {
+            updated = EnsurePackageVersion(updated, packageId, version);
+        }
+
+        if (string.Equals(centralPackageFile.Content, updated, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        AddTextChange(
+            changes,
+            centralPackageFile.Path,
+            "Added missing AgentBlazor and/or MudBlazor central package versions.",
+            centralPackageFile.Content,
+            updated);
+    }
+
+    private static string EnsurePackageVersion(string content, string packageId, string version)
+    {
+        if (HasXmlReference(content, "PackageVersion", packageId, normalizePath: false))
+        {
+            return content;
+        }
+
+        return InsertXmlReference(
+            content,
+            "PackageVersion",
+            $"<PackageVersion Include=\"{EscapeXmlAttribute(packageId)}\" Version=\"{EscapeXmlAttribute(version)}\" />");
+    }
+
+    private static async Task<CentralPackageFile?> ResolveCentralPackageFileAsync(string projectPath, CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(projectPath);
+        while (!string.IsNullOrWhiteSpace(directory))
+        {
+            var centralPackagePath = Path.Combine(directory, "Directory.Packages.props");
+            if (File.Exists(centralPackagePath))
+            {
+                var content = await File.ReadAllTextAsync(centralPackagePath, ct).ConfigureAwait(false);
+                return IsCentralPackageManagementEnabled(content)
+                    ? new CentralPackageFile(centralPackagePath, content)
+                    : null;
+            }
+
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+
+        return null;
+    }
+
+    private static bool IsCentralPackageManagementEnabled(string content)
+    {
+        try
+        {
+            var document = XDocument.Parse(content);
+            return document.Descendants()
+                .Where(element => element.Name.LocalName == "ManagePackageVersionsCentrally")
+                .Any(element => string.Equals(element.Value.Trim(), "true", StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return content.Contains("<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>", StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static string ResolveDefaultAgentBlazorVersion()
@@ -317,6 +423,7 @@ public sealed class ExistingAppScaffoldApplier
         var original = exists ? await File.ReadAllTextAsync(importsPath, ct).ConfigureAwait(false) : string.Empty;
         var updated = original;
 
+        updated = EnsureLine(updated, "@using static Microsoft.AspNetCore.Components.Web.RenderMode");
         updated = EnsureLine(updated, "@using AgentBlazor.Components");
 
         AddTextChange(
@@ -703,7 +810,7 @@ public sealed class AppCapabilities
 
 <h1>Home</h1>
 
-<AgentChatWidget Title="Assistant" />
+<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />
 """;
             AddTextChange(
                 changes,
@@ -722,7 +829,7 @@ public sealed class AppCapabilities
             return;
         }
 
-        var updated = original.TrimEnd() + "\n\n<AgentChatWidget Title=\"Assistant\" />\n";
+        var updated = original.TrimEnd() + $"\n\n{DefaultChatWidgetMarkup}\n";
         AddTextChange(
             changes,
             chatPagePath,
@@ -1034,4 +1141,6 @@ public sealed class AppCapabilities
 
         public string Summary { get; init; } = string.Empty;
     }
+
+    private sealed record CentralPackageFile(string Path, string Content);
 }

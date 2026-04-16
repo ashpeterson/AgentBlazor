@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-04-15
+Last updated: 2026-04-16
 
 ## Production Readiness
 
@@ -13,6 +13,7 @@ Production gates:
 - Validate CLI scaffold/doctor/validate on at least three external Blazor apps. The standard, hosted-WebAssembly, and review-first custom-host lanes now have real-app coverage.
 - Add more independent real-world OSS validation beyond templates and official samples. `CleanArchitectureWithBlazorServer` now covers the larger auth/custom-layout/multi-project path; `whisper.net` now covers hosted WebAssembly; `oqtane.framework` now covers the materially different custom/Oqtane-style review-first path.
 - Real OpenAI-backed workflow validation is now covered by `ProviderAdapterIntegrationTests`: simple chat, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity.
+- Azure OpenAI is wired through the Microsoft Azure OpenAI client and the shared `IChatClient` runtime path, with API-key and `TokenCredential` registration coverage. Live Azure deployment validation remains app-owner specific.
 - Published-feed package validation is complete for `AgentBlazor` and `AgentBlazor.Cli` version `0.1.0-preview.7`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, `0.1.0-preview.5` downgrade-conflict, and `0.1.0-preview.6` CSP nonce findings with a Microsoft Agents 1.1-compatible package that passes clean-app and real-app validation.
 - Current source is now `0.1.0-preview.8` with `global.json` roll-forward set to `latestMinor` for newer .NET 10 preview SDK environments. Publish and validate `0.1.0-preview.8` before calling it the latest published-feed validated package.
 - Finish the browser-safe WebAssembly client story: current CLI behavior detects companion WebAssembly UI projects and leaves client layout/chat work in manual review because the current AgentBlazor UI surface is server-first.
@@ -68,6 +69,7 @@ The runtime realignment is now materially underway:
 - middleware now executes for both `RunTurnAsync` and `RunTurnStreamingAsync`
 - provider endpoint validation now rejects non-HTTP(S) custom endpoints
 - real OpenAI-backed adapter validation now covers runtime tool execution, approval gating, blocked/recovery/retry behavior, streaming/reconnect, cancellation, concurrency, and session-state continuity
+- Azure OpenAI provider registration now covers API-key and Azure `TokenCredential` authentication paths, and CLI scaffold can emit `--provider azure-openai` startup wiring
 - local package validation now proves the `AgentBlazor` package and `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to the current source package version, now `0.1.0-preview.8`
 - the private-preview GitHub Packages workflow now publishes both the runtime package and CLI tool package; workflow run `24443709690` published and archived `0.1.0-preview.7` from commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
 - published `0.1.0-preview.7` validation confirms Microsoft Agents 1.1 compatibility, the AG-UI async session serializer, semantic workflow APIs, and CSP nonce preservation for scaffolded MudBlazor/AgentBlazor assets
@@ -77,6 +79,8 @@ The runtime realignment is now materially underway:
 - external hosted WebAssembly validation now confirms this behavior on a real server+client OSS app; server host scaffold/build/manifest validation passes while browser-client layout/chat edits remain explicit manual-review work
 - existing-app scaffold now respects plan-specific startup edits, avoids duplicate `AddMudServices(...)` when registration is composed outside `Program.cs`, inserts AgentBlazor registration after composed service chains such as `.AddServerUI(...)`, maps endpoints before async `RunAsync`, targets discovered existing root pages, and preserves UTF-8 BOMs on edited existing files
 - project-file scaffold now inserts package/project references without reserializing the whole `.csproj`, preserving XML declarations and MSBuild target expressions such as `@(Files->...)`
+- project-file scaffold now detects the nearest Central Package Management `Directory.Packages.props` and emits unversioned project `PackageReference` entries plus matching `PackageVersion` entries, validated against `thecodewrapper/CH.CleanArchitectureBlazor`
+- the floating `AgentChatWidget` now has a visible minimize control, Escape-to-minimize behavior, and Playwright selectors for prompt-entry/minimize/reopen coverage
 
 ## Shipped and Working
 
@@ -120,6 +124,7 @@ The runtime realignment is now materially underway:
   - `AgentChatPanel`
   - `AgentChatWidget`
   - `AgentChatBar`
+- `AgentChatWidget` supports explicit minimize/reopen affordances and Escape-to-minimize keyboard behavior.
 - The floating widget open path was stabilized:
   - no fresh DOM-style open flash
   - state now transitions in a stable widget shell

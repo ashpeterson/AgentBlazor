@@ -1,5 +1,6 @@
 using AgentBlazor.Options;
 using Azure.AI.OpenAI;
+using Azure.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -96,6 +97,9 @@ public static class AgentProviderRegistrationExtensions
             options.Provider.Endpoint = normalizedEndpoint;
             options.Provider.DeploymentName = deploymentName;
             options.Provider.ApiKey = apiKey;
+            options.Provider.AdditionalSettings["Auth"] = string.IsNullOrWhiteSpace(apiKey)
+                ? "NotConfigured"
+                : "ApiKey";
         });
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
@@ -107,6 +111,38 @@ public static class AgentProviderRegistrationExtensions
                 return client.GetChatClient(deploymentName).AsIChatClient();
             }));
         }
+
+        return services;
+    }
+
+    public static IServiceCollection AddAzureOpenAIProvider(
+        this IServiceCollection services,
+        string endpoint,
+        string deploymentName,
+        TokenCredential credential)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(credential);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deploymentName);
+
+        var normalizedEndpoint = NormalizeAbsoluteEndpoint(endpoint, nameof(endpoint));
+
+        services.Configure<AgentBlazorOptions>(options =>
+        {
+            options.Provider.Kind = AgentProviderKind.AzureOpenAI;
+            options.Provider.Endpoint = normalizedEndpoint;
+            options.Provider.DeploymentName = deploymentName;
+            options.Provider.ApiKey = null;
+            options.Provider.AdditionalSettings["Auth"] = "TokenCredential";
+        });
+        services.Replace(ServiceDescriptor.Singleton<IChatClient>(_ =>
+        {
+            var client = new AzureOpenAIClient(
+                new Uri(normalizedEndpoint, UriKind.Absolute),
+                credential);
+            return client.GetChatClient(deploymentName).AsIChatClient();
+        }));
 
         return services;
     }

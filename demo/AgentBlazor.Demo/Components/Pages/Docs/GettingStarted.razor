@@ -55,7 +55,7 @@ agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
         <div class="docs-section__header">
             <div>
                 <h2>3. Configure services</h2>
-                <p>The primary validated production path today is OpenAI via <code>options.UseOpenAI(...)</code>.</p>
+                <p>The most validated production path today is OpenAI via <code>options.UseOpenAI(...)</code>; Azure OpenAI uses the same runtime path.</p>
             </div>
         </div>
 
@@ -83,8 +83,8 @@ builder.Services.AddAgentBlazor(options =&gt;
 });</code></pre>
 
         <div class="docs-note">
-            <strong>Other providers:</strong> <code>UseAzureOpenAI(...)</code> and <code>UseOllama(...)</code> are supported,
-            but OpenAI is the primary path to validate first in a real app.
+            <strong>Azure OpenAI:</strong> use <code>UseAzureOpenAI(endpoint, deploymentName, apiKey)</code>, or pass a
+            <code>TokenCredential</code> such as <code>DefaultAzureCredential</code> for managed identity.
         </div>
     </section>
 

@@ -53,11 +53,12 @@ internal static class RuntimeEarlyExitResponses
             "// OpenAI\n" +
             "options.UseOpenAI(apiKey: \"sk-...\", model: \"gpt-5.4-mini\");\n\n" +
             "// Azure OpenAI\n" +
-            "options.UseAzureOpenAI(endpoint: \"https://...\", deploymentName: \"...\");\n\n" +
+            "options.UseAzureOpenAI(endpoint: \"https://...\", deploymentName: \"...\", apiKey: \"...\");\n" +
+            "// Or pass a TokenCredential such as DefaultAzureCredential for managed identity.\n\n" +
             "// Ollama (free, local)\n" +
             "options.UseOllama(model: \"llama3.2\");\n" +
             "```\n\n" +
-            "Set your API key via environment variable `OPENAI_API_KEY` or in `appsettings.json`.",
+            "Set your provider credentials via environment variables or app configuration.",
             [],
             []);
 }

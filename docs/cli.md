@@ -1,12 +1,13 @@
 # CLI Guide
 
-Status as of 2026-04-15:
+Status as of 2026-04-16:
 
-- `AgentBlazor.Cli.Analysis.Tests`: `132/132`
+- `AgentBlazor.Cli.Analysis.Tests`: `134/134`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
 - standard Blazor hosts are fully scaffoldable
 - standard hosted WebAssembly server+client hosts are fully scaffoldable
 - scaffolded MudBlazor and AgentBlazor assets preserve existing `nonce="..."` attributes in CSP-aware shells
+- Central Package Management apps are supported for package scaffolding: project files receive unversioned `PackageReference` entries and the nearest active `Directory.Packages.props` receives matching `PackageVersion` entries
 - advanced/custom hosts remain review-first unless the CLI can safely classify and patch them
 
 The CLI is designed to take an existing Blazor app through a standard onboarding path:
@@ -162,12 +163,18 @@ If the app was installed manually and no manifest exists, `validate` reports tha
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp
 ```
 
-Add `--provider openai` for the validated default path. `azure-openai` and `ollama` are also supported.
+Add `--provider openai` for the most validated default path. Use `--provider azure-openai` for Azure OpenAI or `--provider ollama` for local OpenAI-compatible Ollama.
 
 Show the exact file-level diff before applying:
 
 ```bash
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
+```
+
+Azure OpenAI scaffold:
+
+```bash
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider azure-openai --diff
 ```
 
 When you are evaluating from a local AgentBlazor checkout, you can install against source projects instead of a published package:
@@ -195,7 +202,9 @@ The current scaffold slice handles standard host files and proposes or applies e
 
 When scaffold applies changes it also writes `.agentblazor/scaffold-manifest.json` in the host project so the install step has an audit trail.
 
-If you pass `--provider`, scaffold writes the matching provider registration into `Program.cs` and leaves only the configuration values for you to supply. If you omit `--provider`, scaffold leaves concrete OpenAI, Azure OpenAI, and Ollama examples in comments.
+If the host uses Central Package Management with `ManagePackageVersionsCentrally=true`, scaffold keeps the project file valid by adding unversioned `PackageReference` entries and writing missing `PackageVersion` entries to the nearest imported `Directory.Packages.props`. This path was validated against `thecodewrapper/CH.CleanArchitectureBlazor`, a .NET 10 Blazor Server app with a legacy `Startup.cs`/`_Host.cshtml` host shape.
+
+If you pass `--provider`, scaffold writes the matching provider registration into `Program.cs` and leaves only the configuration values for you to supply. Azure OpenAI uses `AzureOpenAI:Endpoint`, `AzureOpenAI:DeploymentName`, and `AzureOpenAI:ApiKey` by default; apps that use managed identity can replace the scaffolded API-key argument with a `TokenCredential` such as `new DefaultAzureCredential()`. If you omit `--provider`, scaffold leaves concrete OpenAI, Azure OpenAI, and Ollama examples in comments.
 
 If the CLI detects an advanced or legacy Blazor host, scaffold now stays review-first: it previews safe file additions such as package/workflow changes and downgrades risky host-specific wiring to manual review. Oqtane, legacy `_Host.cshtml` server apps, and hosted WebAssembly server hosts are examples, but the path is meant to cover recognizable nonstandard Blazor hosts more broadly. For hosted WebAssembly servers, the CLI now infers the companion client project from project references, patches the standard server `Program.cs` startup path, and can patch safe client files such as `_Imports.razor`, `wwwroot/index.html`, layout, and page files there. Only hosts the CLI cannot classify into a Blazor scaffold path still stop early.
 

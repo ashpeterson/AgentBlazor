@@ -30,9 +30,10 @@ const screenshotPath = path.join(outputRoot, "chat-widget.png");
 
 let serverProcess;
 
-run().catch((error) => {
+run().catch(async (error) => {
   console.error(error);
-  process.exitCode = 1;
+  await stopServer(serverProcess).catch((stopError) => console.error(stopError));
+  process.exit(1);
 });
 
 async function run() {

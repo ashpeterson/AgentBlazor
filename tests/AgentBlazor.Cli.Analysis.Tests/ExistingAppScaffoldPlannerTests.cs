@@ -192,6 +192,69 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
     }
 
     [Fact]
+    public async Task ApplyAsync_WhenProjectUsesCentralPackageManagement_AddsUnversionedReferencesAndPackageVersions()
+    {
+        var projectPath = CreateProject(
+            projectName: "CentralPackageApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+        var projectDirectory = Path.GetDirectoryName(projectPath)!;
+        var centralPackagesPath = Path.Combine(projectDirectory, "Directory.Packages.props");
+        await File.WriteAllTextAsync(
+            centralPackagesPath,
+            """
+            <Project>
+              <PropertyGroup>
+                <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+        var preview = await applier.PreviewAsync(plan);
+
+        await applier.ApplyAsync(plan, preview);
+        var projectText = await File.ReadAllTextAsync(projectPath);
+        var centralPackagesText = await File.ReadAllTextAsync(centralPackagesPath);
+
+        Assert.Contains("""<PackageReference Include="AgentBlazor" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="MudBlazor" />""", projectText, StringComparison.Ordinal);
+        Assert.DoesNotContain("PackageReference Include=\"AgentBlazor\" Version=", projectText, StringComparison.Ordinal);
+        Assert.DoesNotContain("PackageReference Include=\"MudBlazor\" Version=", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageVersion Include="AgentBlazor" Version="0.1.0-preview.8" />""", centralPackagesText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageVersion Include="MudBlazor" Version="9.0.0" />""", centralPackagesText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ApplyAsync_WhenProjectIsMissingBaselineWiring_MakesProjectReady()
     {
         var projectPath = CreateProject(
@@ -386,8 +449,11 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
 
         var importsChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "_Imports.razor"), StringComparison.Ordinal));
         var layoutChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Layout", "MainLayout.razor"), StringComparison.Ordinal));
+        var homeChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal));
+        Assert.Contains("@using static Microsoft.AspNetCore.Components.Web.RenderMode", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("@using MudBlazor", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("@using MudBlazor", layoutChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", homeChange.UpdatedContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -444,7 +510,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains("app.MapAgentBlazorEndpoints();\nawait app.RunAsync().ConfigureAwait(false);", programChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains(preview.Changes, change =>
             change.Path.EndsWith(Path.Combine("Pages", "Admin", "Landing.razor"), StringComparison.Ordinal) &&
-            change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
+            change.UpdatedContent.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", StringComparison.Ordinal));
         Assert.DoesNotContain(preview.Changes, change =>
             change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal) &&
             change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
@@ -629,6 +695,55 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
 
         Assert.Contains(
             "options.UseOpenAI(\n        apiKey: builder.Configuration[\"OpenAI:ApiKey\"]!,\n        model: builder.Configuration[\"OpenAI:Model\"] ?? \"gpt-5.4-mini\");",
+            programChange.UpdatedContent,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("// Recommended first path:", programChange.UpdatedContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenAzureOpenAIProviderIsSelected_ScaffoldsConcreteProviderRegistration()
+    {
+        var projectPath = CreateProject(
+            projectName: "AzureProviderApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.AzureOpenAI);
+        var programChange = Assert.Single(
+            preview.Changes,
+            change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
+
+        Assert.Contains(
+            "options.UseAzureOpenAI(\n        endpoint: builder.Configuration[\"AzureOpenAI:Endpoint\"]!,\n        deploymentName: builder.Configuration[\"AzureOpenAI:DeploymentName\"]!,\n        apiKey: builder.Configuration[\"AzureOpenAI:ApiKey\"]);",
             programChange.UpdatedContent,
             StringComparison.Ordinal);
         Assert.DoesNotContain("// Recommended first path:", programChange.UpdatedContent, StringComparison.Ordinal);

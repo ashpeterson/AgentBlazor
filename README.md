@@ -6,7 +6,7 @@ Make your Blazor app agent-capable.
 
 AgentBlazor is the Blazor-native execution and UX layer for agent workflows. It gives external or host-provided agents live app context, deterministic UI execution, approvals, and in-app workflow surfaces without turning your app into a chat-for-clicking gimmick.
 
-Today, the validated production provider path is OpenAI-compatible chat tools via `options.UseOpenAI(...)`. Other providers remain supported as integrations, but they should be treated as secondary validation targets until they have matching real-app proof.
+Today, the most validated production provider path is OpenAI-compatible chat tools via `options.UseOpenAI(...)`. Azure OpenAI is also supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path; other providers remain secondary validation targets until they have matching real-app proof.
 
 ## What It Is
 

@@ -9,6 +9,7 @@ using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Paid.Analytics;
 using AgentBlazor.Core.Paid.Audit;
 using AgentBlazor.Core.Paid.Suggestions;
+using Azure.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -49,6 +50,15 @@ public sealed class AgentBlazorRegistrationOptions
         _providerRegistration = string.IsNullOrWhiteSpace(apiKey)
             ? services => services.AddAzureOpenAIProvider(endpoint, deploymentName)
             : services => services.AddAzureOpenAIProvider(endpoint, deploymentName, apiKey);
+    }
+
+    public void UseAzureOpenAI(string endpoint, string deploymentName, TokenCredential credential)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deploymentName);
+        ArgumentNullException.ThrowIfNull(credential);
+
+        _providerRegistration = services => services.AddAzureOpenAIProvider(endpoint, deploymentName, credential);
     }
 
     public void UseOriginAI(
@@ -225,7 +235,7 @@ public sealed class AgentBlazorRegistrationOptions
             Console.WriteLine("║                                                                               ║");
             Console.WriteLine("║  Add one of the following to your AddAgentBlazor() call:                     ║");
             Console.WriteLine("║    options.UseOpenAI(apiKey, \"gpt-5.4-mini\");                                  ║");
-            Console.WriteLine("║    options.UseAzureOpenAI(endpoint, deploymentName);                         ║");
+            Console.WriteLine("║    options.UseAzureOpenAI(endpoint, deploymentName, apiKey);                 ║");
             Console.WriteLine("║    options.UseOllama(\"llama3.2\");  // Free, runs locally                      ║");
             Console.WriteLine("║    options.UseRuntimeAdapter<TAdapter>();                                    ║");
             Console.WriteLine("║                                                                               ║");

@@ -98,8 +98,9 @@ agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider azure-opena
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider ollama</code></pre>
 
         <div class="docs-note">
-            <strong>Current validation priority:</strong> OpenAI is the first production provider path to validate in a real app.
-            Azure OpenAI and Ollama remain supported integrations.
+            <strong>Azure OpenAI:</strong> scaffold writes <code>AzureOpenAI:Endpoint</code>, <code>AzureOpenAI:DeploymentName</code>,
+            and <code>AzureOpenAI:ApiKey</code> lookups. Apps using managed identity can replace the API key argument with a
+            <code>TokenCredential</code>.
         </div>
     </section>
 
