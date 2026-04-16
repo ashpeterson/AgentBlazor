@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { openAssistantChatSurface } = require("./chat-helpers.cjs");
+const { openAssistantChatSurface, openFloatingChatWidget } = require("./chat-helpers.cjs");
 
 test.describe("Components explorer", () => {
   test("renders the docs-style overview with catalog and contents rails", async ({ page }) => {
@@ -35,6 +35,27 @@ test.describe("Components explorer", () => {
     await expect(chatSurface.getByLabel("Message input")).toBeVisible();
     await expect(page.locator(".ab-chat-widget__window").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /open agent chat/i }).first()).toBeHidden();
+  });
+
+  test("floating chat widget supports prompt input and minimization", async ({ page }) => {
+    await page.goto("/demo/components", { waitUntil: "networkidle" });
+
+    const { widgetWindow, widgetSurface, minimizeButton, openButton } = await openFloatingChatWidget(page);
+    await expect(widgetSurface.getByLabel("Message input")).toBeVisible();
+
+    await widgetSurface.getByLabel("Message input").fill("Can you explain this components page?");
+    await expect(widgetSurface.getByRole("button", { name: /send message/i })).toBeEnabled();
+
+    await minimizeButton.click();
+    await expect(widgetWindow).toBeHidden();
+    await expect(openButton).toBeVisible();
+
+    await openButton.click();
+    await expect(widgetWindow).toBeVisible();
+
+    await widgetWindow.press("Escape");
+    await expect(widgetWindow).toBeHidden();
+    await expect(openButton).toBeVisible();
   });
 
   test("supports focused component routes", async ({ page }) => {

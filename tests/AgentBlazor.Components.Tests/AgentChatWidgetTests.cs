@@ -41,6 +41,25 @@ public sealed class AgentChatWidgetTests : TestContext
         Assert.DoesNotContain("ab-chat-widget--open", cut.Find("section.ab-chat-widget").ClassName);
     }
 
+    [Fact]
+    public void EscapeKey_MinimizesWidget()
+    {
+        var state = new TestChatWidgetState();
+
+        Services.AddSingleton<IAgentChatWidgetState>(state);
+        ComponentFactories.AddStub<AgentChatSurface>();
+
+        var cut = RenderComponent<AgentChatWidget>();
+
+        cut.Find("button.ab-chat-widget__bubble").Click();
+        Assert.True(state.IsOpen);
+
+        cut.Find("[data-testid='agent-chat-widget-window']").KeyDown("Escape");
+
+        Assert.False(state.IsOpen);
+        Assert.DoesNotContain("ab-chat-widget--open", cut.Find("section.ab-chat-widget").ClassName);
+    }
+
     private sealed class TestChatWidgetState : IAgentChatWidgetState
     {
         private bool _isOpen;

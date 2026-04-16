@@ -1,0 +1,67 @@
+name: external-chat-widget
+
+on:
+  workflow_dispatch:
+    inputs:
+      external_repo:
+        description: "External Blazor repository to clone"
+        required: false
+        default: "https://github.com/damienbod/BlazorSecurityNet10.git"
+      external_ref:
+        description: "Optional branch, tag, or commit"
+        required: false
+        default: ""
+      external_project:
+        description: "Project path inside the external repository"
+        required: false
+        default: "BlazorApp/BlazorApp.csproj"
+
+jobs:
+  external-chat-widget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (pinned)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Restore
+        run: dotnet restore AgentBlazor.slnx --force-evaluate
+
+      - name: Build
+        run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
+
+      - name: Install E2E Dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npm run install:browsers
+
+      - name: Run External Chat Widget Validation
+        env:
+          AGENTBLAZOR_EXTERNAL_REPO: ${{ inputs.external_repo }}
+          AGENTBLAZOR_EXTERNAL_REF: ${{ inputs.external_ref }}
+          AGENTBLAZOR_EXTERNAL_PROJECT: ${{ inputs.external_project }}
+        run: npm --prefix tests/e2e run test:external-chat-widget
+
+      - name: Upload External Chat Widget Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-chat-widget-artifacts
+          path: tests/e2e/artifacts/external-chat-widget/**
+          if-no-files-found: warn

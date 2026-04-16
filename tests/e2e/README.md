@@ -1,6 +1,6 @@
 # AgentBlazor E2E (Playwright)
 
-Last updated: 2026-04-15
+Last updated: 2026-04-16
 
 Run locally from `tests/e2e`:
 
@@ -12,11 +12,16 @@ npm run test:e2e:headed
 npm run test:e2e:ui
 npm run test:real-usability
 npm run test:paid-dashboard
+npm run test:external-chat-widget
 ```
 
 This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
 
-Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI or Ollama provider.
+The component explorer suite includes floating `AgentChatWidget` coverage for opening the widget, entering a prompt, minimizing with the visible control, reopening, and minimizing with Escape. Browser execution requires the Playwright browser system libraries to be installed on the machine.
+
+`npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, and `AGENTBLAZOR_EXTERNAL_PROJECT`.
+
+Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
 Use `npm run test:e2e:headed` when you want to watch the browser, and `npm run test:e2e:ui` when you want Playwright's interactive runner.
 
@@ -34,7 +39,14 @@ set OPENAI_API_KEY=...
 set OpenAI__Model=gpt-5.4-mini
 ```
 
-2. Ollama:
+2. Azure OpenAI:
+```bash
+set AzureOpenAI__Endpoint=https://<resource>.openai.azure.com
+set AzureOpenAI__DeploymentName=<deployment-name>
+set AzureOpenAI__ApiKey=...
+```
+
+3. Ollama:
 ```bash
 set OLLAMA_MODEL=...
 set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1

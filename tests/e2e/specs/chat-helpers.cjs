@@ -20,6 +20,28 @@ async function openAssistantChatSurface(page, timeoutMs = 30000) {
   return widgetSurface;
 }
 
+async function openFloatingChatWidget(page, timeoutMs = 30000) {
+  const widgetWindow = page.getByTestId("agent-chat-widget-window").first();
+  if (!(await widgetWindow.isVisible().catch(() => false))) {
+    const openButton = page.getByTestId("agent-chat-widget-open").first();
+    await openButton.waitFor({ state: "visible", timeout: timeoutMs });
+    await openButton.click();
+  }
+
+  await widgetWindow.waitFor({ state: "visible", timeout: timeoutMs });
+  const widgetSurface = await findInteractiveSurface(widgetWindow.locator(".ab-chat-surface"));
+  if (!widgetSurface) {
+    throw new Error("Unable to locate an interactive floating chat widget surface.");
+  }
+
+  return {
+    widgetWindow,
+    widgetSurface,
+    minimizeButton: page.getByTestId("agent-chat-widget-minimize").first(),
+    openButton: page.getByTestId("agent-chat-widget-open").first()
+  };
+}
+
 async function findInteractiveSurface(locator) {
   const count = await locator.count();
   for (let index = 0; index < count; index++) {
@@ -38,5 +60,6 @@ async function findInteractiveSurface(locator) {
 }
 
 module.exports = {
-  openAssistantChatSurface
+  openAssistantChatSurface,
+  openFloatingChatWidget
 };

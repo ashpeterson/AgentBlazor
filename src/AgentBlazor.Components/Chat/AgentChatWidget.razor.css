@@ -265,17 +265,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
+    gap: 0.35rem;
+    min-width: 32px;
     height: 32px;
-    padding: 0;
-    border: 0;
+    padding: 0 0.55rem;
+    border: 1px solid transparent;
     border-radius: 8px;
     background: transparent;
     color: var(--ab-widget-text-muted);
-    font-size: 1.25rem;
+    font-size: 1rem;
     line-height: 1;
     cursor: pointer;
     transition:
+        border-color 0.15s ease,
         background-color 0.15s ease,
         color 0.15s ease,
         transform 0.15s ease;
@@ -283,11 +285,13 @@
 
 .ab-chat-widget__icon-btn:hover {
     background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
     color: var(--ab-widget-text);
 }
 
 .ab-chat-widget[data-theme="dark"] .ab-chat-widget__icon-btn:hover {
     background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .ab-chat-widget__icon-btn:active {
@@ -297,6 +301,16 @@
 .ab-chat-widget__icon-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--ab-widget-accent);
+}
+
+.ab-chat-widget__icon-btn-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.ab-chat-widget__window:focus {
+    outline: none;
 }
 
 /* ── Window Body ───────────────────────────────────────────────────────────── */

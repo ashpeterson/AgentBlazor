@@ -2,6 +2,7 @@
 @using AgentBlazor.Components.Chat
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Runtime
+@using Microsoft.AspNetCore.Components.Web
 @implements IDisposable
 @inject IAgentChatWidgetState WidgetState
 
@@ -15,14 +16,20 @@
          role="dialog"
          aria-modal="true"
          aria-hidden="@(!WidgetState.IsOpen)"
-         aria-label="@(Title ?? "Agent chat")">
+         aria-label="@(Title ?? "Agent chat")"
+         tabindex="@(WidgetState.IsOpen ? 0 : -1)"
+         data-testid="agent-chat-widget-window"
+         @onkeydown="HandleWindowKeyDown">
         <header class="ab-chat-widget__window-header">
             <span id="@HeaderLabelId">@(Title ?? "Agent Assistant")</span>
             <button type="button"
                     class="ab-chat-widget__icon-btn"
                     @onclick="Close"
                     tabindex="@(WidgetState.IsOpen ? 0 : -1)"
+                    title="Minimize chat widget"
+                    data-testid="agent-chat-widget-minimize"
                     aria-label="Minimize chat widget">
+                <span class="ab-chat-widget__icon-btn-label">Minimize</span>
                 <span aria-hidden="true">&minus;</span>
             </button>
         </header>
@@ -62,6 +69,7 @@
             aria-hidden="@WidgetState.IsOpen"
             aria-expanded="@WidgetState.IsOpen"
             tabindex="@(WidgetState.IsOpen ? -1 : 0)"
+            data-testid="agent-chat-widget-open"
             aria-label="@(BubbleAriaLabel ?? "Open agent chat")">
         <span class="ab-chat-widget__bubble-label" aria-hidden="true">@BubbleLabel</span>
     </button>
@@ -190,6 +198,14 @@
     private void Open() => WidgetState.Open();
 
     private void Close() => WidgetState.Close();
+
+    private void HandleWindowKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Escape", StringComparison.OrdinalIgnoreCase))
+        {
+            WidgetState.Close();
+        }
+    }
 
     private void OnWidgetStateChanged() => _ = InvokeAsync(StateHasChanged);
 }
