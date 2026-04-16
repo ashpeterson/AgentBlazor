@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { chromium, expect } = require("@playwright/test");
@@ -17,7 +18,9 @@ const timeoutMs = Number.parseInt(process.env.AGENTBLAZOR_EXTERNAL_TIMEOUT_MS ||
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outputRoot = process.env.AGENTBLAZOR_EXTERNAL_OUTPUT_DIR
   || path.join(repoRoot, "tests", "e2e", "artifacts", "external-chat-widget", stamp);
-const workspaceRoot = path.join(outputRoot, "workspace");
+const workspaceRoot = process.env.AGENTBLAZOR_EXTERNAL_WORKSPACE_DIR
+  ? path.resolve(process.env.AGENTBLAZOR_EXTERNAL_WORKSPACE_DIR)
+  : fs.mkdtempSync(path.join(os.tmpdir(), `agentblazor-external-chat-${stamp}-`));
 const externalRoot = path.join(workspaceRoot, "external-app");
 const localFeed = path.join(workspaceRoot, "local-feed");
 const toolPath = path.join(workspaceRoot, "tools");
@@ -83,6 +86,7 @@ async function run() {
     baseUrl,
     promptText,
     outputRoot,
+    workspaceRoot,
     screenshotPath,
     assertions: {
       packageInstalled: true,
