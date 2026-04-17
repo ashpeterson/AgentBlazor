@@ -7,6 +7,10 @@ on:
         description: "External Blazor repository to clone"
         required: false
         default: "https://github.com/damienbod/BlazorSecurityNet10.git"
+      external_template:
+        description: "Optional dotnet template target to generate instead of cloning, for example: blazor"
+        required: false
+        default: ""
       external_ref:
         description: "Optional branch, tag, or commit"
         required: false
@@ -14,7 +18,7 @@ on:
       external_project:
         description: "Project path inside the external repository"
         required: false
-        default: "BlazorApp/BlazorApp.csproj"
+        default: ""
       external_app_path:
         description: "Route to open for browser widget assertions"
         required: false
@@ -70,6 +74,7 @@ jobs:
       - name: Run External Chat Widget Validation
         env:
           AGENTBLAZOR_EXTERNAL_REPO: ${{ inputs.external_repo }}
+          AGENTBLAZOR_EXTERNAL_TEMPLATE: ${{ inputs.external_template }}
           AGENTBLAZOR_EXTERNAL_REF: ${{ inputs.external_ref }}
           AGENTBLAZOR_EXTERNAL_PROJECT: ${{ inputs.external_project }}
           AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ inputs.external_app_path }}

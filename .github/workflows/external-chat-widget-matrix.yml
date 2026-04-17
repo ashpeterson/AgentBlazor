@@ -1,0 +1,75 @@
+name: external-chat-widget-matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1"
+
+jobs:
+  external-chat-widget:
+    name: external-chat-widget (${{ matrix.target.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: fresh-blazor
+            external_template: blazor
+            external_repo: ""
+            external_ref: ""
+            external_project: AgentBlazorExternalTemplate.csproj
+            external_app_path: /
+          - name: clean-architecture
+            external_template: ""
+            external_repo: https://github.com/neozhu/CleanArchitectureWithBlazorServer.git
+            external_ref: ""
+            external_project: src/Server.UI/Server.UI.csproj
+            external_app_path: /public/index
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (pinned)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Restore
+        run: dotnet restore AgentBlazor.slnx --force-evaluate
+
+      - name: Build
+        run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
+
+      - name: Install E2E Dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npm run install:browsers
+
+      - name: Run External Chat Widget Validation
+        env:
+          AGENTBLAZOR_EXTERNAL_TEMPLATE: ${{ matrix.target.external_template }}
+          AGENTBLAZOR_EXTERNAL_REPO: ${{ matrix.target.external_repo }}
+          AGENTBLAZOR_EXTERNAL_REF: ${{ matrix.target.external_ref }}
+          AGENTBLAZOR_EXTERNAL_PROJECT: ${{ matrix.target.external_project }}
+          AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ matrix.target.external_app_path }}
+        run: npm --prefix tests/e2e run test:external-chat-widget
+
+      - name: Upload External Chat Widget Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-chat-widget-${{ matrix.target.name }}-artifacts
+          path: tests/e2e/artifacts/external-chat-widget/**
+          if-no-files-found: warn

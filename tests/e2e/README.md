@@ -21,6 +21,10 @@ The component explorer suite includes floating `AgentChatWidget` coverage for op
 
 `npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, `AGENTBLAZOR_EXTERNAL_PROJECT`, and `AGENTBLAZOR_EXTERNAL_APP_PATH`.
 
+Set `AGENTBLAZOR_EXTERNAL_TEMPLATE=blazor` with `AGENTBLAZOR_EXTERNAL_PROJECT=AgentBlazorExternalTemplate.csproj` to generate and test a fresh `dotnet new blazor` app instead of cloning a repository. The `external-chat-widget-matrix` workflow runs this fresh-app target plus `neozhu/CleanArchitectureWithBlazorServer` so the widget is tested against both a clean baseline and a production-style Blazor app.
+
+The external chat widget runner now verifies scaffold idempotency, submitted prompt rendering, no-provider guidance, computed open/minimized widget CSS, repeated open/minimize cycles, Escape minimization, reload/reopen behavior, and AgentBlazor asset request failures. Artifacts include per-state screenshots, browser console diagnostics, failed request diagnostics, server logs, and a JSON report.
+
 For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget.
 
 Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
@@ -75,6 +79,9 @@ Evidence output is written to:
 
 Evidence output is written to:
 - `tests/e2e/artifacts/paid-dashboard/<timestamp>/`
+
+External chat widget evidence output is written to:
+- `tests/e2e/artifacts/external-chat-widget/<timestamp>/`
 
 Failure artifacts for `test:e2e` are written to:
 - `tests/e2e/test-results/`

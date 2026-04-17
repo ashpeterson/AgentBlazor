@@ -3,15 +3,20 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { spawn } = require("child_process");
 const { chromium, expect } = require("@playwright/test");
 const { openFloatingChatWidget } = require("../specs/chat-helpers.cjs");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const packageVersion = process.env.AGENTBLAZOR_PACKAGE_VERSION || readPackageVersion();
-const externalRepoUrl = process.env.AGENTBLAZOR_EXTERNAL_REPO || "https://github.com/damienbod/BlazorSecurityNet10.git";
+const externalTemplate = process.env.AGENTBLAZOR_EXTERNAL_TEMPLATE || "";
+const externalRepoUrl = externalTemplate
+  ? ""
+  : process.env.AGENTBLAZOR_EXTERNAL_REPO || "https://github.com/damienbod/BlazorSecurityNet10.git";
 const externalRepoRef = process.env.AGENTBLAZOR_EXTERNAL_REF || "";
-const externalProjectRelativePath = process.env.AGENTBLAZOR_EXTERNAL_PROJECT || "BlazorApp/BlazorApp.csproj";
+const externalProjectRelativePath = process.env.AGENTBLAZOR_EXTERNAL_PROJECT
+  || (externalTemplate ? "AgentBlazorExternalTemplate.csproj" : "BlazorApp/BlazorApp.csproj");
 const baseUrl = process.env.AGENTBLAZOR_EXTERNAL_BASE_URL || "http://127.0.0.1:5295";
 const appPath = process.env.AGENTBLAZOR_EXTERNAL_APP_PATH || "/";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
@@ -31,11 +36,21 @@ const toolPath = path.join(workspaceRoot, "tools");
 const serverLogPath = path.join(outputRoot, "external-app-server.log");
 const reportPath = path.join(outputRoot, "report.json");
 const screenshotPath = path.join(outputRoot, "chat-widget.png");
+const diagnosticsPath = path.join(outputRoot, "diagnostics.json");
+
+const diagnostics = {
+  browserConsole: [],
+  pageErrors: [],
+  failedRequests: [],
+  widgetStates: [],
+  screenshots: []
+};
 
 let serverProcess;
 
 run().catch(async (error) => {
   console.error(error);
+  writeDiagnosticsFile({ failure: { message: error.message, stack: error.stack || "" } });
   await stopServer(serverProcess).catch((stopError) => console.error(stopError));
   process.exit(1);
 });
@@ -45,13 +60,17 @@ async function run() {
   fs.mkdirSync(workspaceRoot, { recursive: true });
 
   console.log(`External chat widget validation output: ${outputRoot}`);
-  console.log(`Repository: ${externalRepoUrl}${externalRepoRef ? ` @ ${externalRepoRef}` : ""}`);
+  if (externalTemplate) {
+    console.log(`Template: ${externalTemplate}`);
+  } else {
+    console.log(`Repository: ${externalRepoUrl}${externalRepoRef ? ` @ ${externalRepoRef}` : ""}`);
+  }
   console.log(`Project: ${externalProjectRelativePath}`);
   console.log(`AgentBlazor package version: ${packageVersion}`);
 
   await restoreRepo();
   await packLocalPackages();
-  await cloneExternalApp();
+  await prepareExternalApp();
 
   const projectPath = path.join(externalRoot, externalProjectRelativePath);
   const projectDirectory = path.dirname(projectPath);
@@ -71,6 +90,7 @@ async function run() {
   await runCommand(agentblazor, ["init", projectPath, "--non-interactive"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["scaffold", projectPath, "--diff", "--non-interactive"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["scaffold", projectPath, "--approve", "--non-interactive"], { cwd: externalRoot, env });
+  await assertScaffoldIdempotent(agentblazor, projectPath, env);
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["doctor", projectPath, "--non-interactive"], { cwd: externalRoot, env });
@@ -84,6 +104,7 @@ async function run() {
 
   const report = {
     generatedAtUtc: new Date().toISOString(),
+    externalTemplate,
     externalRepoUrl,
     externalRepoRef,
     externalProjectRelativePath,
@@ -94,21 +115,40 @@ async function run() {
     outputRoot,
     workspaceRoot,
     screenshotPath,
+    diagnosticsPath,
+    diagnosticsSummary: {
+      browserConsoleCount: diagnostics.browserConsole.length,
+      pageErrorCount: diagnostics.pageErrors.length,
+      failedRequestCount: diagnostics.failedRequests.length,
+      widgetStateCount: diagnostics.widgetStates.length,
+      screenshotCount: diagnostics.screenshots.length
+    },
     assertions: {
       packageInstalled: true,
       cliScaffolded: true,
+      scaffoldIdempotent: true,
       doctorPassed: true,
       validatePassed: true,
       loginSubmitted: Boolean(loginPath && loginUsername && loginPassword),
       promptSubmitted: true,
       providerGuidanceRendered: true,
       minimizeButtonWorks: true,
-      escapeMinimizes: true
+      escapeMinimizes: true,
+      repeatedOpenCloseWorks: true,
+      reloadReopenWorks: true,
+      agentAssetsLoaded: true
     }
   };
+  writeDiagnosticsFile();
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(`External chat widget report: ${reportPath}`);
+  console.log(`External chat widget diagnostics: ${diagnosticsPath}`);
   console.log(`External chat widget screenshot: ${screenshotPath}`);
+}
+
+function writeDiagnosticsFile(extra = {}) {
+  fs.mkdirSync(outputRoot, { recursive: true });
+  fs.writeFileSync(diagnosticsPath, JSON.stringify({ ...diagnostics, ...extra }, null, 2));
 }
 
 function readPackageVersion() {
@@ -146,6 +186,44 @@ async function packLocalPackages() {
   }
 }
 
+async function prepareExternalApp() {
+  if (externalTemplate) {
+    await createExternalAppFromTemplate();
+    return;
+  }
+
+  await cloneExternalApp();
+}
+
+async function createExternalAppFromTemplate() {
+  fs.rmSync(externalRoot, { recursive: true, force: true });
+
+  if (!["blazor"].includes(externalTemplate.toLowerCase())) {
+    throw new Error(`Unsupported external template '${externalTemplate}'. Supported values: blazor.`);
+  }
+
+  await runCommand(
+    "dotnet",
+    [
+      "new",
+      "blazor",
+      "--name",
+      "AgentBlazorExternalTemplate",
+      "--output",
+      externalRoot,
+      "--interactivity",
+      "Server",
+      "--no-restore"
+    ],
+    { cwd: workspaceRoot });
+
+  await runCommand("git", ["init"], { cwd: externalRoot });
+  await runCommand("git", ["config", "user.email", "agentblazor@example.local"], { cwd: externalRoot });
+  await runCommand("git", ["config", "user.name", "AgentBlazor External Test"], { cwd: externalRoot });
+  await runCommand("git", ["add", "."], { cwd: externalRoot });
+  await runCommand("git", ["commit", "-m", "Initial external template"], { cwd: externalRoot });
+}
+
 async function cloneExternalApp() {
   fs.rmSync(externalRoot, { recursive: true, force: true });
   await runCommand("git", ["clone", "--depth", "1", externalRepoUrl, externalRoot], { cwd: workspaceRoot });
@@ -167,6 +245,104 @@ async function writeNuGetConfig(projectDirectory) {
 </configuration>
 `;
   fs.writeFileSync(path.join(projectDirectory, "nuget.config"), content);
+}
+
+async function assertScaffoldIdempotent(agentblazor, projectPath, env) {
+  const before = snapshotRelevantFiles(externalRoot);
+  const output = await runCommand(agentblazor, ["scaffold", projectPath, "--diff", "--non-interactive"], { cwd: externalRoot, env });
+  const after = snapshotRelevantFiles(externalRoot);
+
+  const noChangesReported = output.includes("No file changes were needed.")
+    || output.includes("No scaffold changes proposed.");
+
+  if (JSON.stringify(before) === JSON.stringify(after) && noChangesReported) {
+    return;
+  }
+
+  const diffPath = path.join(outputRoot, "scaffold-idempotency-diff.json");
+  fs.writeFileSync(diffPath, JSON.stringify({
+    output,
+    fileChanges: diffSnapshots(before, after)
+  }, null, 2));
+  throw new Error(`Scaffold was not idempotent. See ${diffPath}.`);
+}
+
+function snapshotRelevantFiles(root) {
+  const files = [];
+  collectRelevantFiles(root, files);
+
+  return files
+    .sort((left, right) => left.localeCompare(right))
+    .map((file) => {
+      const content = fs.readFileSync(path.join(root, file));
+      return {
+        path: file,
+        sha256: crypto.createHash("sha256").update(content).digest("hex")
+      };
+    });
+}
+
+function collectRelevantFiles(directory, files) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (shouldSkipSnapshotEntry(entry.name)) {
+      continue;
+    }
+
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collectRelevantFiles(absolutePath, files);
+      continue;
+    }
+
+    if (!entry.isFile() || !isRelevantSnapshotFile(entry.name)) {
+      continue;
+    }
+
+    files.push(path.relative(externalRoot, absolutePath).split(path.sep).join("/"));
+  }
+}
+
+function shouldSkipSnapshotEntry(name) {
+  return [
+    ".agentblazor",
+    ".git",
+    ".vs",
+    "bin",
+    "obj",
+    "node_modules",
+    "TestResults"
+  ].includes(name);
+}
+
+function isRelevantSnapshotFile(name) {
+  return [
+    ".cs",
+    ".cshtml",
+    ".csproj",
+    ".css",
+    ".html",
+    ".js",
+    ".json",
+    ".props",
+    ".razor",
+    ".targets",
+    ".xml",
+    ".config"
+  ].some((extension) => name.endsWith(extension));
+}
+
+function diffSnapshots(before, after) {
+  const beforeMap = new Map(before.map((entry) => [entry.path, entry.sha256]));
+  const afterMap = new Map(after.map((entry) => [entry.path, entry.sha256]));
+  const paths = [...new Set([...beforeMap.keys(), ...afterMap.keys()])].sort((left, right) => left.localeCompare(right));
+
+  return paths
+    .map((filePath) => ({
+      path: filePath,
+      before: beforeMap.get(filePath) || null,
+      after: afterMap.get(filePath) || null
+    }))
+    .filter((entry) => entry.before !== entry.after);
 }
 
 function buildExternalEnv() {
@@ -225,32 +401,52 @@ async function runBrowserAssertions() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
+  attachBrowserDiagnostics(page);
 
   try {
     await performOptionalLogin(page);
     await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
-    const { widgetWindow, widgetSurface, minimizeButton, openButton } = await openFloatingChatWidget(page);
+    let controls = await openFloatingChatWidget(page);
+    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "initial-open");
+    await captureWidgetState(page, "initial-open", controls.widgetWindow, controls.openButton);
 
-    const input = widgetSurface.getByLabel("Message input").first();
-    const sendButton = widgetSurface.getByRole("button", { name: /send message/i }).first();
+    const input = controls.widgetSurface.getByLabel("Message input").first();
+    const sendButton = controls.widgetSurface.getByRole("button", { name: /send message/i }).first();
     await expect(input).toBeVisible();
     await input.fill(promptText);
     await expect(sendButton).toBeEnabled();
     await sendButton.click();
 
-    await expect(widgetSurface.getByText(promptText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-    await expect(widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
+    await expect(controls.widgetSurface.getByText(promptText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    await expect(controls.widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
+    await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
 
-    await minimizeButton.click();
-    await expect(widgetWindow).toBeHidden();
-    await expect(openButton).toBeVisible();
+    await controls.minimizeButton.click();
+    await assertWidgetClosed(controls.widgetWindow, controls.openButton, "minimize-button");
+    await captureWidgetState(page, "minimize-button", controls.widgetWindow, controls.openButton);
 
-    await openButton.click();
-    await expect(widgetWindow).toBeVisible();
+    await controls.openButton.click();
+    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reopened-after-minimize");
+    await captureWidgetState(page, "reopened-after-minimize", controls.widgetWindow, controls.openButton);
 
-    await widgetWindow.press("Escape");
-    await expect(widgetWindow).toBeHidden();
-    await expect(openButton).toBeVisible();
+    await controls.widgetWindow.press("Escape");
+    await assertWidgetClosed(controls.widgetWindow, controls.openButton, "escape");
+    await captureWidgetState(page, "escape", controls.widgetWindow, controls.openButton);
+
+    for (let index = 1; index <= 3; index++) {
+      await controls.openButton.click();
+      await assertWidgetOpen(controls.widgetWindow, controls.openButton, `cycle-${index}-open`);
+      await controls.minimizeButton.click();
+      await assertWidgetClosed(controls.widgetWindow, controls.openButton, `cycle-${index}-closed`);
+    }
+    await captureWidgetState(page, "repeated-cycle-final", controls.widgetWindow, controls.openButton);
+
+    await page.reload({ waitUntil: "networkidle", timeout: timeoutMs });
+    controls = await openFloatingChatWidget(page);
+    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reload-reopen");
+    await captureWidgetState(page, "reload-reopen", controls.widgetWindow, controls.openButton);
+
+    assertNoAgentBlazorAssetFailures();
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
   } catch (error) {
@@ -261,6 +457,147 @@ async function runBrowserAssertions() {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
+}
+
+function attachBrowserDiagnostics(page) {
+  page.on("console", (message) => {
+    diagnostics.browserConsole.push({
+      type: message.type(),
+      text: message.text(),
+      location: message.location()
+    });
+  });
+
+  page.on("pageerror", (error) => {
+    diagnostics.pageErrors.push({
+      name: error.name,
+      message: error.message,
+      stack: error.stack || ""
+    });
+  });
+
+  page.on("requestfailed", (request) => {
+    diagnostics.failedRequests.push({
+      url: request.url(),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      failure: request.failure()?.errorText || "unknown"
+    });
+  });
+}
+
+async function assertWidgetOpen(widgetWindow, openButton, stateName) {
+  await expect(widgetWindow).toBeVisible({ timeout: 30000 });
+  const styles = await readWidgetWindowState(widgetWindow);
+
+  if (styles.visibility !== "visible") {
+    throw new Error(`Widget state '${stateName}' expected visibility=visible but received '${styles.visibility}'.`);
+  }
+
+  if (styles.pointerEvents === "none") {
+    throw new Error(`Widget state '${stateName}' expected pointer-events to allow interaction.`);
+  }
+
+  if (Number.parseFloat(styles.opacity) < 0.95) {
+    throw new Error(`Widget state '${stateName}' expected opacity near 1 but received '${styles.opacity}'.`);
+  }
+
+  await expect(openButton).toBeHidden({ timeout: 30000 });
+}
+
+async function assertWidgetClosed(widgetWindow, openButton, stateName) {
+  await expect(widgetWindow).toBeHidden({ timeout: 30000 });
+  const styles = await readWidgetWindowState(widgetWindow);
+
+  if (styles.visibility !== "hidden") {
+    throw new Error(`Widget state '${stateName}' expected visibility=hidden but received '${styles.visibility}'.`);
+  }
+
+  if (styles.pointerEvents !== "none") {
+    throw new Error(`Widget state '${stateName}' expected pointer-events=none but received '${styles.pointerEvents}'.`);
+  }
+
+  if (Number.parseFloat(styles.opacity) > 0.05) {
+    throw new Error(`Widget state '${stateName}' expected opacity near 0 but received '${styles.opacity}'.`);
+  }
+
+  await expect(openButton).toBeVisible({ timeout: 30000 });
+}
+
+async function captureWidgetState(page, stateName, widgetWindow, openButton) {
+  const screenshot = path.join(outputRoot, `state-${stateName}.png`);
+  const state = {
+    name: stateName,
+    url: page.url(),
+    widgetWindowVisible: await widgetWindow.isVisible().catch(() => false),
+    openButtonVisible: await openButton.isVisible().catch(() => false),
+    widgetWindow: await readWidgetWindowState(widgetWindow).catch((error) => ({ error: error.message })),
+    openButton: await readElementState(openButton).catch((error) => ({ error: error.message })),
+    screenshot
+  };
+
+  diagnostics.widgetStates.push(state);
+  diagnostics.screenshots.push(screenshot);
+  await page.screenshot({ path: screenshot, fullPage: true });
+}
+
+async function readWidgetWindowState(locator) {
+  return locator.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+
+    return {
+      className: element.className,
+      ariaHidden: element.getAttribute("aria-hidden"),
+      display: styles.display,
+      opacity: styles.opacity,
+      pointerEvents: styles.pointerEvents,
+      transform: styles.transform,
+      visibility: styles.visibility,
+      zIndex: styles.zIndex,
+      rect: {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height
+      }
+    };
+  });
+}
+
+async function readElementState(locator) {
+  return locator.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+
+    return {
+      className: element.className,
+      ariaLabel: element.getAttribute("aria-label"),
+      display: styles.display,
+      opacity: styles.opacity,
+      pointerEvents: styles.pointerEvents,
+      visibility: styles.visibility,
+      rect: {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height
+      }
+    };
+  });
+}
+
+function assertNoAgentBlazorAssetFailures() {
+  const failures = diagnostics.failedRequests.filter((request) =>
+    request.url.includes("_content/AgentBlazor/")
+    || request.url.includes("/agentblazor")
+    || request.url.includes("/_agentblazor"));
+
+  if (failures.length === 0) {
+    return;
+  }
+
+  throw new Error(`AgentBlazor browser requests failed: ${JSON.stringify(failures, null, 2)}`);
 }
 
 async function performOptionalLogin(page) {
