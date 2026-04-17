@@ -38,8 +38,28 @@ const localFeed = path.join(workspaceRoot, "local-feed");
 const toolPath = path.join(workspaceRoot, "tools");
 const serverLogPath = path.join(outputRoot, "external-app-server.log");
 const reportPath = path.join(outputRoot, "report.json");
+const markdownReportPath = path.join(outputRoot, "report.md");
 const screenshotPath = path.join(outputRoot, "chat-widget.png");
 const diagnosticsPath = path.join(outputRoot, "diagnostics.json");
+
+const runState = {
+  packageInstalled: false,
+  cliScaffolded: false,
+  scaffoldIdempotent: false,
+  doctorPassed: false,
+  validatePassed: false,
+  loginSubmitted: false,
+  expectedPageTextRendered: false,
+  promptSubmitted: false,
+  providerGuidanceRendered: false,
+  providerResponseRendered: false,
+  deterministicRuntimeAdapterRegistered: false,
+  minimizeButtonWorks: false,
+  escapeMinimizes: false,
+  repeatedOpenCloseWorks: false,
+  reloadReopenWorks: false,
+  agentAssetsLoaded: false
+};
 
 const diagnostics = {
   browserConsole: [],
@@ -53,7 +73,9 @@ let serverProcess;
 
 run().catch(async (error) => {
   console.error(error);
-  writeDiagnosticsFile({ failure: { message: error.message, stack: error.stack || "" } });
+  const failure = { message: error.message, stack: error.stack || "" };
+  writeDiagnosticsFile({ failure });
+  writeReportFiles(buildExternalReport("failed", failure));
   await stopServer(serverProcess).catch((stopError) => console.error(stopError));
   process.exit(1);
 });
@@ -84,6 +106,7 @@ async function run() {
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["add", projectPath, "package", "AgentBlazor", "--version", packageVersion], { cwd: externalRoot, env });
+  runState.packageInstalled = true;
   await runCommand(
     "dotnet",
     ["tool", "install", "AgentBlazor.Cli", "--version", packageVersion, "--tool-path", toolPath, "--add-source", localFeed],
@@ -94,14 +117,19 @@ async function run() {
   await runCommand(agentblazor, ["init", projectPath, "--non-interactive"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["scaffold", projectPath, "--diff", "--non-interactive"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["scaffold", projectPath, "--approve", "--non-interactive"], { cwd: externalRoot, env });
+  runState.cliScaffolded = true;
   await assertScaffoldIdempotent(agentblazor, projectPath, env);
+  runState.scaffoldIdempotent = true;
   if (providerMode === "deterministic") {
     installDeterministicRuntimeAdapter(projectPath);
+    runState.deterministicRuntimeAdapterRegistered = true;
   }
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["doctor", projectPath, "--non-interactive"], { cwd: externalRoot, env });
+  runState.doctorPassed = true;
   await runCommand(agentblazor, ["validate", projectPath, "--non-interactive"], { cwd: externalRoot, env });
+  runState.validatePassed = true;
 
   serverProcess = startExternalServer(projectPath, env);
   await waitForServerReady(baseUrl, timeoutMs);
@@ -109,8 +137,19 @@ async function run() {
   await stopServer(serverProcess);
   serverProcess = undefined;
 
-  const report = {
+  const report = buildExternalReport("passed");
+  writeDiagnosticsFile();
+  writeReportFiles(report);
+  console.log(`External chat widget report: ${reportPath}`);
+  console.log(`External chat widget markdown report: ${markdownReportPath}`);
+  console.log(`External chat widget diagnostics: ${diagnosticsPath}`);
+  console.log(`External chat widget screenshot: ${screenshotPath}`);
+}
+
+function buildExternalReport(status, failure = null) {
+  return {
     generatedAtUtc: new Date().toISOString(),
+    status,
     externalTemplate,
     externalRepoUrl,
     externalRepoRef,
@@ -124,6 +163,7 @@ async function run() {
     outputRoot,
     workspaceRoot,
     screenshotPath,
+    markdownReportPath,
     diagnosticsPath,
     diagnosticsSummary: {
       browserConsoleCount: diagnostics.browserConsole.length,
@@ -132,30 +172,217 @@ async function run() {
       widgetStateCount: diagnostics.widgetStates.length,
       screenshotCount: diagnostics.screenshots.length
     },
-    assertions: {
-      packageInstalled: true,
-      cliScaffolded: true,
-      scaffoldIdempotent: true,
-      doctorPassed: true,
-      validatePassed: true,
-      loginSubmitted: Boolean(loginPath && loginUsername && loginPassword),
-      expectedPageTextRendered: Boolean(expectedPageText),
-      promptSubmitted: true,
-      providerGuidanceRendered: providerMode === "none",
-      providerResponseRendered: providerMode === "deterministic",
-      deterministicRuntimeAdapterRegistered: providerMode === "deterministic",
-      minimizeButtonWorks: true,
-      escapeMinimizes: true,
-      repeatedOpenCloseWorks: true,
-      reloadReopenWorks: true,
-      agentAssetsLoaded: true
-    }
+    requestSummary: summarizeFailedRequests(),
+    assertions: buildAssertionReport(),
+    failure
   };
-  writeDiagnosticsFile();
+}
+
+function buildAssertionReport() {
+  return {
+    packageInstalled: runState.packageInstalled,
+    cliScaffolded: runState.cliScaffolded,
+    scaffoldIdempotent: runState.scaffoldIdempotent,
+    doctorPassed: runState.doctorPassed,
+    validatePassed: runState.validatePassed,
+    loginSubmitted: loginPath && loginUsername && loginPassword ? runState.loginSubmitted : null,
+    expectedPageTextRendered: expectedPageText ? runState.expectedPageTextRendered : null,
+    promptSubmitted: runState.promptSubmitted,
+    providerGuidanceRendered: providerMode === "none" ? runState.providerGuidanceRendered : null,
+    providerResponseRendered: providerMode === "deterministic" ? runState.providerResponseRendered : null,
+    deterministicRuntimeAdapterRegistered: providerMode === "deterministic"
+      ? runState.deterministicRuntimeAdapterRegistered
+      : null,
+    minimizeButtonWorks: runState.minimizeButtonWorks,
+    escapeMinimizes: runState.escapeMinimizes,
+    repeatedOpenCloseWorks: runState.repeatedOpenCloseWorks,
+    reloadReopenWorks: runState.reloadReopenWorks,
+    agentAssetsLoaded: runState.agentAssetsLoaded
+  };
+}
+
+function writeReportFiles(report) {
+  fs.mkdirSync(outputRoot, { recursive: true });
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  console.log(`External chat widget report: ${reportPath}`);
-  console.log(`External chat widget diagnostics: ${diagnosticsPath}`);
-  console.log(`External chat widget screenshot: ${screenshotPath}`);
+  fs.writeFileSync(markdownReportPath, buildMarkdownReport(report), "utf8");
+}
+
+function buildMarkdownReport(report) {
+  const lines = [
+    "# External Chat Widget Report",
+    "",
+    `Status: **${report.status.toUpperCase()}**`,
+    `Generated: ${report.generatedAtUtc}`,
+    "",
+    "## Target",
+    "",
+    markdownTable(
+      ["Field", "Value"],
+      [
+        ["Template", report.externalTemplate || "-"],
+        ["Repository", report.externalRepoUrl || "-"],
+        ["Ref", report.externalRepoRef || "-"],
+        ["Project", report.externalProjectRelativePath],
+        ["App path", report.appPath],
+        ["Provider mode", report.providerMode],
+        ["Login configured", Boolean(loginPath && loginUsername && loginPassword) ? "yes" : "no"],
+        ["Expected page text", report.expectedPageText || "-"],
+        ["Package version", report.packageVersion]
+      ]),
+    "",
+    "## Assertions",
+    "",
+    markdownTable(
+      ["Assertion", "Result"],
+      Object.entries(report.assertions).map(([name, value]) => [name, boolIcon(value)])),
+    "",
+    "## Diagnostics",
+    "",
+    markdownTable(
+      ["Metric", "Count"],
+      [
+        ["Browser console messages", report.diagnosticsSummary.browserConsoleCount],
+        ["Page errors", report.diagnosticsSummary.pageErrorCount],
+        ["Failed requests", report.diagnosticsSummary.failedRequestCount],
+        ["AgentBlazor failed requests", report.requestSummary.agentBlazorCount],
+        ["Third-party or app failed requests", report.requestSummary.thirdPartyCount],
+        ["Widget states captured", report.diagnosticsSummary.widgetStateCount],
+        ["Screenshots captured", report.diagnosticsSummary.screenshotCount]
+      ]),
+    "",
+    "## Widget States",
+    "",
+    diagnostics.widgetStates.length > 0
+      ? markdownTable(
+        ["State", "Widget visible", "Open button visible", "Visibility", "Opacity", "Pointer events"],
+        diagnostics.widgetStates.map((state) => [
+          state.name,
+          boolIcon(state.widgetWindowVisible),
+          boolIcon(state.openButtonVisible),
+          state.widgetWindow?.visibility ?? "-",
+          state.widgetWindow?.opacity ?? "-",
+          state.widgetWindow?.pointerEvents ?? "-"
+        ]))
+      : "No widget states were captured.",
+    "",
+    "## Failed Requests",
+    "",
+    formatFailedRequestSection(report.requestSummary),
+    "",
+    "## Page Errors",
+    "",
+    diagnostics.pageErrors.length > 0
+      ? diagnostics.pageErrors.map((error) => `- ${markdownEscape(error.name || "Error")}: ${markdownEscape(error.message || "")}`).join("\n")
+      : "No page errors were captured.",
+    "",
+    "## Artifacts",
+    "",
+    `- JSON report: ${relativeArtifact(reportPath)}`,
+    `- Diagnostics: ${relativeArtifact(diagnosticsPath)}`,
+    `- Server log: ${relativeArtifact(serverLogPath)}`,
+    `- Final screenshot: ${relativeArtifact(screenshotPath)}`,
+    ...diagnostics.screenshots.map((screenshot) => `- State screenshot: ${relativeArtifact(screenshot)}`)
+  ];
+
+  if (report.failure) {
+    lines.push(
+      "",
+      "## Failure",
+      "",
+      `Message: ${markdownEscape(firstLine(report.failure.message || ""))}`,
+      "",
+      "```text",
+      report.failure.stack || "",
+      "```");
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatFailedRequestSection(summary) {
+  if (summary.total === 0) {
+    return "No failed browser requests were captured.";
+  }
+
+  const lines = [
+    `Total failed requests: ${summary.total}`,
+    `AgentBlazor failed requests: ${summary.agentBlazorCount}`,
+    `Third-party or app failed requests: ${summary.thirdPartyCount}`
+  ];
+
+  if (summary.agentBlazor.length > 0) {
+    lines.push("", "AgentBlazor failures:");
+    lines.push(...summary.agentBlazor.map(formatFailedRequestLine));
+  }
+
+  if (summary.thirdParty.length > 0) {
+    lines.push("", "Third-party/app failures, first 10:");
+    lines.push(...summary.thirdParty.slice(0, 10).map(formatFailedRequestLine));
+  }
+
+  return lines.join("\n");
+}
+
+function formatFailedRequestLine(request) {
+  return `- ${markdownEscape(request.method)} ${markdownEscape(compactUrl(request.url))} (${markdownEscape(request.resourceType)}): ${markdownEscape(request.failure)}`;
+}
+
+function summarizeFailedRequests() {
+  const agentBlazor = diagnostics.failedRequests.filter(isAgentBlazorRequest);
+  const thirdParty = diagnostics.failedRequests.filter((request) => !isAgentBlazorRequest(request));
+
+  return {
+    total: diagnostics.failedRequests.length,
+    agentBlazorCount: agentBlazor.length,
+    thirdPartyCount: thirdParty.length,
+    agentBlazor,
+    thirdParty
+  };
+}
+
+function isAgentBlazorRequest(request) {
+  return request.url.includes("_content/AgentBlazor/")
+    || request.url.includes("/agentblazor")
+    || request.url.includes("/_agentblazor");
+}
+
+function markdownTable(headers, rows) {
+  return [
+    `| ${headers.map(markdownEscape).join(" | ")} |`,
+    `| ${headers.map(() => "---").join(" | ")} |`,
+    ...rows.map((row) => `| ${row.map((value) => markdownEscape(String(value))).join(" | ")} |`)
+  ].join("\n");
+}
+
+function markdownEscape(value) {
+  return String(value ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ");
+}
+
+function boolIcon(value) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+
+  return value ? "pass" : "fail";
+}
+
+function relativeArtifact(filePath) {
+  return path.relative(outputRoot, filePath).split(path.sep).join("/");
+}
+
+function compactUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+function firstLine(value) {
+  return String(value).split(/\r?\n/)[0];
 }
 
 function writeDiagnosticsFile(extra = {}) {
@@ -584,11 +811,13 @@ async function runBrowserAssertions() {
     await sendButton.click();
 
     await expect(controls.widgetSurface.getByText(promptText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    runState.promptSubmitted = true;
     await assertProviderOutcome(controls.widgetSurface);
     await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
 
     await controls.minimizeButton.click();
     await assertWidgetClosed(controls.widgetWindow, controls.openButton, "minimize-button");
+    runState.minimizeButtonWorks = true;
     await captureWidgetState(page, "minimize-button", controls.widgetWindow, controls.openButton);
 
     await controls.openButton.click();
@@ -597,6 +826,7 @@ async function runBrowserAssertions() {
 
     await controls.widgetWindow.press("Escape");
     await assertWidgetClosed(controls.widgetWindow, controls.openButton, "escape");
+    runState.escapeMinimizes = true;
     await captureWidgetState(page, "escape", controls.widgetWindow, controls.openButton);
 
     for (let index = 1; index <= 3; index++) {
@@ -605,14 +835,17 @@ async function runBrowserAssertions() {
       await controls.minimizeButton.click();
       await assertWidgetClosed(controls.widgetWindow, controls.openButton, `cycle-${index}-closed`);
     }
+    runState.repeatedOpenCloseWorks = true;
     await captureWidgetState(page, "repeated-cycle-final", controls.widgetWindow, controls.openButton);
 
     await page.reload({ waitUntil: "networkidle", timeout: timeoutMs });
     controls = await openFloatingChatWidget(page);
     await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reload-reopen");
+    runState.reloadReopenWorks = true;
     await captureWidgetState(page, "reload-reopen", controls.widgetWindow, controls.openButton);
 
     assertNoAgentBlazorAssetFailures();
+    runState.agentAssetsLoaded = true;
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
   } catch (error) {
@@ -631,11 +864,13 @@ async function assertExpectedPageText(page) {
   }
 
   await expect(page.getByText(expectedPageText, { exact: false }).first()).toBeVisible({ timeout: 30000 });
+  runState.expectedPageTextRendered = true;
 }
 
 async function assertProviderOutcome(widgetSurface) {
   if (providerMode === "deterministic") {
     await expect(widgetSurface.getByText(deterministicResponseText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    runState.providerResponseRendered = true;
 
     const noProviderGuidance = widgetSurface.getByText(/No AI provider configured/i).first();
     if (await noProviderGuidance.isVisible().catch(() => false)) {
@@ -646,6 +881,7 @@ async function assertProviderOutcome(widgetSurface) {
   }
 
   await expect(widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
+  runState.providerGuidanceRendered = true;
 }
 
 function attachBrowserDiagnostics(page) {
@@ -868,6 +1104,8 @@ async function navigateToAppAfterLogin(page, loginUrl) {
   if (currentUrl.pathname.toLowerCase() === expectedLoginUrl.pathname.toLowerCase()) {
     throw new Error(`Login did not reach the authenticated app. Current URL: ${page.url()}`);
   }
+
+  runState.loginSubmitted = true;
 }
 
 function getAppUrl() {
