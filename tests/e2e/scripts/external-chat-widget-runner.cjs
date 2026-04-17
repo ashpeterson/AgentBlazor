@@ -1045,7 +1045,7 @@ async function testFloatingWidget(page) {
 
 async function testEmbeddedChatSurfaces(page) {
   await page.goto(getChatSurfaceHarnessUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
-  await expect(page.getByTestId("agentblazor-chat-surfaces-harness")).toBeVisible({ timeout: 30000 });
+  await assertChatSurfaceHarnessVisible(page);
 
   if (chatSurfaceModes.includes("surface")) {
     const section = page.getByTestId("agentblazor-surface-section");
@@ -1064,6 +1064,32 @@ async function testEmbeddedChatSurfaces(page) {
     const bar = page.getByTestId("agent-chat-bar").first();
     await testChatBar(page, bar, productionPrompts.bar);
   }
+}
+
+async function assertChatSurfaceHarnessVisible(page) {
+  const harness = page.getByTestId("agentblazor-chat-surfaces-harness");
+
+  try {
+    await expect(harness).toBeVisible({ timeout: 30000 });
+  } catch (error) {
+    const currentUrl = page.url();
+    if (looksLikeAuthRedirect(currentUrl)) {
+      throw new Error(
+        `The embedded chat surface harness route '${chatSurfaceHarnessPath}' redirected to '${currentUrl}'. `
+        + "Use AGENTBLAZOR_EXTERNAL_CHAT_SURFACES_PATH for an anonymous route, or configure "
+        + "AGENTBLAZOR_EXTERNAL_LOGIN_PATH, AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME, and "
+        + "AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD for authenticated external apps.");
+    }
+
+    throw error;
+  }
+}
+
+function looksLikeAuthRedirect(url) {
+  const value = url.toLowerCase();
+  return value.includes("/login")
+    || value.includes("/signin")
+    || value.includes("/authentication/");
 }
 
 async function testPromptSurface(page, surfaceName, surface, prompt) {

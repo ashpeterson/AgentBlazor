@@ -241,8 +241,13 @@ Click the chat widget or embedded chat surface and try prompts that match produc
 - "Find invoices due this week, group them by risk, and draft a collector handoff note."
 - "Check whether order ABC123 can be submitted, explain any missing approvals, and submit it only if policy allows."
 - "Summarize the current user-management page for an auditor and list accounts that need review."
+- "Find recently locked users, explain the likely causes, and draft a remediation checklist."
 - "Prepare a release-readiness checklist from the visible deployment status, failed checks, and pending approvals."
+- "Compare staging and production status, list blockers, and draft the release manager handoff."
 - "Draft a customer-support status update from the current incident screen and include open blockers."
+- "Turn the current incident timeline into a short executive update with customer impact and next owner."
+- "Review this inventory screen, identify low-stock exceptions, and create a purchasing follow-up note."
+- "Inspect this claims workflow, identify missing evidence, and propose the next compliant action."
 
 The agent will call your capability methods and handle approvals automatically.
 

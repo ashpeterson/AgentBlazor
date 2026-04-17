@@ -31,6 +31,10 @@ on:
         description: "Comma-separated chat surfaces to validate: widget,surface,panel,bar"
         required: false
         default: "widget,surface,panel,bar"
+      external_chat_surfaces_path:
+        description: "Route used for the temporary embedded chat surfaces harness"
+        required: false
+        default: "/agentblazor-chat-surfaces"
       external_expected_text:
         description: "Optional text that must be visible on the external app page before widget assertions"
         required: false
@@ -92,6 +96,7 @@ jobs:
           AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ inputs.external_app_path }}
           AGENTBLAZOR_EXTERNAL_PROVIDER_MODE: ${{ inputs.external_provider_mode }}
           AGENTBLAZOR_EXTERNAL_CHAT_SURFACES: ${{ inputs.external_chat_surfaces }}
+          AGENTBLAZOR_EXTERNAL_CHAT_SURFACES_PATH: ${{ inputs.external_chat_surfaces_path }}
           AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT: ${{ inputs.external_expected_text }}
           AGENTBLAZOR_EXTERNAL_LOGIN_PATH: ${{ inputs.external_login_path }}
           AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME: ${{ inputs.external_login_username }}
