@@ -772,6 +772,7 @@ function findPagesDirectory(projectDirectory) {
 
 function chatSurfaceHarnessSource() {
   return `@page "${chatSurfaceHarnessPath}"
+@rendermode InteractiveServer
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
 
