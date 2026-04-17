@@ -82,6 +82,7 @@ The runtime realignment is now materially underway:
 - project-file scaffold now detects the nearest Central Package Management `Directory.Packages.props` and emits unversioned project `PackageReference` entries plus matching `PackageVersion` entries, validated against `thecodewrapper/CH.CleanArchitectureBlazor`
 - the floating `AgentChatWidget` now has a visible minimize control, Escape-to-minimize behavior, and Playwright selectors for prompt-entry/minimize/reopen coverage
 - external real-app chat validation now covers all shipped chat entry points, not only the floating widget: the runner can validate `AgentChatWidget` on the app route, inject a temporary route into the cloned app, and prompt-test `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic or no-provider assertions
+- latest source CI is green in run `24586688834`; latest external chat matrix is green in run `24586690690`, covering fresh Blazor no-provider and deterministic all-surface paths, CleanArchitecture public widget validation, and CleanArchitecture authenticated widget/surface/panel/bar validation
 
 ## Shipped and Working
 
