@@ -22,6 +22,7 @@ const appPath = process.env.AGENTBLAZOR_EXTERNAL_APP_PATH || "/";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
 const providerMode = normalizeProviderMode(process.env.AGENTBLAZOR_EXTERNAL_PROVIDER_MODE || "none");
 const deterministicResponseText = `Deterministic external test response: ${promptText}`;
+const expectedPageText = process.env.AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT || "";
 const loginPath = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PATH || "";
 const loginUsername = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME || "";
 const loginPassword = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD || "";
@@ -119,6 +120,7 @@ async function run() {
     appPath,
     promptText,
     providerMode,
+    expectedPageText,
     outputRoot,
     workspaceRoot,
     screenshotPath,
@@ -137,6 +139,7 @@ async function run() {
       doctorPassed: true,
       validatePassed: true,
       loginSubmitted: Boolean(loginPath && loginUsername && loginPassword),
+      expectedPageTextRendered: Boolean(expectedPageText),
       promptSubmitted: true,
       providerGuidanceRendered: providerMode === "none",
       providerResponseRendered: providerMode === "deterministic",
@@ -568,6 +571,7 @@ async function runBrowserAssertions() {
   try {
     await performOptionalLogin(page);
     await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
+    await assertExpectedPageText(page);
     let controls = await openFloatingChatWidget(page);
     await assertWidgetOpen(controls.widgetWindow, controls.openButton, "initial-open");
     await captureWidgetState(page, "initial-open", controls.widgetWindow, controls.openButton);
@@ -619,6 +623,14 @@ async function runBrowserAssertions() {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
+}
+
+async function assertExpectedPageText(page) {
+  if (!expectedPageText) {
+    return;
+  }
+
+  await expect(page.getByText(expectedPageText, { exact: false }).first()).toBeVisible({ timeout: 30000 });
 }
 
 async function assertProviderOutcome(widgetSurface) {

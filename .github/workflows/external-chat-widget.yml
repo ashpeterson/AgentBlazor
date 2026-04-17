@@ -27,6 +27,10 @@ on:
         description: "Provider mode for widget assertions: none or deterministic"
         required: false
         default: "none"
+      external_expected_text:
+        description: "Optional text that must be visible on the external app page before widget assertions"
+        required: false
+        default: ""
       external_login_path:
         description: "Optional login path for authenticated external apps"
         required: false
@@ -83,6 +87,7 @@ jobs:
           AGENTBLAZOR_EXTERNAL_PROJECT: ${{ inputs.external_project }}
           AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ inputs.external_app_path }}
           AGENTBLAZOR_EXTERNAL_PROVIDER_MODE: ${{ inputs.external_provider_mode }}
+          AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT: ${{ inputs.external_expected_text }}
           AGENTBLAZOR_EXTERNAL_LOGIN_PATH: ${{ inputs.external_login_path }}
           AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME: ${{ inputs.external_login_username }}
           AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD: ${{ inputs.external_login_password }}
