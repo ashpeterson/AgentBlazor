@@ -806,30 +806,62 @@ async function performOptionalLogin(page) {
     .locator("input[autocomplete='current-password'], input[type='password'], input[name$='.Password']")
     .first();
   const loginForm = usernameInput.locator("xpath=ancestor::form[1]");
+  const submitButton = loginForm.locator("button[type='submit'], input[type='submit']").first();
 
   await usernameInput.waitFor({ state: "visible", timeout: 30000 });
   await usernameInput.fill(loginUsername);
   await passwordInput.fill(loginPassword);
   await loginForm.waitFor({ state: "attached", timeout: 30000 });
 
-  // Blazor enhanced forms can authenticate successfully without driving a full
-  // document navigation in headless tests. A native post ensures auth cookies
-  // are committed before we navigate into the authenticated app layout.
+  // Some Blazor enhanced forms complete auth through a POST plus a client-side
+  // redirect header, so wait for both the POST and any follow-up navigation.
   const postResponse = page.waitForResponse(
     (response) => response.url().startsWith(loginUrl) && response.request().method() === "POST",
     { timeout: 30000 }).catch(() => null);
+  const loginNavigation = page.waitForURL(
+    (url) => new URL(url).pathname.toLowerCase() !== new URL(loginUrl).pathname.toLowerCase(),
+    { timeout: 30000 }).catch(() => null);
 
-  await loginForm.evaluate((form) => {
-    if (!(form instanceof HTMLFormElement)) {
-      throw new Error("Login form is not an HTML form.");
-    }
+  if (await submitButton.isVisible().catch(() => false)) {
+    await submitButton.click();
+  } else {
+    await loginForm.evaluate((form) => {
+      if (!(form instanceof HTMLFormElement)) {
+        throw new Error("Login form is not an HTML form.");
+      }
 
-    HTMLFormElement.prototype.submit.call(form);
-  });
+      form.requestSubmit();
+    });
+  }
 
   await postResponse;
+  await loginNavigation;
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
+  await navigateToAppAfterLogin(page, loginUrl);
+}
+
+async function navigateToAppAfterLogin(page, loginUrl) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!String(error.message || error).includes("interrupted by another navigation")) {
+        throw error;
+      }
+
+      await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+      await sleep(500 * attempt);
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
 
   const currentUrl = new URL(page.url());
   const expectedLoginUrl = new URL(loginUrl);
