@@ -14,6 +14,9 @@ const externalRepoRef = process.env.AGENTBLAZOR_EXTERNAL_REF || "";
 const externalProjectRelativePath = process.env.AGENTBLAZOR_EXTERNAL_PROJECT || "BlazorApp/BlazorApp.csproj";
 const baseUrl = process.env.AGENTBLAZOR_EXTERNAL_BASE_URL || "http://127.0.0.1:5295";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
+const loginPath = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PATH || "";
+const loginUsername = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME || "";
+const loginPassword = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD || "";
 const timeoutMs = Number.parseInt(process.env.AGENTBLAZOR_EXTERNAL_TIMEOUT_MS || "180000", 10);
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outputRoot = process.env.AGENTBLAZOR_EXTERNAL_OUTPUT_DIR
@@ -94,6 +97,7 @@ async function run() {
       cliScaffolded: true,
       doctorPassed: true,
       validatePassed: true,
+      loginSubmitted: Boolean(loginPath && loginUsername && loginPassword),
       promptSubmitted: true,
       providerGuidanceRendered: true,
       minimizeButtonWorks: true,
@@ -221,6 +225,7 @@ async function runBrowserAssertions() {
   const page = await context.newPage();
 
   try {
+    await performOptionalLogin(page);
     await page.goto(baseUrl, { waitUntil: "networkidle", timeout: timeoutMs });
     const { widgetWindow, widgetSurface, minimizeButton, openButton } = await openFloatingChatWidget(page);
 
@@ -246,10 +251,37 @@ async function runBrowserAssertions() {
     await expect(openButton).toBeVisible();
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
+  } catch (error) {
+    await page.screenshot({ path: path.join(outputRoot, "failure.png"), fullPage: true }).catch(() => {});
+    await fs.promises.writeFile(path.join(outputRoot, "failure.html"), await page.content().catch(() => ""), "utf8").catch(() => {});
+    throw error;
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
+}
+
+async function performOptionalLogin(page) {
+  if (!loginPath || !loginUsername || !loginPassword) {
+    return;
+  }
+
+  const loginUrl = new URL(loginPath, `${baseUrl}/`).toString();
+  await page.goto(loginUrl, { waitUntil: "networkidle", timeout: timeoutMs });
+
+  const usernameInput = page
+    .locator("input[autocomplete='username'], input[name$='.UserName'], input[placeholder*='user' i]")
+    .first();
+  const passwordInput = page
+    .locator("input[autocomplete='current-password'], input[type='password'], input[name$='.Password']")
+    .first();
+  const submitButton = page.getByRole("button", { name: /sign in|log in|login/i }).first();
+
+  await usernameInput.waitFor({ state: "visible", timeout: 30000 });
+  await usernameInput.fill(loginUsername);
+  await passwordInput.fill(loginPassword);
+  await submitButton.click();
+  await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
 }
 
 async function stopServer(child) {

@@ -15,6 +15,18 @@ on:
         description: "Project path inside the external repository"
         required: false
         default: "BlazorApp/BlazorApp.csproj"
+      external_login_path:
+        description: "Optional login path for authenticated external apps"
+        required: false
+        default: ""
+      external_login_username:
+        description: "Optional login username for authenticated external apps"
+        required: false
+        default: ""
+      external_login_password:
+        description: "Optional login password for authenticated external apps"
+        required: false
+        default: ""
 
 jobs:
   external-chat-widget:
@@ -56,6 +68,9 @@ jobs:
           AGENTBLAZOR_EXTERNAL_REPO: ${{ inputs.external_repo }}
           AGENTBLAZOR_EXTERNAL_REF: ${{ inputs.external_ref }}
           AGENTBLAZOR_EXTERNAL_PROJECT: ${{ inputs.external_project }}
+          AGENTBLAZOR_EXTERNAL_LOGIN_PATH: ${{ inputs.external_login_path }}
+          AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME: ${{ inputs.external_login_username }}
+          AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD: ${{ inputs.external_login_password }}
         run: npm --prefix tests/e2e run test:external-chat-widget
 
       - name: Upload External Chat Widget Artifacts

@@ -21,6 +21,8 @@ The component explorer suite includes floating `AgentChatWidget` coverage for op
 
 `npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, and `AGENTBLAZOR_EXTERNAL_PROJECT`.
 
+For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget.
+
 Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
 The real-usability runner requires an explicit live provider from environment variables. It intentionally does not treat demo `appsettings.json` sample values as proof that CI can reach a provider, because empty GitHub secrets or missing Ollama services otherwise produce misleading no-provider transcripts instead of a clear preflight failure.
