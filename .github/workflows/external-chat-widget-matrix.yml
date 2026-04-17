@@ -39,8 +39,8 @@ jobs:
             external_project: src/Server.UI/Server.UI.csproj
             external_app_path: /public/index
             external_provider_mode: deterministic
-            external_chat_surfaces: widget,surface,panel,bar
-            external_chat_surfaces_path: /public/agentblazor-chat-surfaces
+            external_chat_surfaces: widget
+            external_chat_surfaces_path: /agentblazor-chat-surfaces
           - name: clean-architecture-authenticated-users
             external_template: ""
             external_repo: https://github.com/neozhu/CleanArchitectureWithBlazorServer.git
