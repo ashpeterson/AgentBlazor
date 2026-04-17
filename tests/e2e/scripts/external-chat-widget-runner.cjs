@@ -488,40 +488,42 @@ function attachBrowserDiagnostics(page) {
 
 async function assertWidgetOpen(widgetWindow, openButton, stateName) {
   await expect(widgetWindow).toBeVisible({ timeout: 30000 });
-  const styles = await readWidgetWindowState(widgetWindow);
-
-  if (styles.visibility !== "visible") {
-    throw new Error(`Widget state '${stateName}' expected visibility=visible but received '${styles.visibility}'.`);
-  }
-
-  if (styles.pointerEvents === "none") {
-    throw new Error(`Widget state '${stateName}' expected pointer-events to allow interaction.`);
-  }
-
-  if (Number.parseFloat(styles.opacity) < 0.95) {
-    throw new Error(`Widget state '${stateName}' expected opacity near 1 but received '${styles.opacity}'.`);
-  }
-
+  await waitForWidgetStyle(
+    widgetWindow,
+    stateName,
+    (styles) =>
+      styles.visibility === "visible"
+      && styles.pointerEvents !== "none"
+      && Number.parseFloat(styles.opacity) >= 0.95);
   await expect(openButton).toBeHidden({ timeout: 30000 });
 }
 
 async function assertWidgetClosed(widgetWindow, openButton, stateName) {
   await expect(widgetWindow).toBeHidden({ timeout: 30000 });
-  const styles = await readWidgetWindowState(widgetWindow);
-
-  if (styles.visibility !== "hidden") {
-    throw new Error(`Widget state '${stateName}' expected visibility=hidden but received '${styles.visibility}'.`);
-  }
-
-  if (styles.pointerEvents !== "none") {
-    throw new Error(`Widget state '${stateName}' expected pointer-events=none but received '${styles.pointerEvents}'.`);
-  }
-
-  if (Number.parseFloat(styles.opacity) > 0.05) {
-    throw new Error(`Widget state '${stateName}' expected opacity near 0 but received '${styles.opacity}'.`);
-  }
-
+  await waitForWidgetStyle(
+    widgetWindow,
+    stateName,
+    (styles) =>
+      styles.visibility === "hidden"
+      && styles.pointerEvents === "none"
+      && Number.parseFloat(styles.opacity) <= 0.05);
   await expect(openButton).toBeVisible({ timeout: 30000 });
+}
+
+async function waitForWidgetStyle(locator, stateName, predicate) {
+  const deadline = Date.now() + 30000;
+  let lastStyles;
+
+  while (Date.now() < deadline) {
+    lastStyles = await readWidgetWindowState(locator);
+    if (predicate(lastStyles)) {
+      return lastStyles;
+    }
+
+    await sleep(100);
+  }
+
+  throw new Error(`Widget state '${stateName}' did not reach expected computed styles. Last styles: ${JSON.stringify(lastStyles)}`);
 }
 
 async function captureWidgetState(page, stateName, widgetWindow, openButton) {
