@@ -1,9 +1,35 @@
+using System.Text.Json;
 using AgentBlazor.Core.Components;
 
 namespace AgentBlazor.Core.Tests;
 
 public class AgentUiToolCatalogTests
 {
+    [Fact]
+    public void GetTools_InputSchemas_AreCompatibleWithOpenAiToolRequirements()
+    {
+        var catalog = new DefaultAgentUiToolCatalog();
+        var disallowedTopLevelKeywords = new[] { "oneOf", "anyOf", "allOf", "enum", "not" };
+
+        foreach (var descriptor in catalog.GetTools())
+        {
+            using var document = JsonDocument.Parse(descriptor.InputSchema);
+            var root = document.RootElement;
+
+            Assert.True(
+                root.TryGetProperty("type", out var type),
+                $"Tool '{descriptor.ToolId}' input schema must declare a top-level type.");
+            Assert.Equal("object", type.GetString());
+
+            foreach (var keyword in disallowedTopLevelKeywords)
+            {
+                Assert.False(
+                    root.TryGetProperty(keyword, out _),
+                    $"Tool '{descriptor.ToolId}' input schema must not use top-level '{keyword}'.");
+            }
+        }
+    }
+
     [Fact]
     public void BuildDocument_EmptyToolCalls_ReturnsNull()
     {

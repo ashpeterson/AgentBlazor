@@ -253,11 +253,7 @@ public sealed class DefaultAgentUiToolCatalog : IAgentUiToolCatalog
                         "required": ["id"]
                       }
                     }
-                  },
-                  "anyOf": [
-                    { "required": ["chartType", "labels", "series"] },
-                    { "required": ["dataSource"] }
-                  ]
+                  }
                 }
                 """
         }
