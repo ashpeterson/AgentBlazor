@@ -161,6 +161,20 @@ public sealed class ChatClientRuntimeAdapter(
         try
         {
             ApplyContextSharedState(registration.Name, request, turnState.RunId);
+            if (await TryExecuteApprovedCapabilityContinuationAsync(
+                    registration,
+                    request,
+                    turnState,
+                    effectiveCancellationToken).ConfigureAwait(false))
+            {
+                var approvedResponse = BuildTurnResponse(registration.Name, "Approved.", request, turnState);
+                await StoreConversationTurnAsync(registration.Name, request, approvedResponse, effectiveCancellationToken).ConfigureAwait(false);
+                await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
+                await StoreTraceAsync(traceBuilder, turnState, approvedResponse, effectiveCancellationToken).ConfigureAwait(false);
+                RecordInspectorRun(registration.Name, request, turnState, approvedResponse, startedAt, succeeded: !turnState.HasFailures, errorMessage: turnState.HasFailures ? approvedResponse.ResponseText : null);
+                return approvedResponse;
+            }
+
             var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             var response = await agent.RunAsync(
@@ -366,7 +380,6 @@ public sealed class ChatClientRuntimeAdapter(
         try
         {
             ApplyContextSharedState(registration.Name, request, turnState.RunId);
-            var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             await WriteReconnectEventAsync(
                     reconnectState,
@@ -382,6 +395,24 @@ public sealed class ChatClientRuntimeAdapter(
                     effectiveCancellationToken)
                 .ConfigureAwait(false);
 
+            if (await TryExecuteApprovedCapabilityContinuationAsync(
+                    registration,
+                    request,
+                    turnState,
+                    effectiveCancellationToken).ConfigureAwait(false))
+            {
+                await EmitDrainedTurnEventsAsync(turnState, runId, reconnectState, writer, registration.Name, effectiveCancellationToken)
+                    .ConfigureAwait(false);
+
+                var approvedResponse = BuildTurnResponse(registration.Name, "Approved.", request, turnState);
+                await StoreConversationTurnAsync(registration.Name, request, approvedResponse, effectiveCancellationToken).ConfigureAwait(false);
+                await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
+                await StoreTraceAsync(traceBuilder, turnState, approvedResponse, effectiveCancellationToken).ConfigureAwait(false);
+                RecordInspectorRun(registration.Name, request, turnState, approvedResponse, startedAt, succeeded: !turnState.HasFailures, errorMessage: turnState.HasFailures ? approvedResponse.ResponseText : null);
+                return approvedResponse;
+            }
+
+            var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
             await foreach (var update in agent.RunStreamingAsync(
                                new ChatMessage(ChatRole.User, BuildUserMessage(request)),
@@ -492,6 +523,111 @@ public sealed class ChatClientRuntimeAdapter(
             runExecutionScope?.Dispose();
             CurrentTurnState.Value = null;
             sessionState.Gate.Release();
+        }
+    }
+
+    private async Task<bool> TryExecuteApprovedCapabilityContinuationAsync(
+        AgentRegistration registration,
+        AgentTurnRequest request,
+        TurnExecutionState turnState,
+        CancellationToken cancellationToken)
+    {
+        if (!IsApprovalContinuationRequest(request))
+        {
+            return false;
+        }
+
+        var approvedKeys = ResolveApprovedActionKeys(request.Context);
+        if (approvedKeys.Count == 0)
+        {
+            return false;
+        }
+
+        var executionServiceProvider = ResolveExecutionServiceProvider();
+        if (executionServiceProvider is null)
+        {
+            return false;
+        }
+
+        var capabilities = _capabilityRegistry
+            .GetActions(executionServiceProvider)
+            .Where(capability =>
+                capability.RequiresApproval &&
+                IsCapabilityToolAllowed(registration, capability.ActionId) &&
+                approvedKeys.Contains(BuildApprovalKey(capability.CapabilityId, capability.LocalActionId)))
+            .ToArray();
+        if (capabilities.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var capability in capabilities)
+        {
+            await InvokeCapabilityAsync(
+                    capability,
+                    new AIFunctionArguments(new Dictionary<string, object?>()),
+                    turnState,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
+    private static bool IsApprovalContinuationRequest(AgentTurnRequest request)
+        => request.Context is not null &&
+           request.UserMessage.StartsWith("Approved.", StringComparison.OrdinalIgnoreCase);
+
+    private static HashSet<string> ResolveApprovedActionKeys(IDictionary<string, string>? context)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (context is null ||
+            !context.TryGetValue("agentblazor.approvals", out var approvals) ||
+            string.IsNullOrWhiteSpace(approvals) ||
+            IsGlobalApprovalValue(approvals))
+        {
+            return keys;
+        }
+
+        foreach (var entry in approvals.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (entry.Contains('.', StringComparison.Ordinal))
+            {
+                keys.Add(entry);
+            }
+        }
+
+        return keys;
+    }
+
+    private static string BuildApprovalKey(string componentId, string actionId)
+        => $"{componentId}.{actionId}";
+
+    private static bool IsGlobalApprovalValue(string value)
+        => value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("allow", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("approved", StringComparison.OrdinalIgnoreCase) ||
+           value.Equals("all", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task EmitDrainedTurnEventsAsync(
+        TurnExecutionState turnState,
+        string runId,
+        ReconnectableRunState reconnectState,
+        ChannelWriter<AgentTurnStreamEvent> writer,
+        string agentName,
+        CancellationToken cancellationToken)
+    {
+        foreach (var queuedEvent in turnState.DrainStreamEvents())
+        {
+            var emitted = queuedEvent with
+            {
+                RunId = runId,
+                Sequence = reconnectState.NextSequence(),
+                AgentName = queuedEvent.AgentName ?? agentName
+            };
+            await WriteReconnectEventAsync(reconnectState, emitted, writer, cancellationToken).ConfigureAwait(false);
         }
     }
 

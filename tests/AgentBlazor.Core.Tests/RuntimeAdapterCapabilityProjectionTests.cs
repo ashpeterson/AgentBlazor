@@ -369,6 +369,81 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_ApprovalContinuation_ExecutesApprovedCapabilityWithoutModelRoundTrip()
+    {
+        var services = new ServiceCollection();
+        var chatClient = new ThrowingChatClient();
+        services.AddSingleton<IChatClient>(chatClient);
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Approved. Continue by invoking the approved action(s): approval_workflow.create_change_request.",
+            AgentName: "approval-agent",
+            SessionId: "approval-direct",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentblazor.approvals"] = "approval_workflow.create_change_request"
+            }));
+
+        Assert.Equal(0, chatClient.CallCount);
+        Assert.False(response.RequiresApproval);
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Completed, step.Status);
+        Assert.Equal("approval_workflow", step.TargetId);
+        Assert.Equal("create_change_request", step.ActionId);
+        Assert.Contains("Created change request", step.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_StreamingApprovalContinuation_EmitsApprovedCapabilityEventsWithoutModelRoundTrip()
+    {
+        var services = new ServiceCollection();
+        var chatClient = new ThrowingChatClient();
+        services.AddSingleton<IChatClient>(chatClient);
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var events = new List<AgentTurnStreamEvent>();
+        await foreach (var streamEvent in adapter.RunTurnStreamingAsync(new AgentTurnRequest(
+                           "Approved. Continue by invoking the approved action(s): approval_workflow.create_change_request.",
+                           AgentName: "approval-agent",
+                           SessionId: "approval-streaming-direct",
+                           Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                           {
+                               ["agentblazor.approvals"] = "approval_workflow.create_change_request"
+                           })))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Equal(0, chatClient.CallCount);
+        Assert.Contains(events, static streamEvent =>
+            streamEvent.Kind == AgentTurnStreamEventKind.ToolCallResult &&
+            streamEvent.ExecutionResult?.Succeeded == true);
+        var finished = Assert.Single(events, static streamEvent => streamEvent.Kind == AgentTurnStreamEventKind.RunFinished);
+        Assert.False(finished.Response!.RequiresApproval);
+        var step = Assert.Single(finished.Response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Completed, step.Status);
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_ExecutesLegacyComponentToolAlias()
     {
         var services = new ServiceCollection();
@@ -672,6 +747,52 @@ public class RuntimeAdapterCapabilityProjectionTests
             _ = retentionDays;
             _ = ct;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingChatClient : IChatClient
+    {
+        public int CallCount { get; private set; }
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            CallCount++;
+            throw new InvalidOperationException("The model should not be called for deterministic approval continuation.");
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            _ = options;
+            _ = cancellationToken;
+            CallCount++;
+            await Task.Yield();
+            if (CallCount > 0)
+            {
+                throw new InvalidOperationException("The model should not be called for deterministic approval continuation.");
+            }
+
+            yield break;
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
         }
     }
 
