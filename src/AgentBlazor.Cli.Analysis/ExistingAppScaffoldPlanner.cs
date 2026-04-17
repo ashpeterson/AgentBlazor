@@ -154,8 +154,8 @@ public sealed class ExistingAppScaffoldPlanner
                         ? ScaffoldPlanAction.Create
                         : ScaffoldPlanAction.Update,
                 TargetPath = targetFiles.ChatPagePath ?? targetFiles.FallbackChatPagePath,
-                Summary = "Mount AgentChatWidget on a standard page so the runtime is reachable in the UI.",
-                Reason = "An installed runtime is difficult to validate if the app has no visible chat surface.",
+                Summary = "Mount AgentChatWidget in a reachable layout or page so the runtime is visible in the UI.",
+                Reason = "A floating chat widget should not be hidden behind page-specific authorization or route body composition.",
                 Guidance = BuildUiGuidance(hostShape.Family, "chat-surface", usesWebAssemblyClientUi)
             });
         });
@@ -291,8 +291,11 @@ public sealed class ExistingAppScaffoldPlanner
             uiProjectDirectory,
             Path.Combine("Shared", "MainLayout.razor"),
             Path.Combine("Components", "Layout", "MainLayout.razor"),
+            Path.Combine("Components", "Shared", "Layout", "MainLayout.razor"),
             Path.Combine("Layout", "MainLayout.razor"));
-        var chatPagePath = ResolveChatSurfacePath(uiProjectDirectory);
+        var chatPagePath = UsesWebAssemblyClientUi(readiness)
+            ? ResolveChatSurfacePath(uiProjectDirectory)
+            : ResolveChatSurfaceContainerPath(uiProjectDirectory, mainLayoutPath);
 
         return new ScaffoldTargetFiles(
             ProjectDirectory: hostProjectDirectory,
@@ -384,6 +387,9 @@ public sealed class ExistingAppScaffoldPlanner
             ?? ResolveFirstRootRazorPagePath(projectDirectory)
             ?? ResolveFirstExistingPath(projectDirectory, knownPagePaths);
     }
+
+    private static string? ResolveChatSurfaceContainerPath(string projectDirectory, string? mainLayoutPath)
+        => mainLayoutPath ?? ResolveChatSurfacePath(projectDirectory);
 
     private static string? ResolveFirstExistingPathMatching(string projectDirectory, Func<string, bool> predicate, params string[] relativePaths)
     {

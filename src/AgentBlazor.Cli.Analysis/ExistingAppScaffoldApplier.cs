@@ -803,6 +803,9 @@ public sealed class AppCapabilities
 
     private static async Task PreviewChatSurfaceAsync(string chatPagePath, List<ScaffoldPreviewFile> changes, CancellationToken ct)
     {
+        var existingChangeIndex = changes.FindIndex(change =>
+            string.Equals(change.Path, chatPagePath, StringComparison.OrdinalIgnoreCase));
+
         if (!File.Exists(chatPagePath))
         {
             var content = """
@@ -821,7 +824,9 @@ public sealed class AppCapabilities
             return;
         }
 
-        var original = await File.ReadAllTextAsync(chatPagePath, ct).ConfigureAwait(false);
+        var original = existingChangeIndex >= 0
+            ? changes[existingChangeIndex].UpdatedContent
+            : await File.ReadAllTextAsync(chatPagePath, ct).ConfigureAwait(false);
         if (original.Contains("<AgentChatWidget", StringComparison.Ordinal) ||
             original.Contains("<AgentChatSurface", StringComparison.Ordinal) ||
             original.Contains("<AgentChatPanel", StringComparison.Ordinal))
@@ -829,13 +834,54 @@ public sealed class AppCapabilities
             return;
         }
 
-        var updated = original.TrimEnd() + $"\n\n{DefaultChatWidgetMarkup}\n";
+        var updated = InsertChatWidgetMarkup(original);
+        if (existingChangeIndex >= 0)
+        {
+            var existingChange = changes[existingChangeIndex];
+            changes[existingChangeIndex] = existingChange with
+            {
+                Summary = $"{existingChange.Summary} Mounted AgentChatWidget on the default layout or page.",
+                UpdatedContent = updated
+            };
+            return;
+        }
+
         AddTextChange(
             changes,
             chatPagePath,
-            "Mounted AgentChatWidget on the default page.",
+            "Mounted AgentChatWidget on the default layout or page.",
             original,
             updated);
+    }
+
+    private static string InsertChatWidgetMarkup(string content)
+    {
+        var newLine = DetectNewLine(content);
+        var bodyIndex = content.IndexOf("@Body", StringComparison.Ordinal);
+        if (bodyIndex >= 0)
+        {
+            var lineStart = content.LastIndexOf('\n', bodyIndex);
+            lineStart = lineStart < 0 ? 0 : lineStart + 1;
+            var lineEnd = content.IndexOf('\n', bodyIndex);
+            lineEnd = lineEnd < 0 ? content.Length : lineEnd + 1;
+            var indent = GetLineIndent(content, lineStart);
+            return content.Insert(lineEnd, $"{indent}{DefaultChatWidgetMarkup}{newLine}");
+        }
+
+        var codeIndex = content.LastIndexOf("@code", StringComparison.Ordinal);
+        if (codeIndex < 0)
+        {
+            codeIndex = content.LastIndexOf("@functions", StringComparison.Ordinal);
+        }
+
+        if (codeIndex >= 0)
+        {
+            var lineStart = content.LastIndexOf('\n', codeIndex);
+            lineStart = lineStart < 0 ? 0 : lineStart + 1;
+            return content.Insert(lineStart, $"{DefaultChatWidgetMarkup}{newLine}{newLine}");
+        }
+
+        return content.TrimEnd() + $"{newLine}{newLine}{DefaultChatWidgetMarkup}{newLine}";
     }
 
     private static void AddTextChange(

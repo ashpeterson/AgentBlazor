@@ -449,11 +449,10 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
 
         var importsChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "_Imports.razor"), StringComparison.Ordinal));
         var layoutChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Layout", "MainLayout.razor"), StringComparison.Ordinal));
-        var homeChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal));
         Assert.Contains("@using static Microsoft.AspNetCore.Components.Web.RenderMode", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("@using MudBlazor", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("@using MudBlazor", layoutChange.UpdatedContent, StringComparison.Ordinal);
-        Assert.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", homeChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", layoutChange.UpdatedContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -509,8 +508,74 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var programChange = Assert.Single(preview.Changes, change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
         Assert.Contains("app.MapAgentBlazorEndpoints();\nawait app.RunAsync().ConfigureAwait(false);", programChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains(preview.Changes, change =>
-            change.Path.EndsWith(Path.Combine("Pages", "Admin", "Landing.razor"), StringComparison.Ordinal) &&
+            change.Path.EndsWith(Path.Combine("Components", "Layout", "MainLayout.razor"), StringComparison.Ordinal) &&
             change.UpdatedContent.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", StringComparison.Ordinal));
+        Assert.DoesNotContain(preview.Changes, change =>
+            change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal) &&
+            change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenProjectUsesSharedLayoutFolder_MountsChatInLayout()
+    {
+        var projectPath = CreateProject(
+            projectName: "SharedLayoutApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents()
+                    .AddInteractiveServerComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+        var projectDirectory = Path.GetDirectoryName(projectPath)!;
+        File.Delete(Path.Combine(projectDirectory, "Components", "Layout", "MainLayout.razor"));
+        var sharedLayoutDirectory = Path.Combine(projectDirectory, "Components", "Shared", "Layout");
+        Directory.CreateDirectory(sharedLayoutDirectory);
+        File.WriteAllText(
+            Path.Combine(sharedLayoutDirectory, "MainLayout.razor"),
+            """
+            <MudThemeProvider />
+            <MudPopoverProvider />
+            <MudDialogProvider />
+            <MudSnackbarProvider />
+            @Body
+
+            @code
+            {
+            }
+            """);
+
+        var planner = new ExistingAppScaffoldPlanner();
+        var plan = await planner.PlanAsync(projectPath, hostProjectName: null);
+        var applier = new ExistingAppScaffoldApplier();
+
+        var preview = await applier.PreviewAsync(plan, provider: ScaffoldProvider.OpenAI);
+
+        var layoutChange = Assert.Single(preview.Changes, change =>
+            change.Path.EndsWith(Path.Combine("Components", "Shared", "Layout", "MainLayout.razor"), StringComparison.Ordinal));
+        Assert.Contains("@Body\n<AgentChatWidget @rendermode=\"InteractiveServer\" Title=\"Assistant\" />", layoutChange.UpdatedContent, StringComparison.Ordinal);
         Assert.DoesNotContain(preview.Changes, change =>
             change.Path.EndsWith(Path.Combine("Components", "Pages", "Home.razor"), StringComparison.Ordinal) &&
             change.UpdatedContent.Contains("<AgentChatWidget", StringComparison.Ordinal));
