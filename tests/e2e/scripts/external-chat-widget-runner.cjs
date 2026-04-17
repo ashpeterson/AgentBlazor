@@ -275,13 +275,37 @@ async function performOptionalLogin(page) {
   const passwordInput = page
     .locator("input[autocomplete='current-password'], input[type='password'], input[name$='.Password']")
     .first();
-  const submitButton = page.getByRole("button", { name: /sign in|log in|login/i }).first();
+  const loginForm = usernameInput.locator("xpath=ancestor::form[1]");
 
   await usernameInput.waitFor({ state: "visible", timeout: 30000 });
   await usernameInput.fill(loginUsername);
   await passwordInput.fill(loginPassword);
-  await submitButton.click();
+  await loginForm.waitFor({ state: "attached", timeout: 30000 });
+
+  // Blazor enhanced forms can authenticate successfully without driving a full
+  // document navigation in headless tests. A native post ensures auth cookies
+  // are committed before we navigate into the authenticated app layout.
+  const postResponse = page.waitForResponse(
+    (response) => response.url().startsWith(loginUrl) && response.request().method() === "POST",
+    { timeout: 30000 }).catch(() => null);
+
+  await loginForm.evaluate((form) => {
+    if (!(form instanceof HTMLFormElement)) {
+      throw new Error("Login form is not an HTML form.");
+    }
+
+    HTMLFormElement.prototype.submit.call(form);
+  });
+
+  await postResponse;
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+  await page.goto(baseUrl, { waitUntil: "networkidle", timeout: timeoutMs });
+
+  const currentUrl = new URL(page.url());
+  const expectedLoginUrl = new URL(loginUrl);
+  if (currentUrl.pathname.toLowerCase() === expectedLoginUrl.pathname.toLowerCase()) {
+    throw new Error(`Login did not reach the authenticated app. Current URL: ${page.url()}`);
+  }
 }
 
 async function stopServer(child) {
