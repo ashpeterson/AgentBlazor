@@ -14,18 +14,27 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - name: fresh-blazor
+          - name: fresh-blazor-no-provider
             external_template: blazor
             external_repo: ""
             external_ref: ""
             external_project: AgentBlazorExternalTemplate.csproj
             external_app_path: /
-          - name: clean-architecture
+            external_provider_mode: none
+          - name: fresh-blazor-deterministic
+            external_template: blazor
+            external_repo: ""
+            external_ref: ""
+            external_project: AgentBlazorExternalTemplate.csproj
+            external_app_path: /
+            external_provider_mode: deterministic
+          - name: clean-architecture-deterministic
             external_template: ""
             external_repo: https://github.com/neozhu/CleanArchitectureWithBlazorServer.git
             external_ref: ""
             external_project: src/Server.UI/Server.UI.csproj
             external_app_path: /public/index
+            external_provider_mode: deterministic
 
     steps:
       - name: Checkout
@@ -64,6 +73,7 @@ jobs:
           AGENTBLAZOR_EXTERNAL_REF: ${{ matrix.target.external_ref }}
           AGENTBLAZOR_EXTERNAL_PROJECT: ${{ matrix.target.external_project }}
           AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ matrix.target.external_app_path }}
+          AGENTBLAZOR_EXTERNAL_PROVIDER_MODE: ${{ matrix.target.external_provider_mode }}
         run: npm --prefix tests/e2e run test:external-chat-widget
 
       - name: Upload External Chat Widget Artifacts

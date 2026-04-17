@@ -20,6 +20,8 @@ const externalProjectRelativePath = process.env.AGENTBLAZOR_EXTERNAL_PROJECT
 const baseUrl = process.env.AGENTBLAZOR_EXTERNAL_BASE_URL || "http://127.0.0.1:5295";
 const appPath = process.env.AGENTBLAZOR_EXTERNAL_APP_PATH || "/";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
+const providerMode = normalizeProviderMode(process.env.AGENTBLAZOR_EXTERNAL_PROVIDER_MODE || "none");
+const deterministicResponseText = `Deterministic external test response: ${promptText}`;
 const loginPath = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PATH || "";
 const loginUsername = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME || "";
 const loginPassword = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD || "";
@@ -67,6 +69,7 @@ async function run() {
   }
   console.log(`Project: ${externalProjectRelativePath}`);
   console.log(`AgentBlazor package version: ${packageVersion}`);
+  console.log(`Provider mode: ${providerMode}`);
 
   await restoreRepo();
   await packLocalPackages();
@@ -91,6 +94,9 @@ async function run() {
   await runCommand(agentblazor, ["scaffold", projectPath, "--diff", "--non-interactive"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["scaffold", projectPath, "--approve", "--non-interactive"], { cwd: externalRoot, env });
   await assertScaffoldIdempotent(agentblazor, projectPath, env);
+  if (providerMode === "deterministic") {
+    installDeterministicRuntimeAdapter(projectPath);
+  }
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["doctor", projectPath, "--non-interactive"], { cwd: externalRoot, env });
@@ -112,6 +118,7 @@ async function run() {
     baseUrl,
     appPath,
     promptText,
+    providerMode,
     outputRoot,
     workspaceRoot,
     screenshotPath,
@@ -131,7 +138,9 @@ async function run() {
       validatePassed: true,
       loginSubmitted: Boolean(loginPath && loginUsername && loginPassword),
       promptSubmitted: true,
-      providerGuidanceRendered: true,
+      providerGuidanceRendered: providerMode === "none",
+      providerResponseRendered: providerMode === "deterministic",
+      deterministicRuntimeAdapterRegistered: providerMode === "deterministic",
       minimizeButtonWorks: true,
       escapeMinimizes: true,
       repeatedOpenCloseWorks: true,
@@ -159,6 +168,20 @@ function readPackageVersion() {
   }
 
   return match[1];
+}
+
+function normalizeProviderMode(value) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "" || normalized === "none") {
+    return "none";
+  }
+
+  if (normalized === "deterministic") {
+    return "deterministic";
+  }
+
+  throw new Error(`Unsupported AGENTBLAZOR_EXTERNAL_PROVIDER_MODE '${value}'. Supported values: none, deterministic.`);
 }
 
 async function restoreRepo() {
@@ -265,6 +288,145 @@ async function assertScaffoldIdempotent(agentblazor, projectPath, env) {
     fileChanges: diffSnapshots(before, after)
   }, null, 2));
   throw new Error(`Scaffold was not idempotent. See ${diffPath}.`);
+}
+
+function installDeterministicRuntimeAdapter(projectPath) {
+  const projectDirectory = path.dirname(projectPath);
+  const adapterDirectory = path.join(projectDirectory, "AgentBlazorExternalTestProvider");
+  const adapterPath = path.join(adapterDirectory, "DeterministicTestRuntimeAdapter.cs");
+  const programPath = path.join(projectDirectory, "Program.cs");
+
+  if (!fs.existsSync(programPath)) {
+    throw new Error(`Unable to register deterministic runtime adapter because Program.cs was not found at ${programPath}.`);
+  }
+
+  fs.mkdirSync(adapterDirectory, { recursive: true });
+  fs.writeFileSync(adapterPath, deterministicRuntimeAdapterSource(), "utf8");
+  registerDeterministicRuntimeAdapter(programPath);
+}
+
+function deterministicRuntimeAdapterSource() {
+  return `using System.Runtime.CompilerServices;
+using AgentBlazor.Core.Runtime.Agents;
+using AgentBlazor.Core.Runtime.Interfaces;
+
+namespace AgentBlazorExternalTestProvider;
+
+public sealed class DeterministicTestRuntimeAdapter : IAgentRuntimeAdapter
+{
+    private const string AgentName = "External Test Assistant";
+
+    public bool SupportsStreaming => true;
+
+    public bool SupportsReconnect => false;
+
+    public bool SupportsCancellation => false;
+
+    public Task<AgentTurnResponse> RunTurnAsync(
+        AgentTurnRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(BuildResponse(request));
+    }
+
+    public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
+        AgentTurnRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var runId = $"external-test-{Guid.NewGuid():N}";
+        var sequence = 0L;
+        var response = BuildResponse(request);
+
+        yield return new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunStarted,
+            RunId = runId,
+            Sequence = ++sequence,
+            AgentName = AgentName
+        };
+
+        yield return new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.TextMessageStart,
+            RunId = runId,
+            Sequence = ++sequence,
+            AgentName = AgentName
+        };
+
+        await Task.Delay(25, cancellationToken);
+
+        yield return new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.TextMessageContent,
+            RunId = runId,
+            Sequence = ++sequence,
+            AgentName = AgentName,
+            TextDelta = response.ResponseText
+        };
+
+        yield return new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.TextMessageEnd,
+            RunId = runId,
+            Sequence = ++sequence,
+            AgentName = AgentName
+        };
+
+        yield return new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.RunFinished,
+            RunId = runId,
+            Sequence = ++sequence,
+            AgentName = AgentName,
+            Response = response
+        };
+    }
+
+    public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+        string runId,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    public Task<bool> StopRunAsync(
+        string runId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(false);
+    }
+
+    private static AgentTurnResponse BuildResponse(AgentTurnRequest request) =>
+        new(AgentName, $"Deterministic external test response: {request.UserMessage}", [], []);
+}
+`;
+}
+
+function registerDeterministicRuntimeAdapter(programPath) {
+  const registration = "UseRuntimeAdapter<AgentBlazorExternalTestProvider.DeterministicTestRuntimeAdapter>";
+  const content = fs.readFileSync(programPath, "utf8");
+
+  if (content.includes(registration)) {
+    return;
+  }
+
+  const registrationPattern = /(builder\.Services\.AddAgentBlazor\(\s*([A-Za-z_]\w*)\s*=>\s*\r?\n\s*\{\r?\n?)/m;
+  const match = content.match(registrationPattern);
+
+  if (!match) {
+    throw new Error(`Unable to find builder.Services.AddAgentBlazor(...) registration in ${programPath}.`);
+  }
+
+  const optionsVariable = match[2];
+  const patched = content.replace(
+    registrationPattern,
+    `$1    ${optionsVariable}.${registration}();\n`);
+
+  fs.writeFileSync(programPath, patched, "utf8");
 }
 
 function snapshotRelevantFiles(root) {
@@ -418,7 +580,7 @@ async function runBrowserAssertions() {
     await sendButton.click();
 
     await expect(controls.widgetSurface.getByText(promptText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-    await expect(controls.widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
+    await assertProviderOutcome(controls.widgetSurface);
     await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
 
     await controls.minimizeButton.click();
@@ -457,6 +619,21 @@ async function runBrowserAssertions() {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
+}
+
+async function assertProviderOutcome(widgetSurface) {
+  if (providerMode === "deterministic") {
+    await expect(widgetSurface.getByText(deterministicResponseText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+
+    const noProviderGuidance = widgetSurface.getByText(/No AI provider configured/i).first();
+    if (await noProviderGuidance.isVisible().catch(() => false)) {
+      throw new Error("Deterministic provider response rendered alongside no-provider guidance.");
+    }
+
+    return;
+  }
+
+  await expect(widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
 }
 
 function attachBrowserDiagnostics(page) {
