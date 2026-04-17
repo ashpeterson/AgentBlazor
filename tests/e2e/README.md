@@ -13,21 +13,24 @@ npm run test:e2e:ui
 npm run test:real-usability
 npm run test:paid-dashboard
 npm run test:external-chat-widget
+npm run test:external-chat-surfaces
 ```
 
 This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
 
 The component explorer suite includes floating `AgentChatWidget` coverage for opening the widget, entering a prompt, minimizing with the visible control, reopening, and minimizing with Escape. Browser execution requires the Playwright browser system libraries to be installed on the machine.
 
-`npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, `AGENTBLAZOR_EXTERNAL_PROJECT`, and `AGENTBLAZOR_EXTERNAL_APP_PATH`.
+`npm run test:external-chat-widget` and `npm run test:external-chat-surfaces` run the same hardened external-app validation. The runner clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit prompts through the installed floating widget and any requested embedded chat surfaces. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, `AGENTBLAZOR_EXTERNAL_PROJECT`, and `AGENTBLAZOR_EXTERNAL_APP_PATH`.
 
-Set `AGENTBLAZOR_EXTERNAL_TEMPLATE=blazor` with `AGENTBLAZOR_EXTERNAL_PROJECT=AgentBlazorExternalTemplate.csproj` to generate and test a fresh `dotnet new blazor` app instead of cloning a repository. The `external-chat-widget-matrix` workflow runs a fresh no-provider target, a fresh deterministic-provider target, `neozhu/CleanArchitectureWithBlazorServer` on a public route, and the same CleanArchitecture app on an authenticated users route so the widget is tested against both a clean baseline and production-style Blazor layouts.
+Set `AGENTBLAZOR_EXTERNAL_TEMPLATE=blazor` with `AGENTBLAZOR_EXTERNAL_PROJECT=AgentBlazorExternalTemplate.csproj` to generate and test a fresh `dotnet new blazor` app instead of cloning a repository. The `external-chat-widget-matrix` workflow runs a fresh no-provider target, a fresh deterministic-provider target, `neozhu/CleanArchitectureWithBlazorServer` on a public route, and the same CleanArchitecture app on an authenticated users route so the chat surfaces are tested against both a clean baseline and production-style Blazor layouts.
 
-Set `AGENTBLAZOR_EXTERNAL_PROVIDER_MODE=deterministic` to inject a local `IAgentRuntimeAdapter` into the external app after scaffold approval. This mode validates the provider-backed widget path by submitting a prompt, consuming streaming runtime events, and asserting that the deterministic assistant response renders in the installed widget. Leave it unset or set it to `none` to verify the no-provider guidance path.
+Set `AGENTBLAZOR_EXTERNAL_PROVIDER_MODE=deterministic` to inject a local `IAgentRuntimeAdapter` into the external app after scaffold approval. This mode validates the provider-backed chat path by submitting prompts, consuming streaming runtime events, and asserting that the deterministic assistant response renders in each requested surface. Leave it unset or set it to `none` to verify the no-provider guidance path.
 
-The external chat widget runner now verifies scaffold idempotency, submitted prompt rendering, no-provider guidance or deterministic provider response rendering, computed open/minimized widget CSS, repeated open/minimize cycles, Escape minimization, reload/reopen behavior, and AgentBlazor asset request failures. Artifacts include per-state screenshots, browser console diagnostics, failed request diagnostics, server logs, `report.json`, and a human-readable `report.md` that summarizes target details, assertion status, failed requests, widget states, and failure stack traces.
+Set `AGENTBLAZOR_EXTERNAL_CHAT_SURFACES=widget,surface,panel,bar` to choose which surfaces to validate. `widget` tests the CLI-installed floating assistant on the configured app route. `surface`, `panel`, and `bar` inject a temporary routed harness into the external app after scaffold approval, then test `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` in the production app process.
 
-For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget. Set `AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT` to require a protected-page marker before widget assertions begin; the matrix uses this for the CleanArchitecture `/identity/users` authenticated route.
+The external chat surface runner now verifies scaffold idempotency, submitted prompt rendering, no-provider guidance or deterministic provider response rendering, computed open/minimized widget CSS, repeated open/minimize cycles, Escape minimization, reload/reopen behavior, embedded surface prompt submission, side-panel prompt submission, inline chat-bar prompt submission, and AgentBlazor asset request failures. Artifacts include per-state screenshots, browser console diagnostics, failed request diagnostics, server logs, `report.json`, and a human-readable `report.md` that summarizes target details, assertion status, failed requests, widget states, embedded surface states, and failure stack traces.
+
+For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget and before visiting the injected surface harness. Set `AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT` to require a protected-page marker before chat assertions begin; the matrix uses this for the CleanArchitecture `/identity/users` authenticated route.
 
 Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
@@ -82,7 +85,7 @@ Evidence output is written to:
 Evidence output is written to:
 - `tests/e2e/artifacts/paid-dashboard/<timestamp>/`
 
-External chat widget evidence output is written to:
+External chat surface evidence output is written to:
 - `tests/e2e/artifacts/external-chat-widget/<timestamp>/`
 
 Failure artifacts for `test:e2e` are written to:

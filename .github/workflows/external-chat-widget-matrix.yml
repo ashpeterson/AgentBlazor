@@ -21,6 +21,7 @@ jobs:
             external_project: AgentBlazorExternalTemplate.csproj
             external_app_path: /
             external_provider_mode: none
+            external_chat_surfaces: widget,surface,panel,bar
           - name: fresh-blazor-deterministic
             external_template: blazor
             external_repo: ""
@@ -28,6 +29,7 @@ jobs:
             external_project: AgentBlazorExternalTemplate.csproj
             external_app_path: /
             external_provider_mode: deterministic
+            external_chat_surfaces: widget,surface,panel,bar
           - name: clean-architecture-deterministic
             external_template: ""
             external_repo: https://github.com/neozhu/CleanArchitectureWithBlazorServer.git
@@ -35,6 +37,7 @@ jobs:
             external_project: src/Server.UI/Server.UI.csproj
             external_app_path: /public/index
             external_provider_mode: deterministic
+            external_chat_surfaces: widget,surface,panel,bar
           - name: clean-architecture-authenticated-users
             external_template: ""
             external_repo: https://github.com/neozhu/CleanArchitectureWithBlazorServer.git
@@ -42,6 +45,7 @@ jobs:
             external_project: src/Server.UI/Server.UI.csproj
             external_app_path: /identity/users
             external_provider_mode: deterministic
+            external_chat_surfaces: widget,surface,panel,bar
             external_login_path: /pages/authentication/login?ReturnUrl=%2Fidentity%2Fusers
             external_login_username: administrator
             external_login_password: Password123!
@@ -85,6 +89,7 @@ jobs:
           AGENTBLAZOR_EXTERNAL_PROJECT: ${{ matrix.target.external_project }}
           AGENTBLAZOR_EXTERNAL_APP_PATH: ${{ matrix.target.external_app_path }}
           AGENTBLAZOR_EXTERNAL_PROVIDER_MODE: ${{ matrix.target.external_provider_mode }}
+          AGENTBLAZOR_EXTERNAL_CHAT_SURFACES: ${{ matrix.target.external_chat_surfaces }}
           AGENTBLAZOR_EXTERNAL_LOGIN_PATH: ${{ matrix.target.external_login_path }}
           AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME: ${{ matrix.target.external_login_username }}
           AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD: ${{ matrix.target.external_login_password }}

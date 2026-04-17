@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Production Readiness
 
@@ -81,6 +81,7 @@ The runtime realignment is now materially underway:
 - project-file scaffold now inserts package/project references without reserializing the whole `.csproj`, preserving XML declarations and MSBuild target expressions such as `@(Files->...)`
 - project-file scaffold now detects the nearest Central Package Management `Directory.Packages.props` and emits unversioned project `PackageReference` entries plus matching `PackageVersion` entries, validated against `thecodewrapper/CH.CleanArchitectureBlazor`
 - the floating `AgentChatWidget` now has a visible minimize control, Escape-to-minimize behavior, and Playwright selectors for prompt-entry/minimize/reopen coverage
+- external real-app chat validation now covers all shipped chat entry points, not only the floating widget: the runner can validate `AgentChatWidget` on the app route, inject a temporary route into the cloned app, and prompt-test `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic or no-provider assertions
 
 ## Shipped and Working
 
@@ -125,6 +126,7 @@ The runtime realignment is now materially underway:
   - `AgentChatWidget`
   - `AgentChatBar`
 - `AgentChatWidget` supports explicit minimize/reopen affordances and Escape-to-minimize keyboard behavior.
+- `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` now expose stable automation selectors for external browser validation, and `AgentChatBar` exposes accessible prompt/send controls.
 - The floating widget open path was stabilized:
   - no fresh DOM-style open flash
   - state now transitions in a stable widget shell

@@ -196,15 +196,53 @@ Use `AgentChatSurface` when chat should be embedded directly in the page:
     EnableGeneratedUi="true" />
 ```
 
+Use `AgentChatPanel` when the assistant should sit beside a dense operational screen:
+
+```razor
+@using AgentBlazor.Components
+
+<AgentChatPanel
+    Title="Operations Assistant"
+    Description="Review the current screen and guide safe production changes."
+    Height="42rem"
+    ShowAgentSelector="false"
+    EnableGeneratedUi="true" />
+```
+
+Use `AgentChatBar` when the page needs a compact command/search-style entry point:
+
+```razor
+@using AgentBlazor.Components
+
+<AgentChatBar
+    Placeholder="Ask for a status update or next action..."
+    Suggestions="@ProductionPrompts"
+    EnableGeneratedUi="true" />
+
+@code {
+    private static readonly IReadOnlyList<string> ProductionPrompts =
+    [
+        "Summarize this page for an operations lead.",
+        "List the safest next actions before changing production state.",
+        "Draft a handoff note for this workflow."
+    ];
+}
+```
+
 ## 7. Run Your App
 
 ```bash
 dotnet run
 ```
 
-Click the chat widget and try:
-- "Search for widgets"
-- "Submit order ABC123"
+Click the chat widget or embedded chat surface and try prompts that match production Blazor workflows:
+
+- "Review this order queue, identify stuck orders, and recommend the safest next action."
+- "Find invoices due this week, group them by risk, and draft a collector handoff note."
+- "Check whether order ABC123 can be submitted, explain any missing approvals, and submit it only if policy allows."
+- "Summarize the current user-management page for an auditor and list accounts that need review."
+- "Prepare a release-readiness checklist from the visible deployment status, failed checks, and pending approvals."
+- "Draft a customer-support status update from the current incident screen and include open blockers."
 
 The agent will call your capability methods and handle approvals automatically.
 

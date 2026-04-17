@@ -1,6 +1,6 @@
 # Product Expansion Plan
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
 
 ## Goal
 
@@ -88,6 +88,8 @@ Current status:
 - the high-surface Mud-backed `Agent*` components have already been moved onto native-first implementations
 - the components explorer now exposes focused live examples for every shipped Mud-backed `Agent*` component
 - rendered parity tests and browser coverage are in place
+- external chat validation now exercises every shipped chat surface, not just the floating widget, by injecting a temporary harness route into real cloned Blazor apps and prompt-testing `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar`
+- prompt examples now focus on production Blazor workflows such as operations queues, finance review, identity audit, release readiness, approval gates, and incident support
 
 Remaining work:
 

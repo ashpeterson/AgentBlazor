@@ -21,7 +21,8 @@ const baseUrl = process.env.AGENTBLAZOR_EXTERNAL_BASE_URL || "http://127.0.0.1:5
 const appPath = process.env.AGENTBLAZOR_EXTERNAL_APP_PATH || "/";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
 const providerMode = normalizeProviderMode(process.env.AGENTBLAZOR_EXTERNAL_PROVIDER_MODE || "none");
-const deterministicResponseText = `Deterministic external test response: ${promptText}`;
+const chatSurfaceModes = parseChatSurfaceModes(process.env.AGENTBLAZOR_EXTERNAL_CHAT_SURFACES || "widget,surface,panel,bar");
+const chatSurfaceHarnessPath = process.env.AGENTBLAZOR_EXTERNAL_CHAT_SURFACES_PATH || "/agentblazor-chat-surfaces";
 const expectedPageText = process.env.AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT || "";
 const loginPath = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PATH || "";
 const loginUsername = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME || "";
@@ -41,6 +42,7 @@ const reportPath = path.join(outputRoot, "report.json");
 const markdownReportPath = path.join(outputRoot, "report.md");
 const screenshotPath = path.join(outputRoot, "chat-widget.png");
 const diagnosticsPath = path.join(outputRoot, "diagnostics.json");
+const productionPrompts = buildProductionPrompts(promptText);
 
 const runState = {
   packageInstalled: false,
@@ -58,7 +60,8 @@ const runState = {
   escapeMinimizes: false,
   repeatedOpenCloseWorks: false,
   reloadReopenWorks: false,
-  agentAssetsLoaded: false
+  agentAssetsLoaded: false,
+  chatSurfaceHarnessInstalled: false
 };
 
 const diagnostics = {
@@ -66,6 +69,7 @@ const diagnostics = {
   pageErrors: [],
   failedRequests: [],
   widgetStates: [],
+  chatSurfaceStates: [],
   screenshots: []
 };
 
@@ -84,7 +88,7 @@ async function run() {
   fs.mkdirSync(outputRoot, { recursive: true });
   fs.mkdirSync(workspaceRoot, { recursive: true });
 
-  console.log(`External chat widget validation output: ${outputRoot}`);
+  console.log(`External chat surface validation output: ${outputRoot}`);
   if (externalTemplate) {
     console.log(`Template: ${externalTemplate}`);
   } else {
@@ -93,6 +97,7 @@ async function run() {
   console.log(`Project: ${externalProjectRelativePath}`);
   console.log(`AgentBlazor package version: ${packageVersion}`);
   console.log(`Provider mode: ${providerMode}`);
+  console.log(`Chat surfaces: ${chatSurfaceModes.join(", ")}`);
 
   await restoreRepo();
   await packLocalPackages();
@@ -124,6 +129,10 @@ async function run() {
     installDeterministicRuntimeAdapter(projectPath);
     runState.deterministicRuntimeAdapterRegistered = true;
   }
+  if (chatSurfaceModes.some((surface) => surface !== "widget")) {
+    installChatSurfaceHarness(projectPath);
+    runState.chatSurfaceHarnessInstalled = true;
+  }
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
   await runCommand(agentblazor, ["doctor", projectPath, "--non-interactive"], { cwd: externalRoot, env });
@@ -140,10 +149,10 @@ async function run() {
   const report = buildExternalReport("passed");
   writeDiagnosticsFile();
   writeReportFiles(report);
-  console.log(`External chat widget report: ${reportPath}`);
-  console.log(`External chat widget markdown report: ${markdownReportPath}`);
-  console.log(`External chat widget diagnostics: ${diagnosticsPath}`);
-  console.log(`External chat widget screenshot: ${screenshotPath}`);
+  console.log(`External chat surface report: ${reportPath}`);
+  console.log(`External chat surface markdown report: ${markdownReportPath}`);
+  console.log(`External chat surface diagnostics: ${diagnosticsPath}`);
+  console.log(`External chat surface screenshot: ${screenshotPath}`);
 }
 
 function buildExternalReport(status, failure = null) {
@@ -158,6 +167,9 @@ function buildExternalReport(status, failure = null) {
     baseUrl,
     appPath,
     promptText,
+    chatSurfaceModes,
+    chatSurfaceHarnessPath,
+    productionPrompts,
     providerMode,
     expectedPageText,
     outputRoot,
@@ -170,21 +182,28 @@ function buildExternalReport(status, failure = null) {
       pageErrorCount: diagnostics.pageErrors.length,
       failedRequestCount: diagnostics.failedRequests.length,
       widgetStateCount: diagnostics.widgetStates.length,
+      chatSurfaceStateCount: diagnostics.chatSurfaceStates.length,
       screenshotCount: diagnostics.screenshots.length
     },
     requestSummary: summarizeFailedRequests(),
     assertions: buildAssertionReport(),
+    chatSurfaceAssertions: buildChatSurfaceAssertionReport(),
     failure
   };
 }
 
 function buildAssertionReport() {
+  const testsWidget = chatSurfaceModes.includes("widget");
+
   return {
     packageInstalled: runState.packageInstalled,
     cliScaffolded: runState.cliScaffolded,
     scaffoldIdempotent: runState.scaffoldIdempotent,
     doctorPassed: runState.doctorPassed,
     validatePassed: runState.validatePassed,
+    chatSurfaceHarnessInstalled: chatSurfaceModes.some((surface) => surface !== "widget")
+      ? runState.chatSurfaceHarnessInstalled
+      : null,
     loginSubmitted: loginPath && loginUsername && loginPassword ? runState.loginSubmitted : null,
     expectedPageTextRendered: expectedPageText ? runState.expectedPageTextRendered : null,
     promptSubmitted: runState.promptSubmitted,
@@ -193,12 +212,19 @@ function buildAssertionReport() {
     deterministicRuntimeAdapterRegistered: providerMode === "deterministic"
       ? runState.deterministicRuntimeAdapterRegistered
       : null,
-    minimizeButtonWorks: runState.minimizeButtonWorks,
-    escapeMinimizes: runState.escapeMinimizes,
-    repeatedOpenCloseWorks: runState.repeatedOpenCloseWorks,
-    reloadReopenWorks: runState.reloadReopenWorks,
+    minimizeButtonWorks: testsWidget ? runState.minimizeButtonWorks : null,
+    escapeMinimizes: testsWidget ? runState.escapeMinimizes : null,
+    repeatedOpenCloseWorks: testsWidget ? runState.repeatedOpenCloseWorks : null,
+    reloadReopenWorks: testsWidget ? runState.reloadReopenWorks : null,
     agentAssetsLoaded: runState.agentAssetsLoaded
   };
+}
+
+function buildChatSurfaceAssertionReport() {
+  return Object.fromEntries(chatSurfaceModes.map((surface) => {
+    const state = diagnostics.chatSurfaceStates.find((entry) => entry.surface === surface);
+    return [surface, state ? state.passed : false];
+  }));
 }
 
 function writeReportFiles(report) {
@@ -209,7 +235,7 @@ function writeReportFiles(report) {
 
 function buildMarkdownReport(report) {
   const lines = [
-    "# External Chat Widget Report",
+    "# External Chat Surface Report",
     "",
     `Status: **${report.status.toUpperCase()}**`,
     `Generated: ${report.generatedAtUtc}`,
@@ -224,6 +250,8 @@ function buildMarkdownReport(report) {
         ["Ref", report.externalRepoRef || "-"],
         ["Project", report.externalProjectRelativePath],
         ["App path", report.appPath],
+        ["Chat surfaces", report.chatSurfaceModes.join(", ")],
+        ["Chat surface harness path", report.chatSurfaceHarnessPath],
         ["Provider mode", report.providerMode],
         ["Login configured", Boolean(loginPath && loginUsername && loginPassword) ? "yes" : "no"],
         ["Expected page text", report.expectedPageText || "-"],
@@ -236,6 +264,16 @@ function buildMarkdownReport(report) {
       ["Assertion", "Result"],
       Object.entries(report.assertions).map(([name, value]) => [name, boolIcon(value)])),
     "",
+    "## Chat Surface Assertions",
+    "",
+    markdownTable(
+      ["Surface", "Prompt", "Result"],
+      Object.entries(report.chatSurfaceAssertions).map(([surface, value]) => [
+        surface,
+        report.productionPrompts[surface] || "-",
+        boolIcon(value)
+      ])),
+    "",
     "## Diagnostics",
     "",
     markdownTable(
@@ -247,6 +285,7 @@ function buildMarkdownReport(report) {
         ["AgentBlazor failed requests", report.requestSummary.agentBlazorCount],
         ["Third-party or app failed requests", report.requestSummary.thirdPartyCount],
         ["Widget states captured", report.diagnosticsSummary.widgetStateCount],
+        ["Chat surface states captured", report.diagnosticsSummary.chatSurfaceStateCount],
         ["Screenshots captured", report.diagnosticsSummary.screenshotCount]
       ]),
     "",
@@ -264,6 +303,21 @@ function buildMarkdownReport(report) {
           state.widgetWindow?.pointerEvents ?? "-"
         ]))
       : "No widget states were captured.",
+    "",
+    "## Chat Surface States",
+    "",
+    diagnostics.chatSurfaceStates.length > 0
+      ? markdownTable(
+        ["Surface", "State", "Visible", "Prompt submitted", "Provider outcome", "Screenshot"],
+        diagnostics.chatSurfaceStates.map((state) => [
+          state.surface,
+          state.name,
+          boolIcon(state.visible),
+          boolIcon(state.promptSubmitted),
+          boolIcon(state.providerOutcomeRendered),
+          relativeArtifact(state.screenshot)
+        ]))
+      : "No embedded chat surface states were captured.",
     "",
     "## Failed Requests",
     "",
@@ -412,6 +466,42 @@ function normalizeProviderMode(value) {
   }
 
   throw new Error(`Unsupported AGENTBLAZOR_EXTERNAL_PROVIDER_MODE '${value}'. Supported values: none, deterministic.`);
+}
+
+function parseChatSurfaceModes(value) {
+  const supported = new Set(["widget", "surface", "panel", "bar"]);
+  const modes = value
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (modes.length === 0) {
+    throw new Error("AGENTBLAZOR_EXTERNAL_CHAT_SURFACES must include at least one surface.");
+  }
+
+  for (const mode of modes) {
+    if (!supported.has(mode)) {
+      throw new Error(`Unsupported chat surface '${mode}'. Supported values: ${[...supported].join(", ")}.`);
+    }
+  }
+
+  return [...new Set(modes)];
+}
+
+function buildProductionPrompts(widgetPrompt) {
+  return {
+    widget: widgetPrompt,
+    surface: process.env.AGENTBLAZOR_EXTERNAL_SURFACE_PROMPT
+      || "Review this production workflow page and draft a three-step operator checklist with risks and required approvals.",
+    panel: process.env.AGENTBLAZOR_EXTERNAL_PANEL_PROMPT
+      || "Identify the safest next actions for this Blazor screen, including data to verify before making a production change.",
+    bar: process.env.AGENTBLAZOR_EXTERNAL_BAR_PROMPT
+      || "Write a concise status update for the current page that an operations lead could paste into a standup note."
+  };
+}
+
+function expectedProviderTextFor(prompt) {
+  return `Deterministic external test response: ${prompt}`;
 }
 
 async function restoreRepo() {
@@ -659,6 +749,82 @@ function registerDeterministicRuntimeAdapter(programPath) {
   fs.writeFileSync(programPath, patched, "utf8");
 }
 
+function installChatSurfaceHarness(projectPath) {
+  const projectDirectory = path.dirname(projectPath);
+  const pagesDirectory = findPagesDirectory(projectDirectory);
+  const harnessPath = path.join(pagesDirectory, "AgentBlazorChatSurfacesHarness.razor");
+
+  fs.mkdirSync(pagesDirectory, { recursive: true });
+  fs.writeFileSync(harnessPath, chatSurfaceHarnessSource(), "utf8");
+}
+
+function findPagesDirectory(projectDirectory) {
+  const candidates = [
+    path.join(projectDirectory, "Components", "Pages"),
+    path.join(projectDirectory, "Pages"),
+    path.join(projectDirectory, "Components"),
+    projectDirectory
+  ];
+
+  const existing = candidates.find((candidate) => fs.existsSync(candidate));
+  return existing || path.join(projectDirectory, "Pages");
+}
+
+function chatSurfaceHarnessSource() {
+  return `@page "${chatSurfaceHarnessPath}"
+@using AgentBlazor.Components
+@using AgentBlazor.Components.Chat
+
+<PageTitle>AgentBlazor Chat Surface Harness</PageTitle>
+
+<main class="agentblazor-chat-surfaces-harness" data-testid="agentblazor-chat-surfaces-harness">
+    <h1>AgentBlazor Chat Surface Harness</h1>
+    <p>
+        This route is injected only by the AgentBlazor external validation runner. It mounts every public chat surface
+        in the host application after CLI scaffold so production-app browser tests cover more than the floating widget.
+    </p>
+
+    <section data-testid="agentblazor-surface-section">
+        <h2>Embedded workflow surface</h2>
+        <AgentChatSurface Title="Embedded Workflow Assistant"
+                          Description="Use this surface when a workflow page should keep the assistant visible."
+                          FormName="agentblazor-external-surface"
+                          SessionId="agentblazor-external-surface"
+                          ShowAgentSelector="false"
+                          EnableGeneratedUi="true" />
+    </section>
+
+    <section data-testid="agentblazor-panel-section">
+        <h2>Side panel surface</h2>
+        <AgentChatPanel Title="Operations Side Panel"
+                        Description="Use this panel when the assistant should sit beside dense operational UI."
+                        FormName="agentblazor-external-panel"
+                        SessionId="agentblazor-external-panel"
+                        Height="42rem"
+                        ShowAgentSelector="false"
+                        EnableGeneratedUi="true" />
+    </section>
+
+    <section data-testid="agentblazor-bar-section">
+        <h2>Inline command bar</h2>
+        <AgentChatBar Placeholder="Ask for a status update or next action..."
+                      SessionId="agentblazor-external-bar"
+                      Suggestions="@BarSuggestions"
+                      EnableGeneratedUi="true" />
+    </section>
+</main>
+
+@code {
+    private static readonly IReadOnlyList<string> BarSuggestions =
+    [
+        "Summarize this page for an operations lead.",
+        "List the safest next actions before changing production state.",
+        "Draft a short handoff note for the current workflow."
+    ];
+}
+`;
+}
+
 function snapshotRelevantFiles(root) {
   const files = [];
   collectRelevantFiles(root, files);
@@ -799,50 +965,13 @@ async function runBrowserAssertions() {
     await performOptionalLogin(page);
     await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
     await assertExpectedPageText(page);
-    let controls = await openFloatingChatWidget(page);
-    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "initial-open");
-    await captureWidgetState(page, "initial-open", controls.widgetWindow, controls.openButton);
-
-    const input = controls.widgetSurface.getByLabel("Message input").first();
-    const sendButton = controls.widgetSurface.getByRole("button", { name: /send message/i }).first();
-    await expect(input).toBeVisible();
-    await input.fill(promptText);
-    await expect(sendButton).toBeEnabled();
-    await sendButton.click();
-
-    await expect(controls.widgetSurface.getByText(promptText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-    runState.promptSubmitted = true;
-    await assertProviderOutcome(controls.widgetSurface);
-    await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
-
-    await controls.minimizeButton.click();
-    await assertWidgetClosed(controls.widgetWindow, controls.openButton, "minimize-button");
-    runState.minimizeButtonWorks = true;
-    await captureWidgetState(page, "minimize-button", controls.widgetWindow, controls.openButton);
-
-    await controls.openButton.click();
-    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reopened-after-minimize");
-    await captureWidgetState(page, "reopened-after-minimize", controls.widgetWindow, controls.openButton);
-
-    await controls.widgetWindow.press("Escape");
-    await assertWidgetClosed(controls.widgetWindow, controls.openButton, "escape");
-    runState.escapeMinimizes = true;
-    await captureWidgetState(page, "escape", controls.widgetWindow, controls.openButton);
-
-    for (let index = 1; index <= 3; index++) {
-      await controls.openButton.click();
-      await assertWidgetOpen(controls.widgetWindow, controls.openButton, `cycle-${index}-open`);
-      await controls.minimizeButton.click();
-      await assertWidgetClosed(controls.widgetWindow, controls.openButton, `cycle-${index}-closed`);
+    if (chatSurfaceModes.includes("widget")) {
+      await testFloatingWidget(page);
     }
-    runState.repeatedOpenCloseWorks = true;
-    await captureWidgetState(page, "repeated-cycle-final", controls.widgetWindow, controls.openButton);
 
-    await page.reload({ waitUntil: "networkidle", timeout: timeoutMs });
-    controls = await openFloatingChatWidget(page);
-    await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reload-reopen");
-    runState.reloadReopenWorks = true;
-    await captureWidgetState(page, "reload-reopen", controls.widgetWindow, controls.openButton);
+    if (chatSurfaceModes.some((surface) => surface !== "widget")) {
+      await testEmbeddedChatSurfaces(page);
+    }
 
     assertNoAgentBlazorAssetFailures();
     runState.agentAssetsLoaded = true;
@@ -867,12 +996,119 @@ async function assertExpectedPageText(page) {
   runState.expectedPageTextRendered = true;
 }
 
-async function assertProviderOutcome(widgetSurface) {
+async function testFloatingWidget(page) {
+  let controls = await openFloatingChatWidget(page);
+  await assertWidgetOpen(controls.widgetWindow, controls.openButton, "initial-open");
+  await captureWidgetState(page, "initial-open", controls.widgetWindow, controls.openButton);
+
+  await submitSurfacePrompt(controls.widgetSurface, productionPrompts.widget);
+
+  await expect(controls.widgetSurface.getByText(productionPrompts.widget, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  runState.promptSubmitted = true;
+  await assertProviderOutcome(controls.widgetSurface, productionPrompts.widget);
+  await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
+  await captureChatSurfaceState(page, "widget", "prompt-submitted", controls.widgetSurface, {
+    promptSubmitted: true,
+    providerOutcomeRendered: true
+  });
+
+  await controls.minimizeButton.click();
+  await assertWidgetClosed(controls.widgetWindow, controls.openButton, "minimize-button");
+  runState.minimizeButtonWorks = true;
+  await captureWidgetState(page, "minimize-button", controls.widgetWindow, controls.openButton);
+
+  await controls.openButton.click();
+  await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reopened-after-minimize");
+  await captureWidgetState(page, "reopened-after-minimize", controls.widgetWindow, controls.openButton);
+
+  await controls.widgetWindow.press("Escape");
+  await assertWidgetClosed(controls.widgetWindow, controls.openButton, "escape");
+  runState.escapeMinimizes = true;
+  await captureWidgetState(page, "escape", controls.widgetWindow, controls.openButton);
+
+  for (let index = 1; index <= 3; index++) {
+    await controls.openButton.click();
+    await assertWidgetOpen(controls.widgetWindow, controls.openButton, `cycle-${index}-open`);
+    await controls.minimizeButton.click();
+    await assertWidgetClosed(controls.widgetWindow, controls.openButton, `cycle-${index}-closed`);
+  }
+  runState.repeatedOpenCloseWorks = true;
+  await captureWidgetState(page, "repeated-cycle-final", controls.widgetWindow, controls.openButton);
+
+  await page.reload({ waitUntil: "networkidle", timeout: timeoutMs });
+  controls = await openFloatingChatWidget(page);
+  await assertWidgetOpen(controls.widgetWindow, controls.openButton, "reload-reopen");
+  runState.reloadReopenWorks = true;
+  await captureWidgetState(page, "reload-reopen", controls.widgetWindow, controls.openButton);
+}
+
+async function testEmbeddedChatSurfaces(page) {
+  await page.goto(getChatSurfaceHarnessUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
+  await expect(page.getByTestId("agentblazor-chat-surfaces-harness")).toBeVisible({ timeout: 30000 });
+
+  if (chatSurfaceModes.includes("surface")) {
+    const section = page.getByTestId("agentblazor-surface-section");
+    const surface = section.getByTestId("agent-chat-surface").first();
+    await testPromptSurface(page, "surface", surface, productionPrompts.surface);
+  }
+
+  if (chatSurfaceModes.includes("panel")) {
+    const panel = page.getByTestId("agent-chat-panel").first();
+    const surface = panel.getByTestId("agent-chat-surface").first();
+    await expect(panel).toBeVisible({ timeout: 30000 });
+    await testPromptSurface(page, "panel", surface, productionPrompts.panel);
+  }
+
+  if (chatSurfaceModes.includes("bar")) {
+    const bar = page.getByTestId("agent-chat-bar").first();
+    await testChatBar(page, bar, productionPrompts.bar);
+  }
+}
+
+async function testPromptSurface(page, surfaceName, surface, prompt) {
+  await expect(surface).toBeVisible({ timeout: 30000 });
+  await submitSurfacePrompt(surface, prompt);
+  await expect(surface.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await assertProviderOutcome(surface, prompt);
+  await captureChatSurfaceState(page, surfaceName, "prompt-submitted", surface, {
+    promptSubmitted: true,
+    providerOutcomeRendered: true
+  });
+}
+
+async function submitSurfacePrompt(surface, prompt) {
+  const input = surface.getByLabel("Message input").first();
+  const sendButton = surface.getByRole("button", { name: /send message/i }).first();
+  await expect(input).toBeVisible({ timeout: 30000 });
+  await input.fill(prompt);
+  await expect(sendButton).toBeEnabled({ timeout: 30000 });
+  await sendButton.click();
+  runState.promptSubmitted = true;
+}
+
+async function testChatBar(page, bar, prompt) {
+  await expect(bar).toBeVisible({ timeout: 30000 });
+  const input = bar.getByTestId("agent-chat-bar-input").first();
+  const sendButton = bar.getByTestId("agent-chat-bar-send").first();
+  await expect(input).toBeVisible({ timeout: 30000 });
+  await input.fill(prompt);
+  await expect(sendButton).toBeEnabled({ timeout: 30000 });
+  await sendButton.click();
+  runState.promptSubmitted = true;
+  await expect(bar.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+  await assertProviderOutcome(bar, prompt);
+  await captureChatSurfaceState(page, "bar", "prompt-submitted", bar, {
+    promptSubmitted: true,
+    providerOutcomeRendered: true
+  });
+}
+
+async function assertProviderOutcome(chatSurface, prompt) {
   if (providerMode === "deterministic") {
-    await expect(widgetSurface.getByText(deterministicResponseText, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    await expect(chatSurface.getByText(expectedProviderTextFor(prompt), { exact: true }).first()).toBeVisible({ timeout: 30000 });
     runState.providerResponseRendered = true;
 
-    const noProviderGuidance = widgetSurface.getByText(/No AI provider configured/i).first();
+    const noProviderGuidance = chatSurface.getByText(/No AI provider configured/i).first();
     if (await noProviderGuidance.isVisible().catch(() => false)) {
       throw new Error("Deterministic provider response rendered alongside no-provider guidance.");
     }
@@ -880,7 +1116,7 @@ async function assertProviderOutcome(widgetSurface) {
     return;
   }
 
-  await expect(widgetSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
+  await expect(chatSurface.getByText(/No AI provider configured/i).first()).toBeVisible({ timeout: 30000 });
   runState.providerGuidanceRendered = true;
 }
 
@@ -964,6 +1200,25 @@ async function captureWidgetState(page, stateName, widgetWindow, openButton) {
   };
 
   diagnostics.widgetStates.push(state);
+  diagnostics.screenshots.push(screenshot);
+  await page.screenshot({ path: screenshot, fullPage: true });
+}
+
+async function captureChatSurfaceState(page, surfaceName, stateName, surface, result) {
+  const screenshot = path.join(outputRoot, `surface-${surfaceName}-${stateName}.png`);
+  const state = {
+    surface: surfaceName,
+    name: stateName,
+    url: page.url(),
+    visible: await surface.isVisible().catch(() => false),
+    promptSubmitted: Boolean(result.promptSubmitted),
+    providerOutcomeRendered: Boolean(result.providerOutcomeRendered),
+    passed: Boolean(result.promptSubmitted && result.providerOutcomeRendered),
+    surfaceState: await readElementState(surface).catch((error) => ({ error: error.message })),
+    screenshot
+  };
+
+  diagnostics.chatSurfaceStates.push(state);
   diagnostics.screenshots.push(screenshot);
   await page.screenshot({ path: screenshot, fullPage: true });
 }
@@ -1110,6 +1365,10 @@ async function navigateToAppAfterLogin(page, loginUrl) {
 
 function getAppUrl() {
   return new URL(appPath, `${baseUrl}/`).toString();
+}
+
+function getChatSurfaceHarnessUrl() {
+  return new URL(chatSurfaceHarnessPath, `${baseUrl}/`).toString();
 }
 
 async function stopServer(child) {

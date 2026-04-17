@@ -28,6 +28,7 @@
      data-style="@(Theme?.DataStyle)"
      data-radius="@(Theme?.DataRadius)"
      data-spacing="@(Theme?.DataSpacing)"
+     data-testid="agent-chat-bar"
      style="@_themeStyle">
     <div class="ab-chat-bar__input-wrap">
         @if (ShowIcon)
@@ -37,11 +38,16 @@
         <input type="text"
                class="ab-chat-bar__input"
                placeholder="@Placeholder"
+               aria-label="Message input"
+               data-testid="agent-chat-bar-input"
                @bind="_prompt"
                @bind:event="oninput"
                @onkeydown="HandleKeyDown"
                disabled="@_isBusy" />
         <button class="ab-chat-bar__send"
+                type="button"
+                aria-label="Send message"
+                data-testid="agent-chat-bar-send"
                 @onclick="SendAsync"
                 disabled="@(_isBusy || string.IsNullOrWhiteSpace(_prompt))">
             @if (_isBusy)
@@ -61,6 +67,8 @@
             @foreach (var suggestion in Suggestions)
             {
                 <button class="ab-chat-bar__chip"
+                        type="button"
+                        data-testid="agent-chat-bar-suggestion"
                         @onclick="@(() => SendPromptAsync(suggestion))"
                         disabled="@_isBusy">
                     @suggestion
@@ -146,7 +154,10 @@
 
             @if (ShowClearButton)
             {
-                <button class="ab-chat-bar__clear" @onclick="ClearTimelineAsync">
+                <button class="ab-chat-bar__clear"
+                        type="button"
+                        data-testid="agent-chat-bar-clear"
+                        @onclick="ClearTimelineAsync">
                     <MudIcon Icon="@Icons.Material.Filled.Delete" Size="Size.Small" />
                     @ClearButtonText
                 </button>

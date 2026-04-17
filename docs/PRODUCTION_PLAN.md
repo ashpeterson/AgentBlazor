@@ -1,6 +1,6 @@
 # Production Plan
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
 
 Honest assessment and actionable plan to move from private preview to production.
 
@@ -12,11 +12,11 @@ AgentBlazor is not yet ready for a broad, unsupported production release. The no
 
 Current validated baseline:
 
-- `AgentBlazor.Core.Tests`: `261/261`
-- `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-- `AgentBlazor.Cli.Analysis.Tests`: `132/132`
+- `AgentBlazor.Core.Tests`: `264/264`
+- `AgentBlazor.Components.Tests`: `103/104`, `1` skipped
+- `AgentBlazor.Cli.Analysis.Tests`: `135/135`
 - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-- `AgentBlazor.IntegrationTests`: `105/105`
+- `AgentBlazor.IntegrationTests`: `118/118`
 
 Recent hardening complete:
 
@@ -35,6 +35,7 @@ Recent hardening complete:
 - current source is now `0.1.0-preview.8`; it updates SDK roll-forward for newer .NET 10 preview SDKs and needs a publish/validation run before replacing `0.1.0-preview.7` as the latest published-feed validated version
 - GitHub Packages private-preview workflow now publishes both the runtime package and CLI tool package and uploads both package artifacts; workflow run `24443709690` passed for `0.1.0-preview.7` from commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
 - published-feed real-app validation now proves `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.7` install from GitHub Packages, scaffold, restore, build, pass `doctor`/`validate`, and render AgentBlazor assets in external Blazor apps including CSP/nonce-aware shells
+- source external-app validation now covers all shipped chat surfaces, not only `AgentChatWidget`: the runner can inject a temporary route into the cloned app and prompt-test `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with production-style prompts
 - WebAssembly companion-client UI paths are detected and left review-first instead of auto-writing browser-client AgentBlazor chat code into browser-only projects
 - scaffolded MudBlazor imports are scoped to the layout provider file instead of being added globally, avoiding QuickGrid `PropertyColumn` tag conflicts
 - existing-app scaffold now respects plan-specific startup edits, supports composed service chains such as `.AddServerUI(...)`, preserves existing MudBlazor service registration, targets discovered root pages, handles async `RunAsync`, and preserves UTF-8 BOMs on edited files
