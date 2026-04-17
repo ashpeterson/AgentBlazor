@@ -27,6 +27,11 @@ if (!providerConfiguration.configured) {
   process.exit(1);
 }
 
+if (providerConfiguration.error) {
+  console.error(providerConfiguration.error);
+  process.exit(1);
+}
+
 fs.mkdirSync(outputDir, { recursive: true });
 
 const scenarios = JSON.parse(fs.readFileSync(promptsPath, "utf8"));
@@ -974,6 +979,14 @@ function sleep(ms) {
 function getProviderConfiguration() {
   const openAiApiKey = firstNonEmpty(process.env.OPENAI_API_KEY, process.env.OpenAI__ApiKey);
   if (openAiApiKey) {
+    if (!openAiApiKey.startsWith("sk-")) {
+      return {
+        configured: true,
+        provider: "openai",
+        error: "OPENAI_API_KEY is set but does not look like an OpenAI API key. It should start with 'sk-'."
+      };
+    }
+
     return { configured: true, provider: "openai" };
   }
 

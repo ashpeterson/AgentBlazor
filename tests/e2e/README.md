@@ -47,6 +47,8 @@ gh secret set OPENAI_API_KEY --repo ashpeterson/AgentBlazor
 gh variable set OPENAI_MODEL --repo ashpeterson/AgentBlazor --body gpt-5.4-mini
 ```
 
+`OPENAI_API_KEY` must contain the API key value, not the model name. OpenAI keys normally start with `sk-`.
+
 2. Azure OpenAI:
 ```bash
 set AzureOpenAI__Endpoint=https://<resource>.openai.azure.com

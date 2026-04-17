@@ -35,6 +35,10 @@ jobs:
             echo "::error::real-usability-nightly requires OPENAI_API_KEY secret or OLLAMA_MODEL repository variable."
             exit 1
           fi
+          if [ -n "${OPENAI_API_KEY}" ] && [[ "${OPENAI_API_KEY}" != sk-* ]]; then
+            echo "::error::OPENAI_API_KEY is set but does not look like an OpenAI API key. It should start with 'sk-'."
+            exit 1
+          fi
 
       - name: Restore
         run: dotnet restore AgentBlazor.slnx --locked-mode
