@@ -13,6 +13,7 @@ const externalRepoUrl = process.env.AGENTBLAZOR_EXTERNAL_REPO || "https://github
 const externalRepoRef = process.env.AGENTBLAZOR_EXTERNAL_REF || "";
 const externalProjectRelativePath = process.env.AGENTBLAZOR_EXTERNAL_PROJECT || "BlazorApp/BlazorApp.csproj";
 const baseUrl = process.env.AGENTBLAZOR_EXTERNAL_BASE_URL || "http://127.0.0.1:5295";
+const appPath = process.env.AGENTBLAZOR_EXTERNAL_APP_PATH || "/";
 const promptText = process.env.AGENTBLAZOR_EXTERNAL_PROMPT || "Can you explain what this Blazor app does?";
 const loginPath = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_PATH || "";
 const loginUsername = process.env.AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME || "";
@@ -88,6 +89,7 @@ async function run() {
     externalProjectRelativePath,
     packageVersion,
     baseUrl,
+    appPath,
     promptText,
     outputRoot,
     workspaceRoot,
@@ -226,7 +228,7 @@ async function runBrowserAssertions() {
 
   try {
     await performOptionalLogin(page);
-    await page.goto(baseUrl, { waitUntil: "networkidle", timeout: timeoutMs });
+    await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
     const { widgetWindow, widgetSurface, minimizeButton, openButton } = await openFloatingChatWidget(page);
 
     const input = widgetSurface.getByLabel("Message input").first();
@@ -299,13 +301,17 @@ async function performOptionalLogin(page) {
 
   await postResponse;
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
-  await page.goto(baseUrl, { waitUntil: "networkidle", timeout: timeoutMs });
+  await page.goto(getAppUrl(), { waitUntil: "networkidle", timeout: timeoutMs });
 
   const currentUrl = new URL(page.url());
   const expectedLoginUrl = new URL(loginUrl);
   if (currentUrl.pathname.toLowerCase() === expectedLoginUrl.pathname.toLowerCase()) {
     throw new Error(`Login did not reach the authenticated app. Current URL: ${page.url()}`);
   }
+}
+
+function getAppUrl() {
+  return new URL(appPath, `${baseUrl}/`).toString();
 }
 
 async function stopServer(child) {

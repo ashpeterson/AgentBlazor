@@ -1,6 +1,6 @@
 # AgentBlazor E2E (Playwright)
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 Run locally from `tests/e2e`:
 
@@ -19,7 +19,7 @@ This suite starts the demo app via Playwright `webServer` and validates the curr
 
 The component explorer suite includes floating `AgentChatWidget` coverage for opening the widget, entering a prompt, minimizing with the visible control, reopening, and minimizing with Escape. Browser execution requires the Playwright browser system libraries to be installed on the machine.
 
-`npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, and `AGENTBLAZOR_EXTERNAL_PROJECT`.
+`npm run test:external-chat-widget` clones a real Blazor app, packs and installs the local AgentBlazor package/CLI, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit a prompt through the installed floating chat widget. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, `AGENTBLAZOR_EXTERNAL_PROJECT`, and `AGENTBLAZOR_EXTERNAL_APP_PATH`.
 
 For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget.
 
