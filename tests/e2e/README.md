@@ -23,6 +23,8 @@ The component explorer suite includes floating `AgentChatWidget` coverage for op
 
 Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
+The real-usability runner requires an explicit live provider from environment variables. It intentionally does not treat demo `appsettings.json` sample values as proof that CI can reach a provider, because empty GitHub secrets or missing Ollama services otherwise produce misleading no-provider transcripts instead of a clear preflight failure.
+
 Use `npm run test:e2e:headed` when you want to watch the browser, and `npm run test:e2e:ui` when you want Playwright's interactive runner.
 
 By default the suite starts a fresh demo app instance so it does not silently attach to a stale local build. If you intentionally want to reuse an already running server, set:
@@ -37,6 +39,12 @@ The suite uses the real runtime path (no deterministic e2e mock client). Configu
 ```bash
 set OPENAI_API_KEY=...
 set OpenAI__Model=gpt-5.4-mini
+```
+
+For GitHub Actions:
+```bash
+gh secret set OPENAI_API_KEY --repo ashpeterson/AgentBlazor
+gh variable set OPENAI_MODEL --repo ashpeterson/AgentBlazor --body gpt-5.4-mini
 ```
 
 2. Azure OpenAI:

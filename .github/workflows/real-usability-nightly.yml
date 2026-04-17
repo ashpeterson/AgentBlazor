@@ -26,6 +26,16 @@ jobs:
           cache: "npm"
           cache-dependency-path: tests/e2e/package-lock.json
 
+      - name: Validate Live Provider Configuration
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL }}
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ] && [ -z "${OLLAMA_MODEL}" ]; then
+            echo "::error::real-usability-nightly requires OPENAI_API_KEY secret or OLLAMA_MODEL repository variable."
+            exit 1
+          fi
+
       - name: Restore
         run: dotnet restore AgentBlazor.slnx --locked-mode
 
@@ -43,12 +53,9 @@ jobs:
       - name: Run Real Usability Suite
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OpenAI__ApiKey: ${{ secrets.OPENAI_API_KEY }}
           OpenAI__Model: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
           OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL }}
-          Ollama__Model: ${{ vars.OLLAMA_MODEL }}
           OLLAMA_ENDPOINT: ${{ vars.OLLAMA_ENDPOINT }}
-          Ollama__Endpoint: ${{ vars.OLLAMA_ENDPOINT }}
         run: npm --prefix tests/e2e run test:real-usability
 
       - name: Upload Real Usability Artifacts

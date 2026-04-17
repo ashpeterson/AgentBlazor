@@ -33,16 +33,20 @@ var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
 var proDataDirectory = builder.Configuration["AgentBlazor:DataDirectory"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_DATA_DIRECTORY");
 
-var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
-var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
-    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-var ollamaModel = builder.Configuration["Ollama:Model"]
-    ?? Environment.GetEnvironmentVariable("OLLAMA_MODEL");
-var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"]
-    ?? Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT")
-    ?? "http://127.0.0.1:11434/v1";
-var ollamaApiKey = builder.Configuration["Ollama:ApiKey"]
-    ?? Environment.GetEnvironmentVariable("OLLAMA_API_KEY");
+var openAiModel = FirstConfigured(builder.Configuration["OpenAI:Model"], "gpt-5.4-mini")!;
+var openAiApiKey = FirstConfigured(
+    Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+    builder.Configuration["OpenAI:ApiKey"]);
+var ollamaModel = FirstConfigured(
+    Environment.GetEnvironmentVariable("OLLAMA_MODEL"),
+    builder.Configuration["Ollama:Model"]);
+var ollamaEndpoint = FirstConfigured(
+    Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT"),
+    builder.Configuration["Ollama:Endpoint"],
+    "http://127.0.0.1:11434/v1")!;
+var ollamaApiKey = FirstConfigured(
+    Environment.GetEnvironmentVariable("OLLAMA_API_KEY"),
+    builder.Configuration["Ollama:ApiKey"]);
 var workflowConnectionString = builder.Configuration.GetConnectionString("DemoWorkflow")
     ?? "Data Source=agentblazor-demo.db";
 var sharedAgentInstructionsPath = Path.Combine(builder.Environment.ContentRootPath, "agent-instructions.txt");
@@ -211,3 +215,15 @@ app.MapAgentBlazorEndpoints();
 
 app.Run();
 
+static string? FirstConfigured(params string?[] values)
+{
+    foreach (var value in values)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value.Trim();
+        }
+    }
+
+    return null;
+}

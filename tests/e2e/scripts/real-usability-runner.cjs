@@ -18,11 +18,11 @@ const defaultScenarioRoute = process.env.REAL_USABILITY_DEFAULT_ROUTE || "/demo/
 const scenarioTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SCENARIO_TIMEOUT_MS || "90000", 10);
 const serverReadyTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SERVER_TIMEOUT_MS || "180000", 10);
 
-const providerConfigured = isProviderConfigured();
+const providerConfiguration = getProviderConfiguration();
 
-if (!providerConfigured) {
+if (!providerConfiguration.configured) {
   console.error(
-    "Real usability run requires a live provider. Configure OpenAI or Ollama via environment variables or demo appsettings."
+    "Real usability run requires an explicit live provider. Set OPENAI_API_KEY, or set OLLAMA_MODEL with a reachable Ollama endpoint."
   );
   process.exit(1);
 }
@@ -971,23 +971,26 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isProviderConfigured() {
-  if (
-    process.env.OPENAI_API_KEY ||
-    process.env.OpenAI__ApiKey ||
-    process.env.OLLAMA_MODEL ||
-    process.env.Ollama__Model
-  ) {
-    return true;
+function getProviderConfiguration() {
+  const openAiApiKey = firstNonEmpty(process.env.OPENAI_API_KEY, process.env.OpenAI__ApiKey);
+  if (openAiApiKey) {
+    return { configured: true, provider: "openai" };
   }
 
-  try {
-    const appSettingsPath = path.join(repoRoot, "demo", "AgentBlazor.Demo", "appsettings.json");
-    const appSettings = JSON.parse(fs.readFileSync(appSettingsPath, "utf8"));
-    const configuredOpenAiKey = appSettings?.OpenAI?.ApiKey;
-    const configuredOllamaModel = appSettings?.Ollama?.Model;
-    return Boolean(configuredOpenAiKey || configuredOllamaModel);
-  } catch {
-    return false;
+  const ollamaModel = firstNonEmpty(process.env.OLLAMA_MODEL, process.env.Ollama__Model);
+  if (ollamaModel) {
+    return { configured: true, provider: "ollama" };
   }
+
+  return { configured: false, provider: "none" };
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return "";
 }
