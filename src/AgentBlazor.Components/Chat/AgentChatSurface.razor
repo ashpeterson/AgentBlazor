@@ -1001,7 +1001,9 @@
 
         try
         {
-            var approvalMessage = "Approve the pending actions.";
+            var approvalMessage =
+                $"Approved. Continue by invoking the approved action(s): {string.Join(", ", approvalKeys)}. " +
+                "Do not request approval again for these action(s); execute the approved tool call(s) now and summarize the result.";
             var conversationTurnCountBefore = await GetConversationTurnCountAsync();
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 approvalMessage,

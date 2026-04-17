@@ -374,7 +374,8 @@ public sealed class AgentChatSurfaceTests : TestContext
         }
 
         private static bool IsApprovalMessage(string message)
-            => string.Equals(message, "Approve the pending actions.", StringComparison.Ordinal);
+            => message.StartsWith("Approved. Continue by invoking the approved action(s):", StringComparison.Ordinal) &&
+               message.Contains("runtime_probe.run_approval_probe", StringComparison.Ordinal);
 
         private static AgentTurnResponse CreateApprovalRequiredResponse(string sessionId)
         {
