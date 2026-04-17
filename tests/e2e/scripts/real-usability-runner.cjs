@@ -673,8 +673,11 @@ function evaluateScenario(scenario, evidence, dbDiff, interactions) {
     rootCauses.add("missing_stop_interaction");
   }
 
-  const transcriptText = evidence.transcript
-    .map((entry) => entry.text ?? "")
+  const transcriptText = [
+    ...evidence.transcript.map((entry) => entry.text ?? ""),
+    ...evidence.plannedActions,
+    ...evidence.executionOutcomes
+  ]
     .join("\n");
   for (const snippet of scenario.expectedTranscriptIncludes ?? []) {
     if (!transcriptText.includes(snippet)) {
