@@ -62,6 +62,7 @@ Current validated private-preview package:
 - source commit `79cf68df3c448868d1e90a845d3629da20cb5672`
 - published-feed clean-app validation passed, including CLI install, scaffold, restore/build, `doctor`, `validate`, and runtime static-asset smoke
 - published-feed real-app validation passed against `damienbod/BlazorSecurityNet10`, including CSP nonce preservation for scaffolded assets
+- published-feed all-surface browser validation passed against `damienbod/BlazorSecurityNet10` in external chat workflow run `24598484039`, covering `AgentChatWidget`, `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic provider responses and production-style prompts
 
 The generated scaffold workflow has been confirmed to compile in a clean consumer app without manual references to bundled internal assemblies. The scaffolded `AppCapabilities.cs` file imports `AgentBlazor.App`, so each future release still needs published-feed validation that the restored `AgentBlazor` package exposes `AgentBlazor.Core.dll` as a compile asset.
 

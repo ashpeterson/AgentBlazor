@@ -15,7 +15,7 @@ Status as of 2026-04-18:
 - the CLI now supports `init -> scaffold -> doctor -> validate`
 - standard hosted WebAssembly server+client installs are now part of the supported scaffold path
 - `0.1.0-preview.8` is the current source/package version
-- `0.1.0-preview.8` is the latest GitHub Packages published-feed version with full clean-app and external real-app validation
+- `0.1.0-preview.8` is the latest GitHub Packages published-feed version with full clean-app, external real-app, and all-surface chat validation
 - scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
 
 ## Optional: Install The CLI

@@ -54,7 +54,7 @@ What is implemented now:
 
 What is validated now:
 
-- CLI analysis tests are green: `132/132`
+- CLI analysis tests are green: `135/135`
 - CLI integration tests are green: `9/9`
 - `init --help` and `scaffold --help` are correct
 - fresh standard Blazor app smoke test under `/Users/...` succeeds through:

@@ -215,16 +215,16 @@ As of 2026-04-18:
 - the old planner/runtime path is no longer the product center
 - the demo is now led by orchestration workflows instead of primitive component control
 - `0.1.0-preview.8` is the current source/package version and latest fully published-feed validated package
-- published-feed validation now covers CSP nonce-aware host shells as well as Clean Architecture-style real apps
+- published-feed validation now covers CSP nonce-aware host shells, Clean Architecture-style real apps, and all shipped chat surfaces on an external real-world app
 - runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
 - middleware is now wired through both normal and streaming runtime turns
 - OpenAI-compatible endpoint validation now rejects non-HTTP(S) URI shapes such as `file:///...`
 - the full non-demo test matrix is currently green:
-  - `AgentBlazor.Core.Tests`: `261/261`
-  - `AgentBlazor.Components.Tests`: `98/99`, `1` skipped
-  - `AgentBlazor.Cli.Analysis.Tests`: `132/132`
+  - `AgentBlazor.Core.Tests`: `264/264`
+  - `AgentBlazor.Components.Tests`: `103/104`, `1` skipped
+  - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
   - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-  - `AgentBlazor.IntegrationTests`: `105/105`
+  - `AgentBlazor.IntegrationTests`: `118/118`
 
 The biggest remaining product gap is not UI execution. It is durable paid intelligence:
 

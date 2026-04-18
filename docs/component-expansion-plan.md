@@ -88,7 +88,7 @@ Current status:
 - the high-surface Mud-backed `Agent*` components have already been moved onto native-first implementations
 - the components explorer now exposes focused live examples for every shipped Mud-backed `Agent*` component
 - rendered parity tests and browser coverage are in place
-- external chat validation now exercises every shipped chat surface, not just the floating widget, by injecting a temporary harness route into reachable real-app routes and prompt-testing `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar`; matrix run `24586690690` passed fresh Blazor all-surface targets and CleanArchitecture authenticated all-surface coverage
+- external chat validation now exercises every shipped chat surface, not just the floating widget, by injecting a temporary harness route into reachable real-app routes and prompt-testing `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar`; matrix run `24586690690` passed fresh Blazor all-surface targets and CleanArchitecture authenticated all-surface coverage, and published-feed run `24598484039` passed widget/surface/panel/bar validation against `damienbod/BlazorSecurityNet10`
 - prompt examples now focus on production Blazor workflows such as operations queues, finance review, identity audit, release readiness, approval gates, incident support, inventory exceptions, claims review, and release handoffs
 
 Remaining work:
