@@ -10,6 +10,8 @@ const { openFloatingChatWidget } = require("../specs/chat-helpers.cjs");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const packageVersion = process.env.AGENTBLAZOR_PACKAGE_VERSION || readPackageVersion();
+const packageSourceMode = normalizePackageSourceMode(process.env.AGENTBLAZOR_PACKAGE_SOURCE_MODE || "local");
+const publishedFeedUrl = process.env.AGENTBLAZOR_PUBLISHED_FEED_URL || "https://nuget.pkg.github.com/ashpeterson/index.json";
 const externalTemplate = process.env.AGENTBLAZOR_EXTERNAL_TEMPLATE || "";
 const externalRepoUrl = externalTemplate
   ? ""
@@ -37,6 +39,7 @@ const workspaceRoot = process.env.AGENTBLAZOR_EXTERNAL_WORKSPACE_DIR
 const externalRoot = path.join(workspaceRoot, "external-app");
 const localFeed = path.join(workspaceRoot, "local-feed");
 const toolPath = path.join(workspaceRoot, "tools");
+const packageFeedUrl = packageSourceMode === "local" ? localFeed : publishedFeedUrl;
 const serverLogPath = path.join(outputRoot, "external-app-server.log");
 const reportPath = path.join(outputRoot, "report.json");
 const markdownReportPath = path.join(outputRoot, "report.md");
@@ -96,26 +99,31 @@ async function run() {
   }
   console.log(`Project: ${externalProjectRelativePath}`);
   console.log(`AgentBlazor package version: ${packageVersion}`);
+  console.log(`AgentBlazor package source mode: ${packageSourceMode}`);
   console.log(`Provider mode: ${providerMode}`);
   console.log(`Chat surfaces: ${chatSurfaceModes.join(", ")}`);
 
-  await restoreRepo();
-  await packLocalPackages();
+  if (packageSourceMode === "local") {
+    await restoreRepo();
+    await packLocalPackages();
+  } else {
+    validatePublishedFeedCredentials();
+  }
   await prepareExternalApp();
 
   const projectPath = path.join(externalRoot, externalProjectRelativePath);
   const projectDirectory = path.dirname(projectPath);
   const env = buildExternalEnv();
 
-  await writeNuGetConfig(projectDirectory);
+  await writeNuGetConfigs(projectDirectory);
   await runCommand("dotnet", ["restore", projectPath, "--force-evaluate"], { cwd: externalRoot, env });
   await runCommand("dotnet", ["build", projectPath, "--no-restore", "-nologo"], { cwd: externalRoot, env });
-  await runCommand("dotnet", ["add", projectPath, "package", "AgentBlazor", "--version", packageVersion], { cwd: externalRoot, env });
+  await runCommand("dotnet", ["add", projectPath, "package", "AgentBlazor", "--version", packageVersion], { cwd: projectDirectory, env });
   runState.packageInstalled = true;
   await runCommand(
     "dotnet",
-    ["tool", "install", "AgentBlazor.Cli", "--version", packageVersion, "--tool-path", toolPath, "--add-source", localFeed],
-    { cwd: externalRoot, env });
+    ["tool", "install", "AgentBlazor.Cli", "--version", packageVersion, "--tool-path", toolPath, "--add-source", packageFeedUrl],
+    { cwd: projectDirectory, env });
 
   const agentblazor = path.join(toolPath, process.platform === "win32" ? "agentblazor.exe" : "agentblazor");
   await runCommand(agentblazor, ["--version"], { cwd: externalRoot, env });
@@ -164,6 +172,8 @@ function buildExternalReport(status, failure = null) {
     externalRepoRef,
     externalProjectRelativePath,
     packageVersion,
+    packageSourceMode,
+    packageFeedUrl: redactPackageFeedUrl(packageFeedUrl),
     baseUrl,
     appPath,
     promptText,
@@ -255,7 +265,9 @@ function buildMarkdownReport(report) {
         ["Provider mode", report.providerMode],
         ["Login configured", Boolean(loginPath && loginUsername && loginPassword) ? "yes" : "no"],
         ["Expected page text", report.expectedPageText || "-"],
-        ["Package version", report.packageVersion]
+        ["Package version", report.packageVersion],
+        ["Package source mode", report.packageSourceMode],
+        ["Package feed", report.packageFeedUrl]
       ]),
     "",
     "## Assertions",
@@ -488,16 +500,51 @@ function parseChatSurfaceModes(value) {
   return [...new Set(modes)];
 }
 
+function normalizePackageSourceMode(value) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "local" || normalized === "published" || normalized === "github") {
+    return normalized === "github" ? "published" : normalized;
+  }
+
+  throw new Error(`Unsupported AGENTBLAZOR_PACKAGE_SOURCE_MODE '${value}'. Supported values: local, published.`);
+}
+
 function buildProductionPrompts(widgetPrompt) {
   return {
-    widget: widgetPrompt,
-    surface: process.env.AGENTBLAZOR_EXTERNAL_SURFACE_PROMPT
-      || "Review this production workflow page and draft a three-step operator checklist with risks and required approvals.",
-    panel: process.env.AGENTBLAZOR_EXTERNAL_PANEL_PROMPT
-      || "Identify the safest next actions for this Blazor screen, including data to verify before making a production change.",
-    bar: process.env.AGENTBLAZOR_EXTERNAL_BAR_PROMPT
-      || "Write a concise status update for the current page that an operations lead could paste into a standup note."
+    widget: buildPromptList(process.env.AGENTBLAZOR_EXTERNAL_PROMPTS || process.env.AGENTBLAZOR_EXTERNAL_PROMPT, [
+      "Can you explain what this Blazor app does?",
+      "What should an administrator verify before changing records on this page?",
+      "Summarize the current route, visible risks, and missing provider configuration in plain language."
+    ]),
+    surface: buildPromptList(process.env.AGENTBLAZOR_EXTERNAL_SURFACE_PROMPT, [
+      "Review this production workflow page and draft a three-step operator checklist with risks and required approvals.",
+      "Find the validation or data-quality checks a user should complete before saving changes on this page.",
+      "Draft a short runbook for investigating a failed operation from this screen."
+    ]),
+    panel: buildPromptList(process.env.AGENTBLAZOR_EXTERNAL_PANEL_PROMPT, [
+      "Identify the safest next actions for this Blazor screen, including data to verify before making a production change.",
+      "Draft a rollback plan an operator could follow if a change from this screen produces bad data.",
+      "List the audit evidence this page should capture for compliance review."
+    ]),
+    bar: buildPromptList(process.env.AGENTBLAZOR_EXTERNAL_BAR_PROMPT, [
+      "Write a concise status update for the current page that an operations lead could paste into a standup note.",
+      "Create a one-line handoff note for the next support engineer reviewing this page.",
+      "Summarize the most likely user intent for this screen in one sentence."
+    ])
   };
+}
+
+function buildPromptList(overrideValue, defaults) {
+  if (!overrideValue) {
+    return defaults;
+  }
+
+  const prompts = overrideValue
+    .split("||")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return prompts.length > 0 ? prompts : defaults;
 }
 
 function expectedProviderTextFor(prompt) {
@@ -526,6 +573,14 @@ async function packLocalPackages() {
       "dotnet",
       ["pack", project, "-c", "Release", "--no-restore", "-o", localFeed, `-p:PackageVersion=${packageVersion}`, "-nologo"],
       { cwd: repoRoot });
+  }
+}
+
+function validatePublishedFeedCredentials() {
+  const token = getPublishedFeedToken();
+  if (!token) {
+    throw new Error(
+      "Published package source mode requires AGENTBLAZOR_GITHUB_PACKAGES_TOKEN, GITHUB_TOKEN, or GH_TOKEN.");
   }
 }
 
@@ -577,17 +632,54 @@ async function cloneExternalApp() {
   }
 }
 
-async function writeNuGetConfig(projectDirectory) {
+async function writeNuGetConfigs(projectDirectory) {
+  const directories = [...new Set([externalRoot, projectDirectory])];
+  for (const directory of directories) {
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, "nuget.config"), buildNuGetConfigContent(), "utf8");
+  }
+}
+
+function buildNuGetConfigContent() {
+  const sourceName = packageSourceMode === "local" ? "agentblazor-local" : "github-agentblazor";
+  const credentials = packageSourceMode === "published"
+    ? `
+  <packageSourceCredentials>
+    <${sourceName}>
+      <add key="Username" value="${escapeXml(getPublishedFeedUsername())}" />
+      <add key="ClearTextPassword" value="${escapeXml(getPublishedFeedToken())}" />
+    </${sourceName}>
+  </packageSourceCredentials>`
+    : "";
+
   const content = `<?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
-    <add key="agentblazor-local" value="${escapeXml(localFeed)}" />
+    <add key="${sourceName}" value="${escapeXml(packageFeedUrl)}" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>
+  </packageSources>${credentials}
 </configuration>
 `;
-  fs.writeFileSync(path.join(projectDirectory, "nuget.config"), content);
+  return content;
+}
+
+function getPublishedFeedUsername() {
+  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_USERNAME
+    || process.env.GITHUB_ACTOR
+    || process.env.GH_USER
+    || "ashpeterson";
+}
+
+function getPublishedFeedToken() {
+  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_TOKEN
+    || process.env.GITHUB_TOKEN
+    || process.env.GH_TOKEN
+    || "";
+}
+
+function redactPackageFeedUrl(value) {
+  return value.replace(/\/\/([^/@:]+):([^/@]+)@/g, "//***:***@");
 }
 
 async function assertScaffoldIdempotent(agentblazor, projectPath, env) {
@@ -1002,16 +1094,8 @@ async function testFloatingWidget(page) {
   await assertWidgetOpen(controls.widgetWindow, controls.openButton, "initial-open");
   await captureWidgetState(page, "initial-open", controls.widgetWindow, controls.openButton);
 
-  await submitSurfacePrompt(controls.widgetSurface, productionPrompts.widget);
-
-  await expect(controls.widgetSurface.getByText(productionPrompts.widget, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  runState.promptSubmitted = true;
-  await assertProviderOutcome(controls.widgetSurface, productionPrompts.widget);
+  await testPromptList(page, "widget", controls.widgetSurface, productionPrompts.widget);
   await captureWidgetState(page, "prompt-submitted", controls.widgetWindow, controls.openButton);
-  await captureChatSurfaceState(page, "widget", "prompt-submitted", controls.widgetSurface, {
-    promptSubmitted: true,
-    providerOutcomeRendered: true
-  });
 
   await controls.minimizeButton.click();
   await assertWidgetClosed(controls.widgetWindow, controls.openButton, "minimize-button");
@@ -1050,19 +1134,19 @@ async function testEmbeddedChatSurfaces(page) {
   if (chatSurfaceModes.includes("surface")) {
     const section = page.getByTestId("agentblazor-surface-section");
     const surface = section.getByTestId("agent-chat-surface").first();
-    await testPromptSurface(page, "surface", surface, productionPrompts.surface);
+    await testPromptList(page, "surface", surface, productionPrompts.surface);
   }
 
   if (chatSurfaceModes.includes("panel")) {
     const panel = page.getByTestId("agent-chat-panel").first();
     const surface = panel.getByTestId("agent-chat-surface").first();
     await expect(panel).toBeVisible({ timeout: 30000 });
-    await testPromptSurface(page, "panel", surface, productionPrompts.panel);
+    await testPromptList(page, "panel", surface, productionPrompts.panel);
   }
 
   if (chatSurfaceModes.includes("bar")) {
     const bar = page.getByTestId("agent-chat-bar").first();
-    await testChatBar(page, bar, productionPrompts.bar);
+    await testChatBarPrompts(page, bar, productionPrompts.bar);
   }
 }
 
@@ -1092,15 +1176,19 @@ function looksLikeAuthRedirect(url) {
     || value.includes("/authentication/");
 }
 
-async function testPromptSurface(page, surfaceName, surface, prompt) {
+async function testPromptList(page, surfaceName, surface, prompts) {
   await expect(surface).toBeVisible({ timeout: 30000 });
-  await submitSurfacePrompt(surface, prompt);
-  await expect(surface.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  await assertProviderOutcome(surface, prompt);
-  await captureChatSurfaceState(page, surfaceName, "prompt-submitted", surface, {
-    promptSubmitted: true,
-    providerOutcomeRendered: true
-  });
+
+  for (let index = 0; index < prompts.length; index++) {
+    const prompt = prompts[index];
+    await submitSurfacePrompt(surface, prompt);
+    await expect(surface.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    await assertProviderOutcome(surface, prompt);
+    await captureChatSurfaceState(page, surfaceName, `prompt-${index + 1}-submitted`, surface, {
+      promptSubmitted: true,
+      providerOutcomeRendered: true
+    });
+  }
 }
 
 async function submitSurfacePrompt(surface, prompt) {
@@ -1113,21 +1201,25 @@ async function submitSurfacePrompt(surface, prompt) {
   runState.promptSubmitted = true;
 }
 
-async function testChatBar(page, bar, prompt) {
+async function testChatBarPrompts(page, bar, prompts) {
   await expect(bar).toBeVisible({ timeout: 30000 });
-  const input = bar.getByTestId("agent-chat-bar-input").first();
-  const sendButton = bar.getByTestId("agent-chat-bar-send").first();
-  await expect(input).toBeVisible({ timeout: 30000 });
-  await input.fill(prompt);
-  await expect(sendButton).toBeEnabled({ timeout: 30000 });
-  await sendButton.click();
-  runState.promptSubmitted = true;
-  await expect(bar.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
-  await assertProviderOutcome(bar, prompt);
-  await captureChatSurfaceState(page, "bar", "prompt-submitted", bar, {
-    promptSubmitted: true,
-    providerOutcomeRendered: true
-  });
+
+  for (let index = 0; index < prompts.length; index++) {
+    const prompt = prompts[index];
+    const input = bar.getByTestId("agent-chat-bar-input").first();
+    const sendButton = bar.getByTestId("agent-chat-bar-send").first();
+    await expect(input).toBeVisible({ timeout: 30000 });
+    await input.fill(prompt);
+    await expect(sendButton).toBeEnabled({ timeout: 30000 });
+    await sendButton.click();
+    runState.promptSubmitted = true;
+    await expect(bar.getByText(prompt, { exact: true }).first()).toBeVisible({ timeout: 30000 });
+    await assertProviderOutcome(bar, prompt);
+    await captureChatSurfaceState(page, "bar", `prompt-${index + 1}-submitted`, bar, {
+      promptSubmitted: true,
+      providerOutcomeRendered: true
+    });
+  }
 }
 
 async function assertProviderOutcome(chatSurface, prompt) {

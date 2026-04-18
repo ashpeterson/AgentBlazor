@@ -3,6 +3,14 @@ name: external-chat-widget
 on:
   workflow_dispatch:
     inputs:
+      package_source_mode:
+        description: "Package source mode: local packs current source, published installs from GitHub Packages"
+        required: false
+        default: "local"
+      package_version:
+        description: "AgentBlazor package version to install; defaults to Directory.Build.props version"
+        required: false
+        default: ""
       external_repo:
         description: "External Blazor repository to clone"
         required: false
@@ -52,6 +60,10 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   external-chat-widget:
     runs-on: ubuntu-latest
@@ -89,6 +101,10 @@ jobs:
 
       - name: Run External Chat Widget Validation
         env:
+          AGENTBLAZOR_PACKAGE_SOURCE_MODE: ${{ inputs.package_source_mode }}
+          AGENTBLAZOR_PACKAGE_VERSION: ${{ inputs.package_version }}
+          AGENTBLAZOR_GITHUB_PACKAGES_USERNAME: ${{ github.actor }}
+          AGENTBLAZOR_GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AGENTBLAZOR_EXTERNAL_REPO: ${{ inputs.external_repo }}
           AGENTBLAZOR_EXTERNAL_TEMPLATE: ${{ inputs.external_template }}
           AGENTBLAZOR_EXTERNAL_REF: ${{ inputs.external_ref }}
