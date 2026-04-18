@@ -1,6 +1,6 @@
 # AgentBlazor E2E (Playwright)
 
-Last updated: 2026-04-17
+Last updated: 2026-04-18
 
 Run locally from `tests/e2e`:
 
@@ -34,7 +34,7 @@ The external chat surface runner now verifies scaffold idempotency, submitted pr
 
 For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget and before visiting the injected surface harness. Set `AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT` to require a protected-page marker before chat assertions begin; the matrix uses this for the CleanArchitecture `/identity/users` authenticated route.
 
-Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.7` passed the e2e gate in run `24443709690`; `0.1.0-preview.8` is the next source package candidate. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
+Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.8` passed the e2e gate in run `24597951350`, and source external chat matrix run `24586690690` is green across the hardened widget/surface/panel/bar targets. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
 The real-usability runner requires an explicit live provider from environment variables. It intentionally does not treat demo `appsettings.json` sample values as proof that CI can reach a provider, because empty GitHub secrets or missing Ollama services otherwise produce misleading no-provider transcripts instead of a clear preflight failure.
 

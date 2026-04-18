@@ -1,6 +1,6 @@
 # NuGet Prerelease Checklist
 
-Last updated: 2026-04-15
+Last updated: 2026-04-18
 
 Use this before publishing `AgentBlazor` and `AgentBlazor.Cli` prerelease packages for real-project validation.
 
@@ -57,13 +57,13 @@ This catches packaging regressions such as:
 
 Current validated private-preview package:
 
-- `0.1.0-preview.8` is the current source package candidate and should be the next publish/validation version
-- `0.1.0-preview.7`
-- GitHub Packages workflow run `24443709690`
-- source commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
+- `0.1.0-preview.8`
+- GitHub Packages workflow run `24597951350`
+- source commit `79cf68df3c448868d1e90a845d3629da20cb5672`
+- published-feed clean-app validation passed, including CLI install, scaffold, restore/build, `doctor`, `validate`, and runtime static-asset smoke
 - published-feed real-app validation passed against `damienbod/BlazorSecurityNet10`, including CSP nonce preservation for scaffolded assets
 
-Before publishing `0.1.0-preview.8`, confirm the generated scaffold workflow compiles in a clean consumer app without manual references to bundled internal assemblies. The scaffolded `AppCapabilities.cs` file imports `AgentBlazor.App`, so the restored `AgentBlazor` package must expose `AgentBlazor.Core.dll` as a compile asset.
+The generated scaffold workflow has been confirmed to compile in a clean consumer app without manual references to bundled internal assemblies. The scaffolded `AppCapabilities.cs` file imports `AgentBlazor.App`, so each future release still needs published-feed validation that the restored `AgentBlazor` package exposes `AgentBlazor.Core.dll` as a compile asset.
 
 The current package should be described as:
 

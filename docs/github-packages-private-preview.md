@@ -1,6 +1,6 @@
 # GitHub Packages Private Preview
 
-Last updated: 2026-04-15
+Last updated: 2026-04-18
 
 Use this flow when you want to publish `AgentBlazor` and `AgentBlazor.Cli` privately and install them in a separate Blazor app as a test user.
 
@@ -23,13 +23,13 @@ Workflow:
 Current source private-preview version:
 
 - `0.1.0-preview.8`
-- source commit `c288c21666beba430ebf21980c3e96488721316c`
+- source commit `79cf68df3c448868d1e90a845d3629da20cb5672`
 
 Latest published-feed validated private-preview version:
 
-- `0.1.0-preview.7`
-- workflow run `24443709690`
-- source commit `5809ddcfda282e5a70bd89649a901e9599d89ac4`
+- `0.1.0-preview.8`
+- workflow run `24597951350`
+- source commit `79cf68df3c448868d1e90a845d3629da20cb5672`
 - package feed: `https://nuget.pkg.github.com/ashpeterson/index.json`
 
 How to run it:
@@ -86,7 +86,7 @@ Verify the CLI tool resolves to the preview package version:
 agentblazor --version
 ```
 
-Expected for the current source preview after `0.1.0-preview.8` is published:
+Expected for the current private-preview package:
 
 ```text
 0.1.0-preview.8
@@ -107,13 +107,13 @@ agentblazor validate
 ## Notes
 
 - This is the right path for private preview testing.
-- `0.1.0-preview.7` has been validated from GitHub Packages against a clean Blazor Web App and external real-world Blazor apps including `neozhu/CleanArchitectureWithBlazorServer` and `damienbod/BlazorSecurityNet10`.
-- `0.1.0-preview.8` is the current source package version and includes the SDK roll-forward/package-lock update needed for newer .NET 10 preview SDK environments.
+- `0.1.0-preview.8` has been validated from GitHub Packages against a clean Blazor Web App and the external real-world CSP/nonce-aware app `damienbod/BlazorSecurityNet10`.
+- `0.1.0-preview.8` includes the SDK roll-forward/package-lock update needed for newer .NET 10 preview SDK environments.
 - Use the same exact version for `AgentBlazor` and `AgentBlazor.Cli`. Scaffolded workflow files use `AgentBlazor.App` APIs such as `CapabilityResult`; those will not compile if the runtime package is stale or mismatched with the CLI.
-- Published-feed validation should use a clean Blazor Web App or real app, isolated NuGet cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and a runtime HTTP smoke with a placeholder `OpenAI__ApiKey`.
+- Published-feed validation for `0.1.0-preview.8` used isolated NuGet config/cache/tool paths, `agentblazor init`, `scaffold --diff`, `scaffold --approve`, `dotnet restore`, `dotnet build`, `doctor`, `validate`, and runtime HTTP smokes with a placeholder `OpenAI__ApiKey`. Clean-app workdir: `/tmp/agentblazor-published-preview8-clean-20260418053801`. Real-app workdir: `/tmp/agentblazor-published-preview8-damienbod-20260418053944/BlazorSecurityNet10/BlazorApp`.
 - For deterministic runtime smoke, prefer `dotnet run --no-launch-profile --urls http://127.0.0.1:5288` or another known free port; otherwise app launch profiles can bind a different port than the one being probed.
-- Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, `0.1.0-preview.3` later exposed a real-app dependency-range issue, the `0.1.0-preview.4` feed version was already occupied by an older immutable build, `0.1.0-preview.5` was too strict for apps that already depend on Microsoft Agents `1.1.0`, and `0.1.0-preview.6` did not preserve CSP nonces for scaffolded script/link assets. Use `0.1.0-preview.8` or later once it is published, or `0.1.0-preview.7` for the latest fully validated published-feed package.
-- Earlier `0.1.0-preview.3` clean-app validation passed, but real-app runtime smoke exposed an open dependency-range issue where NuGet could float Microsoft Agents packages to an incompatible API. Use `0.1.0-preview.8` after publish, or `0.1.0-preview.7` for the latest fully validated published-feed package.
+- Earlier `0.1.0-preview.2` GitHub Packages validation found a stale immutable runtime package, `0.1.0-preview.3` later exposed a real-app dependency-range issue, the `0.1.0-preview.4` feed version was already occupied by an older immutable build, `0.1.0-preview.5` was too strict for apps that already depend on Microsoft Agents `1.1.0`, and `0.1.0-preview.6` did not preserve CSP nonces for scaffolded script/link assets. Use `0.1.0-preview.8` or later for private-preview testing.
+- Earlier `0.1.0-preview.3` clean-app validation passed, but real-app runtime smoke exposed an open dependency-range issue where NuGet could float Microsoft Agents packages to an incompatible API. Use `0.1.0-preview.8` or later for private-preview testing.
 - Real-app tester checklist: `docs/private-preview-validation.md`.
 - Once real-project validation is complete, move to `nuget.org` for normal public installation.
 - The package currently targets `net10.0`.

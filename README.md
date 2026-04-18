@@ -1,6 +1,6 @@
 # AgentBlazor
 
-Last updated: 2026-04-15
+Last updated: 2026-04-18
 
 Make your Blazor app agent-capable.
 
@@ -207,14 +207,14 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-04-15:
+As of 2026-04-18:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
 - normalized execution, approval, policy, and context-freshness contracts are in place
 - the old planner/runtime path is no longer the product center
 - the demo is now led by orchestration workflows instead of primitive component control
-- `0.1.0-preview.8` is the current source/package version; `0.1.0-preview.7` remains the latest fully published-feed validated package
+- `0.1.0-preview.8` is the current source/package version and latest fully published-feed validated package
 - published-feed validation now covers CSP nonce-aware host shells as well as Clean Architecture-style real apps
 - runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
 - middleware is now wired through both normal and streaming runtime turns
