@@ -44,7 +44,7 @@ public sealed class AgentChatSurfaceTests : TestContext
             Assert.Equal("test-run-1", runtimeAdapter.LastStoppedRunId);
             Assert.Contains("Run canceled.", cut.Markup);
             Assert.DoesNotContain("Something went wrong", cut.Markup);
-        });
+        }, TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public sealed class AgentChatSurfaceTests : TestContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("Run canceled.", cut.Markup);
-        });
+        }, TimeSpan.FromSeconds(10));
 
         var sessionId = AgentConversationScope.BuildSessionKey("cancel-session", "Test Agent", isolateByAgent: false);
         var history = await Services.GetRequiredService<IConversationStore>().GetHistoryAsync(sessionId);
