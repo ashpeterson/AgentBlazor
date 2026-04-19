@@ -64,9 +64,6 @@ permissions:
   contents: read
   packages: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   external-chat-widget:
     runs-on: ubuntu-latest
@@ -74,15 +71,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK (pinned)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -124,7 +121,7 @@ jobs:
 
       - name: Upload External Chat Widget Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: external-chat-widget-artifacts
           path: tests/e2e/artifacts/external-chat-widget/**
