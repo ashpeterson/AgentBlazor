@@ -45,7 +45,8 @@ What is implemented now:
   - supports `--provider openai|azure-openai|ollama`
   - keeps advanced and legacy Blazor hosts in review-first mode with safe additions plus manual-review items
   - infers companion hosted WebAssembly client projects from project references so server-plus-client scaffold can target the correct UI files
-  - can now preview/apply the standard hosted WebAssembly server `Program.cs` path plus standard client `_Imports.razor`, shell, layout, and page edits
+  - can now preview/apply the standard hosted WebAssembly server `Program.cs` path while leaving browser-client `_Imports.razor`, shell assets, providers, and chat surfaces as explicit manual-review items
+  - reports the browser-safe hosted WebAssembly path as `AgentBlazor.Client` remote chat components plus `MapAgentBlazorRemoteChat()` on the server
   - still stops early only when the CLI cannot classify the host into a supported Blazor scaffold path
   - writes `.agentblazor/scaffold-manifest.json` on apply
   - supports local-source evaluation via `--use-local-source`
@@ -182,7 +183,7 @@ The first installable baseline should handle:
 Current limitation:
 
 - scaffold can now write provider-specific registration, but environment-specific secrets and config values are still a human step
-- advanced-host support now includes a working hosted WebAssembly server+client path, but more exotic nonstandard hosts still fall back to review-first/manual work
+- advanced-host support now includes safe hosted WebAssembly server startup/workflow scaffolding and actionable `AgentBlazor.Client` remote-chat guidance, but browser-client auto-patching and more exotic nonstandard hosts still fall back to review-first/manual work
 
 ## Safety Rules
 

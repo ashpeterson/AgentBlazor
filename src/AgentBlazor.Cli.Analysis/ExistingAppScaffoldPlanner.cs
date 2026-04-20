@@ -228,7 +228,7 @@ public sealed class ExistingAppScaffoldPlanner
             (HostFamily.LegacyServer, "chat-surface") =>
                 "Mount `AgentChatWidget` or `AgentChatSurface` on a page/component that is reachable from the legacy `_Host`-based app shell.",
             (HostFamily.HostedWebAssembly, "ui-imports") =>
-                "Review the hosted WebAssembly client `_Imports.razor` manually. The current source package boundary is server-first, so client-side AgentBlazor UI edits need a browser-safe package split or a remote-client integration path before auto-scaffold can write them safely.",
+                "Review the hosted WebAssembly client `_Imports.razor` manually. For the browser-safe remote path, add the `AgentBlazor.Client` package to the client project and import `AgentBlazor.Client.Chat` before placing remote chat components.",
             (HostFamily.HostedWebAssembly, "mud-services") =>
                 "Add MudBlazor services in the hosted WebAssembly server startup path, typically `Program.cs`, alongside the API/static file pipeline that serves the client app.",
             (HostFamily.HostedWebAssembly, "agentblazor-services") =>
@@ -238,11 +238,11 @@ public sealed class ExistingAppScaffoldPlanner
             (HostFamily.HostedWebAssembly, "endpoint-mapping") =>
                 "Map AgentBlazor endpoints in the hosted WebAssembly server pipeline before the `MapFallbackToFile(\"index.html\")` client fallback.",
             (HostFamily.HostedWebAssembly, "shell-assets") =>
-                "Add the AgentBlazor and MudBlazor CSS/JS asset references in the hosted WebAssembly client shell, commonly `wwwroot/index.html` in the client project.",
+                "Review the hosted WebAssembly client shell, commonly `wwwroot/index.html`. The `AgentBlazor.Client` remote components avoid the server-first AgentBlazor/MudBlazor asset path; only keep additional shell assets if the chosen client integration requires them.",
             (HostFamily.HostedWebAssembly, "mud-providers") =>
-                "Review the hosted WebAssembly client layout manually before adding Mud providers; client-side provider edits also require the client project to reference browser-compatible UI dependencies.",
+                "Review the hosted WebAssembly client layout manually. The `AgentBlazor.Client` remote components do not require Mud providers; add Mud providers only if the client app already owns that browser-compatible dependency.",
             (HostFamily.HostedWebAssembly, "chat-surface") =>
-                "Use a remote/server-backed chat integration for hosted WebAssembly clients. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
+                "Use `MapAgentBlazorRemoteChat()` on the server and mount `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, or `AgentRemoteChatBar` from `AgentBlazor.Client` in the WebAssembly client. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
             (HostFamily.OqtaneStyle, "mud-services") =>
                 "Add MudBlazor services in the Oqtane host startup path where platform service registration is composed, not by assuming a standard standalone Blazor `Program.cs` layout.",
             (HostFamily.OqtaneStyle, "agentblazor-services") =>
@@ -265,11 +265,11 @@ public sealed class ExistingAppScaffoldPlanner
             ? itemId switch
             {
                 "ui-imports" =>
-                    "Review the WebAssembly client `_Imports.razor` manually. The current AgentBlazor source package boundary is server-first, so client-side AgentBlazor UI edits need a browser-safe package split or remote-client integration path before auto-scaffold can write them safely.",
+                    "Review the WebAssembly client `_Imports.razor` manually. For the browser-safe remote path, add the `AgentBlazor.Client` package to the client project and import `AgentBlazor.Client.Chat` before placing remote chat components.",
                 "mud-providers" =>
-                    "Review the WebAssembly client layout manually before adding Mud providers; client-side provider edits also require the client project to reference browser-compatible UI dependencies.",
+                    "Review the WebAssembly client layout manually. The `AgentBlazor.Client` remote components do not require Mud providers; add Mud providers only if the client app already owns that browser-compatible dependency.",
                 "chat-surface" =>
-                    "Use a remote/server-backed chat integration for WebAssembly clients. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
+                    "Use `MapAgentBlazorRemoteChat()` on the server and mount `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, or `AgentRemoteChatBar` from `AgentBlazor.Client` in the WebAssembly client. Do not auto-mount the current server-first AgentBlazor chat surface in a browser-only client project.",
                 _ => BuildGuidance(family, itemId)
             }
             : BuildGuidance(family, itemId);

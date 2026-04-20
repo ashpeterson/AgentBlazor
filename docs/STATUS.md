@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 ## Production Readiness
 
@@ -15,8 +15,8 @@ Production gates:
 - Real OpenAI-backed workflow validation is now covered by `ProviderAdapterIntegrationTests`: simple chat, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity.
 - Azure OpenAI is wired through the Microsoft Azure OpenAI client and the shared `IChatClient` runtime path, with API-key and `TokenCredential` registration coverage. Live Azure deployment validation remains app-owner specific.
 - Published-feed package validation is complete for `AgentBlazor` and `AgentBlazor.Cli` version `0.1.0-preview.8`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, `0.1.0-preview.5` downgrade-conflict, and `0.1.0-preview.6` CSP nonce findings with a Microsoft Agents 1.1-compatible package that passes clean-app and real-app validation.
-- Current source and latest published-feed validated package are now `0.1.0-preview.8` with `global.json` roll-forward set to `latestMinor` and web-app runtime framework pins set to `10.0.6` for newer .NET 10 preview SDK environments.
-- Finish the browser-safe WebAssembly client story: current CLI behavior detects companion WebAssembly UI projects and leaves client layout/chat work in manual review because the current AgentBlazor UI surface is server-first.
+- Current source version is now `0.1.0-preview.9`; latest published-feed validated package remains `0.1.0-preview.8` until the next GitHub Packages workflow completes. The source keeps `global.json` roll-forward set to `latestMinor` and web-app runtime framework pins set to `10.0.6` for newer .NET 10 preview SDK environments.
+- Finish hosted WebAssembly CLI automation: the first browser-safe remote client package, server endpoint, fresh WebAssembly package smoke, and generated hosted-WASM browser validation now pass; CLI browser-client auto-scaffold remains review-first.
 - Validate the exact preview package with a small external test group before production claims.
 - Document supported host shapes and review-first/unsupported host behavior.
 - Run demo/e2e separately if the public demo site is part of the production release.
@@ -70,13 +70,18 @@ The runtime realignment is now materially underway:
 - provider endpoint validation now rejects non-HTTP(S) custom endpoints
 - real OpenAI-backed adapter validation now covers runtime tool execution, approval gating, blocked/recovery/retry behavior, streaming/reconnect, cancellation, concurrency, and session-state continuity
 - Azure OpenAI provider registration now covers API-key and Azure `TokenCredential` authentication paths, and CLI scaffold can emit `--provider azure-openai` startup wiring
-- local and published-feed package validation now prove the `AgentBlazor` package and `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to the current source/package version, now `0.1.0-preview.8`
+- local and published-feed package validation now prove the `AgentBlazor` package and `AgentBlazor.Cli` tool install and run from a clean app without project references; CLI display and scaffolded package versions now derive from assembly package metadata and align to the current source/package version, now `0.1.0-preview.9`
 - the private-preview GitHub Packages workflow now publishes both the runtime package and CLI tool package; workflow run `24597951350` published and archived `0.1.0-preview.8` from commit `79cf68df3c448868d1e90a845d3629da20cb5672`
 - published `0.1.0-preview.8` validation confirms Microsoft Agents 1.1 compatibility, the AG-UI async session serializer, semantic workflow APIs, CSP nonce preservation for scaffolded MudBlazor/AgentBlazor assets, and SDK roll-forward/package-lock compatibility with `Microsoft.AspNetCore.App.Internal.Assets` `10.0.6` for newer .NET 10 preview SDK environments
 - repo package source mapping now allows the full non-demo test matrix to restore and run locally
 - existing-app scaffold now keeps MudBlazor imports scoped to the patched layout provider file instead of adding `@using MudBlazor` globally, avoiding QuickGrid `PropertyColumn` tag collisions found in the official `dotnet/blazor-samples` Blazor Web App
 - modern Blazor Web Apps with companion WebAssembly client projects are detected as standard hosts with a separate UI project; server startup/shell edits are safe, while client layout/chat edits remain review-first
 - external hosted WebAssembly validation now confirms this behavior on a real server+client OSS app; server host scaffold/build/manifest validation passes while browser-client layout/chat edits remain explicit manual-review work
+- hosted WebAssembly readiness and scaffold output now explicitly call out that browser-client layout, asset, provider, and chat edits are review-first until a browser-safe package split or remote/server-backed client chat path is selected
+- `AgentBlazor.Client` now provides browser-safe `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, and `AgentRemoteChatBar` components that call the server-side runtime through `MapAgentBlazorRemoteChat()`
+- local WebAssembly client package smoke passed in a fresh `blazorwasm` app: installed `AgentBlazor.Client` `0.1.0-preview.8` from a local feed, mounted remote widget/surface/panel/bar, and built Release with `0` warnings and `0` errors. Workdir: `/tmp/agentblazor-client-wasm-CewXpL/WasmClient`.
+- generated hosted WebAssembly browser validation now passes against a fresh `dotnet new blazor --interactivity WebAssembly --all-interactive` app: packed local `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` `0.1.0-preview.9`; installed server/client packages from an isolated local feed; mapped `MapAgentBlazorRemoteChat()`; registered `HttpClient` in the WebAssembly client; submitted prompts through `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, and `AgentRemoteChatBar`; and verified widget minimize/reopen. Report: `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-22-45-020Z/report.md`.
+- `AgentRemoteChatWidget` now exposes `CssClass` and `Style` overrides so host apps can move the fixed widget away from existing bottom-right action bars, cookie banners, or support controls.
 - existing-app scaffold now respects plan-specific startup edits, avoids duplicate `AddMudServices(...)` when registration is composed outside `Program.cs`, inserts AgentBlazor registration after composed service chains such as `.AddServerUI(...)`, maps endpoints before async `RunAsync`, targets discovered existing root pages, and preserves UTF-8 BOMs on edited existing files
 - project-file scaffold now inserts package/project references without reserializing the whole `.csproj`, preserving XML declarations and MSBuild target expressions such as `@(Files->...)`
 - project-file scaffold now detects the nearest Central Package Management `Directory.Packages.props` and emits unversioned project `PackageReference` entries plus matching `PackageVersion` entries, validated against `thecodewrapper/CH.CleanArchitectureBlazor`
@@ -249,10 +254,10 @@ Latest local verification:
 Latest test status:
 
 - `AgentBlazor.Core.Tests`: `264/264`
-- `AgentBlazor.Components.Tests`: `103/104` passed, `1` skipped
+- `AgentBlazor.Components.Tests`: `108/109` passed, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
-- `AgentBlazor.Cli.IntegrationTests`: `9/9`
-- `AgentBlazor.IntegrationTests`: `118/118`
+- `AgentBlazor.Cli.IntegrationTests`: `0/9` passed, `9` skipped
+- `AgentBlazor.IntegrationTests`: `120/120`
 
 Latest real-app CLI validation:
 
@@ -315,7 +320,7 @@ Latest package validation:
 Latest browser status:
 
 - full end-to-end Playwright suite passed
-- current suite count: `3/3`
+- current suite count: `4/4`
 - real-usability nightly passed in workflow run `24598561465` after explicit `RuntimeFrameworkVersion` `10.0.6` pins stabilized locked restore for the demo and starter web apps
 
 Coverage includes:
@@ -331,10 +336,13 @@ Coverage includes:
 - Persistent user-level intelligence is not complete:
   - no durable `IActionHistoryStore` implementation yet
   - paid suggestions are not yet a mature long-term personalization system
-- WebAssembly-client chat integration is not production-ready yet:
+- Hosted WebAssembly client chat automation is not complete yet:
   - companion client projects are detected correctly
-  - server host wiring and shell asset patching build
-  - client layout/chat edits are review-first until a browser-safe UI package split or remote/server-backed client chat path exists
+  - server host wiring and workflow setup build
+  - the initial browser-safe remote chat package and endpoint exist with component and endpoint tests
+  - a fresh standalone WebAssembly client app builds with all remote chat surfaces from the packed `AgentBlazor.Client` package
+  - generated hosted-WASM browser validation passes across remote widget, surface, panel, and bar prompt submission
+  - CLI auto-scaffold for browser-client edits is still review-first/manual
 - Some component demos still prove isolated control better than full workflow depth, but the workflow showcase now spans multiple blocked and approval-gated scenarios.
 
 ### Demo Gaps

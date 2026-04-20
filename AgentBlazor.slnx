@@ -6,6 +6,7 @@
     <Project Path="samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/AgentBlazor.Client/AgentBlazor.Client.csproj" />
     <Project Path="src/AgentBlazor.Cli/AgentBlazor.Cli.csproj" />
     <Project Path="src/AgentBlazor.Cli.Analysis/AgentBlazor.Cli.Analysis.csproj" />
     <Project Path="src/AgentBlazor.Components/AgentBlazor.Components.csproj" />

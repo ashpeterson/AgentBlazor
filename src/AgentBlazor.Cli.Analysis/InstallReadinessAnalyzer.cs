@@ -163,9 +163,9 @@ public sealed class InstallReadinessAnalyzer
                 Kind = HostShapeKind.AdvancedReview,
                 Family = HostFamily.HostedWebAssembly,
                 Title = "Host shape",
-                Message = $"Detected a hosted WebAssembly-style Blazor server host. Scaffold can patch the standard server startup path plus safe companion client shell, layout, and page files when it can infer the client project, while leaving anything more host-specific in review-first mode. {string.Join(" ", reasons)}",
+                Message = $"Detected a hosted WebAssembly-style Blazor server host. Scaffold can patch the standard server startup path and create server-side AgentBlazor workflow wiring, but browser-client layout, provider, asset, and chat edits remain review-first until a browser-safe or remote/server-backed WebAssembly client chat path is selected. {string.Join(" ", reasons)}",
                 FilePath = evidencePath,
-                SuggestedFix = "Run scaffold preview to review the inferred server/client edits, then use scaffold apply for the safe path and finish any remaining host-specific work manually."
+                SuggestedFix = "Run scaffold preview to review the safe server edits and the explicit client manual-review items, then apply the server path and complete the WebAssembly client integration manually."
             };
         }
 

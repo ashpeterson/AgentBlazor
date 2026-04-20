@@ -45,8 +45,8 @@ What the workflow does:
 - restore, build, test, and run Playwright
 - pack the AgentBlazor package set
 - run the local consumer smoke test script, including CLI and startup validation
-- push `AgentBlazor` and `AgentBlazor.Cli` `.nupkg` files to GitHub Packages
-- upload both `.nupkg` files as workflow artifacts
+- push `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` `.nupkg` files to GitHub Packages
+- upload all package `.nupkg` files as workflow artifacts
 
 ## Install As A Test User
 

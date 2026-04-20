@@ -55,6 +55,11 @@ $packageDefinitions = @(
         OutputDir = Join-Path $repoRoot "src\AgentBlazor.Components\bin\Release"
     },
     @{
+        Id = "AgentBlazor.Client"
+        Project = Join-Path $repoRoot "src\AgentBlazor.Client\AgentBlazor.Client.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.Client\bin\Release"
+    },
+    @{
         Id = "AgentBlazor.Cli"
         Project = Join-Path $repoRoot "src\AgentBlazor.Cli\AgentBlazor.Cli.csproj"
         OutputDir = Join-Path $repoRoot "src\AgentBlazor.Cli\bin\Release"

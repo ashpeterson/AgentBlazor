@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AgentBlazor.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" />
     <ProjectReference Include="..\AgentBlazor.ProviderAdapters\AgentBlazor.ProviderAdapters.csproj" />
     <ProjectReference Include="..\AgentBlazor.Licensing\AgentBlazor.Licensing.csproj" />

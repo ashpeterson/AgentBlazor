@@ -1,0 +1,21 @@
+<aside class="ab-remote-panel @CssClass" style="@Style" data-testid="agent-remote-chat-panel" aria-label="@Title">
+    <AgentRemoteChatSurface Endpoint="@Endpoint"
+                            AgentName="@AgentName"
+                            SessionId="@SessionId"
+                            UserId="@UserId"
+                            Context="@Context"
+                            Title="@Title"
+                            Placeholder="@Placeholder" />
+</aside>
+
+@code {
+    [Parameter] public string Endpoint { get; set; } = "/agentblazor/chat/run";
+    [Parameter] public string? AgentName { get; set; }
+    [Parameter] public string SessionId { get; set; } = $"remote-panel-{Guid.NewGuid():N}";
+    [Parameter] public string? UserId { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Context { get; set; }
+    [Parameter] public string Title { get; set; } = "Assistant";
+    [Parameter] public string Placeholder { get; set; } = "Ask the assistant...";
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string? Style { get; set; }
+}

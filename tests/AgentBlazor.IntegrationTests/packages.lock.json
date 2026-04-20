@@ -280,7 +280,7 @@
       "agentblazor.core": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Licensing": "[0.1.0-preview.8, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.9, )",
           "Microsoft.Agents.AI": "[1.1.0, 1.1.0]",
           "Microsoft.Data.Sqlite": "[10.0.5, )"
         }
@@ -288,9 +288,9 @@
       "agentblazor.demo": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor": "[0.1.0-preview.8, )",
-          "AgentBlazor.Core": "[0.1.0-preview.8, )",
-          "AgentBlazor.Hosting": "[0.1.0-preview.8, )",
+          "AgentBlazor": "[0.1.0-preview.9, )",
+          "AgentBlazor.Core": "[0.1.0-preview.9, )",
+          "AgentBlazor.Hosting": "[0.1.0-preview.9, )",
           "Microsoft.EntityFrameworkCore": "[10.0.2, )",
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.2, )",
           "MudBlazor": "[9.0.0, )"
@@ -299,9 +299,9 @@
       "agentblazor.hosting": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[0.1.0-preview.8, )",
-          "AgentBlazor.Licensing": "[0.1.0-preview.8, )",
-          "AgentBlazor.ProviderAdapters": "[0.1.0-preview.8, )",
+          "AgentBlazor.Core": "[0.1.0-preview.9, )",
+          "AgentBlazor.Licensing": "[0.1.0-preview.9, )",
+          "AgentBlazor.ProviderAdapters": "[0.1.0-preview.9, )",
           "Microsoft.Agents.AI.Hosting.AGUI.AspNetCore": "[1.1.0-preview.260410.1, 1.1.0-preview.260410.1]"
         }
       },
@@ -311,7 +311,7 @@
       "agentblazor.provideradapters": {
         "type": "Project",
         "dependencies": {
-          "AgentBlazor.Core": "[0.1.0-preview.8, )",
+          "AgentBlazor.Core": "[0.1.0-preview.9, )",
           "Azure.AI.OpenAI": "[2.8.0-beta.1, )",
           "Microsoft.Agents.AI.OpenAI": "[1.1.0, 1.1.0]"
         }

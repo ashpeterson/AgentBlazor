@@ -9,18 +9,18 @@ Get AgentBlazor running in your Blazor app in under 5 minutes.
 
 The most validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI is supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path.
 
-Status as of 2026-04-18:
+Status as of 2026-04-20:
 
 - the non-demo test matrix is green
 - the CLI now supports `init -> scaffold -> doctor -> validate`
-- standard hosted WebAssembly server+client installs are now part of the supported scaffold path
-- `0.1.0-preview.8` is the current source/package version
+- hosted WebAssembly server startup/workflow wiring is part of the supported scaffold path; browser-client layout/assets/providers/chat remain review-first
+- `0.1.0-preview.9` is the current source/package version
 - `0.1.0-preview.8` is the latest GitHub Packages published-feed version with full clean-app, external real-app, and all-surface chat validation
 - scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
 
 ## Optional: Install The CLI
 
-The CLI can scaffold the standard runtime wiring for a standard Blazor host and the standard hosted WebAssembly server+client path, including a provider template, but you still need to supply the real configuration values for your environment.
+The CLI can scaffold the standard runtime wiring for a standard Blazor host and the safe server side of a hosted WebAssembly app, including a provider template, but you still need to supply the real configuration values for your environment. Hosted WebAssembly browser-client chat requires manual review until you choose a browser-safe or remote/server-backed integration path.
 
 For private-preview installs, pin the CLI and runtime package to the same version. Do not rely on a broad `--prerelease` install when testing scaffolded workflow code because the generated `AppCapabilities.cs` file uses semantic workflow APIs from `AgentBlazor.App`.
 
@@ -228,6 +228,47 @@ Use `AgentChatBar` when the page needs a compact command/search-style entry poin
     ];
 }
 ```
+
+## Hosted WebAssembly Client Chat
+
+For hosted WebAssembly apps, keep the full AgentBlazor runtime on the server project and use the browser-safe client package in the `.Client` project.
+
+Server project:
+
+```csharp
+app.MapAgentBlazorEndpoints();
+app.MapAgentBlazorRemoteChat();
+```
+
+Client project:
+
+```bash
+dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
+```
+
+Client `_Imports.razor`:
+
+```razor
+@using AgentBlazor.Client.Chat
+```
+
+Client layout or page:
+
+```razor
+<AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" />
+```
+
+The browser-safe client package also includes `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, and `AgentRemoteChatBar`. These components call the server runtime over HTTP and do not require the server-first `AgentBlazor` component package or MudBlazor providers in the WebAssembly client.
+
+If your app already has fixed bottom-right controls, move the floating widget with host-owned overrides:
+
+```razor
+<AgentRemoteChatWidget Endpoint="/agentblazor/chat/run"
+                       Title="Assistant"
+                       Style="right: 2rem; bottom: 7rem;" />
+```
+
+The hosted WebAssembly path has been validated in a generated server+client Blazor Web App by installing packed local `AgentBlazor` and `AgentBlazor.Client` packages, mapping `MapAgentBlazorRemoteChat()`, registering client `HttpClient`, submitting prompts through remote widget/surface/panel/bar, and verifying widget minimize/reopen behavior.
 
 ## 7. Run Your App
 

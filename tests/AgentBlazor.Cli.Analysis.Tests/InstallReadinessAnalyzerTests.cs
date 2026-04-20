@@ -311,6 +311,8 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
         Assert.Equal("HostedWasmClientApp", report.UiProjectName);
         Assert.Equal(clientProjectPath, report.UiProjectPath);
         Assert.Contains("hosted WebAssembly-style Blazor server host", report.HostShape.Message, StringComparison.Ordinal);
+        Assert.Contains("browser-client layout, provider, asset, and chat edits remain review-first", report.HostShape.Message, StringComparison.Ordinal);
+        Assert.Contains("remote/server-backed WebAssembly client chat path", report.HostShape.Message, StringComparison.Ordinal);
         Assert.Contains(report.Checks, check =>
             check.Id == "shell-assets" &&
             check.FilePath is not null &&

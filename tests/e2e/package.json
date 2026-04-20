@@ -11,7 +11,8 @@
     "test:real-usability": "node ./scripts/real-usability-runner.cjs",
     "test:paid-dashboard": "node ./scripts/paid-dashboard-runner.cjs",
     "test:external-chat-widget": "node ./scripts/external-chat-widget-runner.cjs",
-    "test:external-chat-surfaces": "node ./scripts/external-chat-widget-runner.cjs"
+    "test:external-chat-surfaces": "node ./scripts/external-chat-widget-runner.cjs",
+    "test:hosted-wasm-remote-chat": "node ./scripts/hosted-wasm-remote-chat-runner.cjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2"

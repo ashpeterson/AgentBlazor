@@ -1,6 +1,6 @@
 # AgentBlazor Plan (Living Document)
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 Owner: AgentBlazor core team
 Status: Active working plan
 
@@ -11,6 +11,11 @@ Status: Active working plan
 - Existing-app CLI onboarding now supports `init`, `scaffold`, `doctor`, and `validate`.
 - Existing-app scaffold now avoids global `@using MudBlazor` imports and scopes MudBlazor to the patched layout provider file to avoid QuickGrid component tag collisions.
 - Blazor Web Apps with companion WebAssembly client projects are detected; server host edits remain automatic, while client layout/chat edits are review-first until a browser-safe AgentBlazor client path exists.
+- Hosted WebAssembly CLI messaging now makes that split explicit in readiness/scaffold output instead of implying browser-client chat is fully scaffoldable.
+- `AgentBlazor.Client` now provides a first browser-safe remote chat path for hosted WebAssembly clients, backed by the server-side `MapAgentBlazorRemoteChat()` endpoint.
+- Fresh standalone WebAssembly package smoke now proves `AgentBlazor.Client` installs from a local feed and builds with remote widget/surface/panel/bar mounted.
+- Generated hosted WebAssembly browser validation now proves a fresh server+client Blazor Web App can install packed local `AgentBlazor`/`AgentBlazor.Client`, map `MapAgentBlazorRemoteChat()`, register WebAssembly `HttpClient`, prompt-test remote widget/surface/panel/bar, and minimize/reopen the floating widget.
+- `AgentRemoteChatWidget` now exposes `CssClass` and `Style` overrides so host apps can avoid collisions with fixed footers, action bars, cookie banners, and support controls.
 - External hosted WebAssembly validation now confirms that split on a real server+client OSS app; server host scaffold/build/manifest validation passes while browser-client providers/chat stay manual-review.
 - Existing-app scaffold now handles composed service-chain startup paths such as `.AddServerUI(...)`, avoids duplicate MudBlazor service registration, maps endpoints before async `RunAsync`, targets discovered existing root pages, and preserves UTF-8 BOMs on edited existing files.
 - Project-file scaffold now uses minimal package/project reference insertion instead of reserializing `.csproj` files, preserving XML declarations and MSBuild target expressions.
@@ -24,13 +29,14 @@ Status: Active working plan
   - OpenAI-compatible endpoint validation rejects non-HTTP(S) URIs
 - Current non-demo verification:
   - `AgentBlazor.Core.Tests`: `264/264`
-  - `AgentBlazor.Components.Tests`: `103/104`, `1` skipped
+  - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
   - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
-  - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-  - `AgentBlazor.IntegrationTests`: `118/118`
+  - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped
+  - `AgentBlazor.IntegrationTests`: `120/120`
 - Current real-provider validation:
   - `ProviderAdapterIntegrationTests`: `30/30` with real OpenAI provider config from `demo/AgentBlazor.Demo/appsettings.Development.json`; coverage includes chat response, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
 - Current package validation:
+  - local generated hosted WebAssembly browser validation passed for packed `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` `0.1.0-preview.9`; report `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-22-45-020Z/report.md`
   - GitHub Packages workflow `publish-github-packages-preview` run `24597951350` passed on commit `79cf68df3c448868d1e90a845d3629da20cb5672` for `0.1.0-preview.8`
   - clean Blazor Web App package validation installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.8` from GitHub Packages with isolated NuGet config/cache/tool paths; `agentblazor --version`, `init --non-interactive`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor` `9/9`, `validate` `3/3`, and runtime HTTP static-asset smoke all passed
   - published real-app package validation against `damienbod/BlazorSecurityNet10` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.8` from GitHub Packages with isolated NuGet/tool paths; baseline build, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore, build, `doctor` `9/9`, `validate` `3/3`, and runtime HTTP smoke all passed

@@ -1,0 +1,58 @@
+<section class="ab-remote-widget @(IsOpen ? "ab-remote-widget--open" : null) @CssClass"
+         style="@Style"
+         data-testid="agent-remote-chat-widget">
+    @if (IsOpen)
+    {
+        <div class="ab-remote-widget__window" data-testid="agent-remote-chat-widget-window">
+            <button class="ab-remote-widget__minimize"
+                    type="button"
+                    aria-label="Minimize remote chat widget"
+                    data-testid="agent-remote-chat-widget-minimize"
+                    @onclick="Minimize">
+                Minimize
+            </button>
+            <AgentRemoteChatSurface Endpoint="@Endpoint"
+                                    AgentName="@AgentName"
+                                    SessionId="@SessionId"
+                                    UserId="@UserId"
+                                    Context="@Context"
+                                    Title="@Title"
+                                    Placeholder="@Placeholder" />
+        </div>
+    }
+    else
+    {
+        <button class="ab-remote-widget__bubble"
+                type="button"
+                aria-label="Open remote agent chat"
+                data-testid="agent-remote-chat-widget-open"
+                @onclick="Open">
+            @BubbleLabel
+        </button>
+    }
+</section>
+
+@code {
+    [Parameter] public string Endpoint { get; set; } = "/agentblazor/chat/run";
+    [Parameter] public string? AgentName { get; set; }
+    [Parameter] public string SessionId { get; set; } = $"remote-widget-{Guid.NewGuid():N}";
+    [Parameter] public string? UserId { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Context { get; set; }
+    [Parameter] public string Title { get; set; } = "Assistant";
+    [Parameter] public string Placeholder { get; set; } = "Ask the assistant...";
+    [Parameter] public string BubbleLabel { get; set; } = "Ask AI";
+    [Parameter] public bool InitiallyOpen { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string? Style { get; set; }
+
+    private bool IsOpen { get; set; }
+
+    protected override void OnInitialized()
+    {
+        IsOpen = InitiallyOpen;
+    }
+
+    private void Open() => IsOpen = true;
+
+    private void Minimize() => IsOpen = false;
+}

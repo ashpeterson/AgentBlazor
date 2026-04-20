@@ -1,0 +1,4 @@
+.ab-remote-panel {
+    width: min(30rem, 100%);
+    min-height: 100%;
+}

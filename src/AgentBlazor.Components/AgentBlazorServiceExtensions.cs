@@ -107,4 +107,13 @@ public static class AgentBlazorServiceExtensions
             endpoints,
             pattern);
     }
+
+    public static IEndpointConventionBuilder MapAgentBlazorRemoteChat(
+        this IEndpointRouteBuilder endpoints,
+        string pattern = "/agentblazor/chat/run")
+    {
+        return AgentBlazor.Hosting.AgentBlazorRemoteChatEndpointRouteBuilderExtensions.MapAgentBlazorRemoteChat(
+            endpoints,
+            pattern);
+    }
 }

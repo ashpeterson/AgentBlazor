@@ -96,6 +96,14 @@ jobs:
           --api-key "${{ secrets.GITHUB_TOKEN }}"
           --timeout 120
 
+      - name: Publish WebAssembly client package to GitHub Packages
+        run: >
+          dotnet nuget push
+          "src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.nupkg"
+          --source "https://nuget.pkg.github.com/ashpeterson/index.json"
+          --api-key "${{ secrets.GITHUB_TOKEN }}"
+          --timeout 120
+
       - name: Publish CLI tool package to GitHub Packages
         run: >
           dotnet nuget push
@@ -110,5 +118,6 @@ jobs:
           name: agentblazor-packages-${{ inputs.package_version }}
           path: |
             src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg
+            src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg
           if-no-files-found: error

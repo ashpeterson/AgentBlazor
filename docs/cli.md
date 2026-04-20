@@ -1,11 +1,11 @@
 # CLI Guide
 
-Status as of 2026-04-16:
+Status as of 2026-04-20:
 
-- `AgentBlazor.Cli.Analysis.Tests`: `134/134`
-- `AgentBlazor.Cli.IntegrationTests`: `9/9`
+- `AgentBlazor.Cli.Analysis.Tests`: `135/135`
+- `AgentBlazor.Cli.IntegrationTests`: `9/9` discovered locally, skipped without an API key
 - standard Blazor hosts are fully scaffoldable
-- standard hosted WebAssembly server+client hosts are fully scaffoldable
+- hosted WebAssembly server hosts can be scaffolded for server startup/workflow wiring; browser-client layout/assets/providers/chat remain explicit manual-review work
 - scaffolded MudBlazor and AgentBlazor assets preserve existing `nonce="..."` attributes in CSP-aware shells
 - Central Package Management apps are supported for package scaffolding: project files receive unversioned `PackageReference` entries and the nearest active `Directory.Packages.props` receives matching `PackageVersion` entries
 - advanced/custom hosts remain review-first unless the CLI can safely classify and patch them
@@ -206,7 +206,7 @@ If the host uses Central Package Management with `ManagePackageVersionsCentrally
 
 If you pass `--provider`, scaffold writes the matching provider registration into `Program.cs` and leaves only the configuration values for you to supply. Azure OpenAI uses `AzureOpenAI:Endpoint`, `AzureOpenAI:DeploymentName`, and `AzureOpenAI:ApiKey` by default; apps that use managed identity can replace the scaffolded API-key argument with a `TokenCredential` such as `new DefaultAzureCredential()`. If you omit `--provider`, scaffold leaves concrete OpenAI, Azure OpenAI, and Ollama examples in comments.
 
-If the CLI detects an advanced or legacy Blazor host, scaffold now stays review-first: it previews safe file additions such as package/workflow changes and downgrades risky host-specific wiring to manual review. Oqtane, legacy `_Host.cshtml` server apps, and hosted WebAssembly server hosts are examples, but the path is meant to cover recognizable nonstandard Blazor hosts more broadly. For hosted WebAssembly servers, the CLI now infers the companion client project from project references, patches the standard server `Program.cs` startup path, and can patch safe client files such as `_Imports.razor`, `wwwroot/index.html`, layout, and page files there. Only hosts the CLI cannot classify into a Blazor scaffold path still stop early.
+If the CLI detects an advanced or legacy Blazor host, scaffold now stays review-first where safety requires it: it previews safe file additions such as package/workflow changes and downgrades risky host-specific wiring to manual review. Oqtane, legacy `_Host.cshtml` server apps, and hosted WebAssembly server hosts are examples, but the path is meant to cover recognizable nonstandard Blazor hosts more broadly. For hosted WebAssembly servers, the CLI infers the companion client project from project references and patches the standard server `Program.cs` startup path, but browser-client `_Imports.razor`, `wwwroot/index.html`, layout/provider, and chat surface edits remain manual-review. The supported browser-client path is `AgentBlazor.Client` plus `MapAgentBlazorRemoteChat()` on the server, with `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, or `AgentRemoteChatBar` mounted in the client. The remote widget supports `CssClass` and `Style` overrides so a host can avoid fixed footer/action-bar collisions. Only hosts the CLI cannot classify into a Blazor scaffold path still stop early.
 
 ## What The CLI Is For
 

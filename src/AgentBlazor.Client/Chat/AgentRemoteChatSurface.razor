@@ -1,0 +1,157 @@
+@inject IServiceProvider ServiceProvider
+
+<section class="ab-remote-chat @CssClass" style="@Style" data-testid="agent-remote-chat-surface" aria-label="@Title">
+    <header class="ab-remote-chat__header">
+        <div>
+            <div class="ab-remote-chat__eyebrow">@Eyebrow</div>
+            <h2 class="ab-remote-chat__title">@Title</h2>
+        </div>
+        <span class="ab-remote-chat__status">@(_isBusy ? "Thinking" : "Ready")</span>
+    </header>
+
+    <div class="ab-remote-chat__timeline" data-testid="agent-remote-chat-timeline" aria-live="polite">
+        @if (_messages.Count == 0)
+        {
+            <p class="ab-remote-chat__empty">@EmptyText</p>
+        }
+
+        @foreach (var message in _messages)
+        {
+            <article class="ab-remote-chat__message ab-remote-chat__message--@message.Role">
+                <div class="ab-remote-chat__message-role">@GetRoleLabel(message.Role)</div>
+                <div class="ab-remote-chat__message-text">@message.Text</div>
+            </article>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <article class="ab-remote-chat__message ab-remote-chat__message--error" role="alert">
+                <div class="ab-remote-chat__message-role">Error</div>
+                <div class="ab-remote-chat__message-text">@_error</div>
+            </article>
+        }
+    </div>
+
+    <div class="ab-remote-chat__controls">
+        <textarea class="ab-remote-chat__input"
+                  data-testid="agent-remote-chat-input"
+                  aria-label="Message input"
+                  placeholder="@Placeholder"
+                  rows="2"
+                  @bind="_prompt"
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDownAsync"
+                  disabled="@_isBusy" />
+        <button class="ab-remote-chat__send"
+                data-testid="agent-remote-chat-send"
+                aria-label="Send message"
+                type="button"
+                disabled="@(_isBusy || string.IsNullOrWhiteSpace(_prompt))"
+                @onclick="SendAsync">
+            Send
+        </button>
+    </div>
+</section>
+
+@code {
+    private readonly List<RemoteChatMessage> _messages = [];
+    private string _prompt = string.Empty;
+    private string? _error;
+    private bool _isBusy;
+
+    /// <summary>Remote endpoint mapped on the server with MapAgentBlazorRemoteChat().</summary>
+    [Parameter] public string Endpoint { get; set; } = "/agentblazor/chat/run";
+
+    /// <summary>Optional agent name to target on the server runtime.</summary>
+    [Parameter] public string? AgentName { get; set; }
+
+    /// <summary>Stable conversation session id. A generated id is used when omitted.</summary>
+    [Parameter] public string SessionId { get; set; } = $"remote-chat-{Guid.NewGuid():N}";
+
+    /// <summary>Optional user id for server-side personalization and audit flows.</summary>
+    [Parameter] public string? UserId { get; set; }
+
+    /// <summary>Optional request context sent to the server runtime.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Context { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Assistant";
+    [Parameter] public string Eyebrow { get; set; } = "AgentBlazor remote";
+    [Parameter] public string Placeholder { get; set; } = "Ask the assistant...";
+    [Parameter] public string EmptyText { get; set; } = "Ask a question to start a server-backed AgentBlazor session.";
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string? Style { get; set; }
+
+    private async Task SendAsync()
+    {
+        var message = _prompt.Trim();
+        if (_isBusy || message.Length == 0)
+        {
+            return;
+        }
+
+        _messages.Add(new RemoteChatMessage("user", message));
+        _prompt = string.Empty;
+        _error = null;
+        _isBusy = true;
+
+        try
+        {
+            var http = ServiceProvider.GetService(typeof(HttpClient)) as HttpClient;
+            if (http is null)
+            {
+                _error = "Remote chat is not ready yet. Ensure HttpClient is registered in the WebAssembly client Program.cs.";
+                return;
+            }
+
+            var response = await http.PostAsJsonAsync(
+                Endpoint,
+                new RemoteChatRunRequest(message, AgentName, SessionId, UserId, Context));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = $"Remote chat failed with HTTP {(int)response.StatusCode}.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<RemoteChatRunResponse>();
+            if (result is null)
+            {
+                _error = "Remote chat returned an empty response.";
+                return;
+            }
+
+            var text = result.RequiresClarification && !string.IsNullOrWhiteSpace(result.ClarificationQuestion)
+                ? result.ClarificationQuestion
+                : result.RequiresApproval
+                    ? $"Approval required for {result.PendingApprovalCount} action(s). Continue from a server-rendered AgentBlazor surface to approve."
+                    : result.ResponseText;
+
+            _messages.Add(new RemoteChatMessage("assistant", text));
+        }
+        catch (Exception ex)
+        {
+            _error = $"Remote chat request failed: {ex.Message}";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !args.ShiftKey)
+        {
+            await SendAsync();
+        }
+    }
+
+    private static string GetRoleLabel(string role) =>
+        role switch
+        {
+            "user" => "You",
+            "assistant" => "Assistant",
+            "error" => "Error",
+            _ => role
+        };
+}

@@ -151,7 +151,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
                     <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.8" />
+                    <PackageReference Include="AgentBlazor" Version="0.1.0-preview.9" />
                   </ItemGroup>
                 </Project>
                 """,
@@ -186,7 +186,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var report = await new InstallReadinessAnalyzer().AnalyzeAsync(projectPath, hostProjectName: null);
 
         Assert.Contains(plan.Items, item => item.Id == "package-references" && item.Action == ScaffoldPlanAction.Update);
-        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.8" />""", projectText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="AgentBlazor" Version="0.1.0-preview.9" />""", projectText, StringComparison.Ordinal);
         Assert.Contains("""<PackageReference Include="MudBlazor" Version="9.0.0" />""", projectText, StringComparison.Ordinal);
         Assert.Contains(report.Checks, check => check.Id == "package-references" && check.Status == InstallReadinessStatus.Pass);
     }
@@ -250,7 +250,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains("""<PackageReference Include="MudBlazor" />""", projectText, StringComparison.Ordinal);
         Assert.DoesNotContain("PackageReference Include=\"AgentBlazor\" Version=", projectText, StringComparison.Ordinal);
         Assert.DoesNotContain("PackageReference Include=\"MudBlazor\" Version=", projectText, StringComparison.Ordinal);
-        Assert.Contains("""<PackageVersion Include="AgentBlazor" Version="0.1.0-preview.8" />""", centralPackagesText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageVersion Include="AgentBlazor" Version="0.1.0-preview.9" />""", centralPackagesText, StringComparison.Ordinal);
         Assert.Contains("""<PackageVersion Include="MudBlazor" Version="9.0.0" />""", centralPackagesText, StringComparison.Ordinal);
     }
 
@@ -1110,9 +1110,12 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.TargetPath.EndsWith(Path.Combine("wwwroot", "index.html"), StringComparison.Ordinal));
         Assert.Contains(plan.Items, item => item.Id == "mud-providers" && item.TargetPath.EndsWith(Path.Combine("Shared", "MainLayout.razor"), StringComparison.Ordinal));
         Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.TargetPath.EndsWith(Path.Combine("Pages", "Index.razor"), StringComparison.Ordinal));
-        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Guidance is not null && item.Guidance.Contains("wwwroot/index.html", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "shell-assets" && item.Guidance is not null && item.Guidance.Contains("remote components avoid the server-first", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "ui-imports" && item.Guidance is not null && item.Guidance.Contains("AgentBlazor.Client.Chat", StringComparison.Ordinal));
+        Assert.Contains(plan.Items, item => item.Id == "chat-surface" && item.Guidance is not null && item.Guidance.Contains("AgentRemoteChatWidget", StringComparison.Ordinal));
         Assert.NotNull(plan.BlockReason);
         Assert.Contains("hosted WebAssembly-style Blazor server host", plan.BlockReason, StringComparison.Ordinal);
+        Assert.Contains("browser-client layout, provider, asset, and chat edits remain review-first", plan.BlockReason, StringComparison.Ordinal);
     }
 
     [Fact]

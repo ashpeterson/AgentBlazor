@@ -1,0 +1,136 @@
+.ab-remote-chat {
+    --ab-remote-accent: #0f766e;
+    --ab-remote-bg: #f7f3ea;
+    --ab-remote-ink: #17211c;
+    --ab-remote-muted: #647067;
+    --ab-remote-border: rgba(23, 33, 28, 0.14);
+    display: grid;
+    grid-template-rows: auto minmax(12rem, 1fr) auto;
+    gap: 1rem;
+    min-height: 28rem;
+    padding: 1rem;
+    color: var(--ab-remote-ink);
+    background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 34rem),
+        linear-gradient(135deg, #fffaf0, var(--ab-remote-bg));
+    border: 1px solid var(--ab-remote-border);
+    border-radius: 1.25rem;
+    box-shadow: 0 1.5rem 3rem rgba(23, 33, 28, 0.14);
+}
+
+.ab-remote-chat__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.ab-remote-chat__eyebrow {
+    color: var(--ab-remote-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.ab-remote-chat__title {
+    margin: 0.12rem 0 0;
+    font-size: clamp(1.15rem, 2vw, 1.55rem);
+}
+
+.ab-remote-chat__status {
+    padding: 0.3rem 0.6rem;
+    color: var(--ab-remote-accent);
+    background: rgba(15, 118, 110, 0.1);
+    border: 1px solid rgba(15, 118, 110, 0.22);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.ab-remote-chat__timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow: auto;
+    padding: 0.15rem;
+}
+
+.ab-remote-chat__empty {
+    margin: auto;
+    max-width: 24rem;
+    color: var(--ab-remote-muted);
+    text-align: center;
+}
+
+.ab-remote-chat__message {
+    max-width: min(34rem, 88%);
+    padding: 0.75rem 0.85rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--ab-remote-border);
+    border-radius: 1rem;
+}
+
+.ab-remote-chat__message--user {
+    align-self: flex-end;
+    color: #fff;
+    background: linear-gradient(135deg, #0f766e, #134e4a);
+}
+
+.ab-remote-chat__message--error {
+    border-color: rgba(185, 28, 28, 0.35);
+    background: #fff1f2;
+}
+
+.ab-remote-chat__message-role {
+    margin-bottom: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.74;
+}
+
+.ab-remote-chat__message-text {
+    white-space: pre-wrap;
+}
+
+.ab-remote-chat__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: end;
+}
+
+.ab-remote-chat__input {
+    min-height: 3.2rem;
+    resize: vertical;
+    padding: 0.8rem 0.9rem;
+    color: var(--ab-remote-ink);
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--ab-remote-border);
+    border-radius: 0.9rem;
+    font: inherit;
+}
+
+.ab-remote-chat__send {
+    min-height: 3.2rem;
+    padding: 0 1rem;
+    color: #fff;
+    background: #0f766e;
+    border: 0;
+    border-radius: 0.9rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ab-remote-chat__send:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+    .ab-remote-chat__controls {
+        grid-template-columns: 1fr;
+    }
+}

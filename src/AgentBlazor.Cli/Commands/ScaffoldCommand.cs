@@ -256,13 +256,15 @@ public sealed class ScaffoldCommand : AsyncCommand<ScaffoldCommand.Settings>
         table.AddColumn("Review");
         table.AddColumn("Target");
         table.AddColumn("Reason");
+        table.AddColumn("Guidance");
 
         foreach (var item in reviewItems)
         {
             table.AddRow(
                 Markup.Escape(item.Summary),
                 Markup.Escape(item.TargetPath),
-                Markup.Escape(item.Reason));
+                Markup.Escape(item.Reason),
+                Markup.Escape(string.IsNullOrWhiteSpace(item.Guidance) ? "-" : item.Guidance));
         }
 
         AnsiConsole.MarkupLine($"[yellow]Manual review items:[/] {reviewItems.Length}");

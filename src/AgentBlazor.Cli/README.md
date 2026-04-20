@@ -8,12 +8,12 @@
 4. `agentblazor doctor`
 5. `agentblazor validate`
 
-Current status as of 2026-04-18:
+Current status as of 2026-04-20:
 
 - CLI analysis tests: `135/135`
-- CLI integration tests: `9/9`
+- CLI integration tests: `9/9` discovered locally, skipped without an API key
 - standard existing Blazor hosts are scaffoldable end to end
-- standard hosted WebAssembly server+client hosts are scaffoldable end to end
+- hosted WebAssembly server hosts are scaffoldable for server startup/workflow wiring; browser-client layout/assets/providers/chat remain review-first with `AgentBlazor.Client` remote-chat guidance
 - CSP nonce-aware app shells are preserved when scaffold inserts MudBlazor and AgentBlazor assets
 - published-feed validation passes clean-app install, external real-app install, and all-surface chat browser validation for `0.1.0-preview.8`
 - advanced/custom hosts still fall back to review-first or blocked modes depending on how confidently the CLI can classify them
@@ -38,7 +38,7 @@ Current status as of 2026-04-18:
 - validates the current install state and scaffold audit trail when available
 - shows installer-style next steps from `init`
 - previews exact file-level baseline install edits for a standard Blazor host
-- applies the baseline install for a standard Blazor host and the standard hosted WebAssembly server+client path, and writes `.agentblazor/scaffold-manifest.json`
+- applies the baseline install for a standard Blazor host and the safe server side of hosted WebAssembly apps, and writes `.agentblazor/scaffold-manifest.json`
 - scaffolds provider-specific `Program.cs` registration for `openai`, `azure-openai`, or `ollama`
 - helps validate what the agent can see in the current app
 
