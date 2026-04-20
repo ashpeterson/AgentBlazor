@@ -1,6 +1,6 @@
 # AgentBlazor Runtime Realignment Plan
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 ## Status Snapshot
 
@@ -14,10 +14,10 @@ The runtime realignment is no longer only a plan. The default shipped path is no
 Current verification:
 
 - `AgentBlazor.Core.Tests`: `264/264`
-- `AgentBlazor.Components.Tests`: `103/104`, `1` skipped
+- `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
-- `AgentBlazor.Cli.IntegrationTests`: `9/9`
-- `AgentBlazor.IntegrationTests`: `118/118`
+- `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped without live CLI provider configuration
+- `AgentBlazor.IntegrationTests`: `121/121`
 
 ## Goal
 

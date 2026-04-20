@@ -194,6 +194,87 @@ public class UseProLicenseTests
     }
 
     [Fact]
+    public async Task UseProLicense_HandlesConcurrentMultiUserPaidStorage()
+    {
+        var dataDirectory = CreateTempDataDirectory();
+
+        try
+        {
+            await using var provider = CreatePaidProvider(dataDirectory);
+            var historyStore = provider.GetRequiredService<IActionHistoryStore>();
+            var inspectorStore = provider.GetRequiredService<IAgentInspectorStore>();
+            var analyticsService = provider.GetRequiredService<IUsageAnalyticsService>();
+            var auditService = provider.GetRequiredService<IAuditLogService>();
+            var suggestionService = provider.GetRequiredService<ISmartSuggestionService>();
+
+            const int userCount = 4;
+            const int sessionsPerUser = 3;
+            const int actionsPerSession = 4;
+            var totalSessions = userCount * sessionsPerUser;
+            var totalActions = totalSessions * actionsPerSession;
+
+            var tasks = Enumerable.Range(1, userCount)
+                .SelectMany(userIndex => Enumerable.Range(1, sessionsPerUser)
+                    .Select(sessionIndex => SeedConcurrentPaidSessionAsync(
+                        userIndex,
+                        sessionIndex,
+                        historyStore,
+                        inspectorStore,
+                        auditService)))
+                .ToArray();
+
+            await Task.WhenAll(tasks);
+
+            for (var userIndex = 1; userIndex <= userCount; userIndex++)
+            {
+                var userId = $"paid-user-{userIndex}";
+                var userEntries = await historyStore.GetByUserAsync(userId, limit: 100);
+                Assert.Equal(sessionsPerUser * actionsPerSession, userEntries.Count);
+                Assert.All(userEntries, entry => Assert.Equal(userId, entry.UserId));
+
+                var userAuditEvents = await auditService.GetByUserAsync(userId, limit: 100);
+                Assert.Equal(sessionsPerUser * actionsPerSession, userAuditEvents.Count);
+                Assert.All(userAuditEvents, evt => Assert.Equal(userId, evt.UserId));
+            }
+
+            var summary = await analyticsService.GetSummaryAsync(DateRange.Last30Days);
+            Assert.Equal(totalActions, summary.TotalActions);
+            Assert.Equal(userCount, summary.UniqueUsers);
+            Assert.Equal(totalSessions, summary.UniqueSessions);
+            Assert.Equal(0.75, summary.SuccessRate, precision: 3);
+
+            var topActions = await analyticsService.GetTopActionsAsync(limit: 10);
+            Assert.Contains(topActions, action => action.ActionId == "load_dashboard" && action.ExecutionCount == totalSessions);
+            Assert.Contains(topActions, action => action.ActionId == "create_report" && action.ExecutionCount == totalSessions);
+
+            var agentPerformance = await analyticsService.GetAgentPerformanceAsync();
+            var analyticsAgent = Assert.Single(agentPerformance);
+            Assert.Equal("analytics-agent", analyticsAgent.AgentId);
+            Assert.Equal(totalActions, analyticsAgent.TotalActions);
+            Assert.Equal(userCount, analyticsAgent.UniqueUsers);
+
+            var patterns = await suggestionService.GetPatternsAsync("paid-user-1", limit: 10);
+            Assert.Contains(
+                patterns,
+                pattern => pattern.PrecedingActions.SequenceEqual(["load_dashboard"]) &&
+                           pattern.NextAction == "create_report" &&
+                           pattern.Occurrences == sessionsPerUser);
+
+            var routeSuggestions = await suggestionService.GetPopularForRouteAsync("/reports", limit: 5);
+            Assert.Contains(routeSuggestions, suggestion => suggestion.ActionId == "load_dashboard");
+
+            var inspectedSession = inspectorStore.GetRecentRuns("paid-user-1-session-1", limit: 10);
+            var inspectedRun = Assert.Single(inspectedSession);
+            Assert.Equal("paid-user-1-session-1-run", inspectedRun.RunId);
+            Assert.True(inspectedRun.Succeeded);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(dataDirectory);
+        }
+    }
+
+    [Fact]
     public void NoLicense_UsesNullHistoryStore()
     {
         var services = new ServiceCollection();
@@ -314,6 +395,76 @@ public class UseProLicenseTests
             "127.0.0.1",
             new Dictionary<string, object?> { ["agentId"] = "analytics-agent" }));
     }
+
+    private static async Task SeedConcurrentPaidSessionAsync(
+        int userIndex,
+        int sessionIndex,
+        IActionHistoryStore historyStore,
+        IAgentInspectorStore inspectorStore,
+        IAuditLogService auditService)
+    {
+        var userId = $"paid-user-{userIndex}";
+        var sessionId = $"{userId}-session-{sessionIndex}";
+        var startedAt = DateTimeOffset.UtcNow
+            .AddMinutes(-(userIndex * 10 + sessionIndex));
+
+        var actions = new[]
+        {
+            new SeededAction("open dashboard", "load_dashboard", true, 120),
+            new SeededAction("create report", "create_report", true, 240),
+            new SeededAction("approve export", "approve_export", true, 180),
+            new SeededAction("sync external report", "sync_report", false, 320)
+        };
+
+        for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
+        {
+            var action = actions[actionIndex];
+            await historyStore.RecordAsync(new ActionHistoryEntry(
+                sessionId,
+                userId,
+                startedAt + TimeSpan.FromSeconds(actionIndex * 10),
+                action.UserMessage,
+                action.ActionId,
+                "analytics-agent",
+                new Dictionary<string, object?>
+                {
+                    ["userIndex"] = userIndex,
+                    ["sessionIndex"] = sessionIndex,
+                    ["actionIndex"] = actionIndex
+                },
+                action.Succeeded,
+                TimeSpan.FromMilliseconds(action.DurationMs),
+                "/reports",
+                action.Succeeded ? null : "External report service timed out"));
+
+            await auditService.LogActionAsync(
+                userId,
+                $"{userId}@example.com",
+                action.ActionId,
+                "analytics-agent",
+                action.Succeeded,
+                action.Succeeded ? null : "External report service timed out",
+                "127.0.0.1");
+        }
+
+        inspectorStore.RecordRun(new InspectorRunRecord(
+            $"{sessionId}-run",
+            sessionId,
+            "analytics-agent",
+            startedAt,
+            startedAt + TimeSpan.FromSeconds(45),
+            "System prompt",
+            "Plan response",
+            [new InspectorEvent(startedAt, "tool", "AgentGrid", "load_dashboard", "Loaded reports")],
+            true,
+            null));
+    }
+
+    private sealed record SeededAction(
+        string UserMessage,
+        string ActionId,
+        bool Succeeded,
+        int DurationMs);
 
     private static string CreateTempDataDirectory()
     {

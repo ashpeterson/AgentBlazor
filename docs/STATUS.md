@@ -17,10 +17,11 @@ Production gates:
 - Published-feed package validation is complete for `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` version `0.1.0-preview.9`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, `0.1.0-preview.5` downgrade-conflict, and `0.1.0-preview.6` CSP nonce findings with a Microsoft Agents 1.1-compatible package set that passes clean-app, real-app, all-surface browser, and hosted WebAssembly remote-client validation.
 - Current source and latest published-feed validated package are now `0.1.0-preview.9`. The source keeps `global.json` roll-forward set to `latestMinor` and web-app runtime framework pins set to `10.0.6` for newer .NET 10 preview SDK environments.
 - Finish hosted WebAssembly CLI automation: the first browser-safe remote client package, server endpoint, fresh WebAssembly package smoke, and generated hosted-WASM browser validation now pass; CLI browser-client auto-scaffold remains review-first.
+- Pro tier automated storage validation now covers concurrent multi-user usage through the real `UseProLicense()` SQLite service graph; production Pro claims still require a controlled app-owner pilot for retention, authorization, backup, dashboard access, and rollback.
 - Validate the exact preview package with a small external test group before production claims.
 - Document supported host shapes and review-first/unsupported host behavior.
 - Run demo/e2e separately if the public demo site is part of the production release.
-- Decide the public paid-tier promise around durable intelligence and personalization.
+- Keep the public paid-tier promise scoped to durable intelligence, analytics, audit, and suggestions until a real production pilot validates operational behavior.
 
 ## Current Product Shape
 
@@ -89,6 +90,7 @@ The runtime realignment is now materially underway:
 - external real-app chat validation now covers all shipped chat entry points, not only the floating widget: the runner can validate `AgentChatWidget` on the app route, inject a temporary route into the cloned app, and prompt-test `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic or no-provider assertions
 - the external chat runner now supports `AGENTBLAZOR_PACKAGE_SOURCE_MODE=published` to validate the exact package and CLI from GitHub Packages instead of the source tree, including isolated NuGet config and credential setup for the cloned app
 - latest publish workflow is green in run `24680658866`; latest published-feed all-surface external chat validation is green for `0.1.0-preview.9` with report `tests/e2e/artifacts/external-chat-widget/2026-04-20T17-33-11-449Z/report.md`; latest published-feed hosted WebAssembly remote-chat validation is green with report `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-31-59-002Z/report.md`; latest real-usability nightly is green in run `24598561465`
+- paid-tier persistence now has an automated multi-user validation test, `UseProLicense_HandlesConcurrentMultiUserPaidStorage`, covering concurrent action history, audit, inspector, analytics, and smart suggestion usage with one Pro data directory
 
 ## Shipped and Working
 
@@ -228,6 +230,9 @@ Current paid differentiation is service-oriented, not component-action-oriented:
 - action history
 - adaptive suggestions
 - proactive insights
+- usage analytics
+- audit logging
+- smart suggestions
 
 Current funnel intent:
 
@@ -237,9 +242,9 @@ Current funnel intent:
 
 Important limitation:
 
-- persistent cross-session user intelligence is not complete yet
-- the current paid action history store is still in-memory
-- the currently wired suggestion path is not a durable user-profile system yet
+- persistent cross-session user intelligence is still a preview foundation, not a mature personalization system
+- paid storage now uses SQLite-backed durable services and has automated multi-user validation, but still needs production-pilot backup, retention, authorization, and rollback proof
+- the currently wired suggestion path is pattern/route-based durable guidance with optional LLM fallback, not a full durable user-profile system yet
 
 ## Verification Snapshot
 
@@ -257,7 +262,7 @@ Latest test status:
 - `AgentBlazor.Components.Tests`: `108/109` passed, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
 - `AgentBlazor.Cli.IntegrationTests`: `0/9` passed, `9` skipped
-- `AgentBlazor.IntegrationTests`: `120/120`
+- `AgentBlazor.IntegrationTests`: `121/121`
 
 Latest real-app CLI validation:
 
@@ -460,4 +465,5 @@ Current note:
 - NuGet prerelease checklist: `docs/nuget-prerelease-checklist.md`
 - GitHub Packages private preview: `docs/github-packages-private-preview.md`
 - Tier model: `docs/pricing-tiers.md`
+- Pro tier operations: `docs/pro-tier-operations.md`
 - Runtime realignment plan: `docs/runtime-realignment-plan.md`

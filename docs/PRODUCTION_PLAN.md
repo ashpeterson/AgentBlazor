@@ -16,7 +16,7 @@ Current validated baseline:
 - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
 - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped without live CLI provider configuration
-- `AgentBlazor.IntegrationTests`: `120/120`
+- `AgentBlazor.IntegrationTests`: `121/121`
 
 Recent hardening complete:
 
@@ -55,16 +55,15 @@ Recent hardening complete:
   - run the private-preview package through a small external validation group
   - sign off demo/e2e if the demo site is part of the public production story
 
-### Paid Tier - Feature-Complete Preview, Not Production-Proven
+### Paid Tier - Feature-Complete Preview, Not Production-Piloted
 
 - SQLite persistence exists for action history, inspector runs, audit, analytics, and suggestions.
 - `AgentProDashboard` exists.
 - License format validation and service replacement exist.
+- Automated multi-user Pro storage validation now covers concurrent users/sessions through action history, audit, inspector runs, analytics, and smart suggestions using one Pro data directory.
 - Remaining before broad production:
-  - prove paid storage under realistic multi-user app usage
-  - decide the public promise around persistent intelligence and personalization
-  - add a paid-tier guide with operational expectations and limitations
-  - validate upgrade/downgrade behavior and failure modes
+  - validate Pro in a controlled real-app pilot with app-owner retention, backup, authorization, dashboard access, and rollback sign-off
+  - validate upgrade/downgrade behavior in the pilot environment, including disabling Pro while leaving existing SQLite files untouched
 
 ---
 
@@ -98,6 +97,7 @@ Validation log:
 - 2026-04-18 real-usability nightly run `24598536039` initially failed during locked restore because the GitHub Actions SDK resolved the implicit web runtime package `Microsoft.AspNetCore.App.Internal.Assets` as `[10.0.5,)` while the lock files expected `[10.0.6,)`. Commit `990bd71e8a531b544984209f11b1811354707dda` fixed the root issue by pinning `RuntimeFrameworkVersion` `10.0.6` in the demo and starter web apps; real-usability nightly run `24598561465` then passed restore, build, browser setup, real-usability execution, and artifact upload.
 - 2026-04-20 GitHub Packages workflow `publish-github-packages-preview` run `24680658866` passed for `0.1.0-preview.9` on commit `faaeb6842ca90f4bd4cdeea070b1a28e30886463`. The run published `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli`, and passed restore, build, tests, Playwright e2e, local package smoke, package pushes, and artifact upload. Published-feed hosted WebAssembly validation then installed `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` `0.1.0-preview.9` from GitHub Packages into a generated server+client app and passed browser prompt validation for remote widget/surface/panel/bar plus widget minimize/reopen. Report: `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-31-59-002Z/report.md`.
 - 2026-04-20 published-feed real-app validation against `damienbod/BlazorSecurityNet10` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.9` from GitHub Packages with isolated NuGet/tool paths, then passed baseline build, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore/build, `doctor` readiness `9/9`, `validate` readiness `9/9`, validation `3/3`, runtime HTTP smoke, and Playwright prompt validation for `AgentChatWidget`, `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic provider responses. Report: `tests/e2e/artifacts/external-chat-widget/2026-04-20T17-33-11-449Z/report.md`.
+- 2026-04-20 paid-tier storage validation added `UseProLicense_HandlesConcurrentMultiUserPaidStorage`, covering 4 users, 12 sessions, 48 action-history records, matching audit events, inspector runs, usage analytics, agent performance, route suggestions, and sequence-pattern suggestions through the real `UseProLicense()` SQLite service graph.
 
 Exit criteria:
 
@@ -146,6 +146,7 @@ Exit criteria:
 - [x] Add a private-preview limitations section
 - [x] Add a real-app CLI validation checklist
 - [x] Add a provider configuration checklist for OpenAI, Azure OpenAI, and Ollama
+- [x] Add a Pro tier operations guide with storage, authorization, backup, retention, and pilot limits
 
 ### 1.3 Preview Ship
 - [x] Run publish workflow with version 0.1.0-preview.7

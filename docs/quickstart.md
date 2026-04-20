@@ -400,6 +400,8 @@ Then add the Pro Dashboard to your app:
 <AgentProDashboard Title="Analytics" DaysRange="30" />
 ```
 
+For production pilots, configure an explicit persistent `dataDirectory`, protect the SQLite files, and restrict dashboard access to operators/admins. See [Pro Tier Operations](pro-tier-operations.md) for storage, retention, backup, authorization, and rollback expectations.
+
 ## Available Components
 
 AgentBlazor includes 14 agentic components:
@@ -474,5 +476,6 @@ dotnet build .\MyBlazorApp.csproj
 - Run `demo/AgentBlazor.Demo` to see workflow orchestration in action
 - Read [CLI Guide](cli.md) if you want to generate `.agentblazor/AGENT.md`
 - See [Pricing Tiers](pricing-tiers.md) for Pro features
+- See [Pro Tier Operations](pro-tier-operations.md) before enabling Pro in a real app
 - Check `docs/STATUS.md` for current implementation status
 - Use OpenAI as the first production provider you validate in a real app

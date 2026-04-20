@@ -1,6 +1,6 @@
 # AgentBlazor
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 Make your Blazor app agent-capable.
 
@@ -207,30 +207,31 @@ Supporting references remain available:
 
 ## Current Status
 
-As of 2026-04-18:
+As of 2026-04-20:
 
 - the adapter-first runtime path is the default path
 - semantic capabilities are a first-class authoring surface
 - normalized execution, approval, policy, and context-freshness contracts are in place
 - the old planner/runtime path is no longer the product center
 - the demo is now led by orchestration workflows instead of primitive component control
-- `0.1.0-preview.8` is the current source/package version and latest fully published-feed validated package
-- published-feed validation now covers CSP nonce-aware host shells, Clean Architecture-style real apps, and all shipped chat surfaces on an external real-world app
+- `0.1.0-preview.9` is the current source/package version and latest fully published-feed validated package
+- published-feed validation now covers CSP nonce-aware host shells, Clean Architecture-style real apps, all shipped server-side chat surfaces on an external real-world app, and hosted WebAssembly remote chat through `AgentBlazor.Client`
 - runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
 - middleware is now wired through both normal and streaming runtime turns
 - OpenAI-compatible endpoint validation now rejects non-HTTP(S) URI shapes such as `file:///...`
+- Pro tier storage now has automated multi-user validation across concurrent action history, audit, inspector, analytics, and smart suggestions through the real SQLite service graph
 - the full non-demo test matrix is currently green:
   - `AgentBlazor.Core.Tests`: `264/264`
-  - `AgentBlazor.Components.Tests`: `103/104`, `1` skipped
+  - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
   - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
-  - `AgentBlazor.Cli.IntegrationTests`: `9/9`
-  - `AgentBlazor.IntegrationTests`: `118/118`
+  - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped without live CLI provider configuration
+  - `AgentBlazor.IntegrationTests`: `121/121`
 
-The biggest remaining product gap is not UI execution. It is durable paid intelligence:
+The biggest remaining product gap is no longer local storage mechanics. It is real app-owner production-pilot proof:
 
-- persistent action history
-- stronger cross-session memory
-- mature adaptive workflow guidance
+- controlled private-preview user validation
+- Pro retention, backup, dashboard authorization, and rollback sign-off in a real app
+- mature cross-session personalization beyond the current durable history and suggestions foundation
 
 ## Docs
 
@@ -240,6 +241,7 @@ The biggest remaining product gap is not UI execution. It is durable paid intell
 - [Architecture](docs/architecture.md)
 - [Runtime Realignment Plan](docs/runtime-realignment-plan.md)
 - [Pricing Tiers](docs/pricing-tiers.md)
+- [Pro Tier Operations](docs/pro-tier-operations.md)
 - [MudBlazor Compatibility Roadmap](docs/mudblazor-compatibility-roadmap.md)
 
 ## Template Direction

@@ -160,6 +160,7 @@ This means the repo no longer treats baseline component actions as monetized cap
 Data is persisted to SQLite databases in the specified `dataDirectory` (defaults to current directory):
 - `agentblazor-history.db` - Action history
 - `agentblazor-inspector.db` - Inspector runs
+- `agentblazor-audit.db` - Audit log
 
 ## Free Tier Service Defaults
 
@@ -207,7 +208,19 @@ Note:
 
 ### Production Ready
 
-The paid tier now delivers durable "app learns over time" functionality. Action history and inspector data persist to SQLite databases across app restarts.
+The paid tier now delivers durable "app learns over time" functionality. Action history, inspector data, and audit data persist to SQLite databases across app restarts.
+
+Automated validation now covers concurrent multi-user paid storage through the real `UseProLicense()` SQLite service graph:
+
+- 4 users
+- 12 sessions
+- 48 action-history records
+- matching audit events
+- inspector runs
+- usage analytics and agent performance
+- route suggestions and sequence-pattern suggestions
+
+Operational guidance lives in `docs/pro-tier-operations.md`.
 
 ## Enforcement Status
 
@@ -280,12 +293,12 @@ The current product funnel should stay simple:
 Current truth:
 
 - Free tier is private-preview ready and package-validated, not yet broad-production ready
-- Pro tier has durable SQLite persistence and dashboard surface, but still needs realistic multi-user validation before production claims
+- Pro tier has durable SQLite persistence, dashboard surface, and automated multi-user storage validation, but still needs a controlled production pilot before broad production claims
 - All component actions are free (correct product boundary)
 - Paid differentiation is intelligence-driven, not feature-gated
 
 Go-to-market readiness:
 
 - Free: Ready for controlled private-preview validation from GitHub Packages
-- Pro ($29/seat/mo): Feature-complete preview, not production-proven
+- Pro ($29/seat/mo): Feature-complete preview with automated multi-user storage validation, not production-piloted
 - Enterprise: Future tier after SSO, deeper governance, and operational support are real
