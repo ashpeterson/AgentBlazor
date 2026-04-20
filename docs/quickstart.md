@@ -15,7 +15,7 @@ Status as of 2026-04-20:
 - the CLI now supports `init -> scaffold -> doctor -> validate`
 - hosted WebAssembly server startup/workflow wiring is part of the supported scaffold path; browser-client layout/assets/providers/chat remain review-first
 - `0.1.0-preview.9` is the current source/package version
-- `0.1.0-preview.8` is the latest GitHub Packages published-feed version with full clean-app, external real-app, and all-surface chat validation
+- `0.1.0-preview.9` is the latest GitHub Packages published-feed version with full clean-app, external real-app, and all-surface chat validation
 - scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
 
 ## Optional: Install The CLI
@@ -25,8 +25,8 @@ The CLI can scaffold the standard runtime wiring for a standard Blazor host and 
 For private-preview installs, pin the CLI and runtime package to the same version. Do not rely on a broad `--prerelease` install when testing scaffolded workflow code because the generated `AppCapabilities.cs` file uses semantic workflow APIs from `AgentBlazor.App`.
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
-dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
 agentblazor init ./MySolution.sln --host MyBlazorApp
 agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --approve
 ```
@@ -36,7 +36,7 @@ Use `--provider azure-openai` instead when the host app should be scaffolded for
 ## 1. Install the Package
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 ## 2. Configure Services
@@ -243,7 +243,7 @@ app.MapAgentBlazorRemoteChat();
 Client project:
 
 ```bash
-dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 Client `_Imports.razor`:

@@ -1,6 +1,6 @@
 # AgentBlazor E2E (Playwright)
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 Run locally from `tests/e2e`:
 
@@ -14,6 +14,7 @@ npm run test:real-usability
 npm run test:paid-dashboard
 npm run test:external-chat-widget
 npm run test:external-chat-surfaces
+npm run test:hosted-wasm-remote-chat
 ```
 
 This suite starts the demo app via Playwright `webServer` and validates the current workflow and component explorer surfaces.
@@ -23,6 +24,8 @@ The component explorer suite includes floating `AgentChatWidget` coverage for op
 `npm run test:external-chat-widget` and `npm run test:external-chat-surfaces` run the same hardened external-app validation. The runner clones a real Blazor app, installs AgentBlazor from either a local package build or a published package feed, runs `init`, `scaffold`, `doctor`, and `validate`, then launches the cloned app and uses Playwright to submit prompts through the installed floating widget and any requested embedded chat surfaces. By default it uses `damienbod/BlazorSecurityNet10`; override with `AGENTBLAZOR_EXTERNAL_REPO`, `AGENTBLAZOR_EXTERNAL_REF`, `AGENTBLAZOR_EXTERNAL_PROJECT`, and `AGENTBLAZOR_EXTERNAL_APP_PATH`.
 
 Set `AGENTBLAZOR_PACKAGE_SOURCE_MODE=published` or `github` to install `AgentBlazor` and `AgentBlazor.Cli` from GitHub Packages instead of the local source build. Published-feed mode requires `AGENTBLAZOR_PACKAGE_VERSION` plus package credentials from `AGENTBLAZOR_GITHUB_PACKAGES_USERNAME` and `AGENTBLAZOR_GITHUB_PACKAGES_TOKEN`; the runner also accepts `GITHUB_ACTOR`/`GITHUB_TOKEN` in Actions and writes isolated NuGet config files for the cloned app. Leave `AGENTBLAZOR_PACKAGE_SOURCE_MODE` unset or set it to `local` for source-package validation.
+
+`npm run test:hosted-wasm-remote-chat` creates a fresh hosted WebAssembly Blazor Web App, installs `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli`, maps the server `MapAgentBlazorRemoteChat()` endpoint, registers WebAssembly `HttpClient`, and uses Playwright to submit prompts through `AgentRemoteChatWidget`, `AgentRemoteChatSurface`, `AgentRemoteChatPanel`, and `AgentRemoteChatBar`. It supports the same `AGENTBLAZOR_PACKAGE_SOURCE_MODE=local|published|github` package-source modes as the external runner, including GitHub Packages credentials from `AGENTBLAZOR_GITHUB_PACKAGES_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN`.
 
 Set `AGENTBLAZOR_EXTERNAL_TEMPLATE=blazor` with `AGENTBLAZOR_EXTERNAL_PROJECT=AgentBlazorExternalTemplate.csproj` to generate and test a fresh `dotnet new blazor` app instead of cloning a repository. The `external-chat-widget-matrix` workflow runs a fresh no-provider target, a fresh deterministic-provider target, `neozhu/CleanArchitectureWithBlazorServer` on a public route for the CLI-installed widget, and the same CleanArchitecture app on an authenticated users route for widget, surface, panel, and bar coverage. This keeps the public-route case honest while still testing every chat surface in a production-style Blazor layout.
 
@@ -36,7 +39,7 @@ The external chat surface runner now verifies scaffold idempotency, submitted pr
 
 For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget and before visiting the injected surface harness. Set `AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT` to require a protected-page marker before chat assertions begin; the matrix uses this for the CleanArchitecture `/identity/users` authenticated route.
 
-Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.8` passed the e2e gate in run `24597951350`; source external chat matrix run `24586690690` is green across the hardened widget/surface/panel/bar targets; published-feed all-surface external chat validation against `damienbod/BlazorSecurityNet10` passed in run `24598484039`; and real-usability nightly passed in run `24598561465`. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
+Current release context: the GitHub Packages private-preview workflow for `0.1.0-preview.9` passed the e2e gate in run `24680658866`; source external chat matrix run `24586690690` is green across the hardened widget/surface/panel/bar targets; published-feed all-surface external chat validation against `damienbod/BlazorSecurityNet10` passed with report `tests/e2e/artifacts/external-chat-widget/2026-04-20T17-33-11-449Z/report.md`; published-feed hosted WebAssembly remote-chat validation passed with report `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-31-59-002Z/report.md`; and real-usability nightly passed in run `24598561465`. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
 The real-usability runner requires an explicit live provider from environment variables. It intentionally does not treat demo `appsettings.json` sample values as proof that CI can reach a provider, because empty GitHub secrets or missing Ollama services otherwise produce misleading no-provider transcripts instead of a clear preflight failure.
 

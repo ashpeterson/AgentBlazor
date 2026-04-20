@@ -25,19 +25,19 @@ That flow is meant to be predictable for any existing Blazor app. A developer sh
 For private-preview testing, install an exact CLI version from the same feed/version as the runtime package you add to the app. This avoids a CLI/runtime mismatch where scaffold generates `AgentBlazor.App` workflow code but the app restores an older runtime package.
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 If you already have it:
 
 ```bash
-dotnet tool update --global AgentBlazor.Cli --version 0.1.0-preview.8 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet tool update --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 Add the matching runtime package to the host app before or during scaffold validation:
 
 ```bash
-dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.8 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
 ```
 
 ## Standard Flow

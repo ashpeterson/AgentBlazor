@@ -15,7 +15,7 @@ Current status as of 2026-04-20:
 - standard existing Blazor hosts are scaffoldable end to end
 - hosted WebAssembly server hosts are scaffoldable for server startup/workflow wiring; browser-client layout/assets/providers/chat remain review-first with `AgentBlazor.Client` remote-chat guidance
 - CSP nonce-aware app shells are preserved when scaffold inserts MudBlazor and AgentBlazor assets
-- published-feed validation passes clean-app install, external real-app install, and all-surface chat browser validation for `0.1.0-preview.8`
+- published-feed validation passes clean-app install, external real-app install, and all-surface chat browser validation for `0.1.0-preview.9`
 - advanced/custom hosts still fall back to review-first or blocked modes depending on how confidently the CLI can classify them
 
 ## Commands
