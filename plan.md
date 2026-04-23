@@ -1,6 +1,6 @@
 # AgentBlazor Plan (Living Document)
 
-Last updated: 2026-04-20
+Last updated: 2026-04-23
 Owner: AgentBlazor core team
 Status: Active working plan
 
@@ -32,7 +32,7 @@ Status: Active working plan
   - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
   - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
   - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped
-  - `AgentBlazor.IntegrationTests`: `121/121`
+- `AgentBlazor.IntegrationTests`: `122/122`
 - Current real-provider validation:
   - `ProviderAdapterIntegrationTests`: `30/30` with real OpenAI provider config from `demo/AgentBlazor.Demo/appsettings.Development.json`; coverage includes chat response, semantic capability invocation, approval gating, blocked/recovery/retry, streaming/reconnect, cancellation, concurrency, and session-state continuity
 - Current package validation:

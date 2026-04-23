@@ -1,6 +1,6 @@
 # AgentBlazor Development Status
 
-Last updated: 2026-04-20
+Last updated: 2026-04-23
 
 ## Production Readiness
 
@@ -17,7 +17,7 @@ Production gates:
 - Published-feed package validation is complete for `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` version `0.1.0-preview.9`; this replaced `0.1.0-preview.3` dependency float, stale immutable `0.1.0-preview.4`, `0.1.0-preview.5` downgrade-conflict, and `0.1.0-preview.6` CSP nonce findings with a Microsoft Agents 1.1-compatible package set that passes clean-app, real-app, all-surface browser, and hosted WebAssembly remote-client validation.
 - Current source and latest published-feed validated package are now `0.1.0-preview.9`. The source keeps `global.json` roll-forward set to `latestMinor` and web-app runtime framework pins set to `10.0.6` for newer .NET 10 preview SDK environments.
 - Finish hosted WebAssembly CLI automation: the first browser-safe remote client package, server endpoint, fresh WebAssembly package smoke, and generated hosted-WASM browser validation now pass; CLI browser-client auto-scaffold remains review-first.
-- Pro tier automated storage validation now covers concurrent multi-user usage through the real `UseProLicense()` SQLite service graph; production Pro claims still require a controlled app-owner pilot for retention, authorization, backup, dashboard access, and rollback.
+- Pro tier automated storage validation now covers concurrent multi-user usage and downgrade fallback through the real `UseProLicense()` SQLite service graph; production Pro claims still require a controlled app-owner pilot for retention, authorization, backup, dashboard access, and rollback.
 - Validate the exact preview package with a small external test group before production claims.
 - Document supported host shapes and review-first/unsupported host behavior.
 - Run demo/e2e separately if the public demo site is part of the production release.
@@ -262,7 +262,7 @@ Latest test status:
 - `AgentBlazor.Components.Tests`: `108/109` passed, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
 - `AgentBlazor.Cli.IntegrationTests`: `0/9` passed, `9` skipped
-- `AgentBlazor.IntegrationTests`: `121/121`
+- `AgentBlazor.IntegrationTests`: `122/122`
 
 Latest real-app CLI validation:
 

@@ -1,6 +1,6 @@
 # Production Plan
 
-Last updated: 2026-04-20
+Last updated: 2026-04-23
 
 Honest assessment and actionable plan to move from private preview to production.
 
@@ -16,7 +16,7 @@ Current validated baseline:
 - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
 - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
 - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped without live CLI provider configuration
-- `AgentBlazor.IntegrationTests`: `121/121`
+- `AgentBlazor.IntegrationTests`: `122/122`
 
 Recent hardening complete:
 
@@ -61,9 +61,9 @@ Recent hardening complete:
 - `AgentProDashboard` exists.
 - License format validation and service replacement exist.
 - Automated multi-user Pro storage validation now covers concurrent users/sessions through action history, audit, inspector runs, analytics, and smart suggestions using one Pro data directory.
+- Automated Pro downgrade validation now covers removing the license, reverting to free no-op services, and leaving existing SQLite data untouched for later re-enable.
 - Remaining before broad production:
   - validate Pro in a controlled real-app pilot with app-owner retention, backup, authorization, dashboard access, and rollback sign-off
-  - validate upgrade/downgrade behavior in the pilot environment, including disabling Pro while leaving existing SQLite files untouched
 
 ---
 
@@ -98,6 +98,7 @@ Validation log:
 - 2026-04-20 GitHub Packages workflow `publish-github-packages-preview` run `24680658866` passed for `0.1.0-preview.9` on commit `faaeb6842ca90f4bd4cdeea070b1a28e30886463`. The run published `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli`, and passed restore, build, tests, Playwright e2e, local package smoke, package pushes, and artifact upload. Published-feed hosted WebAssembly validation then installed `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` `0.1.0-preview.9` from GitHub Packages into a generated server+client app and passed browser prompt validation for remote widget/surface/panel/bar plus widget minimize/reopen. Report: `tests/e2e/artifacts/hosted-wasm-remote-chat/2026-04-20T17-31-59-002Z/report.md`.
 - 2026-04-20 published-feed real-app validation against `damienbod/BlazorSecurityNet10` installed `AgentBlazor` and `AgentBlazor.Cli` `0.1.0-preview.9` from GitHub Packages with isolated NuGet/tool paths, then passed baseline build, `agentblazor --version`, `init`, `scaffold --diff`, `scaffold --approve`, restore/build, `doctor` readiness `9/9`, `validate` readiness `9/9`, validation `3/3`, runtime HTTP smoke, and Playwright prompt validation for `AgentChatWidget`, `AgentChatSurface`, `AgentChatPanel`, and `AgentChatBar` with deterministic provider responses. Report: `tests/e2e/artifacts/external-chat-widget/2026-04-20T17-33-11-449Z/report.md`.
 - 2026-04-20 paid-tier storage validation added `UseProLicense_HandlesConcurrentMultiUserPaidStorage`, covering 4 users, 12 sessions, 48 action-history records, matching audit events, inspector runs, usage analytics, agent performance, route suggestions, and sequence-pattern suggestions through the real `UseProLicense()` SQLite service graph.
+- 2026-04-23 paid-tier downgrade validation added `RemovingProLicense_UsesFreeServices_WithoutMutatingExistingPaidData`, proving the app falls back to free no-op services after Pro is removed while existing SQLite history, inspector, and audit data remain unchanged and readable when Pro is re-enabled.
 
 Exit criteria:
 

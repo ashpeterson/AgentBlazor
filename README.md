@@ -1,6 +1,6 @@
 # AgentBlazor
 
-Last updated: 2026-04-20
+Last updated: 2026-04-23
 
 Make your Blazor app agent-capable.
 
@@ -219,13 +219,13 @@ As of 2026-04-20:
 - runtime execution now preserves caller-owned scoped services across turns instead of silently replacing them with a fresh internal scope
 - middleware is now wired through both normal and streaming runtime turns
 - OpenAI-compatible endpoint validation now rejects non-HTTP(S) URI shapes such as `file:///...`
-- Pro tier storage now has automated multi-user validation across concurrent action history, audit, inspector, analytics, and smart suggestions through the real SQLite service graph
+- Pro tier storage now has automated multi-user and downgrade validation across concurrent action history, audit, inspector, analytics, and smart suggestions through the real SQLite service graph
 - the full non-demo test matrix is currently green:
   - `AgentBlazor.Core.Tests`: `264/264`
   - `AgentBlazor.Components.Tests`: `108/109`, `1` skipped
   - `AgentBlazor.Cli.Analysis.Tests`: `135/135`
   - `AgentBlazor.Cli.IntegrationTests`: `0/9`, `9` skipped without live CLI provider configuration
-  - `AgentBlazor.IntegrationTests`: `121/121`
+- `AgentBlazor.IntegrationTests`: `122/122`
 
 The biggest remaining product gap is no longer local storage mechanics. It is real app-owner production-pilot proof:
 

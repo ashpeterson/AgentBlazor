@@ -1,6 +1,6 @@
 # Pro Tier Operations Guide
 
-Last updated: 2026-04-20
+Last updated: 2026-04-23
 
 Use this guide when enabling AgentBlazor Pro features in a real Blazor app.
 
@@ -56,12 +56,14 @@ Automated validation now covers:
 - `UseProLicense()` replacing free no-op services with SQLite-backed paid services.
 - Persistence across service-provider restarts.
 - Concurrent multi-user writes across action history, audit log, inspector runs, analytics, and smart suggestions using one Pro data directory.
+- Pro downgrade fallback to free no-op services without mutating existing SQLite data.
 - Pro dashboard rendering persisted overview, audit, and pattern data.
 
 Current test anchors:
 
 - `UseProLicense_PersistsPaidDataAcrossServiceProviderRestart`
 - `UseProLicense_HandlesConcurrentMultiUserPaidStorage`
+- `RemovingProLicense_UsesFreeServices_WithoutMutatingExistingPaidData`
 - `AgentProDashboardTests.Render_ShowsPersistedPaidDataAcrossOverviewAuditAndPatternsTabs`
 
 ## Current Limits
@@ -69,7 +71,7 @@ Current test anchors:
 - SQLite-backed Pro storage is validated for a single app instance using one local data directory. It is not a distributed multi-node storage layer.
 - There is no hosted license-validation service yet. Current license checks validate key shape and configure local tier/services.
 - Tenant isolation is app-owned. Include tenant/user identifiers in your app's user ids, routes, or metadata when you need tenant-scoped reporting.
-- Upgrade and downgrade are configuration changes: enabling Pro creates/uses durable SQLite services; removing Pro returns to free no-op services and leaves existing SQLite files untouched.
+- Upgrade and downgrade are configuration changes: enabling Pro creates/uses durable SQLite services; removing Pro returns to free no-op services and leaves existing SQLite files untouched. Automated integration coverage now validates that downgrade path against the real `UseProLicense()` SQLite service graph.
 - The Pro features are suitable for controlled production pilots, not broad unsupported production claims, until at least one real app owner validates retention, authorization, backups, dashboard access, and rollback in their environment.
 
 ## Pilot Checklist
@@ -81,5 +83,5 @@ Current test anchors:
 5. Run the app through representative users and sessions.
 6. Confirm action history, audit export, analytics, and suggestions reflect those users without mixing identities unexpectedly.
 7. Restart the app and confirm data persists.
-8. Test rollback by disabling Pro and confirming the app still runs with free no-op services.
+8. Test rollback in the pilot app by disabling Pro and confirming the app still runs with free no-op services and your operational controls still behave as expected.
 9. Decide backup and retention settings before storing production-sensitive audit data.

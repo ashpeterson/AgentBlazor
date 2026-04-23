@@ -293,12 +293,12 @@ The current product funnel should stay simple:
 Current truth:
 
 - Free tier is private-preview ready and package-validated, not yet broad-production ready
-- Pro tier has durable SQLite persistence, dashboard surface, and automated multi-user storage validation, but still needs a controlled production pilot before broad production claims
+- Pro tier has durable SQLite persistence, dashboard surface, and automated multi-user plus downgrade storage validation, but still needs a controlled production pilot before broad production claims
 - All component actions are free (correct product boundary)
 - Paid differentiation is intelligence-driven, not feature-gated
 
 Go-to-market readiness:
 
 - Free: Ready for controlled private-preview validation from GitHub Packages
-- Pro ($29/seat/mo): Feature-complete preview with automated multi-user storage validation, not production-piloted
+- Pro ($29/seat/mo): Feature-complete preview with automated multi-user and downgrade storage validation, not production-piloted
 - Enterprise: Future tier after SSO, deeper governance, and operational support are real

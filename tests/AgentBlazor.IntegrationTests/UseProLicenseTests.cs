@@ -6,6 +6,7 @@ using AgentBlazor.Core.Paid.Suggestions;
 using AgentBlazor.Licensing;
 using AgentBlazor.Options;
 using AgentBlazor.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -275,6 +276,90 @@ public class UseProLicenseTests
     }
 
     [Fact]
+    public async Task RemovingProLicense_UsesFreeServices_WithoutMutatingExistingPaidData()
+    {
+        var dataDirectory = CreateTempDataDirectory();
+
+        try
+        {
+            await using (var paidProvider = CreatePaidProvider(dataDirectory))
+            {
+                var historyStore = paidProvider.GetRequiredService<IActionHistoryStore>();
+                var inspectorStore = paidProvider.GetRequiredService<IAgentInspectorStore>();
+                var auditService = paidProvider.GetRequiredService<IAuditLogService>();
+
+                await SeedPaidDataAsync(historyStore, inspectorStore, auditService);
+            }
+
+            var historyPath = Path.Combine(dataDirectory, "agentblazor-history.db");
+            var inspectorPath = Path.Combine(dataDirectory, "agentblazor-inspector.db");
+            var auditPath = Path.Combine(dataDirectory, "agentblazor-audit.db");
+
+            Assert.True(File.Exists(historyPath));
+            Assert.True(File.Exists(inspectorPath));
+            Assert.True(File.Exists(auditPath));
+
+            var historyCountBefore = await CountRowsAsync(historyPath, "action_history");
+            var inspectorCountBefore = await CountRowsAsync(inspectorPath, "inspector_runs");
+            var auditCountBefore = await CountRowsAsync(auditPath, "audit_log");
+
+            await using (var freeProvider = CreateFreeProvider())
+            {
+                var options = freeProvider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+                Assert.Equal(AgentBlazorTier.Free, options.LicensedTier);
+
+                var historyStore = freeProvider.GetRequiredService<IActionHistoryStore>();
+                var inspectorStore = freeProvider.GetRequiredService<IAgentInspectorStore>();
+                var analyticsService = freeProvider.GetRequiredService<IUsageAnalyticsService>();
+                var auditService = freeProvider.GetRequiredService<IAuditLogService>();
+                var suggestionService = freeProvider.GetRequiredService<ISmartSuggestionService>();
+
+                Assert.IsType<NullActionHistoryStore>(historyStore);
+                Assert.IsType<NullAgentInspectorStore>(inspectorStore);
+                Assert.IsType<NullUsageAnalyticsService>(analyticsService);
+                Assert.IsType<NullAuditLogService>(auditService);
+                Assert.IsType<NullSmartSuggestionService>(suggestionService);
+
+                await historyStore.RecordAsync(new ActionHistoryEntry(
+                    "free-session",
+                    "free-user",
+                    DateTimeOffset.UtcNow,
+                    "open dashboard",
+                    "load_dashboard",
+                    "analytics-agent",
+                    new Dictionary<string, object?>()));
+                Assert.Empty(await historyStore.GetRecentAsync("free-session"));
+                Assert.Empty(inspectorStore.GetRecentRuns("session-alpha"));
+                Assert.Empty(await auditService.GetRecentAsync(limit: 10));
+                Assert.Equal(0, (await analyticsService.GetSummaryAsync(DateRange.Last30Days)).TotalActions);
+                Assert.Empty(await suggestionService.GetSuggestionsAsync(
+                    new SuggestionContext("free-session", "free-user", "/reports", ["load_dashboard"])));
+            }
+
+            var historyCountAfter = await CountRowsAsync(historyPath, "action_history");
+            var inspectorCountAfter = await CountRowsAsync(inspectorPath, "inspector_runs");
+            var auditCountAfter = await CountRowsAsync(auditPath, "audit_log");
+
+            Assert.Equal(historyCountBefore, historyCountAfter);
+            Assert.Equal(inspectorCountBefore, inspectorCountAfter);
+            Assert.Equal(auditCountBefore, auditCountAfter);
+
+            await using var paidProviderAgain = CreatePaidProvider(dataDirectory);
+            var restartedHistoryStore = paidProviderAgain.GetRequiredService<IActionHistoryStore>();
+            var restartedInspectorStore = paidProviderAgain.GetRequiredService<IAgentInspectorStore>();
+            var restartedAuditService = paidProviderAgain.GetRequiredService<IAuditLogService>();
+
+            Assert.Equal(6, (await restartedHistoryStore.GetByUserAsync("paid-user")).Count);
+            Assert.Single(restartedInspectorStore.GetRecentRuns("session-alpha", limit: 10));
+            Assert.Single(await restartedAuditService.GetRecentAsync(limit: 10));
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(dataDirectory);
+        }
+    }
+
+    [Fact]
     public void NoLicense_UsesNullHistoryStore()
     {
         var services = new ServiceCollection();
@@ -327,6 +412,30 @@ public class UseProLicenseTests
         });
 
         return services.BuildServiceProvider();
+    }
+
+    private static ServiceProvider CreateFreeProvider()
+    {
+        var services = new ServiceCollection();
+        AgentBlazorUnifiedServiceCollectionExtensions.AddAgentBlazor(services);
+        return services.BuildServiceProvider();
+    }
+
+    private static async Task<long> CountRowsAsync(string dbPath, string tableName)
+    {
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM {tableName}";
+
+        var result = await command.ExecuteScalarAsync();
+        return result switch
+        {
+            long value => value,
+            int value => value,
+            _ => 0
+        };
     }
 
     private static async Task SeedPaidDataAsync(
