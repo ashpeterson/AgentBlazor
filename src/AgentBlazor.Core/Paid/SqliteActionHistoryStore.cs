@@ -36,6 +36,36 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
         return new SqliteActionHistoryStore($"Data Source={dbPath}");
     }
 
+    internal static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS action_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                user_id TEXT,
+                timestamp TEXT NOT NULL,
+                user_message TEXT NOT NULL,
+                action_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                args_json TEXT NOT NULL,
+                succeeded INTEGER NOT NULL DEFAULT 1,
+                duration_ms INTEGER,
+                route TEXT,
+                error_message TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_session_id ON action_history(session_id);
+            CREATE INDEX IF NOT EXISTS idx_user_id ON action_history(user_id);
+            CREATE INDEX IF NOT EXISTS idx_timestamp ON action_history(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_action_id ON action_history(action_id);
+            CREATE INDEX IF NOT EXISTS idx_succeeded ON action_history(succeeded);
+            """;
+
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     private async Task EnsureInitializedAsync(CancellationToken ct)
     {
         if (_initialized) return;
@@ -46,33 +76,7 @@ public sealed class SqliteActionHistoryStore : IActionHistoryStore, IAsyncDispos
             if (_initialized) return;
 
             await _connection.OpenAsync(ct).ConfigureAwait(false);
-
-            using var cmd = _connection.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS action_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL,
-                    user_id TEXT,
-                    timestamp TEXT NOT NULL,
-                    user_message TEXT NOT NULL,
-                    action_id TEXT NOT NULL,
-                    agent_id TEXT NOT NULL,
-                    args_json TEXT NOT NULL,
-                    succeeded INTEGER NOT NULL DEFAULT 1,
-                    duration_ms INTEGER,
-                    route TEXT,
-                    error_message TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_session_id ON action_history(session_id);
-                CREATE INDEX IF NOT EXISTS idx_user_id ON action_history(user_id);
-                CREATE INDEX IF NOT EXISTS idx_timestamp ON action_history(timestamp DESC);
-                CREATE INDEX IF NOT EXISTS idx_action_id ON action_history(action_id);
-                CREATE INDEX IF NOT EXISTS idx_succeeded ON action_history(succeeded);
-                """;
-
-            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await EnsureSchemaAsync(_connection, ct).ConfigureAwait(false);
             _initialized = true;
         }
         finally

@@ -7,10 +7,10 @@
 <div class="docs-article">
     <section class="docs-hero">
         <p class="docs-hero__eyebrow">Getting Started</p>
-        <h1 class="docs-hero__title">From package install to a route-scoped workflow.</h1>
+        <h1 class="docs-hero__title">From package source to a working route-scoped workflow.</h1>
         <p class="docs-hero__lede">
             The shortest successful path is still one package, one workflow, one route, and one chat surface.
-            If you want the fastest baseline install, use the CLI first. If you want full control, wire the runtime by hand.
+            Start with the CLI if you want the fastest install path for an existing app. Start manually if you want to understand every required runtime hook.
         </p>
 
         <div class="docs-actions">
@@ -22,40 +22,78 @@
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>1. Optional CLI-first path</h2>
-                <p>Use this when you want preview-first install guidance and scaffolded baseline wiring.</p>
+                <h2>1. Before you change the app</h2>
+                <p>These three checks avoid most setup churn.</p>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9
-agentblazor init ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai
+        <div class="docs-check-grid">
+            <div class="docs-check">
+                <strong>Pin versions</strong>
+                <ul>
+                    <li>Use the same preview version for <code>AgentBlazor</code>, <code>AgentBlazor.Client</code> when applicable, and <code>AgentBlazor.Cli</code>.</li>
+                    <li>Do not mix a new CLI with an older runtime package.</li>
+                </ul>
+            </div>
+            <div class="docs-check">
+                <strong>Know your host</strong>
+                <ul>
+                    <li>Standard Blazor Web App is the easiest automatic path.</li>
+                    <li>Hosted WebAssembly uses server-host CLI commands plus browser-safe remote chat in the client project.</li>
+                    <li>Legacy/custom hosts can be review-first.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="docs-note">
+            <strong>Current preview source:</strong> the public docs path is GitHub Packages. Add the feed and pin the exact version you are validating.
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>2. Add the package source and install tools</h2>
+                <p>Use the same source and exact version everywhere in the app.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
+  --name github-agentblazor \
+  --username YOUR_GITHUB_USERNAME \
+  --password YOUR_GITHUB_PAT \
+  --store-password-in-clear-text
+
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>3. Fastest path: CLI-assisted install</h2>
+                <p>Use this for an existing app when you want preview-first planning and a written scaffold manifest.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>agentblazor init ./MySolution.slnx --host MyBlazorApp
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
+dotnet restore ./MySolution.slnx --force-evaluate
+dotnet build ./MySolution.slnx --no-restore -nologo
 agentblazor doctor ./MySolution.slnx --host MyBlazorApp
 agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
 
         <div class="docs-note">
-            <strong>Important:</strong> scaffold can write provider registration and baseline files, but you still supply the actual API keys
-            and environment-specific configuration values yourself.
+            <strong>What the CLI still does not do:</strong> it does not generate your provider secrets, choose your production model, or guess through host-specific startup edits that would be brittle.
         </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>2. Install the package</h2>
-                <p>This is the manual runtime path and remains the cleanest way to understand the surface area.</p>
-            </div>
-        </div>
-
-        <pre class="docs-code"><code>dotnet add package AgentBlazor</code></pre>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>3. Configure services</h2>
-                <p>The most validated production path today is OpenAI via <code>options.UseOpenAI(...)</code>; Azure OpenAI uses the same runtime path.</p>
+                <h2>4. Manual runtime path</h2>
+                <p>This is the cleanest way to understand the AgentBlazor runtime surface area.</p>
             </div>
         </div>
 
@@ -83,15 +121,14 @@ builder.Services.AddAgentBlazor(options =&gt;
 });</code></pre>
 
         <div class="docs-note">
-            <strong>Azure OpenAI:</strong> use <code>UseAzureOpenAI(endpoint, deploymentName, apiKey)</code>, or pass a
-            <code>TokenCredential</code> such as <code>DefaultAzureCredential</code> for managed identity.
+            <strong>Provider variants:</strong> OpenAI is the most validated provider path today. Azure OpenAI uses the same runtime shape, and Ollama is available when a local OpenAI-compatible endpoint is appropriate.
         </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>4. Add the host shell</h2>
+                <h2>5. Add the host shell</h2>
                 <p>The exact files vary by host shape. Standard Blazor Web App and hosted WebAssembly are the main automatic paths today.</p>
             </div>
         </div>
@@ -114,8 +151,8 @@ builder.Services.AddAgentBlazor(options =&gt;
             </div>
             <div class="docs-callout">
                 <h3>Hosted WebAssembly server + client</h3>
-                <p>The CLI can infer the companion client project from server <code>ProjectReference</code> entries and patch the standard server
-                startup path plus safe client files such as <code>_Imports.razor</code>, <code>wwwroot/index.html</code>, layout, and page files.</p>
+                <p>The server host still owns the AgentBlazor runtime. The browser client should use the remote chat components from <code>AgentBlazor.Client</code>,
+                not the server-first chat surfaces from <code>AgentBlazor</code>.</p>
             </div>
             <div class="docs-callout">
                 <h3>Advanced hosts</h3>
@@ -128,7 +165,7 @@ builder.Services.AddAgentBlazor(options =&gt;
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>5. Map endpoints</h2>
+                <h2>6. Map endpoints</h2>
                 <p>The runtime endpoint must be mapped after the app is built or the chat UI will render without a working backend.</p>
             </div>
         </div>
@@ -140,15 +177,14 @@ app.MapRazorComponents&lt;App&gt;()
 app.MapAgentBlazorEndpoints();</code></pre>
 
         <div class="docs-note">
-            <strong>Hosted WebAssembly note:</strong> the same server-side endpoint mapping still matters. The client UI files live in the companion
-            client project, but the runtime endpoint is still exposed from the server host.
+            <strong>Hosted WebAssembly note:</strong> if the browser client is using remote chat surfaces, map <code>app.MapAgentBlazorRemoteChat()</code> on the server as well.
         </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>6. Define one capability class</h2>
+                <h2>7. Define one capability class</h2>
                 <p>Use attributes for semantic actions and let the runtime handle approvals, structured results, and next-step suggestions.</p>
             </div>
         </div>
@@ -185,7 +221,7 @@ public sealed class OperationsCapabilities(IOperationsService ops)
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>7. Render a chat surface</h2>
+                <h2>8. Render a chat surface</h2>
                 <p>Use the floating widget for ambient help or the full surface when chat should be part of the page layout.</p>
             </div>
         </div>
@@ -206,14 +242,43 @@ public sealed class OperationsCapabilities(IOperationsService ops)
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>8. Verify the install</h2>
-                <p>Use the runtime and CLI checks together.</p>
+                <h2>9. Hosted WebAssembly client path</h2>
+                <p>Use this when the app has a separate browser client project.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source github-agentblazor
+
+// Client Program.cs
+builder.Services.AddScoped(_ => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+});
+
+// Client _Imports.razor
+@@using AgentBlazor.Client.Chat
+
+// Client page or layout
+&lt;AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" /&gt;</code></pre>
+
+        <div class="docs-note">
+            <strong>Remote client rule:</strong> use <code>AgentRemoteChatWidget</code>, <code>AgentRemoteChatSurface</code>, <code>AgentRemoteChatPanel</code>,
+            or <code>AgentRemoteChatBar</code> in the WebAssembly client. They call the server runtime over HTTP.
+        </div>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>10. Verify the install</h2>
+                <p>Use the runtime and CLI checks together, then run prompts that match the workflow.</p>
             </div>
         </div>
 
         <pre class="docs-code"><code>dotnet run
 agentblazor doctor ./MySolution.slnx --host MyBlazorApp
-agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
+agentblazor validate ./MySolution.slnx --host MyBlazorApp
+curl -fsS http://127.0.0.1:5288/</code></pre>
 
         <div class="docs-inline-list">
             <span>Assess the workflow</span>
@@ -222,8 +287,8 @@ agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
         </div>
 
         <div class="docs-note">
-            See the <MudLink Href="/demo/components">component explorer</MudLink> for the current deterministic UI wrappers and return to the
-            <MudLink Href="/docs">docs overview</MudLink> for the install map.
+            Next: use <MudLink Href="/docs/verification">Verification</MudLink> for fresh-app and real-project test flows, then use the
+            <MudLink Href="/demo/components">component explorer</MudLink> when you want deterministic wrappers beyond the first workflow.
         </div>
     </section>
 </div>

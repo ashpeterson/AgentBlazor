@@ -45,6 +45,7 @@ public sealed class SqliteSmartSuggestionService : ISmartSuggestionService, IAsy
         {
             if (_connectionOpened) return;
             await _connection.OpenAsync(ct).ConfigureAwait(false);
+            await SqliteActionHistoryStore.EnsureSchemaAsync(_connection, ct).ConfigureAwait(false);
             _connectionOpened = true;
         }
         finally

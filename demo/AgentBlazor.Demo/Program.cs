@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseStaticWebAssets();
 
 // Ensure [AgentFlow] logs are visible when running prompts
 builder.Logging.AddFilter("AgentBlazor.Core.Runtime.Agents.AgentRuntime", LogLevel.Information);

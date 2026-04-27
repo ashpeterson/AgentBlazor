@@ -4,7 +4,10 @@ using AgentBlazor.Core.Paid.Analytics;
 using AgentBlazor.Core.Paid.Audit;
 using AgentBlazor.Core.Paid.Suggestions;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
 
 namespace AgentBlazor.Components.Tests;
 
@@ -36,7 +39,8 @@ public sealed class AgentProDashboardTests : TestContext
 
             cut = RenderComponent<AgentProDashboard>(parameters => parameters
                 .Add(component => component.Title, "Agent Intelligence Dashboard")
-                .Add(component => component.DaysRange, 30));
+                .Add(component => component.DaysRange, 30)
+                .Add(component => component.RequireAuthenticatedUser, false));
 
             cut.WaitForAssertion(() =>
             {
@@ -90,6 +94,191 @@ public sealed class AgentProDashboardTests : TestContext
 
             DeleteDirectoryIfPresent(dataDirectory);
         }
+    }
+
+    [Fact]
+    public void Render_WithoutAuthenticationState_ShowsUnauthorizedMessage_ByDefault()
+    {
+        Services.AddSingleton<IUsageAnalyticsService, NullUsageAnalyticsService>();
+        Services.AddSingleton<IAuditLogService, NullAuditLogService>();
+        Services.AddSingleton<ISmartSuggestionService, NullSmartSuggestionService>();
+
+        var cut = RenderComponent<AgentProDashboard>(parameters => parameters
+            .Add(component => component.Title, "Agent Intelligence Dashboard"));
+
+        Assert.Contains("Restricted Pro Dashboard", cut.Markup);
+        Assert.Contains("authorized operators or administrators", cut.Markup);
+        Assert.DoesNotContain("Refresh", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Render_WithAllowedRole_RendersDashboardContent()
+    {
+        var dataDirectory = CreateTempDataDirectory();
+        SqliteUsageAnalyticsService? analyticsService = null;
+        SqliteAuditLogService? auditService = null;
+        SqliteSmartSuggestionService? suggestionService = null;
+
+        try
+        {
+            await SeedPersistedDataAsync(dataDirectory);
+
+            analyticsService = SqliteUsageAnalyticsService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-history.db"));
+            auditService = SqliteAuditLogService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-audit.db"));
+            suggestionService = SqliteSmartSuggestionService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-history.db"));
+
+            Services.AddSingleton<IUsageAnalyticsService>(analyticsService);
+            Services.AddSingleton<IAuditLogService>(auditService);
+            Services.AddSingleton<ISmartSuggestionService>(suggestionService);
+
+            var user = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "ops@example.com"),
+                new Claim(ClaimTypes.Role, "AgentBlazor.ProOperator")
+            ], "TestAuth"));
+
+            var authState = Task.FromResult(new AuthenticationState(user));
+            RenderFragment fragment = builder =>
+            {
+                builder.OpenComponent<CascadingValue<Task<AuthenticationState>>>(0);
+                builder.AddAttribute(1, "Value", authState);
+                builder.AddAttribute(2, "ChildContent", (RenderFragment)(childBuilder =>
+                {
+                    childBuilder.OpenComponent<AgentProDashboard>(0);
+                    childBuilder.AddAttribute(1, "Title", "Agent Intelligence Dashboard");
+                    childBuilder.AddAttribute(2, "DaysRange", 30);
+                    childBuilder.AddAttribute(3, "AllowedRoles", "AgentBlazor.ProOperator");
+                    childBuilder.CloseComponent();
+                }));
+                builder.CloseComponent();
+            };
+
+            var cut = Render(fragment);
+
+            cut.WaitForAssertion(() =>
+            {
+                Assert.Contains("Agent Intelligence Dashboard", cut.Markup);
+                Assert.Contains("Total Actions", cut.Markup);
+                Assert.DoesNotContain("Restricted Pro Dashboard", cut.Markup, StringComparison.Ordinal);
+            });
+        }
+        finally
+        {
+            if (analyticsService is not null)
+            {
+                await analyticsService.DisposeAsync();
+            }
+
+            if (auditService is not null)
+            {
+                await auditService.DisposeAsync();
+            }
+
+            if (suggestionService is not null)
+            {
+                await suggestionService.DisposeAsync();
+            }
+
+            DeleteDirectoryIfPresent(dataDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task Render_WithFreshPaidDatabases_ShowsEmptyStateWithoutSqliteErrors()
+    {
+        var dataDirectory = CreateTempDataDirectory();
+        SqliteUsageAnalyticsService? analyticsService = null;
+        SqliteAuditLogService? auditService = null;
+        SqliteSmartSuggestionService? suggestionService = null;
+
+        try
+        {
+            analyticsService = SqliteUsageAnalyticsService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-history.db"));
+            auditService = SqliteAuditLogService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-audit.db"));
+            suggestionService = SqliteSmartSuggestionService.CreateWithPath(
+                Path.Combine(dataDirectory, "agentblazor-history.db"));
+
+            Services.AddSingleton<IUsageAnalyticsService>(analyticsService);
+            Services.AddSingleton<IAuditLogService>(auditService);
+            Services.AddSingleton<ISmartSuggestionService>(suggestionService);
+
+            var cut = RenderComponent<AgentProDashboard>(parameters => parameters
+                .Add(component => component.Title, "Agent Intelligence Dashboard")
+                .Add(component => component.DaysRange, 30)
+                .Add(component => component.RequireAuthenticatedUser, false));
+
+            cut.WaitForAssertion(() =>
+            {
+                Assert.Contains("Agent Intelligence Dashboard", cut.Markup);
+                Assert.DoesNotContain("Failed to load dashboard data", cut.Markup, StringComparison.Ordinal);
+                Assert.True(
+                    cut.Markup.Contains("Total Actions", StringComparison.Ordinal) ||
+                    cut.Markup.Contains("No usage data available yet.", StringComparison.Ordinal));
+            });
+        }
+        finally
+        {
+            if (analyticsService is not null)
+            {
+                await analyticsService.DisposeAsync();
+            }
+
+            if (auditService is not null)
+            {
+                await auditService.DisposeAsync();
+            }
+
+            if (suggestionService is not null)
+            {
+                await suggestionService.DisposeAsync();
+            }
+
+            DeleteDirectoryIfPresent(dataDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task Render_WithAuthenticatedUserMissingRequiredRole_ShowsUnauthorizedMessage()
+    {
+        Services.AddSingleton<IUsageAnalyticsService, NullUsageAnalyticsService>();
+        Services.AddSingleton<IAuditLogService, NullAuditLogService>();
+        Services.AddSingleton<ISmartSuggestionService, NullSmartSuggestionService>();
+
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "viewer@example.com"),
+            new Claim(ClaimTypes.Role, "Viewer")
+        ], "TestAuth"));
+
+        var authState = Task.FromResult(new AuthenticationState(user));
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<CascadingValue<Task<AuthenticationState>>>(0);
+            builder.AddAttribute(1, "Value", authState);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AgentProDashboard>(0);
+                childBuilder.AddAttribute(1, "AllowedRoles", "AgentBlazor.ProOperator");
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Restricted Pro Dashboard", cut.Markup);
+            Assert.Contains("authorized operators or administrators", cut.Markup);
+            Assert.DoesNotContain("Total Actions", cut.Markup, StringComparison.Ordinal);
+        });
+
+        await Task.CompletedTask;
     }
 
     private static async Task SeedPersistedDataAsync(string dataDirectory)

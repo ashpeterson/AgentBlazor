@@ -334,7 +334,7 @@ public sealed class AgentBlazorRegistrationOptions
             : AgentBlazor.Licensing.AgentBlazorTier.Paid;
 
         // Override free-tier no-op services with durable SQLite implementations
-        var dbDir = dataDirectory ?? Environment.CurrentDirectory;
+        var dbDir = PrepareProDataDirectory(dataDirectory);
         var historyDbPath = Path.Combine(dbDir, "agentblazor-history.db");
         var inspectorDbPath = Path.Combine(dbDir, "agentblazor-inspector.db");
         var auditDbPath = Path.Combine(dbDir, "agentblazor-audit.db");
@@ -373,7 +373,42 @@ public sealed class AgentBlazorRegistrationOptions
                     sp.GetService<Microsoft.Extensions.AI.IChatClient>())));
         };
 
+        _optionsConfiguration += options =>
+        {
+            options.ProDataDirectory = dbDir;
+        };
+
         return this;
+    }
+
+    private static string PrepareProDataDirectory(string? dataDirectory)
+    {
+        var dbDir = Path.GetFullPath(dataDirectory ?? Environment.CurrentDirectory);
+
+        if (File.Exists(dbDir))
+        {
+            throw new InvalidOperationException(
+                $"The configured Pro data directory '{dbDir}' points to a file. Configure a writable directory path instead.");
+        }
+
+        Directory.CreateDirectory(dbDir);
+
+        var probePath = Path.Combine(dbDir, $".agentblazor-pro-write-test-{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            File.WriteAllText(probePath, "agentblazor-pro-storage-check");
+            File.Delete(probePath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"The configured Pro data directory '{dbDir}' is not writable. " +
+                "Configure a persistent writable directory before enabling UseProLicense().",
+                ex);
+        }
+
+        return dbDir;
     }
 
     internal void ApplyOptions(AgentBlazorOptions options)

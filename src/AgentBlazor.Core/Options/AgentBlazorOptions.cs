@@ -41,4 +41,10 @@ public sealed class AgentBlazorOptions
     /// Enables runtime agent auto-resolution from current route metadata and agent route metadata.
     /// </summary>
     public bool EnableRouteAgentResolution { get; set; } = true;
+
+    /// <summary>
+    /// Normalized Pro data directory when <c>UseProLicense(..., dataDirectory)</c> is enabled.
+    /// This is intended for diagnostics and product surfaces that need to explain the active storage path.
+    /// </summary>
+    public string? ProDataDirectory { get; set; }
 }

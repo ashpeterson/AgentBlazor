@@ -160,6 +160,8 @@
     };
 
     private string? _assistantClientId;
+    private int _assistantClientIdLoadAttempts;
+    private const int MaxAssistantClientIdLoadAttempts = 8;
 
     private string CurrentRoutePath => new Uri(NavigationManager.Uri).AbsolutePath;
     private string AssistantSessionId => $"demo:{_assistantClientId}:{CurrentRoutePath.TrimEnd('/').ToLowerInvariant()}";
@@ -310,19 +312,33 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _assistantClientId is not null)
+        if (_assistantClientId is not null ||
+            _assistantClientIdLoadAttempts >= MaxAssistantClientIdLoadAttempts)
         {
             return;
         }
 
         try
         {
+            _assistantClientIdLoadAttempts++;
             _assistantClientId = await JSRuntime.InvokeAsync<string>("AgentBlazorDemo.getOrCreateAssistantClientId");
-            StateHasChanged();
+
+            if (!string.IsNullOrWhiteSpace(_assistantClientId))
+            {
+                StateHasChanged();
+            }
         }
         catch (JSException)
         {
-            // Ignore until interactive JS is available.
+            try
+            {
+                await Task.Delay(150);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore teardown during retry scheduling.
+            }
         }
     }
 

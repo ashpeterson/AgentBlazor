@@ -228,9 +228,11 @@
                         <MudPaper Class="pa-4" Outlined="true">
                             <MudText Typo="Typo.h6">Preparation steps</MudText>
                             <MudList T="string" Dense="true">
-                                @for (var i = 0; i < Snapshot.Steps.Count; i++)
+                                @foreach (var indexedStep in Snapshot.Steps
+                                    .Select(static (step, index) => (Step: step, Index: index))
+                                    .ToArray())
                                 {
-                                    <MudListItem T="string">@($"{i + 1}. {Snapshot.Steps[i]}")</MudListItem>
+                                    <MudListItem T="string">@($"{indexedStep.Index + 1}. {indexedStep.Step}")</MudListItem>
                                 }
                             </MudList>
                         </MudPaper>

@@ -105,7 +105,15 @@ async function run() {
 
 function startDemoServer() {
   const projectPath = path.join(repoRoot, "demo", "AgentBlazor.Demo", "AgentBlazor.Demo.csproj");
-  const args = ["run", "--project", projectPath, "--urls", baseUrl];
+  const args = [
+    "run",
+    "--project",
+    projectPath,
+    "--no-launch-profile",
+    "-p:RuntimeIdentifier=linux-x64",
+    "--urls",
+    baseUrl
+  ];
   const child = spawn("dotnet", args, {
     cwd: repoRoot,
     env: process.env,

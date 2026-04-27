@@ -5,9 +5,10 @@ async function openAssistantChatSurface(page, timeoutMs = 30000) {
   }
 
   const widgetWindow = page.locator(".ab-chat-widget__window").first();
+  const openButton = page.getByRole("button", { name: /open agent chat/i }).first();
+  await waitForWidgetAvailability(widgetWindow, openButton, timeoutMs);
+
   if (!(await widgetWindow.isVisible().catch(() => false))) {
-    const openButton = page.getByRole("button", { name: /open agent chat/i }).first();
-    await openButton.waitFor({ state: "visible", timeout: timeoutMs });
     await openButton.click();
   }
 
@@ -22,9 +23,10 @@ async function openAssistantChatSurface(page, timeoutMs = 30000) {
 
 async function openFloatingChatWidget(page, timeoutMs = 30000) {
   const widgetWindow = page.getByTestId("agent-chat-widget-window").first();
+  const openButton = page.getByTestId("agent-chat-widget-open").first();
+  await waitForWidgetAvailability(widgetWindow, openButton, timeoutMs);
+
   if (!(await widgetWindow.isVisible().catch(() => false))) {
-    const openButton = page.getByTestId("agent-chat-widget-open").first();
-    await openButton.waitFor({ state: "visible", timeout: timeoutMs });
     await openButton.click();
   }
 
@@ -57,6 +59,24 @@ async function findInteractiveSurface(locator) {
   }
 
   return null;
+}
+
+async function waitForWidgetAvailability(widgetWindow, openButton, timeoutMs) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    if (await widgetWindow.isVisible().catch(() => false)) {
+      return;
+    }
+
+    if (await openButton.isVisible().catch(() => false)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+
+  throw new Error("Agent chat widget did not become available.");
 }
 
 module.exports = {

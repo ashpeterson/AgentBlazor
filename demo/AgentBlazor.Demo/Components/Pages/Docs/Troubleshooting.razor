@@ -18,13 +18,14 @@
         <div class="docs-section__header">
             <div>
                 <h2>First commands to run</h2>
-                <p>These are the fastest checks for an existing app.</p>
+                <p>These are the fastest checks for an existing app, and they should happen before speculative code changes.</p>
             </div>
         </div>
 
         <pre class="docs-code"><code>agentblazor doctor ./MySolution.slnx --host MyBlazorApp
 agentblazor validate ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff</code></pre>
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
+dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
     </section>
 
     <section class="docs-section">
@@ -41,6 +42,7 @@ agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --di
             <li>Confirm <code>app.MapAgentBlazorEndpoints()</code> is called after the app is built.</li>
             <li>Confirm the MudBlazor and AgentBlazor CSS and JS assets are mounted in the host shell.</li>
             <li>Confirm the layout includes <code>MudThemeProvider</code>, <code>MudPopoverProvider</code>, <code>MudDialogProvider</code>, and <code>MudSnackbarProvider</code>.</li>
+            <li>Confirm the app actually loads the host page you edited and not an alternate shell or layout.</li>
         </ul>
     </section>
 
@@ -58,6 +60,7 @@ agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --di
             <li>Check the capability class is registered with <code>AddWorkflow&lt;T&gt;()</code>.</li>
             <li>Check <code>WithRoutePrefixes(...)</code> actually matches the current page route.</li>
             <li>Keep the capability semantic. Do not expect every page control to become an action automatically.</li>
+            <li>Confirm the current route is part of the active Blazor navigation flow and not a shell-level redirect.</li>
         </ul>
     </section>
 
@@ -98,7 +101,44 @@ agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --di
             <li>Verify <code>OpenAI:Model</code> resolves to a tool-capable model such as <code>gpt-5.4-mini</code>.</li>
             <li>If using scaffold, remember <code>--provider</code> writes registration code but not your real secrets.</li>
             <li>Azure OpenAI and Ollama remain supported, but they are secondary validation targets today.</li>
+            <li>Use a placeholder key for the first runtime smoke and a real key only after the app boots correctly.</li>
         </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Hosted WebAssembly remote chat issues</h2>
+                <p>Most browser-client failures reduce to one of three setup gaps.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li>Confirm the server maps <code>app.MapAgentBlazorRemoteChat()</code>.</li>
+            <li>Confirm the client project references <code>AgentBlazor.Client</code>, not the server-first runtime package for chat rendering.</li>
+            <li>Confirm the client registers <code>HttpClient</code> with <code>builder.HostEnvironment.BaseAddress</code>.</li>
+            <li>Confirm the remote component uses the correct endpoint, usually <code>/agentblazor/chat/run</code>.</li>
+            <li>If the widget overlaps other fixed controls, move it with <code>CssClass</code> or <code>Style</code> instead of treating the overlap as a runtime failure.</li>
+        </ul>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>Version mismatch symptoms</h2>
+                <p>These usually mean the CLI and runtime package are not on the same preview version.</p>
+            </div>
+        </div>
+
+        <ul class="docs-list">
+            <li><code>AgentBlazor.App</code> cannot be found.</li>
+            <li><code>CapabilityResult</code> cannot be found.</li>
+            <li><code>AgentCapability</code> or <code>AgentAction</code> cannot be found.</li>
+            <li><code>AddWorkflow</code> does not exist on the builder.</li>
+        </ul>
+
+        <pre class="docs-code"><code>dotnet list ./src/MyBlazorApp/MyBlazorApp.csproj package --include-transitive
+dotnet restore ./src/MyBlazorApp/MyBlazorApp.csproj --force --force-evaluate</code></pre>
     </section>
 
     <section class="docs-section">

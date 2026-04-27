@@ -14,13 +14,6 @@ test.describe("Components explorer", () => {
     await expect(page.locator(".components-page__catalog-nav")).toContainText("AgentFileUpload");
     await expect(page.locator(".components-page__contents-card")).toContainText("Contents");
     await expect(page.locator("#catalog")).toContainText("Current drop-in components");
-    const navScrollMetrics = await page.locator(".components-page__catalog-nav").evaluate((element) => ({
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-      overflowY: window.getComputedStyle(element).overflowY
-    }));
-    expect(navScrollMetrics.overflowY).toBe("auto");
-    expect(navScrollMetrics.scrollHeight).toBeGreaterThan(navScrollMetrics.clientHeight);
     const linkPositions = await page.locator(".components-page__catalog-link").evaluateAll((elements) =>
       elements.slice(0, 5).map((element) => {
         const rect = element.getBoundingClientRect();

@@ -79,6 +79,89 @@ public class UseProLicenseTests
     }
 
     [Fact]
+    public void UseProLicense_MissingDataDirectory_CreatesDirectoryAndStoresNormalizedPath()
+    {
+        var tempRoot = CreateTempDataDirectory();
+        var dataDirectory = Path.Combine(tempRoot, "nested", "paid-data");
+
+        try
+        {
+            var services = new ServiceCollection();
+
+            AgentBlazorUnifiedServiceCollectionExtensions.AddAgentBlazor(services, options =>
+            {
+                options.UseProLicense("AB-PRO-VALID-KEY-12345678", dataDirectory);
+            });
+
+            Assert.True(Directory.Exists(dataDirectory));
+
+            using var provider = services.BuildServiceProvider();
+            var opts = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
+
+            Assert.Equal(Path.GetFullPath(dataDirectory), opts.ProDataDirectory);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void UseProLicense_FilePathAsDataDirectory_Throws()
+    {
+        var filePath = Path.GetTempFileName();
+
+        try
+        {
+            var options = new AgentBlazorRegistrationOptions();
+
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                options.UseProLicense("AB-PRO-VALID-KEY-12345678", filePath));
+
+            Assert.Contains("points to a file", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public void UseProLicense_UnwritableDataDirectory_Throws()
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        var tempRoot = CreateTempDataDirectory();
+        var dataDirectory = Path.Combine(tempRoot, "readonly-paid-data");
+        Directory.CreateDirectory(dataDirectory);
+        var originalMode = File.GetUnixFileMode(dataDirectory);
+
+        try
+        {
+            File.SetUnixFileMode(
+                dataDirectory,
+                UnixFileMode.UserRead | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+            var options = new AgentBlazorRegistrationOptions();
+
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                options.UseProLicense("AB-PRO-VALID-KEY-12345678", dataDirectory));
+
+            Assert.Contains("not writable", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.SetUnixFileMode(dataDirectory, originalMode);
+            DeleteDirectoryIfPresent(tempRoot);
+        }
+    }
+
+    [Fact]
     public void NoLicense_DefaultTier_IsFree()
     {
         var services = new ServiceCollection();
@@ -268,6 +351,35 @@ public class UseProLicenseTests
             var inspectedRun = Assert.Single(inspectedSession);
             Assert.Equal("paid-user-1-session-1-run", inspectedRun.RunId);
             Assert.True(inspectedRun.Succeeded);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(dataDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task UseProLicense_FreshDataDirectory_InitializesEmptyPaidAnalyticsAndSuggestionQueries()
+    {
+        var dataDirectory = CreateTempDataDirectory();
+
+        try
+        {
+            await using var provider = CreatePaidProvider(dataDirectory);
+            var analyticsService = provider.GetRequiredService<IUsageAnalyticsService>();
+            var auditService = provider.GetRequiredService<IAuditLogService>();
+            var suggestionService = provider.GetRequiredService<ISmartSuggestionService>();
+
+            var summary = await analyticsService.GetSummaryAsync(DateRange.Last30Days);
+            Assert.Equal(0, summary.TotalActions);
+            Assert.Equal(0, summary.UniqueUsers);
+            Assert.Equal(0, summary.UniqueSessions);
+
+            Assert.Empty(await analyticsService.GetTopActionsAsync(limit: 10));
+            Assert.Empty(await analyticsService.GetAgentPerformanceAsync());
+            Assert.Empty(await auditService.GetRecentAsync(limit: 10));
+            Assert.Empty(await suggestionService.GetPatternsAsync(limit: 10));
+            Assert.Empty(await suggestionService.GetPopularForRouteAsync("/demo/dashboard", limit: 5));
         }
         finally
         {

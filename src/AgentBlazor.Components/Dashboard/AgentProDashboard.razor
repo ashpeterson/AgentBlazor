@@ -2,11 +2,24 @@
 @using AgentBlazor.Core.Paid.Analytics
 @using AgentBlazor.Core.Paid.Audit
 @using AgentBlazor.Core.Paid.Suggestions
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IUsageAnalyticsService AnalyticsService
 @inject IAuditLogService AuditService
 @inject ISmartSuggestionService SuggestionService
 
 <div class="ab-dashboard @(_loading ? "ab-dashboard--loading" : null)">
+    @if (_authorizationChecked && !_isAuthorized)
+    {
+        <div class="ab-dashboard__header">
+            <h2 class="ab-dashboard__title">@UnauthorizedTitle</h2>
+        </div>
+        <div class="ab-dashboard__error">
+            <span>@UnauthorizedMessage</span>
+        </div>
+    }
+    else
+    {
     <div class="ab-dashboard__header">
         <h2 class="ab-dashboard__title">@Title</h2>
         <div class="ab-dashboard__actions">
@@ -278,13 +291,19 @@
             </div>
         }
     </div>
+    }
 </div>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
     private bool _loading;
     private string? _error;
     private int _activeTab;
     private string _auditFilter = string.Empty;
+    private bool _authorizationChecked;
+    private bool _isAuthorized = true;
+    private bool _loadedOnce;
 
     private UsageSummary? _summary;
     private IReadOnlyList<DailyUsage> _dailyTrends = [];
@@ -300,14 +319,33 @@
     [Parameter]
     public int DaysRange { get; set; } = 30;
 
-    protected override async Task OnInitializedAsync()
+    [Parameter]
+    public bool RequireAuthenticatedUser { get; set; } = true;
+
+    [Parameter]
+    public string? AllowedRoles { get; set; }
+
+    [Parameter]
+    public string UnauthorizedTitle { get; set; } = "Restricted Pro Dashboard";
+
+    [Parameter]
+    public string UnauthorizedMessage { get; set; } =
+        "This dashboard is intended for authorized operators or administrators.";
+
+    protected override async Task OnParametersSetAsync()
     {
-        await RefreshAsync();
+        await EvaluateAuthorizationAsync();
+
+        if (_isAuthorized && !_loadedOnce)
+        {
+            _loadedOnce = true;
+            await RefreshAsync();
+        }
     }
 
     private async Task RefreshAsync()
     {
-        if (_loading) return;
+        if (_loading || !_isAuthorized) return;
 
         _loading = true;
         _error = null;
@@ -346,6 +384,49 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task EvaluateAuthorizationAsync()
+    {
+        if (!RequireAuthenticatedUser)
+        {
+            _isAuthorized = true;
+            _authorizationChecked = true;
+            return;
+        }
+
+        if (AuthenticationStateTask is null)
+        {
+            _isAuthorized = false;
+            _authorizationChecked = true;
+            return;
+        }
+
+        var authenticationState = await AuthenticationStateTask;
+        var user = authenticationState.User;
+
+        if (!(user.Identity?.IsAuthenticated ?? false))
+        {
+            _isAuthorized = false;
+            _authorizationChecked = true;
+            return;
+        }
+
+        _isAuthorized = UserMatchesAllowedRoles(user);
+        _authorizationChecked = true;
+    }
+
+    private bool UserMatchesAllowedRoles(ClaimsPrincipal user)
+    {
+        if (string.IsNullOrWhiteSpace(AllowedRoles))
+        {
+            return true;
+        }
+
+        var roles = AllowedRoles
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return roles.Length == 0 || roles.Any(user.IsInRole);
     }
 
     private IEnumerable<AuditEvent> GetFilteredAuditEvents()

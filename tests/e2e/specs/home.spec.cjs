@@ -11,7 +11,7 @@ test.describe("Landing page", () => {
 
     await page.locator("#hero").getByRole("link", { name: "Docs site" }).click();
     await expect(page).toHaveURL(/\/docs$/);
-    await expect(page.getByRole("heading", { name: /Accurate setup and authoring guidance/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /complete install, verification, and authoring guide/i }).first()).toBeVisible();
 
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("#hero").getByRole("link", { name: "Try live workflow" }).click();
