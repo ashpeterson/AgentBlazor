@@ -1,32 +1,53 @@
 @page "/demo"
 @layout DemoLayout
 @using MudBlazor
-@inject NavigationManager NavigationManager
 
 <PageTitle>Demo — AgentBlazor</PageTitle>
 
 <div class="launchpad">
     <MudPaper Elevation="0" Class="launchpad__hero">
         <div class="launchpad__hero-copy">
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Opening demo</MudChip>
-            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Loading response orchestration…</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Video hub</MudChip>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the 3 shortest examples first.</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Install, one live prompt, then the paid dashboard.
+            </MudText>
         </div>
+
+        <div class="launchpad__video-grid">
+            <article class="launchpad__video-card">
+                <div class="launchpad__video-frame">
+                    <video controls preload="metadata" playsinline src="/videos/cli-install.mp4"></video>
+                </div>
+                <strong>1. CLI install</strong>
+                <p>Fresh app to installed runtime.</p>
+            </article>
+            <article class="launchpad__video-card">
+                <div class="launchpad__video-frame">
+                    <video controls preload="metadata" playsinline src="/videos/workflow-live.mp4"></video>
+                </div>
+                <strong>2. Live workflow</strong>
+                <p>Real prompt and approval on the runtime probe.</p>
+            </article>
+            <article class="launchpad__video-card">
+                <div class="launchpad__video-frame">
+                    <video controls preload="metadata" playsinline src="/videos/dashboard-live.mp4"></video>
+                </div>
+                <strong>3. Pro dashboard</strong>
+                <p>Audit and usage after real activity.</p>
+            </article>
+        </div>
+
         <div class="launchpad__hero-actions">
-            <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">
-                Open now
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
+                Open live workflow
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/components">
+                Open components
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/dashboard">
+                Open dashboard
             </MudButton>
         </div>
     </MudPaper>
 </div>
-
-@code {
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
-
-        NavigationManager.NavigateTo("/demo/workflows/response-orchestration?reset=true", replace: true);
-    }
-}
