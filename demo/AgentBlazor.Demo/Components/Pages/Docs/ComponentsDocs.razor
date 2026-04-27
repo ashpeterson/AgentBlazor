@@ -6,40 +6,25 @@
 
 <div class="docs-article">
     <section class="docs-hero">
-        <p class="docs-hero__eyebrow">Component Reference</p>
-        <h1 class="docs-hero__title">Chat surfaces first, deterministic wrappers where they help.</h1>
+        <p class="docs-hero__eyebrow">Components</p>
+        <h1 class="docs-hero__title">Start with chat surfaces. Add wrappers only when needed.</h1>
         <p class="docs-hero__lede">
-            AgentBlazor is not meant to turn an app into chat-driven clicking. The main UI surface is usually a route-scoped workflow plus
-            either <code>AgentChatWidget</code> or <code>AgentChatSurface</code>. Deterministic wrappers are there when the host wants the agent
-            to interact with specific MudBlazor-friendly controls safely.
+            Most apps need one chat surface first. Use deterministic wrappers when the agent must safely control a specific UI element.
         </p>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Primary chat surfaces</h2>
-                <p>These are the main host-facing components most apps start with on server-hosted Blazor pages.</p>
+                <h2>Main chat surfaces</h2>
             </div>
         </div>
 
         <div class="docs-definition-grid">
-            <div class="docs-definition">
-                <strong><code>AgentChatWidget</code></strong>
-                <p>Floating assistant for ambient help, route-scoped prompts, and lightweight operator workflows.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentChatSurface</code></strong>
-                <p>Embedded chat panel for dashboards, workflow pages, and layouts where the assistant should stay visible.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentChatPanel</code></strong>
-                <p>Side-panel assistant for dense production screens such as queues, admin consoles, and operations dashboards.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentChatBar</code></strong>
-                <p>Compact command entry for search, summaries, status updates, and quick workflow actions.</p>
-            </div>
+            <div class="docs-definition"><strong><code>AgentChatWidget</code></strong><p>Floating assistant.</p></div>
+            <div class="docs-definition"><strong><code>AgentChatSurface</code></strong><p>Embedded chat panel.</p></div>
+            <div class="docs-definition"><strong><code>AgentChatPanel</code></strong><p>Side-panel assistant.</p></div>
+            <div class="docs-definition"><strong><code>AgentChatBar</code></strong><p>Compact command entry.</p></div>
         </div>
     </section>
 
@@ -47,153 +32,50 @@
         <div class="docs-section__header">
             <div>
                 <h2>Hosted WebAssembly client surfaces</h2>
-                <p>Browser clients should use the remote chat package instead of the server-first components above.</p>
-            </div>
-        </div>
-
-        <div class="docs-definition-grid">
-            <div class="docs-definition">
-                <strong><code>AgentRemoteChatWidget</code></strong>
-                <p>Floating browser-safe widget that posts prompts to the server endpoint.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentRemoteChatSurface</code></strong>
-                <p>Embedded remote chat surface for hosted WebAssembly pages and dashboards.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentRemoteChatPanel</code></strong>
-                <p>Remote side-panel assistant when the page already has a dense main working area.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>AgentRemoteChatBar</code></strong>
-                <p>Compact remote command bar for search, summaries, and short workflow prompts.</p>
             </div>
         </div>
 
         <pre class="docs-code"><code>@@using AgentBlazor.Client.Chat
 
 &lt;AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" /&gt;</code></pre>
+
+        <div class="docs-inline-list">
+            <span>Remote widget</span>
+            <span>Remote surface</span>
+            <span>Remote panel</span>
+            <span>Remote bar</span>
+        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Production prompt examples</h2>
-                <p>Use prompts that exercise real domain capability boundaries, approvals, and user context.</p>
+                <h2>Current deterministic wrappers</h2>
             </div>
         </div>
 
         <div class="docs-card-grid">
-            <div class="docs-card"><strong>Executive summary</strong><p>Summarize this dashboard for an operations lead and call out the three riskiest items.</p></div>
-            <div class="docs-card"><strong>Operations queue</strong><p>Review this order queue, identify stuck orders, and recommend the safest next action.</p></div>
-            <div class="docs-card"><strong>Finance review</strong><p>Find invoices due this week, group them by risk, and draft a collector handoff note.</p></div>
-            <div class="docs-card"><strong>Approval gate</strong><p>Check whether order ABC123 can be submitted, explain missing approvals, and submit it only if policy allows.</p></div>
-            <div class="docs-card"><strong>Identity audit</strong><p>Summarize the current user-management page for an auditor and list accounts that need review.</p></div>
-            <div class="docs-card"><strong>Access remediation</strong><p>Find recently locked users, explain the likely causes, and draft a remediation checklist.</p></div>
-            <div class="docs-card"><strong>Release readiness</strong><p>Prepare a release-readiness checklist from deployment status, failed checks, and pending approvals.</p></div>
-            <div class="docs-card"><strong>Release handoff</strong><p>Compare staging and production status, list blockers, and draft the release manager handoff.</p></div>
-            <div class="docs-card"><strong>Incident support</strong><p>Draft a customer-support status update from the current incident screen and include open blockers.</p></div>
-            <div class="docs-card"><strong>Executive incident update</strong><p>Turn the current incident timeline into a short executive update with customer impact and next owner.</p></div>
-            <div class="docs-card"><strong>Inventory exception</strong><p>Review this inventory screen, identify low-stock exceptions, and create a purchasing follow-up note.</p></div>
-            <div class="docs-card"><strong>Claims workflow</strong><p>Inspect this claims workflow, identify missing evidence, and propose the next compliant action.</p></div>
+            <div class="docs-card"><strong><code>AgentDataGrid</code></strong><p>Grid actions.</p></div>
+            <div class="docs-card"><strong><code>AgentForm</code></strong><p>Form validation and submit.</p></div>
+            <div class="docs-card"><strong><code>AgentDialog</code></strong><p>Open and confirm dialogs.</p></div>
+            <div class="docs-card"><strong><code>AgentTabs</code></strong><p>Move across tabs.</p></div>
+            <div class="docs-card"><strong><code>AgentTreeView</code></strong><p>Select and expand nodes.</p></div>
+            <div class="docs-card"><strong><code>AgentFileUpload</code></strong><p>Attach and inspect files.</p></div>
         </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Current deterministic UI wrappers</h2>
-                <p>The demo component explorer focuses on the runtime wrappers that are already useful as host-owned control surfaces.</p>
+                <h2>Prompt examples</h2>
             </div>
         </div>
 
         <div class="docs-card-grid">
-            <div class="docs-card"><strong><code>AgentDataGrid</code></strong><p>Sort, filter, page, and focus grid rows through deterministic actions.</p></div>
-            <div class="docs-card"><strong><code>AgentForm</code></strong><p>Validate, reset, and submit a host-owned form model.</p></div>
-            <div class="docs-card"><strong><code>AgentDialog</code></strong><p>Open, confirm, and close dialogs while the host still owns the content.</p></div>
-            <div class="docs-card"><strong><code>AgentNavMenu</code></strong><p>Expose safe route navigation actions from a host-defined menu.</p></div>
-            <div class="docs-card"><strong><code>AgentTabs</code></strong><p>Move between host-owned tabs without replacing the tab surface.</p></div>
-            <div class="docs-card"><strong><code>AgentSelect</code></strong><p>Set or clear values from a known option list.</p></div>
-            <div class="docs-card"><strong><code>AgentAutocomplete</code></strong><p>Drive query text and option selection in autocomplete surfaces.</p></div>
-            <div class="docs-card"><strong><code>AgentDatePicker</code></strong><p>Set one date from typed or natural-language input.</p></div>
-            <div class="docs-card"><strong><code>AgentDateRangePicker</code></strong><p>Apply a start and end date through one component contract.</p></div>
-            <div class="docs-card"><strong><code>AgentTreeView</code></strong><p>Expand, collapse, and select nodes inside a hierarchical host-owned tree.</p></div>
-            <div class="docs-card"><strong><code>AgentStepper</code></strong><p>Advance or jump through structured workflow steps.</p></div>
-            <div class="docs-card"><strong><code>AgentCommandBar</code></strong><p>Map natural-language requests onto a curated command surface.</p></div>
-            <div class="docs-card"><strong><code>AgentFileUpload</code></strong><p>Attach, remove, and inspect files while preserving workflow policy.</p></div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>When to use them</h2>
-                <p>Keep the wrappers subordinate to the workflow model.</p>
-            </div>
-        </div>
-
-        <ul class="docs-list">
-            <li>Start with one workflow capability plus one chat surface.</li>
-            <li>Add deterministic wrappers when the agent must safely manipulate a specific host-owned control.</li>
-            <li>Prefer semantic workflow actions over exposing every possible control interaction directly.</li>
-            <li>Use the component explorer as a reference surface after the workflow story is clear.</li>
-            <li>On hosted WebAssembly clients, use the remote chat surfaces instead of the server-first surfaces.</li>
-        </ul>
-
-        <div class="docs-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/components">Open Component Explorer</MudButton>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Selection rules</h2>
-                <p>Choose the lightest surface that preserves host control.</p>
-            </div>
-        </div>
-
-        <div class="docs-check-grid">
-            <div class="docs-check">
-                <strong>Use chat surfaces when</strong>
-                <ul>
-                    <li>The workflow is primarily semantic.</li>
-                    <li>The page already has its own host-owned UI.</li>
-                    <li>You want route-scoped agent help without redesigning the screen.</li>
-                </ul>
-            </div>
-            <div class="docs-check">
-                <strong>Use deterministic wrappers when</strong>
-                <ul>
-                    <li>The agent must safely manipulate a specific control.</li>
-                    <li>The host needs deterministic filtering, selection, or navigation actions.</li>
-                    <li>You want proof of UI execution without handing over the full UI surface.</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="docs-note">
-            <strong>Default recommendation:</strong> if you are deciding between adding more wrappers or improving the workflow model, improve the workflow model first.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Read next</h2>
-                <p>Go deeper into the live component reference or back up to workflow authoring.</p>
-            </div>
-        </div>
-
-        <div class="docs-next-grid">
-            <a href="/demo/components" class="docs-next-card">
-                <strong>Component Explorer</strong>
-                <p>Inspect each deterministic wrapper in a focused live example.</p>
-            </a>
-            <a href="/docs/workflows" class="docs-next-card">
-                <strong>Workflows</strong>
-                <p>Return to the primary authoring model for route-scoped agent behavior.</p>
-            </a>
+            <div class="docs-card"><strong>Summary</strong><p>Summarize this page and the riskiest items.</p></div>
+            <div class="docs-card"><strong>Approval</strong><p>Check whether this item can be submitted.</p></div>
+            <div class="docs-card"><strong>Handoff</strong><p>Draft a handoff note from the current state.</p></div>
+            <div class="docs-card"><strong>Operations</strong><p>Recommend the next safe action for this screen.</p></div>
         </div>
     </section>
 </div>

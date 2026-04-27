@@ -7,54 +7,16 @@
 <div class="docs-article">
     <section class="docs-hero">
         <p class="docs-hero__eyebrow">Getting Started</p>
-        <h1 class="docs-hero__title">From package source to a working route-scoped workflow.</h1>
+        <h1 class="docs-hero__title">From package source to one working workflow.</h1>
         <p class="docs-hero__lede">
-            The shortest successful path is still one package, one workflow, one route, and one chat surface.
-            Start with the CLI if you want the fastest install path for an existing app. Start manually if you want to understand every required runtime hook.
+            Use the CLI for the fastest path. Use manual setup if you want to wire every part yourself.
         </p>
-
-        <div class="docs-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/cli">Use the CLI path</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">See the live workflow demo</MudButton>
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>1. Before you change the app</h2>
-                <p>These three checks avoid most setup churn.</p>
-            </div>
-        </div>
-
-        <div class="docs-check-grid">
-            <div class="docs-check">
-                <strong>Pin versions</strong>
-                <ul>
-                    <li>Use the same preview version for <code>AgentBlazor</code>, <code>AgentBlazor.Client</code> when applicable, and <code>AgentBlazor.Cli</code>.</li>
-                    <li>Do not mix a new CLI with an older runtime package.</li>
-                </ul>
-            </div>
-            <div class="docs-check">
-                <strong>Know your host</strong>
-                <ul>
-                    <li>Standard Blazor Web App is the easiest automatic path.</li>
-                    <li>Hosted WebAssembly uses server-host CLI commands plus browser-safe remote chat in the client project.</li>
-                    <li>Legacy/custom hosts can be review-first.</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="docs-note">
-            <strong>Current preview source:</strong> the public docs path is GitHub Packages. Add the feed and pin the exact version you are validating.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>2. Add the package source and install tools</h2>
-                <p>Use the same source and exact version everywhere in the app.</p>
+                <h2>Current preview source</h2>
             </div>
         </div>
 
@@ -71,8 +33,7 @@ dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>3. Fastest path: CLI-assisted install</h2>
-                <p>Use this for an existing app when you want preview-first planning and a written scaffold manifest.</p>
+                <h2>Fastest install path</h2>
             </div>
         </div>
 
@@ -80,27 +41,17 @@ dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
 dotnet restore ./MySolution.slnx --force-evaluate
-dotnet build ./MySolution.slnx --no-restore -nologo
-agentblazor doctor ./MySolution.slnx --host MyBlazorApp
-agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
-
-        <div class="docs-note">
-            <strong>What the CLI still does not do:</strong> it does not generate your provider secrets, choose your production model, or guess through host-specific startup edits that would be brittle.
-        </div>
+dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>4. Manual runtime path</h2>
-                <p>This is the cleanest way to understand the AgentBlazor runtime surface area.</p>
+                <h2>Manual runtime path</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>using AgentBlazor;
-using MudBlazor.Services;
-
-builder.Services.AddMudServices();
+        <pre class="docs-code"><code>builder.Services.AddMudServices();
 
 builder.Services.AddAgentBlazor(options =&gt;
 {
@@ -110,119 +61,21 @@ builder.Services.AddAgentBlazor(options =&gt;
 
     options.ConfigureBuilder(agentBuilder =&gt;
     {
-        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;(
-            "Operations Agent",
-            agent =&gt;
-            {
-                agent.WithDescription("Handles workflow assessment and remediation.");
-                agent.WithRoutePrefixes("/ops");
-            });
-    });
-});</code></pre>
-
-        <div class="docs-note">
-            <strong>Provider variants:</strong> OpenAI is the most validated provider path today. Azure OpenAI uses the same runtime shape, and Ollama is available when a local OpenAI-compatible endpoint is appropriate.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>5. Add the host shell</h2>
-                <p>The exact files vary by host shape. Standard Blazor Web App and hosted WebAssembly are the main automatic paths today.</p>
-            </div>
-        </div>
-
-        <div class="docs-callout-grid">
-            <div class="docs-callout">
-                <h3>Standard Blazor Web App</h3>
-                <pre class="docs-code"><code>// Components/App.razor
-&lt;link rel="stylesheet" href="@@Assets["_content/MudBlazor/MudBlazor.min.css"]" /&gt;
-&lt;link rel="stylesheet" href="@@Assets[AgentBlazorAssetPaths.Css]" /&gt;
-...
-&lt;script src="@@Assets["_content/MudBlazor/MudBlazor.min.js"]"&gt;&lt;/script&gt;
-&lt;script src="@@Assets[AgentBlazorAssetPaths.Js]"&gt;&lt;/script&gt;
-
-// MainLayout.razor
-&lt;MudThemeProvider /&gt;
-&lt;MudPopoverProvider /&gt;
-&lt;MudDialogProvider /&gt;
-&lt;MudSnackbarProvider /&gt;</code></pre>
-            </div>
-            <div class="docs-callout">
-                <h3>Hosted WebAssembly server + client</h3>
-                <p>The server host still owns the AgentBlazor runtime. The browser client should use the remote chat components from <code>AgentBlazor.Client</code>,
-                not the server-first chat surfaces from <code>AgentBlazor</code>.</p>
-            </div>
-            <div class="docs-callout">
-                <h3>Advanced hosts</h3>
-                <p>Legacy <code>_Host.cshtml</code> server apps and other recognizable custom hosts stay review-first. The CLI will add safe files,
-                then tell you which startup, shell, or layout locations still need manual wiring.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>6. Map endpoints</h2>
-                <p>The runtime endpoint must be mapped after the app is built or the chat UI will render without a working backend.</p>
-            </div>
-        </div>
-
-        <pre class="docs-code"><code>var app = builder.Build();
-
-app.MapRazorComponents&lt;App&gt;()
-    .AddInteractiveServerRenderMode();
-app.MapAgentBlazorEndpoints();</code></pre>
-
-        <div class="docs-note">
-            <strong>Hosted WebAssembly note:</strong> if the browser client is using remote chat surfaces, map <code>app.MapAgentBlazorRemoteChat()</code> on the server as well.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>7. Define one capability class</h2>
-                <p>Use attributes for semantic actions and let the runtime handle approvals, structured results, and next-step suggestions.</p>
-            </div>
-        </div>
-
-        <pre class="docs-code"><code>using AgentBlazor.App;
-using AgentBlazor.Attributes;
-
-[AgentCapability("operations",
-    Name = "Operations Workflow",
-    Description = "Assess workflow readiness and prepare remediation.",
-    Category = "Workflow")]
-public sealed class OperationsCapabilities(IOperationsService ops)
-{
-    [AgentAction("Assess current workflow readiness")]
-    public Task&lt;CapabilityResult&gt; AssessReadinessAsync()
-    {
-        var summary = ops.GetReadinessSummary();
-        return Task.FromResult(CapabilityResult.Success(summary) with
+        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;("ops", agent =&gt;
         {
-            NextActions = ["Explain blockers", "Prepare remediation"]
+            agent.WithRoutePrefixes("/ops");
         });
-    }
+    });
+});
 
-    [AgentAction("Prepare remediation draft", RequiresApproval = true)]
-    public Task&lt;CapabilityResult&gt; PrepareRemediationAsync(
-        [AgentParam("Target area")] string area)
-    {
-        var draft = ops.PrepareRemediation(area);
-        return Task.FromResult(CapabilityResult.Success(draft));
-    }
-}</code></pre>
+var app = builder.Build();
+app.MapAgentBlazorEndpoints();</code></pre>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>8. Render a chat surface</h2>
-                <p>Use the floating widget for ambient help or the full surface when chat should be part of the page layout.</p>
+                <h2>Render one chat surface</h2>
             </div>
         </div>
 
@@ -230,65 +83,50 @@ public sealed class OperationsCapabilities(IOperationsService ops)
 
 &lt;AgentChatWidget
     Title="Operations"
-    Placeholder="Ask the agent to assess, prepare, or advance the workflow..."
+    Placeholder="Assess, explain, or prepare the workflow..."
     Width="30rem"
     Height="68vh" /&gt;</code></pre>
-
-        <div class="docs-note">
-            <strong>Use <code>AgentChatSurface</code> instead</strong> when you want the chat to stay embedded inside a workflow page or dashboard layout.
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>9. Hosted WebAssembly client path</h2>
-                <p>Use this when the app has a separate browser client project.</p>
+                <h2>Hosted WebAssembly client path</h2>
             </div>
         </div>
 
         <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source github-agentblazor
 
-// Client Program.cs
+// Server
+app.MapAgentBlazorEndpoints();
+app.MapAgentBlazorRemoteChat();
+
+// Client
 builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
 });
 
-// Client _Imports.razor
 @@using AgentBlazor.Client.Chat
-
-// Client page or layout
 &lt;AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" /&gt;</code></pre>
-
-        <div class="docs-note">
-            <strong>Remote client rule:</strong> use <code>AgentRemoteChatWidget</code>, <code>AgentRemoteChatSurface</code>, <code>AgentRemoteChatPanel</code>,
-            or <code>AgentRemoteChatBar</code> in the WebAssembly client. They call the server runtime over HTTP.
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>10. Verify the install</h2>
-                <p>Use the runtime and CLI checks together, then run prompts that match the workflow.</p>
+                <h2>Next step</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet run
-agentblazor doctor ./MySolution.slnx --host MyBlazorApp
-agentblazor validate ./MySolution.slnx --host MyBlazorApp
-curl -fsS http://127.0.0.1:5288/</code></pre>
-
-        <div class="docs-inline-list">
-            <span>Assess the workflow</span>
-            <span>Explain blockers</span>
-            <span>Prepare the draft</span>
-        </div>
-
-        <div class="docs-note">
-            Next: use <MudLink Href="/docs/verification">Verification</MudLink> for fresh-app and real-project test flows, then use the
-            <MudLink Href="/demo/components">component explorer</MudLink> when you want deterministic wrappers beyond the first workflow.
+        <div class="docs-next-grid">
+            <a href="/docs/verification" class="docs-next-card">
+                <strong>Verification</strong>
+                <p>Run the proof steps next.</p>
+            </a>
+            <a href="/docs/cli" class="docs-next-card">
+                <strong>CLI</strong>
+                <p>See the full command rules.</p>
+            </a>
         </div>
     </section>
 </div>

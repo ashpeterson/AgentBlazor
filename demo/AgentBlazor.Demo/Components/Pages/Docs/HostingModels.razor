@@ -6,34 +6,36 @@
 
 <div class="docs-article">
     <section class="docs-hero">
-        <p class="docs-hero__eyebrow">Hosting Models</p>
+        <p class="docs-hero__eyebrow">Hosting</p>
         <h1 class="docs-hero__title">Install behavior depends on the host shape.</h1>
         <p class="docs-hero__lede">
-            AgentBlazor is meant to cover Blazor apps broadly, but the safest automatic edits are still host-shape dependent.
-            The CLI now distinguishes standard hosts, hosted WebAssembly server+client solutions, advanced recognizable hosts, and fully unclassified hosts.
+            Standard hosts patch cleanly. Advanced hosts stay review-first. Hosted WebAssembly uses the server host plus a remote client package.
         </p>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Standard Blazor Web App</h2>
-                <p>This is the cleanest automatic install path today and the recommended first evaluation target.</p>
+                <h2>Host types</h2>
             </div>
         </div>
 
         <div class="docs-card-grid">
             <div class="docs-card">
-                <strong>What scaffold can patch</strong>
-                <p><code>Program.cs</code>, <code>App.razor</code>, main layout providers, starter workflow file, and a chat entry page.</p>
+                <strong>Standard Blazor Web App</strong>
+                <p>Best first target. CLI can patch startup, shell, layout, and starter workflow files.</p>
             </div>
             <div class="docs-card">
-                <strong>What you still do</strong>
-                <p>Supply real provider configuration values and adapt the starter workflow to your app’s real services and routes.</p>
+                <strong>Hosted WebAssembly server + client</strong>
+                <p>Run CLI against the server host. Use <code>AgentBlazor.Client</code> in the browser project.</p>
             </div>
             <div class="docs-card">
-                <strong>What success looks like</strong>
-                <p><code>doctor</code> and <code>validate</code> go green, the app builds after scaffold, and a mounted chat surface answers domain prompts.</p>
+                <strong>Recognizable advanced host</strong>
+                <p>Safe additions still apply, but risky shell or startup edits stay manual.</p>
+            </div>
+            <div class="docs-card">
+                <strong>Unclassified host</strong>
+                <p>The CLI stops instead of guessing.</p>
             </div>
         </div>
     </section>
@@ -42,97 +44,34 @@
         <div class="docs-section__header">
             <div>
                 <h2>Hosted WebAssembly server + client</h2>
-                <p>The CLI now supports the standard server-plus-client path instead of treating it as unsupported.</p>
+            </div>
+        </div>
+
+        <pre class="docs-code"><code>// Server
+app.MapAgentBlazorEndpoints();
+app.MapAgentBlazorRemoteChat();
+
+// Client
+builder.Services.AddScoped(_ => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+});
+
+@@using AgentBlazor.Client.Chat
+&lt;AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" /&gt;</code></pre>
+    </section>
+
+    <section class="docs-section">
+        <div class="docs-section__header">
+            <div>
+                <h2>What review-first means</h2>
             </div>
         </div>
 
         <ul class="docs-list">
-            <li>The server project remains the host entry point for CLI commands.</li>
-            <li>The CLI infers the companion client project from <code>ProjectReference</code> entries and common hosted naming patterns.</li>
-            <li>Server startup wiring can be patched in the standard <code>Program.cs</code> path.</li>
-            <li>The supported browser-client path is remote chat via <code>AgentBlazor.Client</code> and <code>MapAgentBlazorRemoteChat()</code>.</li>
-            <li>The client project must register <code>HttpClient</code> and mount <code>AgentRemoteChatWidget</code>, <code>AgentRemoteChatSurface</code>, <code>AgentRemoteChatPanel</code>, or <code>AgentRemoteChatBar</code>.</li>
-            <li><code>doctor</code> and <code>validate</code> now surface the inferred UI project when relevant.</li>
+            <li>The CLI still shows safe file work.</li>
+            <li>Risky startup, shell, or layout edits are left for manual review.</li>
+            <li><code>validate</code> reports unresolved review items as real gaps.</li>
         </ul>
-
-        <pre class="docs-code"><code>// Server Program.cs
-app.MapAgentBlazorEndpoints();
-app.MapAgentBlazorRemoteChat();
-
-// Client Program.cs
-builder.Services.AddScoped(_ => new HttpClient
-{
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
-});</code></pre>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Advanced recognizable hosts</h2>
-                <p>These paths are supported, but intentionally review-first when the automatic path would be brittle.</p>
-            </div>
-        </div>
-
-        <div class="docs-callout-grid">
-            <div class="docs-callout">
-                <h3>Legacy Blazor Server</h3>
-                <p>Signals like <code>Startup.cs</code>, <code>_Host.cshtml</code>, <code>AddServerSideBlazor()</code>, and <code>MapBlazorHub()</code>
-                move the CLI into a safer review-first mode with targeted manual guidance.</p>
-            </div>
-            <div class="docs-callout">
-                <h3>Oqtane-style custom hosts</h3>
-                <p>Safe file additions still preview or apply, but composition-layer, shell, and routing changes stay manual because the host architecture is intentionally nonstandard.</p>
-            </div>
-            <div class="docs-callout">
-                <h3>What validate does here</h3>
-                <p><code>validate</code> now treats unresolved manual-review items as real install gaps so review-first hosts are not falsely reported as complete.</p>
-            </div>
-        </div>
-
-        <div class="docs-note">
-            <strong>Interpretation rule:</strong> if the CLI stays review-first on a known advanced host, that is the supported behavior. The unsafe behavior would be pretending the host is standard and writing brittle edits anyway.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>When scaffold blocks entirely</h2>
-                <p>The CLI only stops early when it cannot classify the app into a supported Blazor scaffold path.</p>
-            </div>
-        </div>
-
-        <div class="docs-note">
-            <strong>Design rule:</strong> failing early is safer than inventing startup, shell, or endpoint edits in a host shape the CLI does not understand well enough yet.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Pick the right test target first</h2>
-                <p>Use this order when you are validating AgentBlazor on unfamiliar codebases.</p>
-            </div>
-        </div>
-
-        <div class="docs-check-grid">
-            <div class="docs-check">
-                <strong>Start with</strong>
-                <ul>
-                    <li>A standard Blazor Web App.</li>
-                    <li>A hosted WebAssembly app only after the standard path is green.</li>
-                    <li>A custom or framework-owned host only after you understand the expected review-first behavior.</li>
-                </ul>
-            </div>
-            <div class="docs-check">
-                <strong>Do not assume</strong>
-                <ul>
-                    <li>That every multi-project solution has one obvious host.</li>
-                    <li>That browser-only clients can mount the server-first chat package.</li>
-                    <li>That a review-first result means the host is unsupported.</li>
-                </ul>
-            </div>
-        </div>
     </section>
 </div>

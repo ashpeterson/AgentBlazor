@@ -13,28 +13,24 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
-        <MudText Typo="Typo.h5">Recipe release workflow with semantic capabilities</MudText>
+        <p class="demo-doc-page__eyebrow">Workflow</p>
+        <MudText Typo="Typo.h5">Recipe release</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            This workflow shows the app-layer story more clearly: the host keeps a recipe editor, ingredient grid, and
-            release dialog, while the agent assesses readiness, explains blockers, and prepares a publish-ready draft.
+            This page checks recipe readiness, exposes blockers, and prepares a release draft.
         </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            Try prompts like <code>assess the current recipe for release readiness</code>,
-            <code>prepare a publish-ready release draft</code>, or
-            <code>explain why this recipe release is blocked</code>.
-            After a blocker appears, try <code>apply the recipe release recovery playbook</code>.
-        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Assess readiness</span>
+            <span>Explain blockers</span>
+            <span>Prepare release draft</span>
+        </div>
 
         @if (IsReleaseDossierHandoff)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-                Opened from release dossier orchestration. This live recipe surface is carrying the current workflow session and release focus.
-            </MudAlert>
-            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
-                Current orchestration contribution: @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
-                    ? "clear recipe blockers, then return once the publish-ready draft can be prepared."
-                    : "confirm release readiness and prepare the publish-ready draft so the dossier can advance.")
+                @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
+                    ? "Opened from release dossier. Clear recipe blockers, then return."
+                    : "Opened from release dossier. Confirm readiness and prepare the draft, then return.")
             </MudAlert>
         }
 
@@ -94,9 +90,6 @@
                     <MudStack Spacing="2">
                         <MudPaper Class="pa-4" Outlined="true">
                             <MudText Typo="Typo.h6">Recipe metadata</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                                The form remains native and deterministic. Semantic capabilities consume this state to assess or block release work.
-                            </MudText>
 
                             <AgentForm AgentId="recipe-release-form"
                                        FormName="recipe-release-form"
@@ -153,9 +146,6 @@
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
                                 <div>
                                     <MudText Typo="Typo.h6">Ingredient grid</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                        The release workflow uses deterministic ingredient state instead of replacing grid-level filtering.
-                                    </MudText>
                                 </div>
                                 <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
                                     Tags: @string.Join(", ", GetTagSummary())
@@ -203,7 +193,7 @@
                 <MudItem xs="12" xl="5">
                     <MudStack Spacing="2">
                         <WorkflowDecisionSupport Title="Decision support"
-                                                 Description="The workflow should show readiness, blockers, approval boundary, and recommended follow-up actions without relying on the chat transcript."
+                                                 Description="Readiness, blockers, approval state, and next actions."
                                                  PhaseLabel="@GetWorkflowPhase()"
                                                  ApprovalBoundarySummary="release draft preparation"
                                                  NextStepSummary="@GetNextStepSummary()"

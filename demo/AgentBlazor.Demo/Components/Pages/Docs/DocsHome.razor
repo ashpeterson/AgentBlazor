@@ -7,38 +7,28 @@
 <div class="docs-article">
     <section class="docs-hero">
         <p class="docs-hero__eyebrow">Documentation</p>
-        <h1 class="docs-hero__title">A complete install, verification, and authoring guide for real Blazor apps.</h1>
+        <h1 class="docs-hero__title">Install it. Verify it. Add one workflow.</h1>
         <p class="docs-hero__lede">
-            AgentBlazor is a Blazor-native workflow runtime with in-app chat surfaces, deterministic component actions, approvals,
-            and route-scoped workflow registration. These docs are written as a runbook: what to install, which commands to run, how to verify the result,
-            and where the supported host paths stop being automatic.
+            Start with one Blazor route, one workflow, and one chat surface.
         </p>
 
         <div class="docs-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">Getting Started</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">Open CLI Guide</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">Open Live Demo</MudButton>
-        </div>
-
-        <div class="docs-chip-row">
-            <span>OpenAI is the most validated provider path</span>
-            <span>CLI is preview-first before apply</span>
-            <span>Hosted WebAssembly remote chat has a dedicated client path</span>
-            <span>Advanced hosts stay review-first when patching is risky</span>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">Start setup</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">Open demo</MudButton>
         </div>
 
         <div class="docs-kpi-grid">
             <div class="docs-kpi">
                 <strong>Canonical flow</strong>
-                <span><code>init</code> -> <code>scaffold --diff</code> -> <code>--approve</code> -> <code>restore/build</code> -> <code>doctor</code> -> <code>validate</code></span>
-            </div>
-            <div class="docs-kpi">
-                <strong>3 provider flags</strong>
-                <span><code>openai</code>, <code>azure-openai</code>, <code>ollama</code></span>
+                <span><code>init</code> -> <code>scaffold --diff</code> -> <code>--approve</code></span>
             </div>
             <div class="docs-kpi">
                 <strong>Verification first</strong>
-                <span>Placeholder-key runtime smoke plus domain prompt checks before live-provider testing</span>
+                <span>build, doctor, validate, then runtime smoke</span>
+            </div>
+            <div class="docs-kpi">
+                <strong>Hosted WASM</strong>
+                <span>server host + <code>AgentBlazor.Client</code></span>
             </div>
         </div>
     </section>
@@ -46,36 +36,7 @@
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Start here if you are onboarding an app</h2>
-                <p>Most developers need four questions answered up front.</p>
-            </div>
-        </div>
-
-        <div class="docs-card-grid">
-            <div class="docs-card">
-                <strong>Which package source should I use?</strong>
-                <p>The current preview path is GitHub Packages. Pin exact versions for the runtime, CLI, and hosted WebAssembly client package.</p>
-            </div>
-            <div class="docs-card">
-                <strong>What exact commands do I run?</strong>
-                <p>Use <code>init</code>, preview with <code>scaffold --diff</code>, apply with <code>--approve</code>, then run restore/build, <code>doctor</code>, and <code>validate</code>.</p>
-            </div>
-            <div class="docs-card">
-                <strong>How do I know it really worked?</strong>
-                <p>Run a placeholder-key startup smoke and verify a chat surface can answer prompts that reflect the real workflow on the page.</p>
-            </div>
-            <div class="docs-card">
-                <strong>When does the CLI stay conservative?</strong>
-                <p>When the host shape is advanced, legacy, or otherwise risky to patch automatically. Review-first is a safety decision, not a missing feature.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Recommended run order</h2>
-                <p>This is the command path the rest of the docs assume.</p>
+                <h2>Start order</h2>
             </div>
         </div>
 
@@ -87,113 +48,39 @@ dotnet restore ./MySolution.slnx --force-evaluate
 dotnet build ./MySolution.slnx --no-restore -nologo
 agentblazor doctor ./MySolution.slnx --host MyBlazorApp
 agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
-
-        <div class="docs-note">
-            <strong>Keep versions aligned:</strong> if you are testing the preview feed, pin the same AgentBlazor version for the runtime package,
-            <code>AgentBlazor.Client</code> when needed, and <code>AgentBlazor.Cli</code>.
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Choose the right install path</h2>
-                <p>The docs are split by decision, not by marketing copy.</p>
-            </div>
-        </div>
-
-        <div class="docs-card-grid">
-            <div class="docs-card">
-                <strong>CLI-assisted install</strong>
-                <p>Fastest path for existing Blazor apps. Use when you want preview-first file planning, exact diffs, and guided host-shape behavior.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Manual runtime install</strong>
-                <p>Best when you want to understand every moving part directly: package, services, shell assets, endpoint mapping, one workflow, one chat surface.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Hosted WebAssembly</strong>
-                <p>Use the server host for CLI/runtime wiring, then mount <code>AgentBlazor.Client</code> remote chat components in the client project.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Review-first custom hosts</strong>
-                <p>Legacy server and custom framework hosts still get safe file additions, but risky shell or startup edits remain explicit manual review.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>What is validated today</h2>
-                <p>The docs should make the current boundary clear so developers know what to trust first.</p>
-            </div>
-        </div>
-
-        <div class="docs-card-grid">
-            <div class="docs-card">
-                <strong>Most validated provider</strong>
-                <p>OpenAI via <code>UseOpenAI(...)</code> remains the primary path for setup, workflow invocation, approvals, and browser prompt validation.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Standard host path</strong>
-                <p>Standard Blazor Web App hosts are the cleanest scaffold/apply path and the best place to start when evaluating AgentBlazor.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Hosted WebAssembly</strong>
-                <p>The supported client path is remote chat over <code>MapAgentBlazorRemoteChat()</code> with <code>AgentBlazor.Client</code> in the browser project.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Verification expectation</strong>
-                <p>Do not stop at build success. The runtime, assets, endpoint, and prompts all need to be verified on the page.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Docs map</h2>
-                <p>Follow the site in this order if you are new to the product.</p>
+                <h2>Read these pages next</h2>
             </div>
         </div>
 
         <div class="docs-link-grid">
             <a href="/docs/getting-started" class="docs-link-card">
                 <strong>Getting Started</strong>
-                <p>Package source, manual setup, CLI setup, hosted WebAssembly remote chat, and the first route-scoped workflow.</p>
+                <p>Package source, install path, first workflow.</p>
             </a>
             <a href="/docs/cli" class="docs-link-card">
-                <strong>CLI Guide</strong>
-                <p>Exact command order, file planning, provider flags, host arguments, and expected command outcomes.</p>
+                <strong>CLI</strong>
+                <p>Commands and run order.</p>
             </a>
             <a href="/docs/verification" class="docs-link-card">
                 <strong>Verification</strong>
-                <p>Fresh-app smoke, real-project validation, placeholder-key runtime checks, browser prompts, and hosted WebAssembly checks.</p>
+                <p>How to prove the install works.</p>
             </a>
             <a href="/docs/hosting-models" class="docs-link-card">
-                <strong>Hosting Models</strong>
-                <p>Which files scaffold can patch, which hosts are review-first, and where the browser-safe client path applies.</p>
+                <strong>Hosting</strong>
+                <p>Standard, hosted WASM, and review-first hosts.</p>
             </a>
             <a href="/docs/workflows" class="docs-link-card">
                 <strong>Workflows</strong>
-                <p><code>AddWorkflow&lt;T&gt;()</code>, route scoping, approvals, and capability authoring.</p>
+                <p>Capability class and route scoping.</p>
             </a>
             <a href="/docs/components" class="docs-link-card">
                 <strong>Components</strong>
-                <p>Chat surfaces plus the deterministic UI wrappers available in the runtime and demo explorer.</p>
-            </a>
-            <a href="/docs/demo-tour" class="docs-link-card">
-                <strong>Demo Tour</strong>
-                <p>The current live routes, why the funnel is intentionally narrow, and where each proof belongs.</p>
-            </a>
-            <a href="/docs/troubleshooting" class="docs-link-card">
-                <strong>Troubleshooting</strong>
-                <p>What to check when the agent does not respond, actions do not appear, or scaffold stops early.</p>
-            </a>
-            <a href="/docs/pricing" class="docs-link-card">
-                <strong>Pricing & Tiers</strong>
-                <p>The current free, Pro, and Enterprise boundary and where the paid value actually lives.</p>
+                <p>Chat surfaces and deterministic wrappers.</p>
             </a>
         </div>
     </section>

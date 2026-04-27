@@ -33,14 +33,14 @@ const workflowScenarios = [
   {
     name: "incident escalation",
     route: "/demo/workflows/incident-escalation",
-    heading: /Incident escalation workflow with semantic capabilities/i,
+    heading: /Incident escalation/i,
     marker: "Workflow navigation state",
     button: "Focus Evidence Review"
   },
   {
     name: "recipe release",
     route: "/demo/workflows/recipe-release",
-    heading: /Recipe release workflow with semantic capabilities/i,
+    heading: /Recipe release/i,
     marker: "Reset Workflow State",
     button: "Assess Readiness"
   },

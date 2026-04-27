@@ -7,165 +7,76 @@
 <div class="docs-article">
     <section class="docs-hero">
         <p class="docs-hero__eyebrow">Verification</p>
-        <h1 class="docs-hero__title">Test the install path like a real app owner would.</h1>
+        <h1 class="docs-hero__title">Prove the install works.</h1>
         <p class="docs-hero__lede">
-            AgentBlazor should be verified in layers: scaffold preview, post-apply restore/build, readiness checks, runtime smoke,
-            and browser prompts. This page collects the exact run order for standard hosts, hosted WebAssembly, and external real projects.
+            Build it, check it, run it, then test prompts on the real page.
         </p>
-
-        <div class="docs-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/cli">Open CLI Guide</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/troubleshooting">Troubleshooting</MudButton>
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
                 <h2>Canonical verification order</h2>
-                <p>This is the shortest credible sequence for an existing app.</p>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
-agentblazor init ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
+        <pre class="docs-code"><code>agentblazor init ./MySolution.slnx --host MyBlazorApp
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
 dotnet restore ./MySolution.slnx --force-evaluate
 dotnet build ./MySolution.slnx --no-restore -nologo
 agentblazor doctor ./MySolution.slnx --host MyBlazorApp
 agentblazor validate ./MySolution.slnx --host MyBlazorApp
 OpenAI__ApiKey=placeholder-key dotnet run --project ./src/MyBlazorApp/MyBlazorApp.csproj --no-launch-profile --urls http://127.0.0.1:5288</code></pre>
-
-        <div class="docs-note">
-            <strong>Why the placeholder run matters:</strong> it catches assembly, endpoint, asset, and registration failures before you spend time
-            debugging a real provider call.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>What success looks like</h2>
-                <p>Use these expectations to decide whether the install is actually complete.</p>
-            </div>
-        </div>
-
-        <div class="docs-check-grid">
-            <div class="docs-check">
-                <strong>Standard host</strong>
-                <ul>
-                    <li><code>scaffold --diff</code> shows package, startup, shell, layout, workflow, and chat changes that fit the app.</li>
-                    <li><code>dotnet build</code> passes after apply.</li>
-                    <li><code>doctor</code> reports runtime wiring.</li>
-                    <li><code>validate</code> passes readiness and manifest checks.</li>
-                    <li>The app renders AgentBlazor assets and the chat responds.</li>
-                </ul>
-            </div>
-            <div class="docs-check">
-                <strong>Review-first host</strong>
-                <ul>
-                    <li><code>scaffold --diff</code> still shows safe file additions.</li>
-                    <li>Risky startup, shell, or layout work is reported as manual review instead of guessed.</li>
-                    <li><code>validate</code> surfaces those manual-review items as unresolved until you complete them.</li>
-                    <li>You do not treat an early stop or warning as a false green.</li>
-                </ul>
-            </div>
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
                 <h2>Fresh-app smoke</h2>
-                <p>Use this when you want to verify the current published preview package on a clean host before touching a real app.</p>
             </div>
         </div>
 
         <pre class="docs-code"><code>dotnet new blazor -o FreshAgentBlazor
 cd FreshAgentBlazor
 dotnet add package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor
 agentblazor scaffold ./FreshAgentBlazor.csproj --host FreshAgentBlazor --provider openai --approve
 dotnet restore ./FreshAgentBlazor.csproj --force-evaluate
-dotnet build ./FreshAgentBlazor.csproj --no-restore -nologo
-agentblazor doctor ./FreshAgentBlazor.csproj --host FreshAgentBlazor
-agentblazor validate ./FreshAgentBlazor.csproj --host FreshAgentBlazor</code></pre>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>External real-project validation</h2>
-                <p>This is the sequence to use when you want evidence that AgentBlazor behaves correctly on a real Blazor repository.</p>
-            </div>
-        </div>
-
-        <ul class="docs-list">
-            <li>Record the repository URL, commit SHA, target project path, SDK version, CLI version, and runtime package version before editing anything.</li>
-            <li>Run baseline <code>dotnet restore</code> and <code>dotnet build</code> first so you can separate upstream warnings from AgentBlazor regressions.</li>
-            <li>Run <code>init</code>, then <code>scaffold --diff</code>, and review host-shape behavior before <code>--approve</code>.</li>
-            <li>After apply, rerun restore/build, then run <code>doctor</code> and <code>validate</code>.</li>
-            <li>Run a placeholder-key startup smoke and confirm the rendered page contains AgentBlazor and MudBlazor static assets.</li>
-            <li>If provider testing is available, submit real prompts that match the app’s actual workflows and approval boundaries.</li>
-        </ul>
-
-        <div class="docs-note">
-            Capture warnings separately as upstream app warnings, AgentBlazor issues, or expected review-first guidance. Mixing them makes the evidence less useful.
-        </div>
+dotnet build ./FreshAgentBlazor.csproj --no-restore -nologo</code></pre>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
                 <h2>Hosted WebAssembly verification</h2>
-                <p>Use the server host for CLI commands, then validate the remote client path explicitly.</p>
             </div>
         </div>
 
         <pre class="docs-code"><code>agentblazor init ./MyHostedApp.slnx --host MyHostedServer
-agentblazor scaffold ./MyHostedApp.slnx --host MyHostedServer --provider openai --diff
 agentblazor scaffold ./MyHostedApp.slnx --host MyHostedServer --provider openai --approve
-dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json</code></pre>
+dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
 
-        <pre class="docs-code"><code>// Server Program.cs
+// Server
 app.MapAgentBlazorEndpoints();
 app.MapAgentBlazorRemoteChat();
 
-// Client Program.cs
-builder.Services.AddScoped(_ => new HttpClient
-{
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
-});
-
-// Client _Imports.razor
+// Client
 @@using AgentBlazor.Client.Chat
-
-// Client page or layout
 &lt;AgentRemoteChatWidget Endpoint="/agentblazor/chat/run" Title="Assistant" /&gt;</code></pre>
-
-        <div class="docs-inline-list">
-            <span>Remote widget</span>
-            <span>Remote surface</span>
-            <span>Remote panel</span>
-            <span>Remote bar</span>
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
                 <h2>Browser prompt checks</h2>
-                <p>Do not stop at “the widget opened.” Verify meaningful domain prompts.</p>
             </div>
         </div>
 
         <div class="docs-card-grid">
-            <div class="docs-card"><strong>Summary prompt</strong><p>Summarize this page for an operations lead and list the highest-risk items.</p></div>
-            <div class="docs-card"><strong>Approval prompt</strong><p>Check whether the current record can be submitted, explain missing approvals, and submit only if policy allows.</p></div>
-            <div class="docs-card"><strong>Handoff prompt</strong><p>Draft a handoff note from the current screen state, blockers, and next owner.</p></div>
-            <div class="docs-card"><strong>Risk prompt</strong><p>Group the visible work items by risk and recommend the safest next action.</p></div>
+            <div class="docs-card"><strong>Summary</strong><p>Summarize this page and list the highest-risk items.</p></div>
+            <div class="docs-card"><strong>Approval</strong><p>Check whether the current record can be submitted.</p></div>
+            <div class="docs-card"><strong>Handoff</strong><p>Draft a handoff note from the current screen.</p></div>
+            <div class="docs-card"><strong>Risk</strong><p>Group the visible work by risk and recommend the next action.</p></div>
         </div>
     </section>
 </div>

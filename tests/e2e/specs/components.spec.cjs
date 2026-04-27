@@ -9,11 +9,11 @@ test.describe("Components explorer", () => {
     await expect(page.getByRole("link", { name: "Components", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Workflows", exact: true })).toBeVisible();
     await expect(page.locator(".components-page__catalog-card").first()).toContainText("Component Catalog");
-    await expect(page.locator("#catalog").getByRole("heading", { name: "Current drop-in components" })).toBeVisible();
+    await expect(page.locator("#catalog").getByRole("heading", { name: "Pick a component" })).toBeVisible();
     await expect(page.locator(".components-page__catalog-nav")).toContainText("AgentDataGrid");
     await expect(page.locator(".components-page__catalog-nav")).toContainText("AgentFileUpload");
     await expect(page.locator(".components-page__contents-card")).toContainText("Contents");
-    await expect(page.locator("#catalog")).toContainText("Current drop-in components");
+    await expect(page.locator("#catalog")).toContainText("Pick a component");
     const linkPositions = await page.locator(".components-page__catalog-link").evaluateAll((elements) =>
       elements.slice(0, 5).map((element) => {
         const rect = element.getBoundingClientRect();

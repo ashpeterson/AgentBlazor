@@ -22,7 +22,7 @@
                    href="/demo/components"
                    aria-current="@(IsOverviewRoute ? "page" : null)">
                     <span>Overview</span>
-                    <small>Use the component explorer as a reference surface after the workflow hub.</small>
+                    <small>Browse the live component examples.</small>
                 </a>
 
                 @foreach (var entry in _componentEntries)
@@ -61,7 +61,7 @@
                 <div class="components-page__section-head">
                     <div>
                         <p class="components-page__section-eyebrow">Catalog</p>
-                        <MudText Typo="Typo.h5">Current drop-in components</MudText>
+                        <MudText Typo="Typo.h5">Pick a component</MudText>
                     </div>
                 </div>
 
@@ -79,27 +79,27 @@
             <section id="authoring" class="components-page__panel">
                 <div class="components-page__section-head">
                     <div>
-                        <p class="components-page__section-eyebrow">Authoring Paths</p>
-                        <MudText Typo="Typo.h5">Use components directly, then graduate to custom contracts</MudText>
+                        <p class="components-page__section-eyebrow">How to use it</p>
+                        <MudText Typo="Typo.h5">Open a component, try a prompt, inspect the result</MudText>
                     </div>
                 </div>
 
                 <div class="components-page__overview-grid">
                     <div class="components-page__mini-card">
-                        <strong>Component reference surface</strong>
-                        <span>Use the catalog on the left to inspect one built-in component at a time after the workflow story is clear.</span>
+                        <strong>Pick one component</strong>
+                        <span>Use the left rail to open a single live example.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Workflow hub first</strong>
-                        <span>Start in the workflow hub for semantic, approval-aware flows, then come here to inspect reusable component contracts.</span>
+                        <strong>Use the chat</strong>
+                        <span>Drive the example from the widget instead of clicking everything manually.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Talk first, inspect second</strong>
-                        <span>Use the chat bubble to drive the selected component and keep this explorer as proof of the deterministic UI layer.</span>
+                        <strong>Inspect safe actions</strong>
+                        <span>Each page shows the actions and state the agent can use.</span>
                     </div>
                     <div class="components-page__mini-card">
-                        <strong>Keep it minimal</strong>
-                        <span>Use this page as a quick component kit, not as the opening act of the demo.</span>
+                        <strong>Keep it practical</strong>
+                        <span>This is a live reference, not a guided tour.</span>
                     </div>
                 </div>
             </section>
@@ -114,10 +114,9 @@
                 </MudText>
 
                 <div class="components-page__tag-row">
-                    <span class="components-page__tag">Deterministic actions</span>
-                    <span class="components-page__tag">Native Blazor rendering</span>
-                    <span class="components-page__tag">MudBlazor-friendly</span>
-                    <span class="components-page__tag">Ask via chat bubble</span>
+                    <span class="components-page__tag">Live example</span>
+                    <span class="components-page__tag">Safe actions</span>
+                    <span class="components-page__tag">Chat-driven</span>
                 </div>
             </section>
 
@@ -328,8 +327,8 @@
             <section id="prompts" class="components-page__panel">
                 <div class="components-page__section-head">
                     <div>
-                        <p class="components-page__section-eyebrow">Prompt Ideas</p>
-                        <MudText Typo="Typo.h5">Use the chat bubble with these prompts</MudText>
+                        <p class="components-page__section-eyebrow">Prompts</p>
+                        <MudText Typo="Typo.h5">Try these prompts</MudText>
                     </div>
                 </div>
 
@@ -344,8 +343,8 @@
             <section id="contract" class="components-page__panel">
                 <div class="components-page__section-head">
                     <div>
-                        <p class="components-page__section-eyebrow">Component Contract</p>
-                        <MudText Typo="Typo.h5">What the agent can safely do</MudText>
+                        <p class="components-page__section-eyebrow">Safe actions</p>
+                        <MudText Typo="Typo.h5">What the agent can do here</MudText>
                     </div>
                 </div>
 
@@ -375,8 +374,8 @@
                 <section id="activity" class="components-page__panel">
                     <div class="components-page__section-head">
                         <div>
-                            <p class="components-page__section-eyebrow">Workflow Activity</p>
-                            <MudText Typo="Typo.h5">Remote handoff and token validation state</MudText>
+                            <p class="components-page__section-eyebrow">File activity</p>
+                            <MudText Typo="Typo.h5">Remote handoff state</MudText>
                         </div>
                     </div>
 

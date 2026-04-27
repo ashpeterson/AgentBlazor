@@ -12,7 +12,7 @@
             <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Pro Tier</MudChip>
         </div>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Usage analytics, audit logs, and pattern-based intelligence. Available with <code>UseProLicense()</code>.
+            Shows usage, audit, patterns, and agent performance for paid installs.
         </MudText>
     </section>
 
@@ -21,108 +21,37 @@
     </section>
 
     <section class="dashboard-page__info">
-        <MudExpansionPanels>
-            <MudExpansionPanel Text="What's in the Pro Dashboard?" Expanded="true">
-                <MudGrid>
-                    <MudItem xs="12" md="6">
-                        <MudCard Outlined="true">
-                            <MudCardContent>
-                                <MudText Typo="Typo.h6">Usage Analytics</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                    Track total actions, unique users, sessions, success rates, and response times.
-                                    See daily trends and detect anomalies automatically.
-                                </MudText>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudCard Outlined="true">
-                            <MudCardContent>
-                                <MudText Typo="Typo.h6">Audit Log</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                    Compliance-ready activity tracking. Filter by event type, export to CSV,
-                                    and maintain audit trails for enterprise governance.
-                                </MudText>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudCard Outlined="true">
-                            <MudCardContent>
-                                <MudText Typo="Typo.h6">Action Patterns</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                    Discover how users navigate your workflows. Pattern-based learning powers
-                                    smart suggestions that improve over time.
-                                </MudText>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudCard Outlined="true">
-                            <MudCardContent>
-                                <MudText Typo="Typo.h6">Agent Performance</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                    Monitor each agent's execution count, success rate, and response time.
-                                    Identify bottlenecks and optimize workflows.
-                                </MudText>
-                            </MudCardContent>
-                        </MudCard>
-                    </MudItem>
-                </MudGrid>
-            </MudExpansionPanel>
-
-            <MudExpansionPanel Text="How to Enable Pro Features">
-                <pre class="dashboard-page__code"><code>builder.Services.AddAgentBlazor(options =>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">What this shows</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Use the tabs to inspect the paid surfaces.
+                    </MudText>
+                    <MudChipSet T="string">
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Usage</MudChip>
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Audit</MudChip>
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Patterns</MudChip>
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Performance</MudChip>
+                    </MudChipSet>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6">Enable it</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Add `UseProLicense()` and render `AgentProDashboard`.
+                    </MudText>
+                    <pre class="dashboard-page__code"><code>builder.Services.AddAgentBlazor(options =>
 {
     options.UseOpenAI(apiKey, "gpt-5.4-mini");
-
-    // Enable Pro tier with durable SQLite persistence
     options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
 });
 
-// Then render the dashboard anywhere in your app:
 &lt;AgentProDashboard Title="My Dashboard" DaysRange="30" /&gt;</code></pre>
-            </MudExpansionPanel>
-
-            <MudExpansionPanel Text="Pro Tier Services">
-                <MudSimpleTable Dense="true">
-                    <thead>
-                        <tr>
-                            <th>Service</th>
-                            <th>Free Tier</th>
-                            <th>Pro Tier</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Action History</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Error" Size="Size.Small" /></td>
-                            <td>SQLite persistence</td>
-                        </tr>
-                        <tr>
-                            <td>Usage Analytics</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Error" Size="Size.Small" /></td>
-                            <td>Full metrics + anomaly detection</td>
-                        </tr>
-                        <tr>
-                            <td>Audit Log</td>
-                            <td><MudIcon Icon="@Icons.Material.Filled.Close" Color="Color.Error" Size="Size.Small" /></td>
-                            <td>Query + export (CSV/JSON)</td>
-                        </tr>
-                        <tr>
-                            <td>Smart Suggestions</td>
-                            <td>Static prompts</td>
-                            <td>Pattern-based + LLM hybrid</td>
-                        </tr>
-                        <tr>
-                            <td>Inspector Store</td>
-                            <td>In-memory (dev only)</td>
-                            <td>SQLite persistence</td>
-                        </tr>
-                    </tbody>
-                </MudSimpleTable>
-            </MudExpansionPanel>
-        </MudExpansionPanels>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
     </section>
 </div>
 

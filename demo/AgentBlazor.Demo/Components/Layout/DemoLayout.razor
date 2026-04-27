@@ -35,26 +35,6 @@
 
     <div class="demo-shell__frame @(ShowAssistantPane ? "demo-shell__frame--split" : null)">
         <main class="demo-shell__main">
-            @if (!IsComponentsRoute && !IsWorkflowHubRoute)
-            {
-                <section class="demo-shell__route-head">
-                    <div class="demo-shell__route-copy">
-                        <p class="demo-shell__eyebrow">@RouteTagline</p>
-                        <h1 class="demo-shell__title">@RouteTitle</h1>
-                    </div>
-
-                    @if (RoutePrompts.Count > 0)
-                    {
-                        <div class="demo-shell__prompts">
-                            @foreach (var prompt in RoutePrompts)
-                            {
-                                <span>@prompt</span>
-                            }
-                        </div>
-                    }
-                </section>
-            }
-
             <article class="demo-shell__content">
                 @Body
             </article>
@@ -255,55 +235,6 @@
                                 : IsRuntimeProbeRoute
                                     ? "Runtime Probe Agent"
                                 : null;
-
-    private string RouteTitle =>
-        IsWorkflowHubRoute
-            ? "Live demo"
-            : IsResponseOrchestrationRoute
-                ? "Response orchestration"
-                : IsReleaseDossierRoute
-                    ? "Release dossier"
-                    : IsSupplierWorkflowRoute
-                        ? "Supplier review"
-                        : IsFileWorkflowRoute
-                            ? "Audit evidence"
-                            : IsRecipeWorkflowRoute
-                                ? "Recipe release"
-                                : IsIncidentWorkflowRoute
-                            ? "Incident escalation"
-                            : IsRuntimeProbeRoute
-                                ? "Runtime probe"
-                                    : "Reference";
-
-    private string RouteTagline =>
-        IsWorkflowHubRoute
-            ? "Start with the main live workflow"
-            : IsResponseOrchestrationRoute
-                ? "Primary proof"
-                : IsReleaseDossierRoute
-                    ? "Second proof"
-                    : IsRuntimeProbeRoute
-                        ? "Runtime validation"
-                    : "Drill-in surface";
-
-    private IReadOnlyList<string> RoutePrompts =>
-        IsWorkflowHubRoute
-            ? ["Try the live workflow", "Open the release proof"]
-            : IsResponseOrchestrationRoute
-                ? ["Assess readiness", "Advance next stage", "Prepare packet"]
-                : IsReleaseDossierRoute
-                    ? ["Assess readiness", "Advance next stage", "Prepare dossier"]
-                    : IsRuntimeProbeRoute
-                        ? ["Run the cancellation probe", "Stop the active run"]
-                    : IsSupplierWorkflowRoute
-                        ? ["Review risk", "Recover blockers", "Prepare draft"]
-                        : IsFileWorkflowRoute
-                            ? ["Prepare bundle", "Recover files", "Retry handoff"]
-                            : IsRecipeWorkflowRoute
-                                ? ["Assess readiness", "Recover blockers", "Prepare draft"]
-                                : IsIncidentWorkflowRoute
-                                    ? ["Summarize triage", "Recover blocker", "Submit handoff"]
-                                    : [];
 
     protected override void OnInitialized()
     {

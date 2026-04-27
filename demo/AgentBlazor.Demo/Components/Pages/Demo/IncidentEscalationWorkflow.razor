@@ -12,28 +12,24 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow Showcase</p>
-        <MudText Typo="Typo.h5">Incident escalation workflow with semantic capabilities</MudText>
+        <p class="demo-doc-page__eyebrow">Workflow</p>
+        <MudText Typo="Typo.h5">Incident escalation</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            This workflow proves a different shape from the grid-first demos: the host keeps tree, tab, stepper,
-            command, and dialog surfaces native while the agent compresses triage, evidence review, and escalation prep.
+            This page moves triage, evidence review, and escalation handoff.
         </MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
-            Try prompts like <code>summarize the current incident triage workflow</code>,
-            <code>focus this workflow on evidence review</code>, or
-            <code>prepare an escalation brief for the current incident</code>.
-            After that, try <code>submit the current escalation brief to the review board</code> to hit the recovery branch.
-        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Summarize triage</span>
+            <span>Focus evidence review</span>
+            <span>Prepare escalation brief</span>
+        </div>
 
         @if (IsResponseOrchestrationHandoff)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-                Opened from response orchestration. This live incident surface is carrying the current workflow session and handoff focus.
-            </MudAlert>
-            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
-                Current orchestration contribution: @(Focus?.Equals("escalation", StringComparison.OrdinalIgnoreCase) == true
-                    ? "finalize the escalation brief so the response packet can be prepared."
-                    : "clear triage and evidence blockers, then return once the incident is escalation-ready.")
+                @(Focus?.Equals("escalation", StringComparison.OrdinalIgnoreCase) == true
+                    ? "Opened from response orchestration. Finish the escalation brief, then return."
+                    : "Opened from response orchestration. Clear triage and evidence blockers, then return.")
             </MudAlert>
         }
 
@@ -89,9 +85,6 @@
                 <MudStack Spacing="2">
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Workflow navigation state</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            Semantic workflow actions can move the tree focus, active tab, and current step together instead of asking the user to manipulate them separately.
-                        </MudText>
 
                         <MudGrid Spacing="2">
                             <MudItem xs="12" lg="4">
@@ -152,9 +145,6 @@
 
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Escalation phases</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            The stepper remains host-owned. Semantic actions can advance the workflow when the underlying state is ready.
-                        </MudText>
 
                         <AgentStepper AgentId="incident-escalation-stepper"
                                       CurrentStepIndex="@Workflow.Snapshot.CurrentStepIndex"
@@ -176,7 +166,7 @@
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
                     <WorkflowDecisionSupport Title="Decision support"
-                                             Description="This workflow should explain blockers, owner assignment, evidence status, and the escalation approval boundary without relying on the chat transcript."
+                                             Description="Blockers, owner, evidence status, and handoff state."
                                              PhaseLabel="@GetWorkflowPhase()"
                                              ApprovalBoundarySummary="escalation brief preparation"
                                              NextStepSummary="@GetNextStepSummary()"
@@ -201,9 +191,6 @@
 
                     <MudPaper Class="pa-4" Outlined="true">
                         <MudText Typo="Typo.h6">Workflow commands</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                            These host commands are still available as deterministic fallback primitives, but the semantic workflow should remain the main path.
-                        </MudText>
 
                         <AgentCommandBar AgentId="incident-escalation-command-bar"
                                          Commands="@Workflow.Snapshot.Commands"

@@ -13,27 +13,24 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow module</p>
+        <p class="demo-doc-page__eyebrow">Workflow</p>
         <MudText Typo="Typo.h5">File audit bundle</MudText>
         <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
-            Handoff evidence. Recover failures. Verify tokens.
+            Switch files into remote handoff mode, build the bundle, and verify the tokens.
         </MudText>
 
         <div class="demo-doc-page__prompt-row">
-            <span>Summarize the current file workflow</span>
-            <span>Switch this workflow to remote mode</span>
-            <span>Prepare an audit-ready remote bundle</span>
+            <span>Explain the file state</span>
+            <span>Switch to remote mode</span>
+            <span>Prepare the bundle</span>
         </div>
 
         @if (IsResponseOrchestrationHandoff)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-                Opened from response orchestration. This live evidence surface is carrying the current workflow session and target bundle state.
-            </MudAlert>
-            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
-                Current orchestration contribution: @(Focus?.Equals("verification", StringComparison.OrdinalIgnoreCase) == true
-                    ? "finish token verification so the response packet can rely on verified evidence."
-                    : "move the bundle into remote-ready state and clear any rejected-file blockers before returning.")
+                @(Focus?.Equals("verification", StringComparison.OrdinalIgnoreCase) == true
+                    ? "Opened from response orchestration. Finish token verification, then return."
+                    : "Opened from response orchestration. Prepare the remote bundle, then return.")
             </MudAlert>
         }
 
@@ -84,7 +81,7 @@
                                          FileNamesChanged="OnFilesChanged" />
 
                         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-                            Current mode: @_snapshot.UploadMode. Remote mode turns file names into auditable handoff tokens.
+                            Mode: @_snapshot.UploadMode
                         </MudAlert>
                     </MudPaper>
 

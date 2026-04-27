@@ -13,8 +13,11 @@
     <MudPaper Elevation="0" Class="workflow-board__hero">
         <div class="workflow-board__hero-top">
             <div>
-                <p class="workflow-board__eyebrow">Primary live flow</p>
+                <p class="workflow-board__eyebrow">Main demo</p>
                 <MudText Typo="Typo.h4">Response orchestration</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                    Start here. The assistant moves supplier, file, and incident work toward one approval packet.
+                </MudText>
             </div>
 
             <div class="workflow-board__stat-strip">
@@ -26,10 +29,10 @@
         </div>
 
         <div class="workflow-board__prompt-row">
-            <span>Assess readiness</span>
-            <span>Run next step</span>
+            <span>Assess</span>
+            <span>Advance</span>
             <span>Prepare packet</span>
-            <a href="/demo/workflows/release-dossier?reset=true">Release proof</a>
+            <a href="/demo/workflows/release-dossier?reset=true">Open release flow</a>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(ReturnedFrom))

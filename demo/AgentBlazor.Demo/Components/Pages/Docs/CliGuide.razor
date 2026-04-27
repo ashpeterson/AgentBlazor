@@ -6,42 +6,28 @@
 
 <div class="docs-article">
     <section class="docs-hero">
-        <p class="docs-hero__eyebrow">CLI Guide</p>
-        <h1 class="docs-hero__title">Run the CLI in a predictable order and treat its output as evidence.</h1>
+        <p class="docs-hero__eyebrow">CLI</p>
+        <h1 class="docs-hero__title">Run the CLI in this order.</h1>
         <p class="docs-hero__lede">
-            The CLI exists to take an existing Blazor app through a predictable onboarding path instead of making you infer
-            the required AgentBlazor wiring by hand. The main rule is simple: preview first, approve second, then verify the actual runtime.
+            Preview first. Approve second. Verify after apply.
         </p>
-
-        <div class="docs-chip-row">
-            <span><code>init</code> generates <code>.agentblazor/AGENT.md</code> and state</span>
-            <span><code>scaffold</code> previews before mutating files</span>
-            <span><code>doctor</code> checks readiness</span>
-            <span><code>validate</code> checks install state and scaffold audit trail</span>
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Install and update</h2>
-                <p>The current public preview path is a pinned global tool from GitHub Packages.</p>
+                <h2>Install or update</h2>
             </div>
         </div>
 
         <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 dotnet tool update --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json</code></pre>
-
-        <div class="docs-note">
-            <strong>Version rule:</strong> match the CLI version to the runtime package version in the app. Most scaffold compile failures are version mismatches, not codegen bugs.
-        </div>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
                 <h2>Standard run order</h2>
-                <p>This is the canonical command flow for an existing Blazor app and should be your default unless you have a reason to diverge.</p>
             </div>
         </div>
 
@@ -58,180 +44,41 @@ agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
         <div class="docs-section__header">
             <div>
                 <h2>What to pass as the target</h2>
-                <p>The CLI accepts a solution or a project, but it still needs to know which Blazor host to treat as the runtime entry point.</p>
-            </div>
-        </div>
-
-        <div class="docs-definition-grid">
-            <div class="docs-definition">
-                <strong><code>.sln</code> / <code>.slnx</code></strong>
-                <p>Use this when the app lives inside a larger solution. Pair it with <code>--host</code> so the CLI knows which project is the Blazor host.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>.csproj</code></strong>
-                <p>Use this when you want to point directly at the host project file. This is often the simplest way to validate a cloned real-world repo.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>--host</code></strong>
-                <p>Required when the target solution contains more than one candidate project. Pass the host project name or the host project identity used by the CLI output.</p>
-            </div>
-            <div class="docs-definition">
-                <strong>Hosted WebAssembly rule</strong>
-                <p>Always target the server host project for CLI commands. The client project is inferred or edited separately for the remote chat path.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Command reference</h2>
-                <p>The current CLI surface is install-focused, not a general project generator.</p>
-            </div>
-        </div>
-
-        <div class="docs-definition-grid">
-            <div class="docs-definition">
-                <strong><code>init</code></strong>
-                <p>Generates <code>.agentblazor/AGENT.md</code> and <code>.agentblazor/state.json</code>, then prints the exact next commands for the selected host.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>scaffold</code></strong>
-                <p>Previews the baseline install plan. Use <code>--diff</code> when you want the file-level edits before apply, and use <code>--approve</code> only after that review.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>doctor</code></strong>
-                <p>Checks package references, runtime registration, endpoint mapping, shell assets, layout providers, and chat mounting. It is about readiness, not scaffold history.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>validate</code></strong>
-                <p>Combines readiness checks with scaffold manifest verification and tracked-file audit checks when a manifest exists. Use it after apply, not as a substitute for preview.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>update</code></strong>
-                <p>Refreshes the agent-facing project summary after code changes.</p>
-            </div>
-            <div class="docs-definition">
-                <strong><code>watch</code></strong>
-                <p>Runs continuous refresh during development.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Provider selection</h2>
-                <p>Provider registration can be scaffolded directly into the host startup path, but the secret values remain your responsibility.</p>
-            </div>
-        </div>
-
-        <pre class="docs-code"><code>agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider azure-openai
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider ollama</code></pre>
-
-        <div class="docs-note">
-            <strong>Azure OpenAI:</strong> scaffold writes <code>AzureOpenAI:Endpoint</code>, <code>AzureOpenAI:DeploymentName</code>,
-            and <code>AzureOpenAI:ApiKey</code> lookups. Apps using managed identity can replace the API key argument with a
-            <code>TokenCredential</code>.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>What <code>scaffold --diff</code> should tell you</h2>
-                <p>Treat the preview output as the first acceptance gate.</p>
             </div>
         </div>
 
         <ul class="docs-list">
-            <li>The package references and provider registration match the selected <code>--provider</code> flag.</li>
-            <li>The startup edits target real host files instead of inventing new entry points.</li>
-            <li>Layout and asset edits make sense for the host shape.</li>
-            <li>Hosted WebAssembly output clearly separates server work from client remote-chat work.</li>
-            <li>Review-first guidance is explicit anywhere the CLI chose safety over automatic edits.</li>
+            <li>Use <code>.sln</code> or <code>.slnx</code> when the app lives in a larger solution.</li>
+            <li>Use <code>.csproj</code> when you want to point directly at the host project.</li>
+            <li>Use <code>--host</code> when a solution contains more than one project candidate.</li>
+            <li>For hosted WebAssembly, target the server host project.</li>
         </ul>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Host-shape behavior</h2>
-                <p><code>scaffold</code> changes behavior depending on whether the host is standard, supported-but-advanced, or unclassifiable.</p>
+                <h2>Provider flags</h2>
             </div>
         </div>
 
-        <div class="docs-card-grid">
-            <div class="docs-card">
-                <strong>Standard Blazor Web App</strong>
-                <p>The CLI can patch package references, <code>Program.cs</code>, <code>App.razor</code>, layout, starter workflow, and a chat entry page.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Hosted WebAssembly server + client</strong>
-                <p>The CLI can patch standard server startup wiring and then point you to the browser-safe <code>AgentBlazor.Client</code> remote chat path for the client.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Recognizable advanced hosts</strong>
-                <p>Legacy server hosts and other custom Blazor shapes stay review-first. Safe additions still apply, but risky host wiring becomes guided manual review.</p>
-            </div>
-            <div class="docs-card">
-                <strong>Unclassified hosts</strong>
-                <p>The CLI stops early rather than guessing at startup or shell wiring that could break the app.</p>
-            </div>
-        </div>
+        <pre class="docs-code"><code>agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider azure-openai
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider ollama</code></pre>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>After apply: required follow-through</h2>
-                <p>Do not treat <code>--approve</code> as the end of the process.</p>
+                <h2>What scaffold --diff should tell you</h2>
             </div>
         </div>
 
-        <div class="docs-check-grid">
-            <div class="docs-check">
-                <strong>Build verification</strong>
-                <ul>
-                    <li>Run restore with <code>--force-evaluate</code> if package versions or feed state changed.</li>
-                    <li>Run build immediately so compile errors stay close to the generated changes.</li>
-                    <li>Record whether warnings were upstream or AgentBlazor-related.</li>
-                </ul>
-            </div>
-            <div class="docs-check">
-                <strong>Runtime verification</strong>
-                <ul>
-                    <li>Run <code>doctor</code> and <code>validate</code>.</li>
-                    <li>Run the app with a placeholder provider key first.</li>
-                    <li>Confirm the chat surface renders and the runtime endpoint responds.</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="docs-note">
-            <strong>The CLI is intentionally not doing everything:</strong> it does not invent provider secrets, environment-specific config,
-            or arbitrary startup edits in host shapes it cannot classify safely.
-        </div>
-    </section>
-
-    <section class="docs-section">
-        <div class="docs-section__header">
-            <div>
-                <h2>Read next</h2>
-                <p>Follow the install path into verification or host-shape guidance.</p>
-            </div>
-        </div>
-
-        <div class="docs-next-grid">
-            <a href="/docs/verification" class="docs-next-card">
-                <strong>Verification</strong>
-                <p>Run the fresh-app, real-project, and browser prompt checks that prove the install actually works.</p>
-            </a>
-            <a href="/docs/hosting-models" class="docs-next-card">
-                <strong>Hosting Models</strong>
-                <p>Understand when scaffold fully patches, stays review-first, or blocks.</p>
-            </a>
-        </div>
+        <ul class="docs-list">
+            <li>Which packages will be added.</li>
+            <li>Which startup and shell files will be touched.</li>
+            <li>Whether the host stays automatic or review-first.</li>
+            <li>What still needs manual follow-through.</li>
+        </ul>
     </section>
 </div>

@@ -8,27 +8,24 @@
 
 <div class="demo-doc-page">
     <MudPaper Elevation="1" Class="demo-doc-page__hero">
-        <p class="demo-doc-page__eyebrow">Workflow module</p>
+        <p class="demo-doc-page__eyebrow">Workflow</p>
         <MudText Typo="Typo.h5">Supplier compliance</MudText>
         <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
-            Focus risk. Explain it. Draft remediation.
+            Find at-risk suppliers, explain the risk, and draft remediation.
         </MudText>
 
         <div class="demo-doc-page__prompt-row">
-            <span>Show suppliers likely to fail compliance review</span>
-            <span>Explain why these suppliers are at risk</span>
+            <span>Show at-risk suppliers</span>
+            <span>Explain the current risk</span>
             <span>Prepare a remediation draft</span>
         </div>
 
         @if (IsResponseOrchestrationHandoff)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mt-3">
-                Opened from response orchestration. This live supplier surface is carrying the current workflow session and focus.
-            </MudAlert>
-            <MudAlert Severity="Severity.Success" Variant="Variant.Text" Dense="true" Class="mt-2">
-                Current orchestration contribution: @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
-                    ? "clear severe supplier blockers, then return once the remediation draft is ready."
-                    : "confirm supplier focus and prepare the remediation draft so the response packet can advance.")
+                @(Focus?.Equals("recovery", StringComparison.OrdinalIgnoreCase) == true
+                    ? "Opened from response orchestration. Clear supplier blockers, then return."
+                    : "Opened from response orchestration. Confirm supplier risk and prepare the draft, then return.")
             </MudAlert>
         }
 
