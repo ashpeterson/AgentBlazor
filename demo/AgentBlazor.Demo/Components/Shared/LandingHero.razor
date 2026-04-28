@@ -1,67 +1,30 @@
 @using MudBlazor
 
-<section class="landing-hero" id="hero">
-    <div class="landing-hero__glow landing-hero__glow--orange"></div>
-    <div class="landing-hero__glow landing-hero__glow--blue"></div>
+<div class="landing-hero" id="hero">
+    <p class="landing-hero__eyebrow">Agent workflows for Blazor</p>
+    <h1 class="landing-hero__title">Install it. Mount one workflow. Watch the UI move.</h1>
+    <p class="landing-hero__subtitle">
+        One reel. CLI install, minimal code, then a real prompt changing an official Microsoft Blazor app.
+    </p>
 
-    <div class="landing-hero__content">
-        <div class="landing-hero__intro">
-            <p class="landing-hero__eyebrow">Blazor-native agent workflows</p>
-            <h1 class="landing-hero__title">From fresh app to a real Blazor app.</h1>
-            <p class="landing-hero__subtitle">
-                Start with one short reel: CLI install, the smallest code shape, then a real prompt changing the official Microsoft movie sample.
-            </p>
-        </div>
-
-        <div class="landing-hero__cta">
-            <MudButton Href="/demo"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Large"
-                       EndIcon="@Icons.Material.Filled.PlayArrow">
-                Watch examples
-            </MudButton>
-            <MudButton Href="/docs"
-                       Variant="Variant.Outlined"
-                       Size="Size.Large"
-                       EndIcon="@Icons.Material.Filled.MenuBook">
-                Docs site
-            </MudButton>
-            <MudButton Href="/demo/workflows/response-orchestration?reset=true"
-                       Variant="Variant.Text"
-                       Size="Size.Large">
-                Try live workflow
-            </MudButton>
-        </div>
-
-        <div class="landing-hero__prompts" aria-label="Suggested prompts">
-            <span>One short reel</span>
-            <span>CLI → code → UI</span>
-            <span>Official sample proof</span>
-        </div>
-
-        <div class="landing-hero__proof">
-            <article class="landing-hero__proof-card landing-hero__proof-card--primary">
-                <p>Main reel</p>
-                <strong>One stitched walkthrough</strong>
-                <span>Install the runtime, inspect the code, then watch the chat surface drive an official Microsoft Blazor app.</span>
-            </article>
-            <article class="landing-hero__proof-card">
-                <p>Starter shape</p>
-                <strong>Minimal Blazor setup</strong>
-                <span>One workflow, one page, one embedded chat surface.</span>
-            </article>
-            <article class="landing-hero__proof-card">
-                <p>Real app proof</p>
-                <strong>Microsoft sample + Pro clip</strong>
-                <span>Show the prompt result on a known Blazor app, then show the paid dashboard state.</span>
-            </article>
-        </div>
-
-        <div class="landing-hero__plan-strip" aria-label="What to do next">
-            <span><strong>Watch</strong> the short examples first</span>
-            <span><strong>Read</strong> the setup docs second</span>
-            <span><strong>Open</strong> the live workflow last</span>
-        </div>
+    <div class="landing-hero__cta">
+        <MudButton Href="/demo"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Large"
+                   EndIcon="@Icons.Material.Filled.PlayArrow">
+            Watch reel
+        </MudButton>
+        <MudButton Href="/docs"
+                   Variant="Variant.Outlined"
+                   Size="Size.Large"
+                   EndIcon="@Icons.Material.Filled.MenuBook">
+            Open docs
+        </MudButton>
+        <MudButton Href="/demo/workflows/response-orchestration?reset=true"
+                   Variant="Variant.Text"
+                   Size="Size.Large">
+            Live workflow
+        </MudButton>
     </div>
-</section>
+</div>

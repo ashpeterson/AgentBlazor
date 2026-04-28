@@ -13,13 +13,13 @@ public sealed class MovieCatalogCapabilities(MovieWorkflowStateService workflow)
 
     [AgentAction("Filter the movie catalog by a title phrase", ActionId = "filter_movie_catalog")]
     public Task<CapabilityResult> FilterCatalog(
-        [AgentParam("Title phrase to filter by, for example road, mad, or furiosa", Required = true)] string titleContains,
+        [AgentParam("Title phrase to filter by, for example furiosa or thunderbolt", Required = true)] string titleContains,
         CancellationToken cancellationToken = default)
         => workflow.ApplyTitleFilterAsync(titleContains, cancellationToken);
 
     [AgentAction("Focus one movie for detail review by title phrase", ActionId = "focus_movie")]
     public Task<CapabilityResult> FocusMovie(
-        [AgentParam("Title phrase to focus, for example road warrior", Required = true)] string titleContains,
+        [AgentParam("Title phrase to focus, for example furiosa", Required = true)] string titleContains,
         CancellationToken cancellationToken = default)
         => workflow.FocusMovieAsync(titleContains, cancellationToken);
 

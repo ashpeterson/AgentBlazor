@@ -121,7 +121,7 @@ async function recordFlow(browser, baseUrl, outDir) {
 
   const widget = await openFloatingChatWidget(page, 30000);
 
-  await sendPrompt(widget.widgetSurface, "Filter movies with road in the title");
+  await sendPrompt(widget.widgetSurface, "Filter movies with furiosa in the title");
   await page.waitForTimeout(1000);
   await sendPrompt(widget.widgetSurface, "Focus Furiosa");
   await page.waitForTimeout(1000);

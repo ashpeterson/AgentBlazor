@@ -50,7 +50,7 @@ public sealed class MovieWorkflowStateService(IDbContextFactory<BlazorWebAppMovi
         NotifyChanged();
 
         var result = matches.Count == 0
-            ? CapabilityResult.Blocked(LastNarrative).WithWarning("Try a broader title phrase such as 'mad' or 'road'.")
+            ? CapabilityResult.Blocked(LastNarrative).WithWarning("Try a title phrase such as 'furiosa' or 'thunderbolt'.")
             : CapabilityResult.Success(LastNarrative);
 
         return result
@@ -76,7 +76,7 @@ public sealed class MovieWorkflowStateService(IDbContextFactory<BlazorWebAppMovi
             LastNarrative = $"Could not find a movie matching '{TitleFilter}'.";
             NotifyChanged();
             return CapabilityResult.Blocked(LastNarrative)
-                .WithWarning("Search for 'mad', 'road', or 'furiosa' to match the seeded catalog.");
+                .WithWarning("Search for 'furiosa' or 'thunderbolt' to match the seeded catalog.");
         }
 
         Spotlight = MovieSpotlight.From(movie);

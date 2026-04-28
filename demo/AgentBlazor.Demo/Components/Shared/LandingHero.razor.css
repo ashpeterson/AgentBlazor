@@ -1,48 +1,9 @@
 .landing-hero {
     position: relative;
-    min-height: 100svh;
-    display: grid;
-    place-items: center;
-    padding: 7.4rem 1.35rem 3rem;
-    overflow: hidden;
-}
-
-.landing-hero__glow {
-    position: absolute;
-    border-radius: 999px;
-    filter: blur(90px);
-    opacity: 0.58;
-    pointer-events: none;
-}
-
-.landing-hero__glow--orange {
-    top: -10rem;
-    right: -8rem;
-    width: 34rem;
-    height: 34rem;
-    background: radial-gradient(circle, rgba(255, 106, 61, 0.34), transparent 68%);
-}
-
-.landing-hero__glow--blue {
-    left: -10rem;
-    bottom: -12rem;
-    width: 38rem;
-    height: 38rem;
-    background: radial-gradient(circle, rgba(110, 168, 254, 0.28), transparent 70%);
-}
-
-.landing-hero__content {
-    position: relative;
-    z-index: 1;
-    width: min(76rem, 100%);
     display: grid;
     gap: 1.55rem;
-}
-
-.landing-hero__intro {
-    display: grid;
-    gap: 0.8rem;
-    max-width: 46rem;
+    align-content: start;
+    max-width: 33rem;
 }
 
 .landing-hero__eyebrow {
@@ -56,18 +17,17 @@
 
 .landing-hero__title {
     margin: 0;
-    font-size: clamp(3rem, 7vw, 5.6rem);
-    line-height: 0.95;
+    font-size: clamp(3rem, 6vw, 5.1rem);
+    line-height: 0.92;
     letter-spacing: -0.05em;
     color: #f3f8ff;
 }
 
 .landing-hero__subtitle {
     margin: 0;
-    max-width: 38rem;
     color: rgba(217, 229, 245, 0.78);
     font-size: clamp(1rem, 2vw, 1.15rem);
-    line-height: 1.55;
+    line-height: 1.5;
 }
 
 .landing-hero__cta {
@@ -86,106 +46,9 @@
     border-color: rgba(255, 255, 255, 0.16);
 }
 
-.landing-hero__prompts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-}
-
-.landing-hero__prompts > span {
-    padding: 0.58rem 0.92rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(11, 20, 31, 0.76);
-    color: rgba(236, 244, 255, 0.86);
-    font-size: 0.83rem;
-    font-weight: 700;
-}
-
-.landing-hero__proof {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr;
-    gap: 0.9rem;
-}
-
-.landing-hero__proof-card {
-    display: grid;
-    gap: 0.35rem;
-    padding: 1.2rem;
-    border-radius: 1.15rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(155deg, rgba(12, 22, 34, 0.86), rgba(8, 15, 24, 0.96));
-    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(12px);
-    position: relative;
-    overflow: hidden;
-}
-
-.landing-hero__proof-card--primary {
-    border-color: rgba(255, 130, 94, 0.3);
-    background:
-        radial-gradient(circle at top right, rgba(255, 106, 61, 0.12), transparent 32%),
-        linear-gradient(150deg, rgba(17, 30, 45, 0.92), rgba(10, 17, 27, 0.98));
-}
-
-.landing-hero__proof-card::after {
-    content: "";
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, rgba(110, 168, 254, 0.52), rgba(255, 106, 61, 0.22), transparent 72%);
-    opacity: 0.85;
-}
-
-.landing-hero__proof-card p {
-    margin: 0;
-    color: rgba(214, 228, 247, 0.7);
-    font-size: 0.74rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-}
-
-.landing-hero__proof-card strong {
-    color: #f3f8ff;
-    font-size: 1rem;
-}
-
-.landing-hero__proof-card span {
-    color: rgba(217, 229, 245, 0.72);
-    font-size: 0.9rem;
-    line-height: 1.45;
-}
-
-.landing-hero__plan-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.1rem;
-    color: rgba(214, 228, 247, 0.72);
-    font-size: 0.88rem;
-    font-weight: 600;
-    padding: 1rem 1.1rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(7, 13, 24, 0.56);
-    backdrop-filter: blur(10px);
-}
-
-.landing-hero__plan-strip strong {
-    color: #f3f8ff;
-    margin-right: 0.28rem;
-}
-
-@media (max-width: 960px) {
-    .landing-hero__proof {
-        grid-template-columns: 1fr;
-    }
-}
-
 @media (max-width: 680px) {
     .landing-hero {
-        padding: 6.6rem 1rem 2.4rem;
+        gap: 1.15rem;
     }
 
     .landing-hero__cta {

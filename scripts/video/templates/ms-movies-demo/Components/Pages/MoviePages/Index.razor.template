@@ -17,7 +17,7 @@
             <h1>Movies</h1>
             <p class="movies-shell__subtitle">Use the widget to filter the catalog, focus a movie, and prepare an approval-gated sequel draft card.</p>
             <div class="movies-shell__prompt-row">
-                <span>Filter movies with road in the title</span>
+                <span>Filter movies with furiosa in the title</span>
                 <span>Focus Furiosa</span>
                 <span>Prepare a sequel draft for the focused movie</span>
             </div>
@@ -85,7 +85,7 @@
         string.IsNullOrWhiteSpace(Workflow.TitleFilter)
             ? context.Movie.OrderBy(movie => movie.ReleaseDate)
             : context.Movie
-                .Where(m => m.Title != null && m.Title.Contains(Workflow.TitleFilter))
+                .Where(m => m.Title != null && EF.Functions.Like(m.Title, $"%{Workflow.TitleFilter}%"))
                 .OrderBy(movie => movie.ReleaseDate);
 
     private string WorkflowFilter
