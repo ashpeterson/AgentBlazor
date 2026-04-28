@@ -74,17 +74,6 @@
     border-color: rgba(255, 255, 255, 0.12);
 }
 
-.lp__nav-cta {
-    color: #fff !important;
-    background: linear-gradient(135deg, #ff6a3d 0%, #f04f2d 100%);
-    border-color: rgba(255, 140, 104, 0.35) !important;
-    box-shadow: 0 18px 32px rgba(240, 79, 45, 0.22);
-}
-
-.lp__nav-cta:hover {
-    box-shadow: 0 22px 38px rgba(240, 79, 45, 0.28);
-}
-
 #blazor-error-ui {
     color-scheme: light only;
     background: #fff6dc;
@@ -112,7 +101,7 @@
         padding: 0.85rem 1rem;
     }
 
-    .lp__nav a:not(.lp__nav-cta) {
+    .lp__nav a {
         display: none;
     }
 }
