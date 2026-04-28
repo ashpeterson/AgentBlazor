@@ -56,7 +56,7 @@ run_step() {
     printf '\033[1;32m$ %s\033[0m\n' "$display"
     "$@"
     printf '\n'
-    sleep 0.5
+    sleep 0.8
 }
 
 run_step "dotnet new blazor -n FreshAgentBlazor" \

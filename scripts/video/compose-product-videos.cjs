@@ -295,14 +295,13 @@ async function main() {
 
   const cliSegment = path.join(segmentDir, "reel-cli.mp4");
   renderClipSegment(cliPath, cliSegment, {
-    start: 0.55,
-    duration: 3.15,
+    start: 0.0,
+    duration: 6.7,
     eyebrow: "CLI INSTALL",
-    title: "Start with the CLI",
-    body: "Create the app and add the package before touching the host code.",
-    crop: "crop=1420:840:90:60",
-    titleSize: 44,
-    bodySize: 22,
+    title: "Run the full install flow",
+    body: "New app, package, tool install, init, scaffold, build, validate.",
+    titleSize: 42,
+    bodySize: 21,
     boxY: 742,
     boxHeight: 156
   });
