@@ -94,16 +94,28 @@ function renderTitleCard(outputPath, config) {
   const safeTitle = escapeDrawText(config.title);
   const safeBody = escapeDrawText(config.body);
   const duration = String(config.duration);
+  const titleSize = config.titleSize ?? 86;
+  const bodySize = config.bodySize ?? 30;
 
   const filter = [
-    "drawbox=x=0:y=0:w=1600:h=980:color=0x06111a@1:t=fill",
-    "drawbox=x=1110:y=0:w=490:h=980:color=0x1a1823@0.95:t=fill",
-    "drawbox=x=0:y=0:w=960:h=980:color=0x081522@0.94:t=fill",
-    "drawbox=x=64:y=188:w=720:h=392:color=0xffffff@0.06:t=fill",
-    "drawbox=x=64:y=188:w=720:h=392:color=0xffffff@0.90:t=2",
-    `drawtext=fontfile=${fontBold}:text='${safeEyebrow}':x=128:y=136:fontsize=24:fontcolor=white@0.72`,
-    `drawtext=fontfile=${fontBold}:text='${safeTitle}':x=128:y=210:fontsize=92:line_spacing=8:fontcolor=white`,
-    `drawtext=fontfile=${fontRegular}:text='${safeBody}':x=128:y=638:fontsize=30:fontcolor=white@0.82`,
+    "drawbox=x=0:y=0:w=1600:h=980:color=0x050b13@1:t=fill",
+    "drawbox=x=0:y=0:w=1600:h=6:color=0xff6a3d@0.9:t=fill",
+    "drawbox=x=76:y=130:w=718:h=518:color=0x08101a@1:t=fill",
+    "drawbox=x=76:y=130:w=718:h=518:color=0xffffff@0.12:t=2",
+    "drawbox=x=890:y=108:w=614:h=564:color=0x0c1724@0.98:t=fill",
+    "drawbox=x=890:y=108:w=614:h=564:color=0xff6a3d@0.16:t=2",
+    "drawbox=x=112:y=168:w=500:h=18:color=0xffffff@0.12:t=fill",
+    "drawbox=x=112:y=208:w=420:h=18:color=0xffffff@0.10:t=fill",
+    "drawbox=x=112:y=248:w=280:h=18:color=0xffffff@0.08:t=fill",
+    "drawbox=x=112:y=348:w=560:h=240:color=0x02060c@1:t=fill",
+    "drawbox=x=920:y=144:w=150:h=26:color=0x223447@1:t=fill",
+    "drawbox=x=920:y=144:w=150:h=26:color=0xffffff@0.10:t=2",
+    `drawtext=fontfile=${fontBold}:text='${safeEyebrow}':x=896:y=86:fontsize=24:fontcolor=white@0.72`,
+    `drawtext=fontfile=${fontBold}:text='${safeTitle}':x=896:y=208:fontsize=${titleSize}:line_spacing=8:fontcolor=white`,
+    `drawtext=fontfile=${fontRegular}:text='${safeBody}':x=896:y=336:fontsize=${bodySize}:fontcolor=white@0.80`,
+    `drawtext=fontfile=${fontBold}:text='dotnet new blazor -n FreshAgentBlazor':x=112:y=164:fontsize=22:fontcolor=white@0.82`,
+    `drawtext=fontfile=${fontRegular}:text='dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor':x=112:y=208:fontsize=18:fontcolor=white@0.58`,
+    `drawtext=fontfile=${fontRegular}:text='Install. Mount one workflow. Watch the UI move.' :x=112:y=578:fontsize=22:fontcolor=white@0.72`,
     `fade=t=in:st=0:d=0.2,fade=t=out:st=${Math.max(0.1, config.duration - 0.25).toFixed(2)}:d=0.2`
   ].join(",");
 
@@ -212,9 +224,11 @@ async function main() {
   const introCard = path.join(segmentDir, "intro-card.mp4");
   renderTitleCard(introCard, {
     eyebrow: "AGENTBLAZOR",
-    title: "See the app move.",
-    body: "Real app first. Setup second. Audit still visible at the end.",
-    duration: 1.25
+    title: "CLI first.\nThen the UI moves.",
+    body: "Show the command, the generated shape, and the result.",
+    titleSize: 60,
+    bodySize: 21,
+    duration: 1.6
   });
 
   const teaserMovieA = path.join(segmentDir, "teaser-movie-a.mp4");
@@ -281,8 +295,8 @@ async function main() {
 
   const cliSegment = path.join(segmentDir, "reel-cli.mp4");
   renderClipSegment(cliPath, cliSegment, {
-    start: 0.0,
-    duration: 3.4,
+    start: 0.55,
+    duration: 3.15,
     eyebrow: "CLI INSTALL",
     title: "Start with the CLI",
     body: "Create the app and add the package before touching the host code.",
@@ -336,13 +350,13 @@ async function main() {
   });
 
   const capabilityReel = path.join(deliverDir, "agentblazor-capability-reel.mp4");
-  concatSegments([cliSegment, codeSegment, movieSegmentA, movieSegmentB], capabilityReel);
+  concatSegments([introCard, cliSegment, codeSegment, movieSegmentA, movieSegmentB], capabilityReel);
 
   const moviesHighlight = path.join(deliverDir, "ms-movies-agentblazor.mp4");
   concatSegments([teaserMovieA, teaserMovieB], moviesHighlight);
 
   renderPoster(heroTeaser, path.join(deliverDir, "agentblazor-hero-teaser-poster.jpg"), 1.4);
-  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 5.8);
+  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 0.4);
   renderPoster(moviesHighlight, path.join(deliverDir, "ms-movies-agentblazor-poster.jpg"), 1.8);
   renderPoster(dashboardHighlight, path.join(deliverDir, "dashboard-live-poster.jpg"), 1.0);
 
