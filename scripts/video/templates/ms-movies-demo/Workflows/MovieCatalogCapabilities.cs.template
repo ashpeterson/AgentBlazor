@@ -1,0 +1,35 @@
+using AgentBlazor.App;
+using AgentBlazor.Attributes;
+using BlazorWebAppMovies.Services;
+
+namespace BlazorWebAppMovies.Workflows;
+
+[AgentCapability("movie_catalog", Name = "Movie Catalog", Description = "Search the Microsoft movie sample, focus one movie, and prepare a sequel draft card.")]
+public sealed class MovieCatalogCapabilities(MovieWorkflowStateService workflow)
+{
+    [AgentAction("Summarize the current movie catalog and any active filter", ActionId = "summarize_movie_catalog")]
+    public Task<CapabilityResult> SummarizeCatalog(CancellationToken cancellationToken = default)
+        => workflow.SummarizeCatalogAsync(cancellationToken);
+
+    [AgentAction("Filter the movie catalog by a title phrase", ActionId = "filter_movie_catalog")]
+    public Task<CapabilityResult> FilterCatalog(
+        [AgentParam("Title phrase to filter by, for example road, mad, or furiosa", Required = true)] string titleContains,
+        CancellationToken cancellationToken = default)
+        => workflow.ApplyTitleFilterAsync(titleContains, cancellationToken);
+
+    [AgentAction("Focus one movie for detail review by title phrase", ActionId = "focus_movie")]
+    public Task<CapabilityResult> FocusMovie(
+        [AgentParam("Title phrase to focus, for example road warrior", Required = true)] string titleContains,
+        CancellationToken cancellationToken = default)
+        => workflow.FocusMovieAsync(titleContains, cancellationToken);
+
+    [AgentAction("Prepare a sequel draft card for the focused movie", ActionId = "prepare_movie_draft", RequiresApproval = true)]
+    public Task<CapabilityResult> PrepareDraft(
+        [AgentParam("Optional title phrase to focus first")] string? titleContains = null,
+        CancellationToken cancellationToken = default)
+        => workflow.PrepareSequelDraftAsync(titleContains, cancellationToken);
+
+    [AgentAction("Clear the current movie workflow view", ActionId = "clear_movie_workflow")]
+    public CapabilityResult ClearWorkflow()
+        => workflow.ClearWorkflowView();
+}

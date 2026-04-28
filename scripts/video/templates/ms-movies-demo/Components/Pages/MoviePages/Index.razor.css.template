@@ -1,0 +1,124 @@
+.movies-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.movies-shell__hero,
+.movies-shell__status-card,
+.movies-shell__overview-card {
+    border-radius: 1.2rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.movies-shell__hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 0.8fr);
+    gap: 1rem;
+    padding: 1.2rem;
+}
+
+.movies-shell__eyebrow,
+.movies-shell__card-label {
+    margin: 0 0 0.45rem;
+    color: #5b6b84;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.movies-shell__hero h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.movies-shell__subtitle {
+    margin: 0.6rem 0 0;
+    color: #475569;
+    max-width: 42rem;
+}
+
+.movies-shell__prompt-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.movies-shell__prompt-row span {
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1d4ed8;
+    font-size: 0.86rem;
+}
+
+.movies-shell__status-card,
+.movies-shell__overview-card {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1rem;
+}
+
+.movies-shell__status-card strong,
+.movies-shell__overview-card strong {
+    font-size: 1rem;
+}
+
+.movies-shell__status-card span,
+.movies-shell__overview-card span {
+    color: #475569;
+}
+
+.movies-shell__overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+}
+
+.movies-shell__overview-card--draft {
+    background: linear-gradient(135deg, rgba(253, 242, 248, 0.92), rgba(255, 255, 255, 0.96));
+}
+
+.movies-shell__overview-card--spotlight {
+    background: linear-gradient(135deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.96));
+}
+
+.movies-shell__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.movies-shell__toolbar input[type="search"] {
+    width: min(24rem, 100%);
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.8rem;
+    border: 1px solid #cbd5e1;
+}
+
+::deep tr {
+    height: 3em;
+}
+
+::deep tr > td {
+    vertical-align: middle;
+}
+
+@media (max-width: 900px) {
+    .movies-shell__hero {
+        grid-template-columns: 1fr;
+    }
+
+    .movies-shell__toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .movies-shell__toolbar input[type="search"] {
+        width: 100%;
+    }
+}

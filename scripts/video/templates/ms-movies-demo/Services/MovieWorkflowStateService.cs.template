@@ -1,0 +1,170 @@
+using AgentBlazor.App;
+using BlazorWebAppMovies.Data;
+using BlazorWebAppMovies.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace BlazorWebAppMovies.Services;
+
+public sealed class MovieWorkflowStateService(IDbContextFactory<BlazorWebAppMoviesContext> dbFactory)
+{
+    public event Action? Changed;
+
+    public string TitleFilter { get; private set; } = string.Empty;
+    public MovieSpotlight? Spotlight { get; private set; }
+    public DraftMovieCard? Draft { get; private set; }
+    public string LastNarrative { get; private set; } = "Search the catalog, focus one movie, or prepare a sequel draft.";
+
+    public async Task<CapabilityResult> SummarizeCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        await using var context = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var total = await context.Movie.CountAsync(cancellationToken);
+        var filtered = string.IsNullOrWhiteSpace(TitleFilter)
+            ? total
+            : await context.Movie.CountAsync(
+                movie => movie.Title != null && EF.Functions.Like(movie.Title, $"%{TitleFilter}%"),
+                cancellationToken);
+
+        LastNarrative = string.IsNullOrWhiteSpace(TitleFilter)
+            ? $"The movie catalog has {total} titles and no active filter."
+            : $"The movie catalog has {filtered} matching title(s) for filter '{TitleFilter}' out of {total} total.";
+        NotifyChanged();
+
+        return CapabilityResult.Success(LastNarrative)
+            .WithOutput("totalMovies", total)
+            .WithOutput("activeFilter", TitleFilter)
+            .WithOutput("filteredMovies", filtered)
+            .WithNextActions("Filter the catalog by title", "Focus one movie for detail review");
+    }
+
+    public async Task<CapabilityResult> ApplyTitleFilterAsync(string titleContains, CancellationToken cancellationToken = default)
+    {
+        TitleFilter = titleContains.Trim();
+        Spotlight = null;
+        Draft = null;
+
+        await using var context = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var matches = await FindMatchesAsync(context, cancellationToken);
+        LastNarrative = matches.Count == 0
+            ? $"No movies match '{TitleFilter}'."
+            : $"Applied filter '{TitleFilter}'. {matches.Count} movie(s) now match.";
+        NotifyChanged();
+
+        var result = matches.Count == 0
+            ? CapabilityResult.Blocked(LastNarrative).WithWarning("Try a broader title phrase such as 'mad' or 'road'.")
+            : CapabilityResult.Success(LastNarrative);
+
+        return result
+            .WithOutput("activeFilter", TitleFilter)
+            .WithOutput("matchCount", matches.Count)
+            .WithNextActions("Focus one movie from the filtered list", "Clear the current movie workflow view");
+    }
+
+    public async Task<CapabilityResult> FocusMovieAsync(string titleContains, CancellationToken cancellationToken = default)
+    {
+        TitleFilter = titleContains.Trim();
+        Draft = null;
+
+        await using var context = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var movie = await context.Movie
+            .Where(item => item.Title != null && EF.Functions.Like(item.Title, $"%{TitleFilter}%"))
+            .OrderBy(item => item.ReleaseDate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (movie is null)
+        {
+            Spotlight = null;
+            LastNarrative = $"Could not find a movie matching '{TitleFilter}'.";
+            NotifyChanged();
+            return CapabilityResult.Blocked(LastNarrative)
+                .WithWarning("Search for 'mad', 'road', or 'furiosa' to match the seeded catalog.");
+        }
+
+        Spotlight = MovieSpotlight.From(movie);
+        LastNarrative = $"Focused the workflow on {movie.Title} so the operator can review details or prepare a sequel draft.";
+        NotifyChanged();
+
+        return CapabilityResult.Success(LastNarrative)
+            .WithOutput("movieTitle", movie.Title)
+            .WithOutput("movieGenre", movie.Genre)
+            .WithOutput("movieRating", movie.Rating)
+            .WithNextActions("Prepare a sequel draft for the focused movie", "Summarize the current movie catalog");
+    }
+
+    public async Task<CapabilityResult> PrepareSequelDraftAsync(string? titleContains = null, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(titleContains))
+        {
+            var focusResult = await FocusMovieAsync(titleContains, cancellationToken);
+            if (!focusResult.Succeeded)
+            {
+                return focusResult;
+            }
+        }
+
+        if (Spotlight is null)
+        {
+            return CapabilityResult.NeedsClarification("Focus one movie before preparing a sequel draft.");
+        }
+
+        Draft = new DraftMovieCard(
+            Title: $"{Spotlight.Title}: Follow-up Signal",
+            Genre: Spotlight.Genre,
+            Rating: Spotlight.Rating,
+            Price: Spotlight.Price + 2.00m,
+            ReleaseDate: Spotlight.ReleaseDate.AddYears(3),
+            Narrative: $"Drafted a sequel-style follow-up card from {Spotlight.Title}. Approval was required because this prepares operator-facing content.");
+
+        LastNarrative = Draft.Narrative;
+        NotifyChanged();
+
+        return CapabilityResult.Success(LastNarrative)
+            .WithOutput("draftTitle", Draft.Title)
+            .WithOutput("draftReleaseDate", Draft.ReleaseDate.ToString("yyyy-MM-dd"))
+            .WithNextActions("Review the draft card on screen", "Clear the current movie workflow view");
+    }
+
+    public CapabilityResult ClearWorkflowView()
+    {
+        TitleFilter = string.Empty;
+        Spotlight = null;
+        Draft = null;
+        LastNarrative = "Cleared the movie workflow view.";
+        NotifyChanged();
+
+        return CapabilityResult.Success(LastNarrative)
+            .WithNextActions("Summarize the current movie catalog", "Filter the catalog by title");
+    }
+
+    private async Task<List<Movie>> FindMatchesAsync(BlazorWebAppMoviesContext context, CancellationToken cancellationToken)
+    {
+        var query = context.Movie.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(TitleFilter))
+        {
+            query = query.Where(movie => movie.Title != null && EF.Functions.Like(movie.Title, $"%{TitleFilter}%"));
+        }
+
+        return await query.OrderBy(movie => movie.ReleaseDate).ToListAsync(cancellationToken);
+    }
+
+    private void NotifyChanged() => Changed?.Invoke();
+}
+
+public sealed record MovieSpotlight(
+    int Id,
+    string Title,
+    string Genre,
+    string Rating,
+    decimal Price,
+    DateOnly ReleaseDate)
+{
+    public static MovieSpotlight From(Movie movie) =>
+        new(movie.Id, movie.Title ?? "Unknown", movie.Genre ?? "Unknown", movie.Rating ?? "Unknown", movie.Price, movie.ReleaseDate);
+}
+
+public sealed record DraftMovieCard(
+    string Title,
+    string Genre,
+    string Rating,
+    decimal Price,
+    DateOnly ReleaseDate,
+    string Narrative);

@@ -8,10 +8,43 @@
     <MudPaper Elevation="0" Class="launchpad__hero">
         <div class="launchpad__hero-copy">
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Video hub</MudChip>
-            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the 3 shortest examples first.</MudText>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the real-app path first.</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Install, one live prompt, then the paid dashboard.
+                Start with the stitched reel, then jump into the Microsoft movie app clip and the Pro dashboard clip.
             </MudText>
+        </div>
+
+        <div class="launchpad__feature-grid">
+            <article class="launchpad__feature-card">
+                <div class="launchpad__feature-frame">
+                    <video controls preload="metadata" playsinline src="/videos/agentblazor-capability-reel.mp4"></video>
+                </div>
+                <div class="launchpad__feature-copy">
+                    <strong>AgentBlazor in one reel</strong>
+                    <p>Fresh app. CLI install. Starter code. Official Microsoft app. Real prompt result.</p>
+                </div>
+            </article>
+
+            <aside class="launchpad__guide-card">
+                <span class="launchpad__eyebrow">What to copy</span>
+                <div class="launchpad__guide-list">
+                    <span><strong>Program.cs</strong> for runtime setup and endpoint mapping.</span>
+                    <span><strong>OpsReviewCapabilities.cs</strong> for one semantic workflow class.</span>
+                    <span><strong>OpsReview.razor</strong> for a page with an embedded chat widget.</span>
+                    <span><strong>Movies sample clip</strong> for the strongest prompt-result proof.</span>
+                </div>
+                <div class="launchpad__hero-actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
+                        Open live workflow
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">
+                        Open CLI guide
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/dashboard">
+                        Open dashboard
+                    </MudButton>
+                </div>
+            </aside>
         </div>
 
         <div class="launchpad__video-grid">
@@ -19,35 +52,23 @@
                 <div class="launchpad__video-frame">
                     <video controls preload="metadata" playsinline src="/videos/cli-install.mp4"></video>
                 </div>
-                <strong>1. CLI install</strong>
-                <p>Fresh app to installed runtime.</p>
+                <strong>CLI install</strong>
+                <p>Short terminal-only version.</p>
             </article>
             <article class="launchpad__video-card">
                 <div class="launchpad__video-frame">
-                    <video controls preload="metadata" playsinline src="/videos/workflow-live.mp4"></video>
+                    <video controls preload="metadata" playsinline src="/videos/ms-movies-agentblazor.mp4"></video>
                 </div>
-                <strong>2. Live workflow</strong>
-                <p>Real prompt and approval on the runtime probe.</p>
+                <strong>Official app prompt</strong>
+                <p>Short prompt/approval/result version on the Microsoft movie sample.</p>
             </article>
             <article class="launchpad__video-card">
                 <div class="launchpad__video-frame">
                     <video controls preload="metadata" playsinline src="/videos/dashboard-live.mp4"></video>
                 </div>
-                <strong>3. Pro dashboard</strong>
-                <p>Audit and usage after real activity.</p>
+                <strong>Pro dashboard</strong>
+                <p>Short audit/usage version.</p>
             </article>
-        </div>
-
-        <div class="launchpad__hero-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
-                Open live workflow
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/components">
-                Open components
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/dashboard">
-                Open dashboard
-            </MudButton>
         </div>
     </MudPaper>
 </div>

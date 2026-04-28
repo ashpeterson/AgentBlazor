@@ -9,69 +9,99 @@
 <div class="landing-page">
     <LandingHero />
 
-    <section class="landing-page__section">
+    <section class="landing-page__section landing-page__section--feature">
         <div class="landing-page__section-head">
             <div>
-                <p class="landing-page__eyebrow">Quick Examples</p>
-                <h2>3 short videos. No tour required.</h2>
+                <p class="landing-page__eyebrow">Product Tour</p>
+                <h2>See the whole path before you open anything else.</h2>
             </div>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo">
                 Open video hub
             </MudButton>
         </div>
 
-        <div class="landing-page__video-grid">
-            <article class="landing-page__video-card">
-                <div class="landing-page__video-frame">
-                    <video controls preload="metadata" playsinline src="/videos/cli-install.mp4"></video>
+        <div class="landing-page__feature-grid">
+            <article class="landing-page__feature-player">
+                <div class="landing-page__feature-frame">
+                    <video controls preload="metadata" playsinline src="/videos/agentblazor-capability-reel.mp4"></video>
                 </div>
-                <strong>1. Install with CLI</strong>
-                <p>Fresh app to installed runtime in one pass.</p>
-            </article>
-            <article class="landing-page__video-card">
-                <div class="landing-page__video-frame">
-                    <video controls preload="metadata" playsinline src="/videos/workflow-live.mp4"></video>
+                <div class="landing-page__feature-copy">
+                    <strong>CLI, code, then a real app result</strong>
+                    <p>Fresh install, the smallest code shape, then a live prompt changing the official Microsoft movie sample.</p>
                 </div>
-                <strong>2. Run one live workflow</strong>
-                <p>Real prompt and approval on the runtime probe route.</p>
             </article>
-            <article class="landing-page__video-card">
-                <div class="landing-page__video-frame">
-                    <video controls preload="metadata" playsinline src="/videos/dashboard-live.mp4"></video>
-                </div>
-                <strong>3. Open the Pro dashboard</strong>
-                <p>See audit and usage after real activity.</p>
-            </article>
+
+            <aside class="landing-page__feature-rail">
+                <article class="landing-page__rail-card">
+                    <p class="landing-page__eyebrow">What You See</p>
+                    <div class="landing-page__step-list">
+                        <span><strong>1.</strong> Install `AgentBlazor` and run the CLI on a fresh Blazor app.</span>
+                        <span><strong>2.</strong> Inspect the exact `Program.cs`, workflow capability, and page shape.</span>
+                        <span><strong>3.</strong> Watch the chat widget change the official Microsoft movie app.</span>
+                    </div>
+                </article>
+
+                <article class="landing-page__rail-card landing-page__rail-card--accent">
+                    <p class="landing-page__eyebrow">Open Next</p>
+                    <div class="landing-page__step-list">
+                        <span><strong>Docs:</strong> setup and CLI run order.</span>
+                        <span><strong>Live app:</strong> the full workflow surface after you know what to look for.</span>
+                        <span><strong>Pro:</strong> audit, usage, and dashboard state.</span>
+                    </div>
+                    <div class="landing-page__rail-actions">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
+                            Open live workflow
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/getting-started">
+                            Open getting started
+                        </MudButton>
+                    </div>
+                </article>
+            </aside>
         </div>
     </section>
 
     <section class="landing-page__section">
         <div class="landing-page__section-head">
             <div>
-                <p class="landing-page__eyebrow">Next Step</p>
-                <h2>Then choose docs or the live app.</h2>
+                <p class="landing-page__eyebrow">Supporting Proof</p>
+                <h2>Then drill into the specific surfaces.</h2>
             </div>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs">
                 Open docs
             </MudButton>
         </div>
 
-        <div class="landing-page__grid landing-page__grid--demo">
-            <a href="/docs/getting-started" class="landing-page__card">
-                <strong>Getting Started</strong>
-                <p>Install source, first workflow, first chat surface.</p>
-            </a>
+        <div class="landing-page__video-grid landing-page__video-grid--support">
+            <article class="landing-page__video-card landing-page__video-card--support">
+                <div class="landing-page__video-frame">
+                    <video controls preload="metadata" playsinline src="/videos/ms-movies-agentblazor.mp4"></video>
+                </div>
+                <strong>Official Microsoft app clip</strong>
+                <p>Prompt, approval, and visible state change on the movie sample.</p>
+            </article>
+            <article class="landing-page__video-card landing-page__video-card--support">
+                <div class="landing-page__video-frame">
+                    <video controls preload="metadata" playsinline src="/videos/dashboard-live.mp4"></video>
+                </div>
+                <strong>Pro dashboard clip</strong>
+                <p>Usage, audit, and patterns after real activity.</p>
+            </article>
             <a href="/docs/cli" class="landing-page__card">
-                <strong>CLI Guide</strong>
-                <p>Exact command order and validation flow.</p>
+                <strong>CLI guide</strong>
+                <p>Exact command order, validate flow, and host-safe usage.</p>
+            </a>
+            <a href="/docs/getting-started" class="landing-page__card">
+                <strong>Getting started</strong>
+                <p>Runtime install, provider wiring, first workflow, first chat surface.</p>
             </a>
             <a href="/demo/workflows/response-orchestration?reset=true" class="landing-page__card landing-page__card--featured">
                 <strong>Live workflow</strong>
-                <p>Open the route after you know what to look for.</p>
+                <p>Open the full route after the short clips make the behavior obvious.</p>
             </a>
-            <a href="/demo/components" class="landing-page__card">
-                <strong>Reference surfaces</strong>
-                <p>Components and paid dashboard stay secondary.</p>
+            <a href="/demo/dashboard" class="landing-page__card">
+                <strong>Pro dashboard</strong>
+                <p>Open the paid surface directly if audit and analytics are the focus.</p>
             </a>
         </div>
     </section>

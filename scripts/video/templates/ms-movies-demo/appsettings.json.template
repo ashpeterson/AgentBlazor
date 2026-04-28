@@ -1,0 +1,16 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "BlazorWebAppMoviesContext": "Data Source=App_Data/movies.db"
+  },
+  "OpenAI": {
+    "ApiKey": "",
+    "Model": "gpt-5.4-mini"
+  }
+}

@@ -1,0 +1,73 @@
+using BlazorWebAppMovies.Components;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using BlazorWebAppMovies.Data;
+using BlazorWebAppMovies.Services;
+using BlazorWebAppMovies.Workflows;
+using AgentBlazor;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseStaticWebAssets();
+var databasePath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "movies.db");
+Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+var connectionString = builder.Configuration.GetConnectionString("BlazorWebAppMoviesContext")
+    ?? $"Data Source={databasePath}";
+
+builder.Services.AddDbContextFactory<BlazorWebAppMoviesContext>(options =>
+    options.UseSqlite(connectionString));
+
+builder.Services.AddQuickGridEntityFrameworkAdapter();
+builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddScoped<MovieWorkflowStateService>();
+
+var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
+    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
+var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+var conversationStorePath = Path.Combine(dataDirectory, "agentblazor-conversations.json");
+var sharedStateStorePath = Path.Combine(dataDirectory, "agentblazor-shared-state.json");
+
+builder.Services.AddAgentBlazor(options =>
+{
+    if (!string.IsNullOrWhiteSpace(openAiApiKey))
+    {
+        options.UseOpenAI(openAiApiKey, openAiModel);
+    }
+
+    options.ConfigureBuilder(agentBuilder =>
+    {
+        agentBuilder.UseJsonFileConversationStore(conversationStorePath);
+        agentBuilder.UseJsonFileSharedStateStore(sharedStateStorePath);
+        agentBuilder.AddWorkflow<MovieCatalogCapabilities>("movies", agent =>
+        {
+            agent.WithDescription("Help the operator search the movie catalog, focus one movie, and prepare a sequel draft card for review.");
+            agent.WithRoutePrefixes("/movies");
+        });
+    });
+});
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    SeedData.Initialize(services);
+}
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
+}
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseHttpsRedirection();
+app.UseAntiforgery();
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();
+
+app.Run();

@@ -5,6 +5,7 @@ using AgentBlazor.Starter.Workflows;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseStaticWebAssets();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

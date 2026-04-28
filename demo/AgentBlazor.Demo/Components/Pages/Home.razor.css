@@ -42,10 +42,103 @@
     gap: 0.95rem;
 }
 
+.landing-page__feature-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(19rem, 0.9fr);
+    gap: 1rem;
+}
+
+.landing-page__feature-player,
+.landing-page__feature-rail {
+    display: grid;
+    gap: 1rem;
+}
+
+.landing-page__feature-player {
+    padding: 1.1rem;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background:
+        radial-gradient(circle at top right, rgba(255, 106, 61, 0.12), transparent 28%),
+        linear-gradient(150deg, rgba(17, 30, 45, 0.94), rgba(8, 15, 24, 0.98));
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.24);
+}
+
+.landing-page__feature-frame {
+    overflow: hidden;
+    border-radius: 1.15rem;
+    background: #020610;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    aspect-ratio: 16 / 9;
+}
+
+.landing-page__feature-frame video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.landing-page__feature-copy {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.landing-page__feature-copy strong {
+    color: #f3f8ff;
+    font-size: 1.08rem;
+}
+
+.landing-page__feature-copy p {
+    margin: 0;
+    color: rgba(217, 229, 245, 0.78);
+    line-height: 1.55;
+}
+
+.landing-page__rail-card {
+    display: grid;
+    gap: 0.85rem;
+    padding: 1rem 1.05rem;
+    border-radius: 1.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(155deg, rgba(12, 22, 34, 0.86), rgba(8, 15, 24, 0.96));
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.18);
+}
+
+.landing-page__rail-card--accent {
+    background:
+        radial-gradient(circle at top right, rgba(110, 168, 254, 0.12), transparent 30%),
+        linear-gradient(155deg, rgba(12, 22, 34, 0.88), rgba(8, 15, 24, 0.98));
+}
+
+.landing-page__step-list {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.landing-page__step-list span {
+    color: rgba(217, 229, 245, 0.8);
+    line-height: 1.55;
+}
+
+.landing-page__step-list strong {
+    color: #f3f8ff;
+}
+
+.landing-page__rail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
 .landing-page__video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
     gap: 1rem;
+}
+
+.landing-page__video-grid--support {
+    align-items: stretch;
 }
 
 .landing-page__video-card {
@@ -82,6 +175,10 @@
     margin: 0;
     color: rgba(217, 229, 245, 0.78);
     line-height: 1.5;
+}
+
+.landing-page__video-card--support {
+    padding: 0.9rem;
 }
 
 .landing-page__grid--demo {
@@ -155,5 +252,11 @@ html {
 
     .landing-page__section-head {
         display: block;
+    }
+}
+
+@media (max-width: 980px) {
+    .landing-page__feature-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -8,7 +8,7 @@ CAST_FILE="$OUT_DIR/cli-install.cast"
 TEMP_ROOT="$(mktemp -d /tmp/agentblazor-cli-video-XXXXXX)"
 WORK_DIR="$TEMP_ROOT/workspace"
 SESSION_SCRIPT="$TEMP_ROOT/session.sh"
-SESSION_OUTPUT_DIR="$WORK_DIR/output"
+SESSION_OUTPUT_DIR="$OUT_DIR/generated-project"
 
 cleanup() {
     rm -rf "$TEMP_ROOT"

@@ -1,0 +1,114 @@
+@page "/movies"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using BlazorWebAppMovies.Models
+@using BlazorWebAppMovies.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<BlazorWebAppMovies.Data.BlazorWebAppMoviesContext> DbFactory
+@inject BlazorWebAppMovies.Services.MovieWorkflowStateService Workflow
+
+<PageTitle>Index</PageTitle>
+
+<div class="movies-shell">
+    <section class="movies-shell__hero">
+        <div>
+            <p class="movies-shell__eyebrow">Official Microsoft Blazor sample + AgentBlazor</p>
+            <h1>Movies</h1>
+            <p class="movies-shell__subtitle">Use the widget to filter the catalog, focus a movie, and prepare an approval-gated sequel draft card.</p>
+            <div class="movies-shell__prompt-row">
+                <span>Filter movies with road in the title</span>
+                <span>Focus Furiosa</span>
+                <span>Prepare a sequel draft for the focused movie</span>
+            </div>
+        </div>
+        <div class="movies-shell__status-card">
+            <strong>Workflow view</strong>
+            <span>@Workflow.LastNarrative</span>
+        </div>
+    </section>
+
+    <div class="movies-shell__overview">
+        @if (Workflow.Spotlight is not null)
+        {
+            <article class="movies-shell__overview-card movies-shell__overview-card--spotlight">
+                <p class="movies-shell__card-label">Focused movie</p>
+                <strong>@Workflow.Spotlight.Title</strong>
+                <span>@Workflow.Spotlight.Genre · @Workflow.Spotlight.Rating · @Workflow.Spotlight.ReleaseDate.ToString("yyyy")</span>
+            </article>
+        }
+
+        @if (Workflow.Draft is not null)
+        {
+            <article class="movies-shell__overview-card movies-shell__overview-card--draft">
+                <p class="movies-shell__card-label">Draft card</p>
+                <strong>@Workflow.Draft.Title</strong>
+                <span>@Workflow.Draft.Genre · @Workflow.Draft.Rating · @Workflow.Draft.ReleaseDate.ToString("yyyy-MM-dd")</span>
+            </article>
+        }
+    </div>
+
+    <div class="movies-shell__toolbar">
+        <input type="search" @bind="WorkflowFilter" @bind:event="oninput" placeholder="Type to filter the title list..." />
+        <a href="movies/create">Create New</a>
+    </div>
+
+    <div>
+        <QuickGrid Class="table" Items="FilteredMovies" Pagination="pagination">
+            <PropertyColumn Property="movie => movie.Title" Sortable="true" />
+            <PropertyColumn Property="movie => movie.ReleaseDate" Title="Release Date" />
+            <PropertyColumn Property="movie => movie.Genre" />
+            <PropertyColumn Property="movie => movie.Price" />
+            <PropertyColumn Property="movie => movie.Rating" />
+
+            <TemplateColumn Context="movie">
+                <a href="@($"movies/edit?id={movie.Id}")">Edit</a> |
+                <a href="@($"movies/details?id={movie.Id}")">Details</a> |
+                <a href="@($"movies/delete?id={movie.Id}")">Delete</a>
+            </TemplateColumn>
+        </QuickGrid>
+    </div>
+
+    <Paginator State="pagination" />
+
+    <AgentChatWidget Title="Movies"
+                     Placeholder="Ask the agent to filter, focus, or prepare a sequel draft..."
+                     Width="31rem"
+                     Height="70vh" />
+</div>
+
+@code {
+    private BlazorWebAppMoviesContext context = default!;
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 5 };
+
+    private IQueryable<Movie> FilteredMovies =>
+        string.IsNullOrWhiteSpace(Workflow.TitleFilter)
+            ? context.Movie.OrderBy(movie => movie.ReleaseDate)
+            : context.Movie
+                .Where(m => m.Title != null && m.Title.Contains(Workflow.TitleFilter))
+                .OrderBy(movie => movie.ReleaseDate);
+
+    private string WorkflowFilter
+    {
+        get => Workflow.TitleFilter;
+        set => Workflow.ApplyTitleFilterAsync(value).GetAwaiter().GetResult();
+    }
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+        Workflow.Changed += HandleWorkflowChanged;
+    }
+
+    private async void HandleWorkflowChanged()
+    {
+        pagination = new PaginationState { ItemsPerPage = 5 };
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+        await context.DisposeAsync();
+    }
+}
