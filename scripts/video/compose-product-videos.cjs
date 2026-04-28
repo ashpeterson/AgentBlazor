@@ -43,20 +43,23 @@ function escapeDrawText(value) {
     .replace(/%/g, "\\%");
 }
 
-function buildOverlayFilter({ eyebrow, title, body, duration }) {
+function buildOverlayFilter({ eyebrow, title, body, duration, crop, titleSize = 48, bodySize = 24, boxY = 728, boxHeight = 176 }) {
   const safeEyebrow = escapeDrawText(eyebrow);
   const safeTitle = escapeDrawText(title);
   const safeBody = escapeDrawText(body);
   const fadeOutStart = Math.max(0.1, duration - 0.35).toFixed(2);
+  const titleY = boxY + 66;
+  const bodyY = boxY + 124;
+  const baseVisual = crop ? `${crop},scale=1600:980` : "scale=1600:980";
 
   return [
-    "scale=1600:980",
+    baseVisual,
     "eq=contrast=1.03:saturation=1.08:brightness=0.015",
-    "drawbox=x=44:y=728:w=1512:h=176:color=0x06111a@0.74:t=fill",
-    "drawbox=x=44:y=728:w=1512:h=176:color=0xffffff@0.10:t=2",
-    `drawtext=fontfile=${fontBold}:text='${safeEyebrow}':x=76:y=760:fontsize=22:fontcolor=white@0.72`,
-    `drawtext=fontfile=${fontBold}:text='${safeTitle}':x=76:y=794:fontsize=48:fontcolor=white`,
-    `drawtext=fontfile=${fontRegular}:text='${safeBody}':x=76:y=852:fontsize=24:fontcolor=white@0.78`,
+    `drawbox=x=44:y=${boxY}:w=1512:h=${boxHeight}:color=0x06111a@0.76:t=fill`,
+    `drawbox=x=44:y=${boxY}:w=1512:h=${boxHeight}:color=0xffffff@0.10:t=2`,
+    `drawtext=fontfile=${fontBold}:text='${safeEyebrow}':x=76:y=${boxY + 32}:fontsize=22:fontcolor=white@0.72`,
+    `drawtext=fontfile=${fontBold}:text='${safeTitle}':x=76:y=${titleY}:fontsize=${titleSize}:fontcolor=white`,
+    `drawtext=fontfile=${fontRegular}:text='${safeBody}':x=76:y=${bodyY}:fontsize=${bodySize}:fontcolor=white@0.78`,
     `fade=t=in:st=0:d=0.25,fade=t=out:st=${fadeOutStart}:d=0.25`
   ].join(",");
 }
@@ -209,99 +212,144 @@ async function main() {
   const introCard = path.join(segmentDir, "intro-card.mp4");
   renderTitleCard(introCard, {
     eyebrow: "AGENTBLAZOR",
-    title: "Prompt. Approve.\nWatch the UI move.",
-    body: "Real Blazor app first. Then the minimal code and CLI that made it happen.",
-    duration: 1.8
+    title: "See the app move.",
+    body: "Real app first. Setup second. Audit still visible at the end.",
+    duration: 1.25
   });
 
   const teaserMovieA = path.join(segmentDir, "teaser-movie-a.mp4");
   renderClipSegment(moviesPath, teaserMovieA, {
-    start: 10.8,
-    duration: 3.8,
+    start: 11.7,
+    duration: 2.9,
     eyebrow: "REAL APP RESULT",
     title: "Filter and focus a real page",
     body: "The chat surface drives the Microsoft movie sample, not a synthetic mock.",
+    crop: "crop=1340:820:170:90",
+    titleSize: 46,
+    bodySize: 22,
+    boxY: 744,
+    boxHeight: 154
   });
 
   const teaserMovieB = path.join(segmentDir, "teaser-movie-b.mp4");
   renderClipSegment(moviesPath, teaserMovieB, {
-    start: 17.2,
-    duration: 3.9,
+    start: 17.3,
+    duration: 3.2,
     eyebrow: "APPROVAL FLOW",
     title: "Approve and keep moving",
-    body: "The draft card lands on screen after the approval boundary is cleared."
+    body: "The draft card lands on screen after the approval boundary is cleared.",
+    crop: "crop=1340:820:170:90",
+    titleSize: 46,
+    bodySize: 22,
+    boxY: 744,
+    boxHeight: 154
   });
 
-  const teaserDashboard = path.join(segmentDir, "teaser-dashboard.mp4");
-  renderClipSegment(dashboardPath, teaserDashboard, {
-    start: 0.4,
-    duration: 3.2,
+  const dashboardOverview = path.join(segmentDir, "dashboard-overview.mp4");
+  renderClipSegment(dashboardPath, dashboardOverview, {
+    start: 0.2,
+    duration: 1.9,
     eyebrow: "PAID SURFACE",
-    title: "Usage and audit stay visible",
-    body: "Operators can inspect actions, audit, and patterns after real activity."
+    title: "Usage stays visible",
+    body: "Operators keep the action count, success rate, and timings in view.",
+    crop: "crop=1400:760:100:80",
+    titleSize: 42,
+    bodySize: 21,
+    boxY: 744,
+    boxHeight: 154
   });
+
+  const dashboardAudit = path.join(segmentDir, "dashboard-audit.mp4");
+  renderClipSegment(dashboardPath, dashboardAudit, {
+    start: 2.0,
+    duration: 1.9,
+    eyebrow: "AUDIT + PATTERNS",
+    title: "Audit and patterns stay queryable",
+    body: "The paid view keeps the operational history close to the workflow.",
+    crop: "crop=1400:760:100:80",
+    titleSize: 40,
+    bodySize: 21,
+    boxY: 744,
+    boxHeight: 154
+  });
+
+  const dashboardHighlight = path.join(deliverDir, "dashboard-live.mp4");
+  concatSegments([dashboardOverview, dashboardAudit], dashboardHighlight);
 
   const heroTeaser = path.join(deliverDir, "agentblazor-hero-teaser.mp4");
-  concatSegments([teaserMovieA, teaserMovieB, teaserDashboard], heroTeaser);
+  concatSegments([teaserMovieA, teaserMovieB, dashboardOverview], heroTeaser);
 
   const cliSegment = path.join(segmentDir, "reel-cli.mp4");
   renderClipSegment(cliPath, cliSegment, {
-    start: 0.6,
-    duration: 4.8,
+    start: 0.0,
+    duration: 3.4,
     eyebrow: "CLI INSTALL",
-    title: "Install it fast",
-    body: "Create the app, add the package, run the setup path, move on."
+    title: "Start with the CLI",
+    body: "Create the app and add the package before touching the host code.",
+    crop: "crop=1420:840:90:60",
+    titleSize: 44,
+    bodySize: 22,
+    boxY: 742,
+    boxHeight: 156
   });
 
   const codeSegment = path.join(segmentDir, "reel-code.mp4");
   renderClipSegment(codePath, codeSegment, {
-    start: 0.3,
-    duration: 6.2,
+    start: 0.1,
+    duration: 3.8,
     eyebrow: "SMALL CODE SHAPE",
     title: "Keep the app native",
-    body: "Wire the runtime, add one capability class, mount one chat surface."
+    body: "Wire the runtime, add one capability class, mount one chat surface.",
+    crop: "crop=1460:860:70:70",
+    titleSize: 44,
+    bodySize: 22,
+    boxY: 742,
+    boxHeight: 156
   });
 
   const movieSegmentA = path.join(segmentDir, "reel-movie-a.mp4");
   renderClipSegment(moviesPath, movieSegmentA, {
-    start: 10.8,
-    duration: 4.2,
+    start: 11.5,
+    duration: 3.4,
     eyebrow: "REAL BLAZOR APP",
     title: "Prompt changes the page",
-    body: "The catalog filters and the workflow focuses the movie in view."
+    body: "The catalog filters and the workflow focuses the movie in view.",
+    crop: "crop=1340:820:170:90",
+    titleSize: 46,
+    bodySize: 22,
+    boxY: 742,
+    boxHeight: 156
   });
 
   const movieSegmentB = path.join(segmentDir, "reel-movie-b.mp4");
   renderClipSegment(moviesPath, movieSegmentB, {
-    start: 16.6,
-    duration: 4.8,
+    start: 17.1,
+    duration: 3.9,
     eyebrow: "APPROVAL + RESULT",
     title: "Approve, then ship the next step",
-    body: "The draft card appears in the workflow after operator approval."
-  });
-
-  const dashboardSegment = path.join(segmentDir, "reel-dashboard.mp4");
-  renderClipSegment(dashboardPath, dashboardSegment, {
-    start: 0.4,
-    duration: 3.8,
-    eyebrow: "PRO DASHBOARD",
-    title: "See what happened",
-    body: "Usage, audit, and patterns stay visible for the paid tier."
+    body: "The draft card appears in the workflow after operator approval.",
+    crop: "crop=1340:820:170:90",
+    titleSize: 46,
+    bodySize: 22,
+    boxY: 742,
+    boxHeight: 156
   });
 
   const capabilityReel = path.join(deliverDir, "agentblazor-capability-reel.mp4");
-  concatSegments([introCard, movieSegmentA, cliSegment, codeSegment, movieSegmentB, dashboardSegment], capabilityReel);
+  concatSegments([introCard, movieSegmentA, movieSegmentB, codeSegment, cliSegment, dashboardOverview, dashboardAudit], capabilityReel);
 
   const moviesHighlight = path.join(deliverDir, "ms-movies-agentblazor.mp4");
   concatSegments([teaserMovieA, teaserMovieB], moviesHighlight);
 
-  renderPoster(heroTeaser, path.join(deliverDir, "agentblazor-hero-teaser-poster.jpg"), 2.2);
-  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 8.0);
-  renderPoster(moviesHighlight, path.join(deliverDir, "ms-movies-agentblazor-poster.jpg"), 3.8);
+  renderPoster(heroTeaser, path.join(deliverDir, "agentblazor-hero-teaser-poster.jpg"), 1.4);
+  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 2.6);
+  renderPoster(moviesHighlight, path.join(deliverDir, "ms-movies-agentblazor-poster.jpg"), 1.8);
+  renderPoster(dashboardHighlight, path.join(deliverDir, "dashboard-live-poster.jpg"), 1.0);
 
   console.log(heroTeaser);
   console.log(capabilityReel);
   console.log(moviesHighlight);
+  console.log(dashboardHighlight);
 }
 
 main().catch((error) => {
