@@ -336,13 +336,13 @@ async function main() {
   });
 
   const capabilityReel = path.join(deliverDir, "agentblazor-capability-reel.mp4");
-  concatSegments([introCard, movieSegmentA, movieSegmentB, codeSegment, cliSegment, dashboardOverview, dashboardAudit], capabilityReel);
+  concatSegments([cliSegment, codeSegment, movieSegmentA, movieSegmentB], capabilityReel);
 
   const moviesHighlight = path.join(deliverDir, "ms-movies-agentblazor.mp4");
   concatSegments([teaserMovieA, teaserMovieB], moviesHighlight);
 
   renderPoster(heroTeaser, path.join(deliverDir, "agentblazor-hero-teaser-poster.jpg"), 1.4);
-  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 2.6);
+  renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 5.8);
   renderPoster(moviesHighlight, path.join(deliverDir, "ms-movies-agentblazor-poster.jpg"), 1.8);
   renderPoster(dashboardHighlight, path.join(deliverDir, "dashboard-live-poster.jpg"), 1.0);
 
