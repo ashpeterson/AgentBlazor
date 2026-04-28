@@ -296,7 +296,7 @@ async function main() {
   const cliSegment = path.join(segmentDir, "reel-cli.mp4");
   renderClipSegment(cliPath, cliSegment, {
     start: 0.0,
-    duration: 6.7,
+    duration: 10.2,
     eyebrow: "CLI INSTALL",
     title: "Run the full install flow",
     body: "New app, package, tool install, init, scaffold, build, validate.",
@@ -322,8 +322,8 @@ async function main() {
 
   const movieSegmentA = path.join(segmentDir, "reel-movie-a.mp4");
   renderClipSegment(moviesPath, movieSegmentA, {
-    start: 11.5,
-    duration: 3.4,
+    start: 10.8,
+    duration: 4.6,
     eyebrow: "REAL BLAZOR APP",
     title: "Prompt changes the page",
     body: "The catalog filters and the workflow focuses the movie in view.",
@@ -336,8 +336,8 @@ async function main() {
 
   const movieSegmentB = path.join(segmentDir, "reel-movie-b.mp4");
   renderClipSegment(moviesPath, movieSegmentB, {
-    start: 17.1,
-    duration: 3.9,
+    start: 15.9,
+    duration: 5.3,
     eyebrow: "APPROVAL + RESULT",
     title: "Approve, then ship the next step",
     body: "The draft card appears in the workflow after operator approval.",

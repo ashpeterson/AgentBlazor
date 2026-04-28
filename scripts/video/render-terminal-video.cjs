@@ -48,6 +48,7 @@ async function main() {
   const svgPath = path.join(outDir, "cli-install.svg");
   const htmlPath = path.join(outDir, "cli-install.html");
   const mp4Path = path.join(outDir, "cli-install.mp4");
+  const playbackMultiplier = Number(process.env.AGENTBLAZOR_CAST_PLAYBACK_MULTIPLIER || "1.5");
 
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -112,7 +113,7 @@ async function main() {
 
   const page = await context.newPage();
   await page.goto(`file://${htmlPath}`);
-  await page.waitForTimeout(readDurationMs(castPath));
+  await page.waitForTimeout(Math.ceil(readDurationMs(castPath) * playbackMultiplier));
 
   const video = page.video();
   await context.close();
