@@ -8,9 +8,9 @@
     <MudPaper Elevation="0" Class="launchpad__hero">
         <div class="launchpad__hero-copy">
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Video hub</MudChip>
-            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the real-app path first.</MudText>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the app path first.</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Start with the stitched reel, then jump into the Microsoft movie app clip and the Pro dashboard clip.
+                Start with the stitched reel, then use the guide to jump into the live workflow or CLI docs.
             </MudText>
         </div>
 
@@ -31,7 +31,6 @@
                     <span><strong>Program.cs</strong> for runtime setup and endpoint mapping.</span>
                     <span><strong>OpsReviewCapabilities.cs</strong> for one semantic workflow class.</span>
                     <span><strong>OpsReview.razor</strong> for a page with an embedded chat widget.</span>
-                    <span><strong>Movies sample clip</strong> for the strongest prompt-result proof.</span>
                 </div>
                 <div class="launchpad__hero-actions">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
@@ -40,35 +39,8 @@
                     <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">
                         Open CLI guide
                     </MudButton>
-                    <MudButton Variant="Variant.Text" Color="Color.Info" Href="/demo/dashboard">
-                        Open dashboard
-                    </MudButton>
                 </div>
             </aside>
-        </div>
-
-        <div class="launchpad__video-grid">
-            <article class="launchpad__video-card">
-                <div class="launchpad__video-frame">
-                    <video controls preload="metadata" playsinline poster="/videos/cli-install-poster.jpg" src="/videos/cli-install.mp4"></video>
-                </div>
-                <strong>CLI install</strong>
-                <p>Short terminal-only version.</p>
-            </article>
-            <article class="launchpad__video-card">
-                <div class="launchpad__video-frame">
-                    <video controls preload="metadata" playsinline poster="/videos/ms-movies-agentblazor-poster.jpg" src="/videos/ms-movies-agentblazor.mp4"></video>
-                </div>
-                <strong>Official app prompt</strong>
-                <p>Short prompt/approval/result version on the Microsoft movie sample.</p>
-            </article>
-            <article class="launchpad__video-card">
-                <div class="launchpad__video-frame">
-                    <video controls preload="metadata" playsinline poster="/videos/dashboard-live-poster.jpg" src="/videos/dashboard-live.mp4"></video>
-                </div>
-                <strong>Pro dashboard</strong>
-                <p>Short audit/usage version.</p>
-            </article>
         </div>
     </MudPaper>
 </div>
