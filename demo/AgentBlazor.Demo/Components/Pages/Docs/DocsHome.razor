@@ -40,13 +40,7 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
-  --name github-agentblazor \
-  --username YOUR_GITHUB_USERNAME \
-  --password YOUR_GITHUB_PAT \
-  --store-password-in-clear-text
-
-dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
+        <pre class="docs-code"><code>dotnet add package AgentBlazor --version 0.1.0-preview.10
 builder.Services.AddAgentBlazor(...)
 app.MapAgentBlazorEndpoints()
 Render one chat surface on one route

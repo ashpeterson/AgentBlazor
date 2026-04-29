@@ -20,13 +20,10 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>agentblazor init ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
-dotnet restore ./MySolution.slnx --force-evaluate
-dotnet build ./MySolution.slnx --no-restore -nologo
-agentblazor doctor ./MySolution.slnx --host MyBlazorApp
-agentblazor validate ./MySolution.slnx --host MyBlazorApp
-OpenAI__ApiKey=placeholder-key dotnet run --project ./src/MyBlazorApp/MyBlazorApp.csproj --no-launch-profile --urls http://127.0.0.1:5288</code></pre>
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10
+dotnet build ./MySolution.slnx --nologo
+OpenAI__ApiKey=placeholder-key dotnet run --project ./src/MyBlazorApp/MyBlazorApp.csproj --no-launch-profile --urls http://127.0.0.1:5288
+Open the support route and submit one real prompt</code></pre>
     </section>
 
     <section class="docs-section">
@@ -38,11 +35,8 @@ OpenAI__ApiKey=placeholder-key dotnet run --project ./src/MyBlazorApp/MyBlazorAp
 
         <pre class="docs-code"><code>dotnet new blazor -o FreshAgentBlazor
 cd FreshAgentBlazor
-dotnet add package AgentBlazor --version 0.1.0-preview.10 --source https://nuget.pkg.github.com/ashpeterson/index.json
-agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor
-agentblazor scaffold ./FreshAgentBlazor.csproj --host FreshAgentBlazor --provider openai --approve
-dotnet restore ./FreshAgentBlazor.csproj --force-evaluate
-dotnet build ./FreshAgentBlazor.csproj --no-restore -nologo</code></pre>
+dotnet add package AgentBlazor --version 0.1.0-preview.10
+dotnet build FreshAgentBlazor.csproj --nologo</code></pre>
     </section>
 
     <section class="docs-section">
@@ -52,9 +46,8 @@ dotnet build ./FreshAgentBlazor.csproj --no-restore -nologo</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>agentblazor init ./MyHostedApp.slnx --host MyHostedServer
-agentblazor scaffold ./MyHostedApp.slnx --host MyHostedServer --provider openai --approve
-dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.1.0-preview.10 --source https://nuget.pkg.github.com/ashpeterson/index.json
+        <pre class="docs-code"><code>dotnet add ./src/MyHostedServer/MyHostedServer.csproj package AgentBlazor --version 0.1.0-preview.10
+dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.1.0-preview.10
 
 // Server
 app.MapAgentBlazorEndpoints();

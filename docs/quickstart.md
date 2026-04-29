@@ -8,18 +8,10 @@ Get one AgentBlazor route working first. Keep the CLI out of the first install.
 - use the .NET 10 SDK when working from this repo or running the included demo/sample apps
 - an OpenAI API key, or Azure OpenAI endpoint/deployment/key or credential
 
-The current public preview source is GitHub Packages. `nuget.org` publication is still the launch gate.
-
 ## 1. Install the Package
 
 ```bash
-dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
-  --name github-agentblazor \
-  --username YOUR_GITHUB_USERNAME \
-  --password YOUR_GITHUB_PAT \
-  --store-password-in-clear-text
-
-dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
+dotnet add package AgentBlazor --version 0.1.0-preview.10
 ```
 
 ## 2. Configure Services
@@ -184,7 +176,7 @@ app.MapAgentBlazorRemoteChat();
 Client project:
 
 ```bash
-dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10 --source github-agentblazor
+dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10
 ```
 
 Client `_Imports.razor`:

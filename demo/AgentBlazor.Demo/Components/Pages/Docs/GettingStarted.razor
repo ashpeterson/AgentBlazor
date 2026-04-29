@@ -16,17 +16,11 @@
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Current preview source</h2>
+                <h2>Install the package</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
-  --name github-agentblazor \
-  --username YOUR_GITHUB_USERNAME \
-  --password YOUR_GITHUB_PAT \
-  --store-password-in-clear-text
-
-dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor</code></pre>
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10</code></pre>
     </section>
 
     <section class="docs-section">
@@ -36,7 +30,7 @@ dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10
 
 builder.Services.AddMudServices();
 builder.Services.AddAgentBlazor(...);
@@ -81,7 +75,7 @@ app.MapAgentBlazorEndpoints();</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.10 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.10
 agentblazor init ./MySolution.slnx --host MyBlazorApp
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
@@ -96,7 +90,7 @@ dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10 --source github-agentblazor
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10
 
 // Server
 app.MapAgentBlazorEndpoints();

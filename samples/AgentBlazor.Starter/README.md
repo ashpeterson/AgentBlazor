@@ -1,6 +1,6 @@
 # AgentBlazor Starter
 
-Last updated: 2026-04-15
+Last updated: 2026-04-29
 
 This is the current golden-path starter for AgentBlazor.
 
@@ -28,17 +28,11 @@ Open:
 
 ## Canonical Quickstart
 
-For a package-first app, the current preview entry path is:
+For a package-first app, start here:
 
 ```powershell
-dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" `
-  --name github-agentblazor `
-  --username YOUR_GITHUB_USERNAME `
-  --password YOUR_GITHUB_PAT `
-  --store-password-in-clear-text
-
 dotnet new blazor
-dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
+dotnet add package AgentBlazor --version 0.1.0-preview.10
 ```
 
 Then copy the shape from:
@@ -48,7 +42,7 @@ Then copy the shape from:
 - [OpsReviewService.cs](Services/OpsReviewService.cs)
 - [OpsReview.razor](Components/Pages/OpsReview.razor)
 
-The local source-project mode exists only so this repo can build and validate the sample before packages are published to a public feed.
+The local source-project mode exists only so this repo can build and validate the sample from source as well as from the published package feed.
 
 ## Provider Setup
 
