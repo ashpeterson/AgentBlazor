@@ -234,7 +234,9 @@ Invoke-Step "Preparing local package feed" {
                 "-c", "Release",
                 "-o", $localFeed,
                 "/p:UseSharedCompilation=false",
-                "/p:PackageVersion=$PackageVersion"
+                "/p:PackageVersion=$PackageVersion",
+                "/p:RestoreLockedMode=false",
+                "/p:RestoreForceEvaluate=true"
             )
 
             $packedPackagePath = Join-Path $localFeed "$($definition.Id).$PackageVersion.nupkg"
