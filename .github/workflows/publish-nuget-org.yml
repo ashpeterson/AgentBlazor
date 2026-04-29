@@ -61,6 +61,13 @@ jobs:
       - name: Test
         run: dotnet test AgentBlazor.slnx -c Release --no-build -nologo
 
+      - name: Restore Demo For E2E
+        run: >
+          dotnet restore
+          demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj
+          --force-evaluate
+          -p:RuntimeIdentifier=linux-x64
+
       - name: Build Demo For E2E
         run: >
           dotnet build

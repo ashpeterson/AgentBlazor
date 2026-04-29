@@ -57,6 +57,13 @@ jobs:
         run: |
           ./scripts/smoke-test-local-package.ps1 -PackageVersion 0.1.0-preview.10
 
+      - name: Restore Demo For E2E
+        run: >
+          dotnet restore
+          demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj
+          --force-evaluate
+          -p:RuntimeIdentifier=linux-x64
+
       - name: Build Demo For E2E
         run: >
           dotnet build
