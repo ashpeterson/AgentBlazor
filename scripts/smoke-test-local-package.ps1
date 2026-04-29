@@ -161,6 +161,11 @@ function Copy-PackageToFeed {
     }
 
     Copy-Item -LiteralPath $packagePath -Destination $localFeed -Force
+
+    $symbolPackagePath = Join-Path $Definition.OutputDir "$($Definition.Id).$Version.snupkg"
+    if (Test-Path $symbolPackagePath) {
+        Copy-Item -LiteralPath $symbolPackagePath -Destination $localFeed -Force
+    }
 }
 
 function Test-AllPackagesAvailable {
@@ -246,6 +251,11 @@ Invoke-Step "Preparing local package feed" {
 
             New-Item -ItemType Directory -Force $definition.OutputDir | Out-Null
             Copy-Item -LiteralPath $packedPackagePath -Destination $definition.OutputDir -Force
+
+            $packedSymbolPackagePath = Join-Path $localFeed "$($definition.Id).$PackageVersion.snupkg"
+            if (Test-Path $packedSymbolPackagePath) {
+                Copy-Item -LiteralPath $packedSymbolPackagePath -Destination $definition.OutputDir -Force
+            }
         }
     }
     else {
