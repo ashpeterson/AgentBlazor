@@ -4,7 +4,7 @@ test.describe("Documentation site", () => {
   test("renders the docs overview and exposes the expanded navigation", async ({ page }) => {
     await page.goto("/docs", { waitUntil: "networkidle" });
 
-    await expect(page.getByRole("heading", { name: /install it\. verify it\. add one workflow\./i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /install it\. run one route\. prove it works\./i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Getting Started", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Advanced CLI", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Verification", exact: true }).first()).toBeVisible();
@@ -54,7 +54,7 @@ test.describe("Documentation site", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/docs", { waitUntil: "networkidle" });
 
-    await expect(page.getByRole("heading", { name: /install it\. verify it\. add one workflow\./i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /install it\. run one route\. prove it works\./i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Verification", exact: true }).first()).toBeVisible();
 
     await page.goto("/docs/verification", { waitUntil: "networkidle" });
