@@ -38,7 +38,7 @@ dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" `
   --store-password-in-clear-text
 
 dotnet new blazor
-dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
 ```
 
 Then copy the shape from:
@@ -94,5 +94,5 @@ Inside this repo, the starter defaults to local source-project references so the
 To validate the package-first path from inside the repo:
 
 ```powershell
-dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.9
+dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.10
 ```

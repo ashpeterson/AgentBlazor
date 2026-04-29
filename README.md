@@ -21,7 +21,7 @@ dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
   --password YOUR_GITHUB_PAT \
   --store-password-in-clear-text
 
-dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
 ```
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.

@@ -19,7 +19,7 @@ dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
   --password YOUR_GITHUB_PAT \
   --store-password-in-clear-text
 
-dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
 ```
 
 ## 2. Configure Services
@@ -184,7 +184,7 @@ app.MapAgentBlazorRemoteChat();
 Client project:
 
 ```bash
-dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source github-agentblazor
+dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10 --source github-agentblazor
 ```
 
 Client `_Imports.razor`:

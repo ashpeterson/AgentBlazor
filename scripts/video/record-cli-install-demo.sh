@@ -64,11 +64,11 @@ run_step "dotnet new blazor -n FreshAgentBlazor" \
 
 cd FreshAgentBlazor
 
-run_step "dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor" \
-    dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+run_step "dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor" \
+    dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
 
-run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json" \
-    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10 --add-source https://nuget.pkg.github.com/ashpeterson/index.json" \
+    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 
 run_step "./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor" \
     ./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor
