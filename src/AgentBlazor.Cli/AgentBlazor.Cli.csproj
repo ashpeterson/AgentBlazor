@@ -12,8 +12,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agentblazor</ToolCommandName>
     <PackageId>AgentBlazor.Cli</PackageId>
-    <Description>CLI tool for generating AGENT.md from Blazor applications</Description>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Description>Advanced scaffold and validation tool for wiring AgentBlazor into existing Blazor apps.</Description>
+    <PackageTags>blazor;ai;agents;cli;scaffold;workflow</PackageTags>
+    <PackageReadmeFile>PACKAGE_README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,7 +27,7 @@
 
   <ItemGroup>
     <None Include="..\AgentBlazor.Components\icon.png" Pack="true" PackagePath="" Link="icon.png" />
-    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="PACKAGE_README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Include MSBuild targets for build-time integration -->

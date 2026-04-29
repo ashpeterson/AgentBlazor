@@ -202,7 +202,7 @@ async function main() {
         DOTNET_ENVIRONMENT: "Production",
         OPENAI_API_KEY: openAiKey,
         OpenAI__ApiKey: openAiKey,
-        OpenAI__Model: process.env.OpenAI__Model || "gpt-5.4-mini"
+        OpenAI__Model: process.env.OpenAI__Model || "gpt-4o-mini"
       },
       stdio: ["ignore", "pipe", "pipe"]
     }

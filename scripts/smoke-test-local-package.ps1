@@ -4,7 +4,7 @@ param(
     [switch]$Pack,
     [switch]$KeepScratch,
     [string]$OpenAIApiKey = "",
-    [string]$OpenAIModel = "gpt-5.4-mini"
+    [string]$OpenAIModel = "gpt-4o-mini"
 )
 
 Set-StrictMode -Version Latest

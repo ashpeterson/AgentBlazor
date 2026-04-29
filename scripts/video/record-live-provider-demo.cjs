@@ -300,7 +300,7 @@ async function main() {
       env: {
         ...process.env,
         OpenAI__ApiKey: openAiKey,
-        OpenAI__Model: process.env.OpenAI__Model || "gpt-5.4-mini",
+        OpenAI__Model: process.env.OpenAI__Model || "gpt-4o-mini",
         AgentBlazor__LicenseKey: process.env.AGENTBLAZOR_LICENSE_KEY || "AB-PRO-VALID-KEY-12345678",
         AgentBlazor__DataDirectory: paidDataDir
       },

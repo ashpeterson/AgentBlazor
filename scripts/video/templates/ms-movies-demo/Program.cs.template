@@ -24,7 +24,7 @@ builder.Services.AddScoped<MovieWorkflowStateService>();
 
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
 var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
 var conversationStorePath = Path.Combine(dataDirectory, "agentblazor-conversations.json");
 var sharedStateStorePath = Path.Combine(dataDirectory, "agentblazor-shared-state.json");

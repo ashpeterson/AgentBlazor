@@ -7,7 +7,7 @@
     <PackageId>AgentBlazor.Client</PackageId>
     <Description>Browser-safe AgentBlazor client components for Blazor WebAssembly and hosted WebAssembly apps.</Description>
     <PackageTags>blazor;webassembly;ai;agents;chat;agentic</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>PACKAGE_README.md</PackageReadmeFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <None Include="..\AgentBlazor.Components\icon.png" Pack="true" PackagePath="\" Link="icon.png" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    <None Include="PACKAGE_README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
