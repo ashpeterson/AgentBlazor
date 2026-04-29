@@ -143,6 +143,7 @@
     private bool IsWorkflowHubRoute => string.Equals(CurrentRoutePath.TrimEnd('/'), "/demo", StringComparison.OrdinalIgnoreCase);
     private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
     private bool IsWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows", StringComparison.OrdinalIgnoreCase);
+    private bool IsSupportInboxRoute => CurrentRoutePath.StartsWith("/demo/workflows/support-inbox", StringComparison.OrdinalIgnoreCase);
     private bool IsDashboardRoute => CurrentRoutePath.StartsWith("/demo/dashboard", StringComparison.OrdinalIgnoreCase);
     private bool IsSupplierWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/supplier-compliance", StringComparison.OrdinalIgnoreCase);
     private bool IsFileWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/file-audit-bundle", StringComparison.OrdinalIgnoreCase);
@@ -157,6 +158,8 @@
     private string AssistantTitle =>
         IsWorkflowHubRoute
             ? "Demo assistant"
+            : IsSupportInboxRoute
+            ? "Support assistant"
             : IsResponseOrchestrationRoute
             ? "Response assistant"
             : IsReleaseDossierRoute
@@ -176,6 +179,8 @@
     private string AssistantDescription =>
         IsWorkflowHubRoute
             ? "Open the main flow first."
+            : IsSupportInboxRoute
+            ? "Find tickets, explain the queue, draft a reply."
             : IsResponseOrchestrationRoute
             ? "Assess, advance, recover, prepare."
             : IsReleaseDossierRoute
@@ -195,6 +200,8 @@
     private string AssistantPlaceholder =>
         IsWorkflowHubRoute
             ? "Open the response flow or the release flow."
+            : IsSupportInboxRoute
+            ? "Show open tickets. Explain the queue. Draft a reply."
             : IsResponseOrchestrationRoute
             ? "Assess readiness. Advance next stage. Prepare packet."
             : IsReleaseDossierRoute
@@ -214,6 +221,8 @@
     private string? DefaultAssistantAgent =>
         IsWorkflowHubRoute
             ? "Workflow Hub Agent"
+            : IsSupportInboxRoute
+            ? "Support Inbox Agent"
             : IsResponseOrchestrationRoute
             ? "Response Orchestration Agent"
             : IsReleaseDossierRoute

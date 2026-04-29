@@ -759,7 +759,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
             change => change.Path.EndsWith("Program.cs", StringComparison.Ordinal));
 
         Assert.Contains(
-            "options.UseOpenAI(\n        apiKey: builder.Configuration[\"OpenAI:ApiKey\"]!,\n        model: builder.Configuration[\"OpenAI:Model\"] ?? \"gpt-5.4-mini\");",
+            "options.UseOpenAI(\n        apiKey: builder.Configuration[\"OpenAI:ApiKey\"]!,\n        model: builder.Configuration[\"OpenAI:Model\"] ?? \"gpt-4o-mini\");",
             programChange.UpdatedContent,
             StringComparison.Ordinal);
         Assert.DoesNotContain("// Recommended first path:", programChange.UpdatedContent, StringComparison.Ordinal);

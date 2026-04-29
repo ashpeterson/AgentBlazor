@@ -9,7 +9,7 @@
         <p class="docs-hero__eyebrow">Getting Started</p>
         <h1 class="docs-hero__title">From package source to one working workflow.</h1>
         <p class="docs-hero__lede">
-            Use the CLI for the fastest path. Use manual setup if you want to wire every part yourself.
+            Manual setup is the default path. Use the CLI only when you want scaffold help for an existing app.
         </p>
     </section>
 
@@ -26,22 +26,24 @@
   --password YOUR_GITHUB_PAT \
   --store-password-in-clear-text
 
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
 dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor</code></pre>
     </section>
 
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Fastest install path</h2>
+                <h2>Default install path</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>agentblazor init ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
-dotnet restore ./MySolution.slnx --force-evaluate
-dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+
+builder.Services.AddMudServices();
+builder.Services.AddAgentBlazor(...);
+app.MapAgentBlazorEndpoints();
+
+@@using AgentBlazor.Components
+&lt;AgentChatWidget Title="Support inbox" /&gt;</code></pre>
     </section>
 
     <section class="docs-section">
@@ -57,13 +59,13 @@ builder.Services.AddAgentBlazor(options =&gt;
 {
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+        model: builder.Configuration["OpenAI:Model"]!);
 
     options.ConfigureBuilder(agentBuilder =&gt;
     {
-        agentBuilder.AddWorkflow&lt;OperationsCapabilities&gt;("ops", agent =&gt;
+        agentBuilder.AddWorkflow&lt;SupportInboxCapabilities&gt;("support-inbox", agent =&gt;
         {
-            agent.WithRoutePrefixes("/ops");
+            agent.WithRoutePrefixes("/support");
         });
     });
 });
@@ -75,17 +77,16 @@ app.MapAgentBlazorEndpoints();</code></pre>
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Render one chat surface</h2>
+                <h2>Advanced CLI path</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>@@using AgentBlazor.Components
-
-&lt;AgentChatWidget
-    Title="Operations"
-    Placeholder="Assess, explain, or prepare the workflow..."
-    Width="30rem"
-    Height="68vh" /&gt;</code></pre>
+        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+agentblazor init ./MySolution.slnx --host MyBlazorApp
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
+agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
+dotnet restore ./MySolution.slnx --force-evaluate
+dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
     </section>
 
     <section class="docs-section">

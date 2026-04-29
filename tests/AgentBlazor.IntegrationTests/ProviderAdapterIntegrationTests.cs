@@ -20,7 +20,7 @@ namespace AgentBlazor.IntegrationTests;
 
 public class ProviderAdapterIntegrationTests
 {
-    private const string DefaultOpenAiModel = "gpt-5.4-mini";
+    private const string DefaultOpenAiModel = "gpt-4o-mini";
 
     [Fact]
     public void AddAgentBlazor_RegistersRuntimeAndHosting_WithoutImplicitDefaultAgent()

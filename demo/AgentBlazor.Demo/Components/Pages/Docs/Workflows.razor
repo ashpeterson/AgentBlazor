@@ -22,9 +22,9 @@
 
         <pre class="docs-code"><code>options.ConfigureBuilder(agentBuilder =&gt;
 {
-    agentBuilder.AddWorkflow&lt;OpsReviewCapabilities&gt;("ops", agent =&gt;
+    agentBuilder.AddWorkflow&lt;SupportInboxCapabilities&gt;("support-inbox", agent =&gt;
     {
-        agent.WithRoutePrefixes("/ops-review");
+        agent.WithRoutePrefixes("/support");
     });
 });</code></pre>
     </section>
@@ -36,16 +36,19 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>[AgentCapability("ops_review", Name = "Ops Review")]
-public sealed class OpsReviewCapabilities(OpsReviewService reviewService)
+        <pre class="docs-code"><code>[AgentCapability("support_inbox", Name = "Support Inbox")]
+public sealed class SupportInboxCapabilities
 {
-    [AgentAction("Assess the current review workflow")]
-    public Task&lt;CapabilityResult&gt; AssessAsync()
-        =&gt; reviewService.AssessAsync();
+    [AgentAction("Show open tickets that still need a reply")]
+    public Task&lt;CapabilityResult&gt; ShowOpenTicketsAsync(int days = 7)
+        =&gt; Task.FromResult(
+            CapabilityResult.Success($"Highlighted tickets from the last {days} days."));
 
-    [AgentAction("Prepare the review draft", RequiresApproval = true)]
-    public Task&lt;CapabilityResult&gt; PrepareDraftAsync()
-        =&gt; reviewService.PrepareDraftAsync();
+    [AgentAction("Draft a reply for the highlighted tickets", RequiresApproval = true)]
+    public Task&lt;CapabilityResult&gt; DraftReplyAsync()
+        =&gt; Task.FromResult(
+            CapabilityResult.Success("Prepared the reply draft.")
+                .WithNextActions("Review the reply", "Approve the draft"));
 }</code></pre>
     </section>
 

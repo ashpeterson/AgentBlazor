@@ -23,6 +23,7 @@ builder.Services.AddScoped<DemoFileWorkflowService>();
 builder.Services.AddScoped<DojoRecipeReleaseWorkflowService>();
 builder.Services.AddScoped<IncidentEscalationWorkflowService>();
 builder.Services.AddScoped<SupplierComplianceWorkflowService>();
+builder.Services.AddScoped<SupportInboxWorkflowService>();
 builder.Services.AddScoped<ResponseOrchestrationWorkflowService>();
 builder.Services.AddScoped<ReleaseDossierWorkflowService>();
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
@@ -34,7 +35,7 @@ var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
 var proDataDirectory = builder.Configuration["AgentBlazor:DataDirectory"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_DATA_DIRECTORY");
 
-var openAiModel = FirstConfigured(builder.Configuration["OpenAI:Model"], "gpt-5.4-mini")!;
+var openAiModel = FirstConfigured(builder.Configuration["OpenAI:Model"], "gpt-4o-mini")!;
 var openAiApiKey = FirstConfigured(
     Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
     builder.Configuration["OpenAI:ApiKey"]);
@@ -124,6 +125,17 @@ builder.Services.AddAgentBlazor(options =>
             }
             agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
             agent.WithRoutePrefixes("/demo/workflows/supplier-compliance");
+        });
+
+        agentBuilder.AddWorkflow<SupportInboxCapabilities>("Support Inbox Agent", agent =>
+        {
+            agent.WithDescription("Focused on support tickets that need a reply, reply drafting, escalation, and queue guidance.");
+            if (!string.IsNullOrWhiteSpace(sharedAgentInstructions))
+            {
+                agent.WithInstructions(sharedAgentInstructions);
+            }
+            agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
+            agent.WithRoutePrefixes("/demo/workflows/support-inbox");
         });
 
         agentBuilder.AddWorkflow<DemoFileWorkflowCapabilities>("File Workflow Agent", agent =>

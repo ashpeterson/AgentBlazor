@@ -1,0 +1,326 @@
+@page "/demo/workflows/support-inbox"
+@layout DemoLayout
+@using AgentBlazor.Demo.Services
+@inject SupportInboxWorkflowService Workflow
+
+<PageTitle>Support Inbox Workflow</PageTitle>
+
+<div class="demo-doc-page">
+    <MudPaper Elevation="1" Class="demo-doc-page__hero">
+        <p class="demo-doc-page__eyebrow">Live demo</p>
+        <MudText Typo="Typo.h5">Support inbox</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="demo-doc-page__hero-subtitle">
+            Find tickets that still need a reply, explain the queue, draft a customer response, and escalate blocked cases.
+        </MudText>
+
+        <div class="demo-doc-page__prompt-row">
+            <span>Show open tickets from this week</span>
+            <span>Explain why they need attention</span>
+            <span>Draft a reply for ticket TCK-1042</span>
+        </div>
+
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                Window: @Workflow.CurrentReviewWindowDays days
+            </MudChip>
+            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                Highlighted tickets: @Workflow.HighlightedTicketIds.Count
+            </MudChip>
+            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
+                Escalated: @Workflow.EscalatedTicketIds.Count
+            </MudChip>
+            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
+                Approval: @(Workflow.CurrentDraft is null ? "not reached" : "draft ready")
+            </MudChip>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => FocusOpenAsync(7))">
+                Show this week's tickets
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ExplainFocusedAsync">
+                Explain queue
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareDraftAsync">
+                Draft reply
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="EscalateAsync">
+                Escalate blockers
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
+                Reset
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <section class="demo-doc-page__section">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" xl="7">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <div>
+                            <MudText Typo="Typo.h6">Ticket queue</MudText>
+                        </div>
+                        <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
+                            Review window: @Workflow.CurrentReviewWindowDays days
+                        </MudChip>
+                    </MudStack>
+
+                    <AgentDataGrid TItem="SupportTicketRow"
+                                   AgentId="support-inbox-grid"
+                                   Items="@Workflow.VisibleTickets"
+                                   Dense="true"
+                                   Hover="true"
+                                   Bordered="true"
+                                   Striped="true"
+                                   RowsPerPage="5"
+                                   RowKeyProperty="Id">
+                        <Columns>
+                            <PropertyColumn T="SupportTicketRow" TProperty="string" Property="x => x.Id" Title="Ticket" />
+                            <PropertyColumn T="SupportTicketRow" TProperty="string" Property="x => x.Subject" Title="Subject" />
+                            <PropertyColumn T="SupportTicketRow" TProperty="string" Property="x => x.Team" Title="Team" />
+                            <PropertyColumn T="SupportTicketRow" TProperty="string" Property="x => x.Priority" Title="Priority" />
+                            <PropertyColumn T="SupportTicketRow" TProperty="int" Property="x => x.AgeDays" Title="Age (days)" />
+                            <TemplateColumn T="SupportTicketRow" Title="Signals">
+                                <CellTemplate>
+                                    <MudStack Spacing="1">
+                                        @if (Workflow.IsHighlighted(context.Item.Id))
+                                        {
+                                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                                                In current focus
+                                            </MudChip>
+                                        }
+                                        <MudText Typo="Typo.caption">@Workflow.DescribeSignals(context.Item)</MudText>
+                                    </MudStack>
+                                </CellTemplate>
+                            </TemplateColumn>
+                        </Columns>
+                    </AgentDataGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" xl="5">
+                <MudStack Spacing="2">
+                    <WorkflowDecisionSupport Title="Decision support"
+                                             Description="Queue focus, blockers, and reply readiness."
+                                             PhaseLabel="@GetWorkflowPhase()"
+                                             ApprovalBoundarySummary="@(Workflow.CurrentDraft is null ? "not reached" : "draft ready")"
+                                             NextStepSummary="@GetNextStepSummary()"
+                                             OutcomeTitle="Queue insight"
+                                             OutcomeSummary="@GetOutcomeSummary()"
+                                             OutcomeSeverity="@GetOutcomeSeverity()"
+                                             BlockerSummary="Escalate these tickets before sending a drafted reply."
+                                             Blockers="@GetBlockers()"
+                                             Warnings="@GetWarnings()"
+                                             NextActions="@GetRecommendedActions()">
+                        <SummaryContent>
+                            <MudList T="string" Dense="true" Class="mb-0">
+                                <MudListItem T="string">Highlighted tickets: @Workflow.HighlightedTicketIds.Count</MudListItem>
+                                <MudListItem T="string">Escalated tickets: @Workflow.EscalatedTicketIds.Count</MudListItem>
+                                <MudListItem T="string">Review window: @Workflow.CurrentReviewWindowDays days</MudListItem>
+                                <MudListItem T="string">Reply checklist items: @(Workflow.CurrentDraft?.Checklist.Count ?? 0)</MudListItem>
+                            </MudList>
+                        </SummaryContent>
+                    </WorkflowDecisionSupport>
+
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.h6">Reply draft</MudText>
+
+                        @if (Workflow.CurrentDraft is { } draft)
+                        {
+                            <MudText Typo="Typo.subtitle2">@draft.Title</MudText>
+                            <MudText Typo="Typo.caption" Class="d-block mb-2">
+                                Tickets: @string.Join(", ", draft.TicketIds)
+                            </MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var action in draft.Checklist)
+                                {
+                                    <MudListItem T="string">@action</MudListItem>
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">No reply draft has been prepared yet.</MudText>
+                        }
+                    </MudPaper>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    <AgentDialog AgentId="support-inbox-dialog"
+                 Visible="@Workflow.IsDraftDialogOpen"
+                 OnConfirm="ConfirmDraftAsync"
+                 VisibleChanged="OnDraftVisibilityChanged">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Draft customer reply</MudText>
+        </TitleContent>
+        <DialogContent>
+            @if (Workflow.CurrentDraft is { } draft)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    This is the approval boundary before the drafted reply is handed back to the queue owner.
+                </MudText>
+                <MudText Typo="Typo.caption" Class="d-block mb-3">
+                    Tickets: @string.Join(", ", draft.TicketIds)
+                </MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var action in draft.Checklist)
+                    {
+                        <MudListItem T="string">@action</MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">No reply draft is active.</MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseDraftAsync">
+                Close draft
+            </MudButton>
+        </DialogActions>
+    </AgentDialog>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Workflow.Changed += HandleWorkflowChanged;
+    }
+
+    private Task FocusOpenAsync(int days)
+    {
+        Workflow.FocusOpenTickets(days);
+        return Task.CompletedTask;
+    }
+
+    private Task ExplainFocusedAsync()
+    {
+        Workflow.ExplainFocusedTickets();
+        return Task.CompletedTask;
+    }
+
+    private Task PrepareDraftAsync()
+    {
+        if (Workflow.HighlightedTicketIds.Any())
+        {
+            Workflow.PrepareReplyDraft();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task EscalateAsync()
+    {
+        Workflow.ApplyEscalationPlaybook();
+        return Task.CompletedTask;
+    }
+
+    private Task ResetAsync()
+    {
+        Workflow.Reset();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseDraftAsync()
+    {
+        Workflow.SetDraftDialogVisible(false);
+        return Task.CompletedTask;
+    }
+
+    private Task<AgentBlazor.Runtime.ActionResult> ConfirmDraftAsync()
+    {
+        Workflow.SetDraftDialogVisible(false);
+        return Task.FromResult(AgentBlazor.Runtime.ActionResult.Applied("Approved the support inbox reply draft dialog."));
+    }
+
+    private Task OnDraftVisibilityChanged(bool visible)
+    {
+        Workflow.SetDraftDialogVisible(visible);
+        return Task.CompletedTask;
+    }
+
+    private string GetWorkflowPhase()
+        => Workflow.CurrentDraft is not null
+            ? "draft ready"
+            : Workflow.LatestDraftBlockers.Count > 0
+                ? "blocked"
+                : Workflow.HighlightedTicketIds.Count > 0
+                    ? "queue focused"
+                    : "not started";
+
+    private string GetNextStepSummary()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return "Review the drafted reply and decide whether to approve it.";
+        }
+
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return "Escalate the blocked tickets, then draft the reply again.";
+        }
+
+        if (Workflow.HighlightedTicketIds.Count > 0)
+        {
+            return "Explain the queue or draft the reply for the highlighted tickets.";
+        }
+
+        return "Start by showing this week's open tickets.";
+    }
+
+    private string GetOutcomeSummary()
+        => Workflow.LatestInsight
+           ?? "No queue insight yet. Ask the agent to show open tickets from this week.";
+
+    private Severity GetOutcomeSeverity()
+        => Workflow.LatestDraftBlockers.Count > 0
+            ? Severity.Warning
+            : Workflow.CurrentDraft is not null
+                ? Severity.Success
+                : Severity.Info;
+
+    private IReadOnlyList<string> GetBlockers() => Workflow.LatestDraftBlockers;
+
+    private IReadOnlyList<string> GetWarnings()
+    {
+        if (Workflow.HighlightedTicketIds.Count == 0)
+        {
+            return ["No ticket cluster is active yet."];
+        }
+
+        if (Workflow.EscalatedTicketIds.Count > 0)
+        {
+            return [$"{Workflow.EscalatedTicketIds.Count} ticket(s) already escalated before draft approval."];
+        }
+
+        return [];
+    }
+
+    private IReadOnlyList<string> GetRecommendedActions()
+    {
+        if (Workflow.CurrentDraft is not null)
+        {
+            return ["Review the reply draft", "Approve the reply draft"];
+        }
+
+        if (Workflow.LatestDraftBlockers.Count > 0)
+        {
+            return ["Escalate the blocked tickets", "Draft the reply again"];
+        }
+
+        if (Workflow.HighlightedTicketIds.Count > 0)
+        {
+            return ["Explain the current queue", "Draft a reply"];
+        }
+
+        return ["Show open tickets from this week"];
+    }
+
+    private void HandleWorkflowChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Workflow.Changed -= HandleWorkflowChanged;
+    }
+}

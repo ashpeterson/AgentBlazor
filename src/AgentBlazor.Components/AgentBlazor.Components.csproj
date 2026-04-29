@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AgentBlazor</AssemblyName>
     <PackageId>AgentBlazor</PackageId>
-    <Description>Blazor-first agentic UI framework. 14 deterministic components, workflow orchestration, and AI-powered assistance. Free tier includes full runtime. Pro tier adds analytics, audit logging, and smart suggestions.</Description>
+    <Description>Blazor-first agentic UI framework for chat surfaces, deterministic actions, and route-scoped workflow assistance.</Description>
     <PackageTags>blazor;aspnetcore;ai;agents;mudblazor;ui;workflow;llm;openai;agentic</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

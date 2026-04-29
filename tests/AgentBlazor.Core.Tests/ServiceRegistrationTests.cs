@@ -34,14 +34,14 @@ public class ServiceRegistrationTests
         services.AddAgentBlazorServices(options =>
         {
             options.Provider.Kind = AgentProviderKind.OpenAI;
-            options.Provider.Model = "gpt-5.4-mini";
+            options.Provider.Model = "gpt-4o-mini";
         });
 
         using var provider = services.BuildServiceProvider();
 
         var options = provider.GetRequiredService<IOptions<AgentBlazorOptions>>().Value;
         Assert.Equal(AgentProviderKind.OpenAI, options.Provider.Kind);
-        Assert.Equal("gpt-5.4-mini", options.Provider.Model);
+        Assert.Equal("gpt-4o-mini", options.Provider.Model);
 
         var registry = provider.GetRequiredService<IAgentRegistry>();
         Assert.False(registry.TryGet("AgentBlazor UI Agent", out _));

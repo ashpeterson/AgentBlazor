@@ -7,10 +7,10 @@
 <div class="launchpad">
     <MudPaper Elevation="0" Class="launchpad__hero">
         <div class="launchpad__hero-copy">
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Video hub</MudChip>
-            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Watch the app path first.</MudText>
+            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Live demo</MudChip>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">One normal app screen. One support queue.</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Start with the stitched reel, then use the guide to jump into the live workflow or CLI docs.
+                Start with the reel, then open the support inbox route and run the same workflow live.
             </MudText>
         </div>
 
@@ -21,23 +21,23 @@
                 </div>
                 <div class="launchpad__feature-copy">
                     <strong>AgentBlazor in one reel</strong>
-                    <p>Fresh app. CLI install. Starter code. Official Microsoft app. Real prompt result.</p>
+                    <p>CLI install, workflow code, then the support inbox working on a real Blazor page.</p>
                 </div>
             </article>
 
             <aside class="launchpad__guide-card">
-                <span class="launchpad__eyebrow">What to copy</span>
+                <span class="launchpad__eyebrow">What this route shows</span>
                 <div class="launchpad__guide-list">
-                    <span><strong>Program.cs</strong> for runtime setup and endpoint mapping.</span>
-                    <span><strong>OpsReviewCapabilities.cs</strong> for one semantic workflow class.</span>
-                    <span><strong>OpsReview.razor</strong> for a page with an embedded chat widget.</span>
+                    <span><strong>SupportInboxWorkflow.razor</strong> shows the queue, summary panel, and approval boundary.</span>
+                    <span><strong>SupportInboxWorkflowService.cs</strong> holds the workflow actions and visible state changes.</span>
+                    <span><strong>Program.cs</strong> wires the workflow to one route and the chat endpoint.</span>
                 </div>
                 <div class="launchpad__hero-actions">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/response-orchestration?reset=true">
-                        Open live workflow
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/support-inbox">
+                        Open live support queue
                     </MudButton>
                     <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">
-                        Open CLI guide
+                        Advanced CLI
                     </MudButton>
                 </div>
             </aside>

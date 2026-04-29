@@ -1,43 +1,25 @@
 # Quickstart
 
-Get AgentBlazor running in your Blazor app in under 5 minutes.
+Get one AgentBlazor route working first. Keep the CLI out of the first install.
 
 ## Prerequisites
 
-- AgentBlazor packages support `net8.0` through `net10.0`
+- `net8.0` through `net10.0` are supported
 - use the .NET 10 SDK when working from this repo or running the included demo/sample apps
-- An OpenAI API key, or an Azure OpenAI resource endpoint, deployment name, and API key or Azure credential
+- an OpenAI API key, or Azure OpenAI endpoint/deployment/key or credential
 
-The most validated production path is OpenAI via `options.UseOpenAI(...)`. Azure OpenAI is supported as a first-class provider through the Microsoft Azure OpenAI client and the same `IChatClient` runtime path.
-
-Status as of 2026-04-20:
-
-- the non-demo test matrix is green
-- the CLI now supports `init -> scaffold -> doctor -> validate`
-- hosted WebAssembly server startup/workflow wiring is part of the supported scaffold path; browser-client layout/assets/providers/chat remain review-first
-- `0.1.0-preview.9` is the current source/package version
-- `0.1.0-preview.9` is the latest GitHub Packages published-feed version with full clean-app, external real-app, and all-surface chat validation
-- scaffolded assets preserve existing CSP nonce attributes in nonce-aware host shells
-
-## Optional: Install The CLI
-
-The CLI can scaffold the standard runtime wiring for a standard Blazor host and the safe server side of a hosted WebAssembly app, including a provider template, but you still need to supply the real configuration values for your environment. Hosted WebAssembly browser-client chat requires manual review until you choose a browser-safe or remote/server-backed integration path.
-
-For private-preview installs, pin the CLI and runtime package to the same version. Do not rely on a broad `--prerelease` install when testing scaffolded workflow code because the generated `AppCapabilities.cs` file uses semantic workflow APIs from `AgentBlazor.App`.
-
-```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
-dotnet add ./MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
-agentblazor init ./MySolution.sln --host MyBlazorApp
-agentblazor scaffold ./MySolution.sln --host MyBlazorApp --provider openai --approve
-```
-
-Use `--provider azure-openai` instead when the host app should be scaffolded for Azure OpenAI configuration.
+The current public preview source is GitHub Packages. `nuget.org` publication is still the launch gate.
 
 ## 1. Install the Package
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
+  --name github-agentblazor \
+  --username YOUR_GITHUB_USERNAME \
+  --password YOUR_GITHUB_PAT \
+  --store-password-in-clear-text
+
+dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
 ```
 
 ## 2. Configure Services
@@ -55,15 +37,13 @@ builder.Services.AddAgentBlazor(options =>
     // Choose your LLM provider
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+        model: builder.Configuration["OpenAI:Model"]!);
 
-    // Register your workflow agent
     options.ConfigureBuilder(agentBuilder =>
     {
-        agentBuilder.AddWorkflow<MyCapabilities>("assistant", agent =>
+        agentBuilder.AddWorkflow<SupportInboxCapabilities>("support-inbox", agent =>
         {
-            agent.WithDescription("Help users complete their tasks.");
-            agent.WithRoutePrefixes("/"); // Active on all routes
+            agent.WithRoutePrefixes("/support");
         });
     });
 });
@@ -140,31 +120,24 @@ Without `MapAgentBlazorEndpoints()`, the chat UI can render but the runtime endp
 Use `[AgentCapability]` to mark a class as agent-accessible:
 
 ```csharp
-[AgentCapability("assistant")]
-public sealed class MyCapabilities
+[AgentCapability("support_inbox")]
+public sealed class SupportInboxCapabilities
 {
-    private readonly IMyService _service;
-
-    public MyCapabilities(IMyService service)
+    [AgentAction("Show open tickets that still need a reply")]
+    public Task<CapabilityResult> ShowOpenTicketsAsync(
+        [AgentParam("Include tickets from the last N days", Required = false)] int days = 7)
     {
-        _service = service;
+        return Task.FromResult(
+            CapabilityResult.Success($"Highlighted tickets from the last {days} days.")
+                .WithNextActions("Explain the queue", "Draft a reply"));
     }
 
-    [AgentAction("Search for items")]
-    public async Task<CapabilityResult> SearchAsync(
-        [AgentParam("Search query")] string query)
+    [AgentAction("Draft a reply for the highlighted tickets", RequiresApproval = true)]
+    public Task<CapabilityResult> DraftReplyAsync()
     {
-        var results = await _service.SearchAsync(query);
-        return CapabilityResult.Success($"Found {results.Count} items.");
-    }
-
-    [AgentAction("Submit order", RequiresApproval = true)]
-    public async Task<CapabilityResult> SubmitOrderAsync(
-        [AgentParam("Order ID")] Guid orderId)
-    {
-        await _service.SubmitAsync(orderId);
-        return CapabilityResult.Success("Order submitted.")
-            .WithNextActions("View order status", "Create another order");
+        return Task.FromResult(
+            CapabilityResult.Success("Prepared the reply draft.")
+                .WithNextActions("Review the reply", "Approve the draft"));
     }
 }
 ```
@@ -177,8 +150,8 @@ In your layout or page:
 @using AgentBlazor.Components
 
 <AgentChatWidget
-    Title="Assistant"
-    Placeholder="Ask me anything..."
+    Title="Support inbox"
+    Placeholder="Show open tickets, explain the queue, or draft a reply..."
     Width="28rem"
     Height="60vh" />
 ```
@@ -190,44 +163,11 @@ Use `AgentChatSurface` when chat should be embedded directly in the page:
 @using AgentBlazor.Components
 
 <AgentChatSurface
-    Title="Assistant"
-    Description="Help users complete the current workflow."
+    Title="Support inbox"
+    Description="Review the current queue and prepare the next safe step."
     LockAgentToCurrentRoute="true"
     ShowAgentSelector="false"
     EnableGeneratedUi="true" />
-```
-
-Use `AgentChatPanel` when the assistant should sit beside a dense operational screen:
-
-```razor
-@using AgentBlazor.Components
-
-<AgentChatPanel
-    Title="Operations Assistant"
-    Description="Review the current screen and guide safe production changes."
-    Height="42rem"
-    ShowAgentSelector="false"
-    EnableGeneratedUi="true" />
-```
-
-Use `AgentChatBar` when the page needs a compact command/search-style entry point:
-
-```razor
-@using AgentBlazor.Components
-
-<AgentChatBar
-    Placeholder="Ask for a status update or next action..."
-    Suggestions="@ProductionPrompts"
-    EnableGeneratedUi="true" />
-
-@code {
-    private static readonly IReadOnlyList<string> ProductionPrompts =
-    [
-        "Summarize this page for an operations lead.",
-        "List the safest next actions before changing production state.",
-        "Draft a handoff note for this workflow."
-    ];
-}
 ```
 
 ## Hosted WebAssembly Client Chat
@@ -244,7 +184,7 @@ app.MapAgentBlazorRemoteChat();
 Client project:
 
 ```bash
-dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source https://nuget.pkg.github.com/ashpeterson/index.json
+dotnet add ./MyApp.Client/MyApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.9 --source github-agentblazor
 ```
 
 Client `_Imports.razor`:
@@ -381,28 +321,6 @@ AgentBlazor includes MudBlazor-backed components the agent can control:
 
 The agent can filter, sort, paginate the grid, and fill form fields automatically.
 
-## Pro Tier Features
-
-Enable analytics, audit logging, and smart suggestions with a Pro license:
-
-```csharp
-builder.Services.AddAgentBlazor(options =>
-{
-    options.UseOpenAI(apiKey, "gpt-5.4-mini");
-
-    // Enable Pro tier with SQLite persistence
-    options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
-});
-```
-
-Then add the Pro Dashboard to your app:
-
-```razor
-<AgentProDashboard Title="Analytics" DaysRange="30" />
-```
-
-For production pilots, configure an explicit persistent `dataDirectory`, protect the SQLite files, and restrict dashboard access to operators/admins. See [Pro Tier Operations](pro-tier-operations.md) for storage, retention, backup, authorization, and rollback expectations.
-
 ## Available Components
 
 AgentBlazor includes 14 agentic components:
@@ -429,7 +347,7 @@ AgentBlazor includes 14 agentic components:
 ### Agent not responding
 
 1. Check your OpenAI API key is valid
-2. Confirm `OpenAI:Model` resolves to a tool-capable model such as `gpt-5.4-mini`
+2. Confirm `OpenAI:Model` resolves to a tool-capable OpenAI chat model
 3. Ensure `AddAgentBlazor` is called before `builder.Build()`
 4. Ensure `AddMudServices()` is registered
 5. Ensure the MudBlazor providers are present in your layout
@@ -466,17 +384,8 @@ dotnet build .\MyBlazorApp.csproj
 1. Add `[AgentReadable]` to properties the agent should see
 2. Ensure the component has a `@ref` reference in the page
 
-### Pro features not working
-
-1. Verify `UseProLicense()` is called with a valid key
-2. Check the SQLite database is writable at the data directory
-3. Ensure `IUsageAnalyticsService` is injected (not the null implementation)
-
 ## Next Steps
 
-- Run `demo/AgentBlazor.Demo` to see workflow orchestration in action
-- Read [CLI Guide](cli.md) if you want to generate `.agentblazor/AGENT.md`
-- See [Pricing Tiers](pricing-tiers.md) for Pro features
-- See [Pro Tier Operations](pro-tier-operations.md) before enabling Pro in a real app
-- Check `docs/STATUS.md` for current implementation status
+- Run `samples/AgentBlazor.Starter` to see the smallest working route-scoped setup
+- Read [Advanced CLI](advanced/cli.md) if you want scaffold help for an existing app
 - Use OpenAI as the first production provider you validate in a real app

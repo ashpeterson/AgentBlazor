@@ -23,7 +23,7 @@ builder.Services.AddAgentBlazor(options =>
 {
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini");
 
     options.UseProLicense(
         licenseKey: builder.Configuration["AgentBlazor:LicenseKey"]!,

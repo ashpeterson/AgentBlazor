@@ -1,7 +1,14 @@
 const { test, expect } = require("@playwright/test");
-const { openAssistantChatSurface, openFloatingChatWidget } = require("./chat-helpers.cjs");
+const { openAssistantChatSurface } = require("./chat-helpers.cjs");
 
 const workflowScenarios = [
+  {
+    name: "support inbox",
+    route: "/demo/workflows/support-inbox",
+    heading: /Support inbox/i,
+    marker: "Ticket queue",
+    button: "Show this week's tickets"
+  },
   {
     name: "response orchestration",
     route: "/demo/workflows/response-orchestration?reset=true",
@@ -68,35 +75,4 @@ test.describe("Workflow demos", () => {
       await expect(chatSurface.getByLabel("Message input")).toBeVisible();
     });
   }
-});
-
-test.describe("Paid dashboard", () => {
-  test("renders the public pro dashboard route and supports tabs plus widget controls", async ({ page }) => {
-    await page.goto("/demo/dashboard", { waitUntil: "networkidle" });
-
-    await expect(page.getByRole("heading", { name: "Pro Dashboard", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Agent Intelligence Dashboard", exact: true })).toBeVisible();
-    await expect(page.locator(".dashboard-page")).toContainText("UseProLicense()");
-    await expect(page.locator(".ab-dashboard")).not.toContainText("Restricted Pro Dashboard");
-    await expect(page.locator(".ab-dashboard")).not.toContainText("Failed to load dashboard data");
-    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
-
-    const dashboardBodyText = await page.locator(".ab-dashboard__body").textContent();
-    expect(dashboardBodyText || "").toMatch(/Total Actions|No usage data available yet/i);
-
-    await page.getByRole("tab", { name: "Actions", exact: true }).click();
-    await expect(page.locator(".ab-dashboard__body")).toContainText(/Action|No action data available yet/i);
-
-    await page.getByRole("tab", { name: "Audit Log", exact: true }).click();
-    await expect(page.locator(".ab-dashboard__body")).toContainText(/Audit|No audit events recorded yet/i);
-
-    await page.getByRole("tab", { name: "Patterns", exact: true }).click();
-    await expect(page.locator(".ab-dashboard__body")).toContainText(/Patterns|No patterns discovered yet/i);
-
-    const { widgetWindow, widgetSurface, minimizeButton, openButton } = await openFloatingChatWidget(page);
-    await expect(widgetSurface.getByLabel("Message input")).toBeVisible();
-    await minimizeButton.click();
-    await expect(widgetWindow).toBeHidden();
-    await expect(openButton).toBeVisible();
-  });
 });

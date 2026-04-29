@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 test.describe("Landing page", () => {
-  test("guides users from home into the workflow demos", async ({ page }) => {
+  test("guides users from home into the live support demo", async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: /From CLI to working UI\./i }).first()).toBeVisible();
@@ -21,6 +21,6 @@ test.describe("Landing page", () => {
 
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("#hero").getByRole("link", { name: "Live demo" }).click();
-    await expect(page).toHaveURL(/\/demo\/workflows\/response-orchestration/);
+    await expect(page).toHaveURL(/\/demo\/workflows\/support-inbox/);
   });
 });

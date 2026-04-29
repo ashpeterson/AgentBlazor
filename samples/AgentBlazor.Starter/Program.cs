@@ -15,7 +15,7 @@ builder.Services.AddScoped<OpsReviewService>();
 
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
     ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
+var openAiModel = builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini";
 var ollamaModel = builder.Configuration["Ollama:Model"]
     ?? Environment.GetEnvironmentVariable("OLLAMA_MODEL");
 var ollamaEndpoint = builder.Configuration["Ollama:Endpoint"]

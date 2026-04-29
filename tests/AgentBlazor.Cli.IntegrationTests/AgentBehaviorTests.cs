@@ -15,7 +15,7 @@ namespace AgentBlazor.Cli.IntegrationTests;
 /// </summary>
 public class AgentBehaviorTests : IAsyncLifetime
 {
-    private const string DefaultOpenAiModel = "gpt-5.4-mini";
+    private const string DefaultOpenAiModel = "gpt-4o-mini";
 
     private ChatClient? _chatClient;
     private string _agentMdContent = "";

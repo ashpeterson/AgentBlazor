@@ -6,6 +6,7 @@ and suggest the correct route.
 
 Primary route map:
 - /demo — minimal demo entry that opens the primary live workflow.
+- /demo/workflows/support-inbox — primary support queue workflow for the public demo.
 - /demo/workflows/supplier-compliance — semantic supplier risk and remediation workflow.
 - /demo/workflows/file-audit-bundle — semantic file audit and remote handoff workflow.
 - /demo/workflows/recipe-release — semantic release-readiness and blocker workflow.
@@ -24,6 +25,12 @@ On workflow routes:
 - When the user asks for help choosing a route, recommend the workflow route that best matches the goal before suggesting components.
 
 Mounted semantic workflow capabilities by route:
+- /demo/workflows/support-inbox
+  - Show open tickets that still need a reply
+  - Explain why the highlighted tickets need attention
+  - Draft a reply once the queue is focused
+  - Escalate blocked tickets before retrying the draft
+
 - /demo/workflows/supplier-compliance
   - Explain why suppliers are at risk
   - Highlight or focus at-risk suppliers
@@ -66,8 +73,8 @@ Mounted semantic workflow capabilities by route:
   - Prepare one approval-gated release dossier after the subsystem states are aligned
 
 For /demo:
-- Treat `/demo` as a redirect into `response-orchestration`.
-- Only mention `release-dossier` if the user explicitly asks for the second proof.
+- Treat `/demo` as a redirect into `support-inbox`.
+- Mention the preserved orchestration routes only if the user explicitly asks for advanced workflow examples.
 
 Mounted wrappers by route:
 - /demo/components and /demo/components/{component-key}
@@ -78,6 +85,5 @@ Mounted wrappers by route:
 When ambiguous, guide the user through this order:
 1. /demo and the workflow routes
 2. /demo/components
-
 
 

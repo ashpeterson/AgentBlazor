@@ -9,10 +9,10 @@
     <section class="dashboard-page__header">
         <div class="dashboard-page__title-row">
             <MudText Typo="Typo.h4">Pro Dashboard</MudText>
-            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Pro Tier</MudChip>
+            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Archived Route</MudChip>
         </div>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Shows usage, audit, patterns, and agent performance for paid installs.
+            This route is preserved for future paid-tier work. It is intentionally not linked from the current public launch path.
         </MudText>
     </section>
 
@@ -21,37 +21,12 @@
     </section>
 
     <section class="dashboard-page__info">
-        <MudGrid Spacing="2">
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Outlined="true">
-                    <MudText Typo="Typo.h6">What this shows</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                        Use the tabs to inspect the paid surfaces.
-                    </MudText>
-                    <MudChipSet T="string">
-                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Usage</MudChip>
-                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Audit</MudChip>
-                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Patterns</MudChip>
-                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">Performance</MudChip>
-                    </MudChipSet>
-                </MudPaper>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Outlined="true">
-                    <MudText Typo="Typo.h6">Enable it</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                        Add `UseProLicense()` and render `AgentProDashboard`.
-                    </MudText>
-                    <pre class="dashboard-page__code"><code>builder.Services.AddAgentBlazor(options =>
-{
-    options.UseOpenAI(apiKey, "gpt-5.4-mini");
-    options.UseProLicense("AB-PRO-YOUR-LICENSE-KEY");
-});
-
-&lt;AgentProDashboard Title="My Dashboard" DaysRange="30" /&gt;</code></pre>
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudText Typo="Typo.h6">Why this still exists</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                The dashboard, licensing, audit, and analytics work are being preserved in the repo. They are not part of the current launch story, but they are not being deleted.
+            </MudText>
+        </MudPaper>
     </section>
 </div>
 
@@ -75,24 +50,5 @@
 
     .dashboard-page__content {
         margin-bottom: 32px;
-    }
-
-    .dashboard-page__info {
-        margin-top: 24px;
-    }
-
-    .dashboard-page__code {
-        background: #1e1e1e;
-        color: #d4d4d4;
-        padding: 16px;
-        border-radius: 8px;
-        overflow-x: auto;
-        font-family: 'Consolas', 'Monaco', monospace;
-        font-size: 0.875rem;
-        line-height: 1.5;
-    }
-
-    .dashboard-page__code code {
-        color: inherit;
     }
 </style>

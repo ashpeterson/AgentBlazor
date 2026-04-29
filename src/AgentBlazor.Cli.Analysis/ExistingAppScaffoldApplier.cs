@@ -548,7 +548,7 @@ builder.Services.AddAgentBlazor(options =>
             ScaffoldProvider.OpenAI => """
     options.UseOpenAI(
         apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-        model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+        model: builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini");
 """,
             ScaffoldProvider.AzureOpenAI => """
     options.UseAzureOpenAI(
@@ -566,7 +566,7 @@ builder.Services.AddAgentBlazor(options =>
     // Recommended first path:
     // options.UseOpenAI(
     //     apiKey: builder.Configuration["OpenAI:ApiKey"]!,
-    //     model: builder.Configuration["OpenAI:Model"] ?? "gpt-5.4-mini");
+    //     model: builder.Configuration["OpenAI:Model"] ?? "gpt-4o-mini");
     //
     // Alternatives:
     // options.UseAzureOpenAI(

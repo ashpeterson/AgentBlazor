@@ -6,9 +6,9 @@ test.describe("Documentation site", () => {
 
     await expect(page.getByRole("heading", { name: /install it\. verify it\. add one workflow\./i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Getting Started", exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "CLI", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Advanced CLI", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Verification", exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Canonical flow")).toBeVisible();
+    await expect(page.getByText("Default path")).toBeVisible();
     await expect(page.getByText("Verification first")).toBeVisible();
   });
 
@@ -19,7 +19,7 @@ test.describe("Documentation site", () => {
     await expect(page.getByText("Hosted WebAssembly client path")).toBeVisible();
 
     await page.goto("/docs/cli", { waitUntil: "networkidle" });
-    await expect(page.getByRole("heading", { name: /run the cli in this order/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /use the cli only when manual setup is not enough/i })).toBeVisible();
     await expect(page.getByText("What to pass as the target")).toBeVisible();
     await expect(page.getByText("What scaffold --diff should tell you")).toBeVisible();
 
@@ -48,9 +48,6 @@ test.describe("Documentation site", () => {
 
     await page.goto("/docs/demo-tour", { waitUntil: "networkidle" });
     await expect(page.getByRole("heading", { name: /the demo is a small funnel/i })).toBeVisible();
-
-    await page.goto("/docs/pricing", { waitUntil: "networkidle" });
-    await expect(page.getByRole("heading", { name: /free ships the workflow\. pro adds durable intelligence/i })).toBeVisible();
   });
 
   test("holds together at a mobile width", async ({ page }) => {

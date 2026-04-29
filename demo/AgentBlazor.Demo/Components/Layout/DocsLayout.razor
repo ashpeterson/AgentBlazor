@@ -19,7 +19,7 @@
         <nav class="docs-shell__nav" aria-label="Docs">
             <a href="/docs" class="@(IsActive("/docs") ? "is-active" : null)" aria-current="@(IsActive("/docs") ? "page" : null)">Overview</a>
             <a href="/docs/getting-started" class="@(IsActive("/docs/getting-started") ? "is-active" : null)" aria-current="@(IsActive("/docs/getting-started") ? "page" : null)">Getting Started</a>
-            <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)" aria-current="@(IsActive("/docs/cli") ? "page" : null)">CLI</a>
+            <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)" aria-current="@(IsActive("/docs/cli") ? "page" : null)">Advanced CLI</a>
             <a href="/docs/verification" class="@(IsActive("/docs/verification") ? "is-active" : null)" aria-current="@(IsActive("/docs/verification") ? "page" : null)">Verification</a>
             <a href="/docs/hosting-models" class="@(IsActive("/docs/hosting-models") ? "is-active" : null)" aria-current="@(IsActive("/docs/hosting-models") ? "page" : null)">Hosting</a>
             <a href="/docs/workflows" class="@(IsActive("/docs/workflows") ? "is-active" : null)" aria-current="@(IsActive("/docs/workflows") ? "page" : null)">Workflows</a>
@@ -27,7 +27,7 @@
         </nav>
 
         <div class="docs-shell__actions">
-            <a href="/demo/workflows/response-orchestration?reset=true" class="docs-shell__demo-link">Live Demo</a>
+            <a href="/demo/workflows/support-inbox" class="docs-shell__demo-link">Live Demo</a>
         </div>
     </header>
 
@@ -38,7 +38,7 @@
                 <nav class="docs-shell__sidebar-nav">
                     <a href="/docs" class="@(IsActive("/docs") ? "is-active" : null)">Docs Overview</a>
                     <a href="/docs/getting-started" class="@(IsActive("/docs/getting-started") ? "is-active" : null)">Getting Started</a>
-                    <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)">CLI Guide</a>
+                    <a href="/docs/cli" class="@(IsActive("/docs/cli") ? "is-active" : null)">Advanced CLI</a>
                     <a href="/docs/verification" class="@(IsActive("/docs/verification") ? "is-active" : null)">Verification</a>
                 </nav>
             </div>
@@ -66,17 +66,10 @@
                 </nav>
             </div>
 
-            <div class="docs-shell__sidebar-card">
-                <p class="docs-shell__sidebar-label">Plans</p>
-                <nav class="docs-shell__sidebar-nav">
-                    <a href="/docs/pricing" class="@(IsActive("/docs/pricing") ? "is-active" : null)">Pricing & Tiers</a>
-                </nav>
-            </div>
-
             <div class="docs-shell__sidebar-callout">
                 <span>Quick rule</span>
-                <strong>Start with a standard host.</strong>
-                <small>Then move to hosted WebAssembly or review-first hosts.</small>
+                <strong>Start without the CLI.</strong>
+                <small>First prove one route works. Add scaffold help only if manual setup is too slow.</small>
             </div>
         </aside>
 

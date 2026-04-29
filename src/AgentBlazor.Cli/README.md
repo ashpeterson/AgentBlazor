@@ -1,54 +1,8 @@
 # AgentBlazor CLI
 
-`agentblazor` is meant to onboard an existing Blazor app through one standard path:
+The CLI is the advanced setup path for existing Blazor apps.
 
-1. `agentblazor init`
-2. `agentblazor scaffold`
-3. `agentblazor scaffold --approve`
-4. `agentblazor doctor`
-5. `agentblazor validate`
+See:
 
-Current status as of 2026-04-20:
-
-- CLI analysis tests: `135/135`
-- CLI integration tests: `9/9` discovered locally, skipped without an API key
-- standard existing Blazor hosts are scaffoldable end to end
-- hosted WebAssembly server hosts are scaffoldable for server startup/workflow wiring; browser-client layout/assets/providers/chat remain review-first with `AgentBlazor.Client` remote-chat guidance
-- CSP nonce-aware app shells are preserved when scaffold inserts MudBlazor and AgentBlazor assets
-- published-feed validation passes clean-app install, external real-app install, and all-surface chat browser validation for `0.1.0-preview.9`
-- advanced/custom hosts still fall back to review-first or blocked modes depending on how confidently the CLI can classify them
-
-## Commands
-
-- `agentblazor init ./MySolution.slnx --host MyBlazorApp`
-- `agentblazor doctor ./MySolution.slnx --host MyBlazorApp`
-- `agentblazor validate ./MySolution.slnx --host MyBlazorApp`
-- `agentblazor scaffold ./MySolution.slnx --host MyBlazorApp`
-- `agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff`
-- `agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --diff --use-local-source /path/to/AgentBlazor`
-- `agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve`
-- `agentblazor update`
-- `agentblazor watch`
-
-## What It Does
-
-- scans routes, services, and agent-exposable surfaces
-- generates `.agentblazor/AGENT.md`
-- inspects whether the baseline AgentBlazor runtime wiring exists in an app
-- validates the current install state and scaffold audit trail when available
-- shows installer-style next steps from `init`
-- previews exact file-level baseline install edits for a standard Blazor host
-- applies the baseline install for a standard Blazor host and the safe server side of hosted WebAssembly apps, and writes `.agentblazor/scaffold-manifest.json`
-- scaffolds provider-specific `Program.cs` registration for `openai`, `azure-openai`, or `ollama`
-- helps validate what the agent can see in the current app
-
-When the CLI is run from a local AgentBlazor checkout it will auto-detect the source tree and scaffold `ProjectReference`s instead of an `AgentBlazor` package reference. You can also force that path with `--use-local-source /path/to/AgentBlazor`.
-
-## What It Does Not Do
-
-- it does not safely patch arbitrary nonstandard hosts yet
-- it does not populate provider secrets or app-specific configuration values for you
-
-Use the main quickstart for runtime setup:
-
+- `docs/advanced/cli.md`
 - `docs/quickstart.md`

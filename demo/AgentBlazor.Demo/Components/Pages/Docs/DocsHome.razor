@@ -7,28 +7,28 @@
 <div class="docs-article">
     <section class="docs-hero">
         <p class="docs-hero__eyebrow">Documentation</p>
-        <h1 class="docs-hero__title">Install it. Verify it. Add one workflow.</h1>
+        <h1 class="docs-hero__title">Install it. Run one route. Prove it works.</h1>
         <p class="docs-hero__lede">
-            Start with one Blazor route, one workflow, and one chat surface.
+            Start with one Blazor route, one workflow, and one chat surface. The reference route is the support inbox demo.
         </p>
 
         <div class="docs-actions">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/docs/getting-started">Start setup</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/response-orchestration?reset=true">Open demo</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/demo/workflows/support-inbox">Open demo</MudButton>
         </div>
 
         <div class="docs-kpi-grid">
             <div class="docs-kpi">
-                <strong>Canonical flow</strong>
-                <span><code>init</code> -> <code>scaffold --diff</code> -> <code>--approve</code></span>
+                <strong>Default path</strong>
+                <span><code>package</code> -> <code>Program.cs</code> -> <code>one workflow</code></span>
             </div>
             <div class="docs-kpi">
                 <strong>Verification first</strong>
-                <span>build, doctor, validate, then runtime smoke</span>
+                <span>build, run, then test prompts on a real route</span>
             </div>
             <div class="docs-kpi">
-                <strong>Hosted WASM</strong>
-                <span>server host + <code>AgentBlazor.Client</code></span>
+                <strong>CLI is advanced</strong>
+                <span>keep it out of the first install unless manual setup is too slow</span>
             </div>
         </div>
     </section>
@@ -36,18 +36,22 @@
     <section class="docs-section">
         <div class="docs-section__header">
             <div>
-                <h2>Start order</h2>
+                <h2>Manual start order</h2>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.9 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
-agentblazor init ./MySolution.slnx --host MyBlazorApp
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
-agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
-dotnet restore ./MySolution.slnx --force-evaluate
-dotnet build ./MySolution.slnx --no-restore -nologo
-agentblazor doctor ./MySolution.slnx --host MyBlazorApp
-agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
+        <pre class="docs-code"><code>dotnet nuget add source "https://nuget.pkg.github.com/ashpeterson/index.json" \
+  --name github-agentblazor \
+  --username YOUR_GITHUB_USERNAME \
+  --password YOUR_GITHUB_PAT \
+  --store-password-in-clear-text
+
+dotnet add package AgentBlazor --version 0.1.0-preview.9 --source github-agentblazor
+builder.Services.AddAgentBlazor(...)
+app.MapAgentBlazorEndpoints()
+Render one chat surface on one route
+dotnet build
+dotnet run</code></pre>
     </section>
 
     <section class="docs-section">
@@ -63,8 +67,8 @@ agentblazor validate ./MySolution.slnx --host MyBlazorApp</code></pre>
                 <p>Package source, install path, first workflow.</p>
             </a>
             <a href="/docs/cli" class="docs-link-card">
-                <strong>CLI</strong>
-                <p>Commands and run order.</p>
+                <strong>Advanced CLI</strong>
+                <p>Scaffold help for existing apps after the manual path works.</p>
             </a>
             <a href="/docs/verification" class="docs-link-card">
                 <strong>Verification</strong>
