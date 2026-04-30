@@ -179,7 +179,7 @@ function renderPoster(inputPath, outputPath, second) {
 function ensureSourceClips(sourceDir) {
   const cliPath = path.join(sourceDir, "cli-install.mp4");
   const codePath = path.join(sourceDir, "code-tour.mp4");
-  const moviesPath = path.join(sourceDir, "ms-movies-raw.mp4");
+  const supportPath = path.join(sourceDir, "support-inbox-raw.mp4");
   const dashboardPath = path.join(sourceDir, "dashboard-live.mp4");
 
   if (!fs.existsSync(cliPath)) {
@@ -194,10 +194,10 @@ function ensureSourceClips(sourceDir) {
     fs.copyFileSync(existing, codePath);
   }
 
-  if (!fs.existsSync(moviesPath)) {
-    const existing = path.join(repoRoot, "artifacts/video/ms-movies-demo-e2e/ms-movies-agentblazor.mp4");
+  if (!fs.existsSync(supportPath)) {
+    const existing = path.join(repoRoot, "artifacts/video/support-inbox-demo/support-inbox-agentblazor.mp4");
     assertExists(existing);
-    fs.copyFileSync(existing, moviesPath);
+    fs.copyFileSync(existing, supportPath);
   }
 
   if (!fs.existsSync(dashboardPath)) {
@@ -206,7 +206,7 @@ function ensureSourceClips(sourceDir) {
     fs.copyFileSync(existing, dashboardPath);
   }
 
-  return { cliPath, codePath, moviesPath, dashboardPath };
+  return { cliPath, codePath, supportPath, dashboardPath };
 }
 
 async function main() {
@@ -219,7 +219,7 @@ async function main() {
   ensureDir(segmentDir);
   ensureDir(deliverDir);
 
-  const { cliPath, codePath, moviesPath, dashboardPath } = ensureSourceClips(sourceDir);
+  const { cliPath, codePath, supportPath, dashboardPath } = ensureSourceClips(sourceDir);
 
   const introCard = path.join(segmentDir, "intro-card.mp4");
   renderTitleCard(introCard, {
@@ -231,28 +231,28 @@ async function main() {
     duration: 1.6
   });
 
-  const teaserMovieA = path.join(segmentDir, "teaser-movie-a.mp4");
-  renderClipSegment(moviesPath, teaserMovieA, {
-    start: 11.7,
-    duration: 2.9,
+  const teaserSupportA = path.join(segmentDir, "teaser-support-a.mp4");
+  renderClipSegment(supportPath, teaserSupportA, {
+    start: 8.9,
+    duration: 3.3,
     eyebrow: "REAL APP RESULT",
-    title: "Filter and focus a real page",
-    body: "The chat surface drives the Microsoft movie sample, not a synthetic mock.",
-    crop: "crop=1340:820:170:90",
+    title: "Focus the live support queue",
+    body: "The chat surface highlights live tickets and explains why they need attention.",
+    crop: "crop=1400:840:120:70",
     titleSize: 46,
     bodySize: 22,
     boxY: 744,
     boxHeight: 154
   });
 
-  const teaserMovieB = path.join(segmentDir, "teaser-movie-b.mp4");
-  renderClipSegment(moviesPath, teaserMovieB, {
-    start: 17.3,
-    duration: 3.2,
+  const teaserSupportB = path.join(segmentDir, "teaser-support-b.mp4");
+  renderClipSegment(supportPath, teaserSupportB, {
+    start: 18.4,
+    duration: 3.6,
     eyebrow: "APPROVAL FLOW",
-    title: "Approve and keep moving",
-    body: "The draft card lands on screen after the approval boundary is cleared.",
-    crop: "crop=1340:820:170:90",
+    title: "Approve the drafted reply",
+    body: "Escalation clears the blocker, then the reply draft lands on screen after approval.",
+    crop: "crop=1400:840:120:70",
     titleSize: 46,
     bodySize: 22,
     boxY: 744,
@@ -291,7 +291,7 @@ async function main() {
   concatSegments([dashboardOverview, dashboardAudit], dashboardHighlight);
 
   const heroTeaser = path.join(deliverDir, "agentblazor-hero-teaser.mp4");
-  concatSegments([teaserMovieA, teaserMovieB, dashboardOverview], heroTeaser);
+  concatSegments([teaserSupportA, teaserSupportB, dashboardOverview], heroTeaser);
 
   const cliSegment = path.join(segmentDir, "reel-cli.mp4");
   renderClipSegment(cliPath, cliSegment, {
@@ -320,28 +320,28 @@ async function main() {
     boxHeight: 156
   });
 
-  const movieSegmentA = path.join(segmentDir, "reel-movie-a.mp4");
-  renderClipSegment(moviesPath, movieSegmentA, {
-    start: 10.8,
-    duration: 4.6,
+  const supportSegmentA = path.join(segmentDir, "reel-support-a.mp4");
+  renderClipSegment(supportPath, supportSegmentA, {
+    start: 7.8,
+    duration: 5.2,
     eyebrow: "REAL BLAZOR APP",
-    title: "Prompt changes the page",
-    body: "The catalog filters and the workflow focuses the movie in view.",
-    crop: "crop=1340:820:170:90",
+    title: "Prompt changes the support queue",
+    body: "The route highlights open tickets and turns the queue into a concrete workflow.",
+    crop: "crop=1400:840:120:70",
     titleSize: 46,
     bodySize: 22,
     boxY: 742,
     boxHeight: 156
   });
 
-  const movieSegmentB = path.join(segmentDir, "reel-movie-b.mp4");
-  renderClipSegment(moviesPath, movieSegmentB, {
-    start: 15.9,
-    duration: 5.3,
+  const supportSegmentB = path.join(segmentDir, "reel-support-b.mp4");
+  renderClipSegment(supportPath, supportSegmentB, {
+    start: 16.1,
+    duration: 6.1,
     eyebrow: "APPROVAL + RESULT",
-    title: "Approve, then ship the next step",
-    body: "The draft card appears in the workflow after operator approval.",
-    crop: "crop=1340:820:170:90",
+    title: "Escalate, approve, then send the next step",
+    body: "The visible draft card appears after the blocker is cleared and the reply is approved.",
+    crop: "crop=1400:840:120:70",
     titleSize: 46,
     bodySize: 22,
     boxY: 742,
@@ -349,19 +349,19 @@ async function main() {
   });
 
   const capabilityReel = path.join(deliverDir, "agentblazor-capability-reel.mp4");
-  concatSegments([introCard, cliSegment, codeSegment, movieSegmentA, movieSegmentB], capabilityReel);
+  concatSegments([introCard, cliSegment, codeSegment, supportSegmentA, supportSegmentB], capabilityReel);
 
-  const moviesHighlight = path.join(deliverDir, "ms-movies-agentblazor.mp4");
-  concatSegments([teaserMovieA, teaserMovieB], moviesHighlight);
+  const supportHighlight = path.join(deliverDir, "support-inbox-agentblazor.mp4");
+  concatSegments([teaserSupportA, teaserSupportB], supportHighlight);
 
   renderPoster(heroTeaser, path.join(deliverDir, "agentblazor-hero-teaser-poster.jpg"), 1.4);
   renderPoster(capabilityReel, path.join(deliverDir, "agentblazor-capability-reel-poster.jpg"), 0.4);
-  renderPoster(moviesHighlight, path.join(deliverDir, "ms-movies-agentblazor-poster.jpg"), 1.8);
+  renderPoster(supportHighlight, path.join(deliverDir, "support-inbox-agentblazor-poster.jpg"), 1.8);
   renderPoster(dashboardHighlight, path.join(deliverDir, "dashboard-live-poster.jpg"), 1.0);
 
   console.log(heroTeaser);
   console.log(capabilityReel);
-  console.log(moviesHighlight);
+  console.log(supportHighlight);
   console.log(dashboardHighlight);
 }
 

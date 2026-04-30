@@ -20,6 +20,8 @@ Current scripts:
   Clones the official Microsoft Blazor movies sample, switches it to SQLite, overlays AgentBlazor integration files, and creates a runnable scratch workspace.
 - `record-ms-movies-demo.cjs`
   Runs the prepared official Microsoft movie sample, drives the chat widget with real prompts, and records the resulting page-state changes.
+- `record-support-inbox-demo.cjs`
+  Runs the demo app support inbox route, drives the embedded assistant through queue focus, escalation, draft, and approval, and records the visible page-state changes.
 
 Useful commands:
 
@@ -31,6 +33,7 @@ OPENAI_API_KEY=... node scripts/video/record-starter-ui-live.cjs
 OPENAI_API_KEY=... node scripts/video/record-capability-reel.cjs
 node scripts/video/prepare-ms-movies-demo.cjs
 OPENAI_API_KEY=... node scripts/video/record-ms-movies-demo.cjs
+OPENAI_API_KEY=... node scripts/video/record-support-inbox-demo.cjs
 ```
 
 Notes:
