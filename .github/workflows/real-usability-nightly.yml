@@ -46,6 +46,22 @@ jobs:
       - name: Build
         run: dotnet build AgentBlazor.slnx -c Release --no-restore -nologo
 
+      - name: Restore Demo For E2E
+        run: >
+          dotnet restore
+          demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj
+          --force-evaluate
+          -p:RuntimeIdentifier=linux-x64
+
+      - name: Build Demo For E2E
+        run: >
+          dotnet build
+          demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj
+          -c Release
+          --no-restore
+          -nologo
+          -p:RuntimeIdentifier=linux-x64
+
       - name: Install E2E Dependencies
         working-directory: tests/e2e
         run: npm ci

@@ -15,7 +15,7 @@ test.describe("Documentation site", () => {
   test("covers the main onboarding pages developers will follow", async ({ page }) => {
     await page.goto("/docs/getting-started", { waitUntil: "networkidle" });
     await expect(page.getByRole("heading", { name: /from package source to one working workflow/i })).toBeVisible();
-    await expect(page.getByText("Current preview source")).toBeVisible();
+    await expect(page.getByText("Install the package")).toBeVisible();
     await expect(page.getByText("Hosted WebAssembly client path")).toBeVisible();
 
     await page.goto("/docs/cli", { waitUntil: "networkidle" });
