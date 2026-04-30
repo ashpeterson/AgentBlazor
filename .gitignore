@@ -5,6 +5,8 @@
 
 # dotenv files
 .env
+.codex
+.codex/
 
 # User-specific files
 *.rsuser

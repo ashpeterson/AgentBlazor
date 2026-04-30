@@ -9,7 +9,7 @@ const { chromium, expect } = require("@playwright/test");
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const packageVersion = process.env.AGENTBLAZOR_PACKAGE_VERSION || readPackageVersion();
 const packageSourceMode = normalizePackageSourceMode(process.env.AGENTBLAZOR_PACKAGE_SOURCE_MODE || "local");
-const publishedFeedUrl = process.env.AGENTBLAZOR_PUBLISHED_FEED_URL || "https://nuget.pkg.github.com/ashpeterson/index.json";
+const publishedFeedUrl = process.env.AGENTBLAZOR_PUBLISHED_FEED_URL || "https://api.nuget.org/v3/index.json";
 const baseUrl = process.env.AGENTBLAZOR_HOSTED_WASM_BASE_URL || "http://127.0.0.1:5305";
 const timeoutMs = Number.parseInt(process.env.AGENTBLAZOR_HOSTED_WASM_TIMEOUT_MS || "180000", 10);
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -76,8 +76,6 @@ async function run() {
   if (packageSourceMode === "local") {
     await packLocalPackages();
     state.packagesPacked = true;
-  } else {
-    validatePublishedFeedCredentials();
   }
   await createHostedWasmApp();
   state.templateCreated = true;
@@ -139,16 +137,7 @@ async function createHostedWasmApp() {
 }
 
 async function writeNuGetConfig() {
-  const sourceName = packageSourceMode === "local" ? "agentblazor-local" : "github-agentblazor";
-  const credentials = packageSourceMode === "published"
-    ? `
-  <packageSourceCredentials>
-    <${sourceName}>
-      <add key="Username" value="${escapeXml(getPublishedFeedUsername())}" />
-      <add key="ClearTextPassword" value="${escapeXml(getPublishedFeedToken())}" />
-    </${sourceName}>
-  </packageSourceCredentials>`
-    : "";
+  const sourceName = packageSourceMode === "local" ? "agentblazor-local" : "agentblazor-published";
 
   const content = `<?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -156,7 +145,7 @@ async function writeNuGetConfig() {
     <clear />
     <add key="${sourceName}" value="${escapeXml(packageFeedUrl)}" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>${credentials}
+  </packageSources>
 </configuration>
 `;
 
@@ -442,27 +431,6 @@ function normalizePackageSourceMode(value) {
   }
 
   throw new Error(`Unsupported AGENTBLAZOR_PACKAGE_SOURCE_MODE '${value}'. Supported values: local, published.`);
-}
-
-function validatePublishedFeedCredentials() {
-  if (!getPublishedFeedToken()) {
-    throw new Error(
-      "Published package source mode requires AGENTBLAZOR_GITHUB_PACKAGES_TOKEN, GITHUB_TOKEN, or GH_TOKEN.");
-  }
-}
-
-function getPublishedFeedUsername() {
-  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_USERNAME
-    || process.env.GITHUB_ACTOR
-    || process.env.GH_USER
-    || "ashpeterson";
-}
-
-function getPublishedFeedToken() {
-  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_TOKEN
-    || process.env.GITHUB_TOKEN
-    || process.env.GH_TOKEN
-    || "";
 }
 
 function buildMarkdownReport(report) {

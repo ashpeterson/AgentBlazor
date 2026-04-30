@@ -18,26 +18,13 @@ trap cleanup EXIT
 
 mkdir -p "$OUT_DIR" "$WORK_DIR" "$SESSION_OUTPUT_DIR"
 
-GH_TOKEN="$(gh auth token)"
-if [[ -z "$GH_TOKEN" ]]; then
-    echo "GitHub auth token was not available via gh auth token." >&2
-    exit 1
-fi
-
 cat > "$WORK_DIR/NuGet.Config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
-    <add key="github-agentblazor" value="https://nuget.pkg.github.com/ashpeterson/index.json" />
   </packageSources>
-  <packageSourceCredentials>
-    <github-agentblazor>
-      <add key="Username" value="gh" />
-      <add key="ClearTextPassword" value="$GH_TOKEN" />
-    </github-agentblazor>
-  </packageSourceCredentials>
 </configuration>
 EOF
 
@@ -64,11 +51,11 @@ run_step "dotnet new blazor -n FreshAgentBlazor" \
 
 cd FreshAgentBlazor
 
-run_step "dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor" \
-    dotnet add package AgentBlazor --version 0.1.0-preview.10 --source github-agentblazor
+run_step "dotnet add package AgentBlazor --version 0.1.0-preview.10" \
+    dotnet add package AgentBlazor --version 0.1.0-preview.10
 
-run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10 --add-source https://nuget.pkg.github.com/ashpeterson/index.json" \
-    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10 --add-source https://nuget.pkg.github.com/ashpeterson/index.json
+run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10" \
+    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.1.0-preview.10
 
 run_step "./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor" \
     ./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor
