@@ -10,6 +10,7 @@
     <PackageTags>blazor;aspnetcore;ai;agents;mudblazor;ui;workflow;llm;openai;agentic</PackageTags>
     <PackageReadmeFile>PACKAGE_README.md</PackageReadmeFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>false</IncludeSymbols>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferenceBuildOutputs</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
 

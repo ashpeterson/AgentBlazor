@@ -104,15 +104,6 @@ jobs:
           --skip-duplicate
           --timeout 120
 
-      - name: Publish runtime symbols to nuget.org
-        run: >
-          dotnet nuget push
-          "src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.snupkg"
-          --source "https://api.nuget.org/v3/index.json"
-          --api-key "${{ secrets.NUGET_API_KEY }}"
-          --skip-duplicate
-          --timeout 120
-
       - name: Publish WebAssembly client package to nuget.org
         run: >
           dotnet nuget push
@@ -155,7 +146,6 @@ jobs:
           name: agentblazor-nuget-packages-${{ inputs.package_version }}
           path: |
             src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg
-            src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.snupkg
             src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.snupkg
             src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg
