@@ -14,7 +14,7 @@ Current public releases are prerelease builds. If you prefer a pinned install, u
 dotnet add package AgentBlazor --version 0.1.0-preview.10
 ```
 
-If `dotnet` still probes an old `nuget.pkg.github.com/ashpeterson` source on your machine, remove or disable that source before testing the public NuGet install path.
+If `dotnet` still probes an old custom package source on your machine, remove or disable that source before testing the public NuGet install path.
 
 Minimal setup:
 
