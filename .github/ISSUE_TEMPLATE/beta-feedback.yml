@@ -1,0 +1,84 @@
+name: Beta feedback
+description: Report install friction or first-run confusion during the pre-launch beta.
+title: "[Beta]: "
+labels:
+  - beta
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for pre-launch install and first-run feedback.
+  - type: input
+    id: sdk
+    attributes:
+      label: .NET SDK version
+      placeholder: 10.0.107
+    validations:
+      required: true
+  - type: dropdown
+    id: app_type
+    attributes:
+      label: App type tested
+      options:
+        - Fresh Blazor app
+        - Existing Blazor app
+        - Hosted WebAssembly app
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider path
+      options:
+        - OpenAI
+        - Azure OpenAI
+        - Ollama
+        - No provider
+    validations:
+      required: true
+  - type: dropdown
+    id: install_result
+    attributes:
+      label: Did package install work?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: dropdown
+    id: build_result
+    attributes:
+      label: Did the app build work?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: dropdown
+    id: prompt_result
+    attributes:
+      label: Did one prompt visibly change the page?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: first_confusion
+    attributes:
+      label: First confusing point
+      description: Which line, screen, or prompt first stopped making sense?
+    validations:
+      required: true
+  - type: textarea
+    id: failure_text
+    attributes:
+      label: Exact failure text or symptom
+      description: Paste the command failure, build error, or explain what did not work.
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Screenshots, route tested, reproduction steps, or suggestions.

@@ -1,0 +1,38 @@
+name: Install friction
+description: Report a command, restore, build, or setup failure on the launch path.
+title: "[Install]: "
+labels:
+  - install
+body:
+  - type: input
+    id: command
+    attributes:
+      label: Command that failed
+      placeholder: dotnet add package AgentBlazor --version 0.1.0-preview.10
+    validations:
+      required: true
+  - type: input
+    id: sdk
+    attributes:
+      label: .NET SDK version
+      placeholder: 10.0.107
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Exact output
+      description: Paste the exact command output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra notes
+      description: Host model, OS, package source mapping, repo/project shape, or screenshots.

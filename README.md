@@ -94,5 +94,6 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 ## Docs
 
 - [Quickstart](docs/quickstart.md)
+- [Beta testing](docs/beta-testing.md)
 - [Starter sample](samples/AgentBlazor.Starter/README.md)
 - [Advanced CLI](docs/advanced/cli.md)
