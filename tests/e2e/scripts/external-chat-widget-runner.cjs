@@ -11,7 +11,7 @@ const { openFloatingChatWidget } = require("../specs/chat-helpers.cjs");
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const packageVersion = process.env.AGENTBLAZOR_PACKAGE_VERSION || readPackageVersion();
 const packageSourceMode = normalizePackageSourceMode(process.env.AGENTBLAZOR_PACKAGE_SOURCE_MODE || "local");
-const publishedFeedUrl = process.env.AGENTBLAZOR_PUBLISHED_FEED_URL || "https://nuget.pkg.github.com/ashpeterson/index.json";
+const publishedFeedUrl = process.env.AGENTBLAZOR_PUBLISHED_FEED_URL || "https://api.nuget.org/v3/index.json";
 const externalTemplate = process.env.AGENTBLAZOR_EXTERNAL_TEMPLATE || "";
 const externalRepoUrl = externalTemplate
   ? ""
@@ -106,8 +106,6 @@ async function run() {
   if (packageSourceMode === "local") {
     await restoreRepo();
     await packLocalPackages();
-  } else {
-    validatePublishedFeedCredentials();
   }
   await prepareExternalApp();
 
@@ -576,14 +574,6 @@ async function packLocalPackages() {
   }
 }
 
-function validatePublishedFeedCredentials() {
-  const token = getPublishedFeedToken();
-  if (!token) {
-    throw new Error(
-      "Published package source mode requires AGENTBLAZOR_GITHUB_PACKAGES_TOKEN, GITHUB_TOKEN, or GH_TOKEN.");
-  }
-}
-
 async function prepareExternalApp() {
   if (externalTemplate) {
     await createExternalAppFromTemplate();
@@ -641,16 +631,7 @@ async function writeNuGetConfigs(projectDirectory) {
 }
 
 function buildNuGetConfigContent() {
-  const sourceName = packageSourceMode === "local" ? "agentblazor-local" : "github-agentblazor";
-  const credentials = packageSourceMode === "published"
-    ? `
-  <packageSourceCredentials>
-    <${sourceName}>
-      <add key="Username" value="${escapeXml(getPublishedFeedUsername())}" />
-      <add key="ClearTextPassword" value="${escapeXml(getPublishedFeedToken())}" />
-    </${sourceName}>
-  </packageSourceCredentials>`
-    : "";
+  const sourceName = packageSourceMode === "local" ? "agentblazor-local" : "agentblazor-published";
 
   const content = `<?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -658,24 +639,10 @@ function buildNuGetConfigContent() {
     <clear />
     <add key="${sourceName}" value="${escapeXml(packageFeedUrl)}" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>${credentials}
+  </packageSources>
 </configuration>
 `;
   return content;
-}
-
-function getPublishedFeedUsername() {
-  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_USERNAME
-    || process.env.GITHUB_ACTOR
-    || process.env.GH_USER
-    || "ashpeterson";
-}
-
-function getPublishedFeedToken() {
-  return process.env.AGENTBLAZOR_GITHUB_PACKAGES_TOKEN
-    || process.env.GITHUB_TOKEN
-    || process.env.GH_TOKEN
-    || "";
 }
 
 function redactPackageFeedUrl(value) {
