@@ -5,8 +5,16 @@ Add an agent chat surface and deterministic app actions to a Blazor app.
 Install:
 
 ```bash
-dotnet add package AgentBlazor
+dotnet add package AgentBlazor --prerelease
 ```
+
+Current public releases are prerelease builds. If you prefer a pinned install, use:
+
+```bash
+dotnet add package AgentBlazor --version 0.1.0-preview.10
+```
+
+If `dotnet` still probes an old `nuget.pkg.github.com/ashpeterson` source on your machine, remove or disable that source before testing the public NuGet install path.
 
 Minimal setup:
 

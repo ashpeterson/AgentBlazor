@@ -5,7 +5,13 @@ Advanced scaffold and validation tool for wiring AgentBlazor into existing Blazo
 Install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli
+dotnet tool install --global AgentBlazor.Cli --prerelease
+```
+
+If you want the exact current preview:
+
+```bash
+dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.10
 ```
 
 Example:
