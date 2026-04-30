@@ -14,7 +14,7 @@ const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.join(repoRoot, "tests", "e2e", "artifacts", "real-usability", stamp);
 const serverLogPath = path.join(outputDir, "demo-server.log");
 const baseUrl = process.env.REAL_USABILITY_BASE_URL || "http://127.0.0.1:5190";
-const defaultScenarioRoute = process.env.REAL_USABILITY_DEFAULT_ROUTE || "/demo/workflows/response-orchestration?reset=true";
+const defaultScenarioRoute = process.env.REAL_USABILITY_DEFAULT_ROUTE || "/demo/workflows/support-inbox";
 const scenarioTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SCENARIO_TIMEOUT_MS || "90000", 10);
 const serverReadyTimeoutMs = Number.parseInt(process.env.REAL_USABILITY_SERVER_TIMEOUT_MS || "180000", 10);
 

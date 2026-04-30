@@ -80,7 +80,7 @@ set OLLAMA_MODEL=...
 set OLLAMA_ENDPOINT=http://127.0.0.1:11434/v1
 ```
 
-`test:real-usability` runs the nightly-style orchestration suite using:
+`test:real-usability` runs the nightly-style support-inbox launch suite using:
 - `tests/e2e/real-usability.prompts.json`
 - `tests/e2e/real-usability-baseline.json`
 

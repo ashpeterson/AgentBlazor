@@ -1,14 +1,10 @@
 {
-  "minPassRate": 0.67,
+  "minPassRate": 0.75,
   "maxFailures": 1,
   "requiredScenarioPasses": [
-    "response-readiness-assess",
-    "response-advance-stage",
-    "release-dossier-approval-flow",
-    "runtime-probe-approval-flow",
-    "runtime-probe-stop-flow",
-    "runtime-probe-reconnect-flow",
-    "runtime-probe-sustained-session-flow"
+    "support-open-tickets",
+    "support-explain-queue",
+    "support-draft-approval-flow"
   ],
   "maxRootCauseCounts": {
     "missing_generated_ui": 0,
@@ -21,6 +17,9 @@
     "missing_approval_interaction": 0,
     "missing_stop_interaction": 0,
     "missing_expected_text": 0,
-    "stop_loop": 0
+    "stop_loop": 0,
+    "component_unavailable": 0,
+    "runtime_error": 0,
+    "scenario_runtime_failure": 0
   }
 }

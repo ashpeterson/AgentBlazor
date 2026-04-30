@@ -1,158 +1,73 @@
 [
   {
-    "id": "response-readiness-assess",
-    "name": "Response Readiness Assess",
-    "route": "/demo/workflows/response-orchestration?reset=true",
-    "prompt": "assess cross-system response readiness",
+    "id": "support-open-tickets",
+    "name": "Support Open Tickets",
+    "route": "/demo/workflows/support-inbox",
+    "prompt": "show open tickets from this week",
     "requiredBlockTypes": [],
     "requiresActions": false,
     "minGeneratedBlocks": 0,
     "maxClarifications": 1,
     "maxDeferredRepeats": 2,
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "response-advance-stage",
-    "name": "Response Advance Stage",
-    "route": "/demo/workflows/response-orchestration?reset=true",
-    "prompt": "advance the next guided subsystem stage",
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 1,
-    "maxDeferredRepeats": 2,
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "release-dossier-assess",
-    "name": "Release Dossier Assess",
-    "route": "/demo/workflows/release-dossier?reset=true",
-    "prompt": "assess release dossier readiness",
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 1,
-    "maxDeferredRepeats": 2,
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "release-dossier-approval-flow",
-    "name": "Release Dossier Approval Flow",
-    "route": "/demo/workflows/release-dossier?reset=true",
-    "prompts": [
-      "apply the release dossier recovery playbook",
-      "advance the next guided subsystem stage",
-      "advance the next guided subsystem stage",
-      "prepare the release dossier"
-    ],
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 1,
-    "maxDeferredRepeats": 2,
-    "maxApprovalInteractions": 2,
     "expectedTranscriptIncludes": [
-      "approval"
+      "Highlighted"
     ],
     "expectedDbDelta": {}
   },
   {
-    "id": "runtime-probe-approval-flow",
-    "name": "Runtime Probe Approval Flow",
-    "route": "/demo/workflows/runtime-probe",
+    "id": "support-explain-queue",
+    "name": "Support Explain Queue",
+    "route": "/demo/workflows/support-inbox",
     "prompts": [
-      {
-        "text": "run the runtime approval probe"
-      }
+      "show open tickets from this week",
+      "explain why they need attention"
     ],
     "requiredBlockTypes": [],
     "requiresActions": false,
     "minGeneratedBlocks": 0,
-    "maxClarifications": 0,
-    "maxDeferredRepeats": 0,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2,
+    "expectedTranscriptIncludes": [
+      "tickets needing attention"
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "support-escalate-blockers",
+    "name": "Support Escalate Blockers",
+    "route": "/demo/workflows/support-inbox",
+    "prompts": [
+      "show open tickets from this week",
+      "escalate the blocked tickets"
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2,
+    "expectedTranscriptIncludes": [
+      "Escalated"
+    ],
+    "expectedDbDelta": {}
+  },
+  {
+    "id": "support-draft-approval-flow",
+    "name": "Support Draft Approval Flow",
+    "route": "/demo/workflows/support-inbox",
+    "prompts": [
+      "show open tickets from this week",
+      "escalate the blocked tickets",
+      "draft a reply for the highlighted tickets"
+    ],
+    "requiredBlockTypes": [],
+    "requiresActions": false,
+    "minGeneratedBlocks": 0,
+    "maxClarifications": 1,
+    "maxDeferredRepeats": 2,
     "maxApprovalInteractions": 1,
     "minApprovalInteractions": 1,
     "expectedTranscriptIncludes": [
-      "Runtime approval probe completed."
-    ],
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "runtime-probe-stop-flow",
-    "name": "Runtime Probe Stop Flow",
-    "route": "/demo/workflows/runtime-probe",
-    "prompts": [
-      {
-        "text": "run the runtime cancellation probe",
-        "cancelAfterStopVisible": true
-      }
-    ],
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 0,
-    "maxDeferredRepeats": 0,
-    "maxStopInteractions": 1,
-    "minStopInteractions": 1,
-    "expectedTranscriptIncludes": [
-      "Run canceled."
-    ],
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "runtime-probe-reconnect-flow",
-    "name": "Runtime Probe Reconnect Flow",
-    "route": "/demo/workflows/runtime-probe",
-    "prompts": [
-      {
-        "text": "run the runtime reconnect probe",
-        "reloadAfterStopVisible": true
-      }
-    ],
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 0,
-    "maxDeferredRepeats": 0,
-    "expectedTranscriptIncludes": [
-      "Runtime reconnect probe completed"
-    ],
-    "expectedDbDelta": {}
-  },
-  {
-    "id": "runtime-probe-sustained-session-flow",
-    "name": "Runtime Probe Sustained Session Flow",
-    "route": "/demo/workflows/runtime-probe",
-    "prompts": [
-      {
-        "text": "run the runtime approval probe"
-      },
-      {
-        "text": "run the runtime cancellation probe",
-        "cancelAfterStopVisible": true
-      },
-      {
-        "text": "run the runtime reconnect probe",
-        "reloadAfterStopVisible": true
-      },
-      {
-        "text": "run the runtime reconnect probe",
-        "reloadAfterStopVisible": true
-      }
-    ],
-    "requiredBlockTypes": [],
-    "requiresActions": false,
-    "minGeneratedBlocks": 0,
-    "maxClarifications": 0,
-    "maxDeferredRepeats": 0,
-    "maxApprovalInteractions": 1,
-    "minApprovalInteractions": 1,
-    "maxStopInteractions": 1,
-    "minStopInteractions": 1,
-    "expectedTranscriptIncludes": [
-      "Runtime approval probe completed.",
-      "Run canceled.",
-      "Runtime reconnect probe completed"
+      "Prepared a reply draft"
     ],
     "expectedDbDelta": {}
   }

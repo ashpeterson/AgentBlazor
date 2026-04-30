@@ -184,7 +184,7 @@ internal sealed class SupportInboxWorkflowService
             .ToArray();
 
         _latestDraftBlockers.Clear();
-        foreach (var blocker in BuildDraftBlockers(targetedTickets))
+        foreach (var blocker in BuildDraftBlockers(targetedTickets, _escalatedTicketIds))
         {
             _latestDraftBlockers.Add(blocker);
         }
@@ -296,9 +296,11 @@ internal sealed class SupportInboxWorkflowService
         return $"The current queue has {focused.Length} tickets needing attention. {highRiskCount} have escalation risk, {evidenceBlockers} are blocked by missing evidence, and the oldest highlighted ticket is {oldestAge} days old.";
     }
 
-    private static IEnumerable<string> BuildDraftBlockers(IEnumerable<SupportTicketRow> tickets)
+    private static IEnumerable<string> BuildDraftBlockers(
+        IEnumerable<SupportTicketRow> tickets,
+        IReadOnlySet<string> escalatedTicketIds)
     {
-        foreach (var ticket in tickets.Where(static ticket => ticket.MissingEvidence))
+        foreach (var ticket in tickets.Where(ticket => ticket.MissingEvidence && !escalatedTicketIds.Contains(ticket.Id)))
         {
             yield return $"{ticket.Id} is missing order evidence, so the reply needs escalation first.";
         }
