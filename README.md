@@ -14,8 +14,6 @@ dotnet add package AgentBlazor --version 0.1.0-preview.10
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
 
-The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
-
 ## Minimal Setup
 
 Register the runtime in `Program.cs`:
@@ -97,3 +95,16 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 - [Beta testing](docs/beta-testing.md)
 - [Starter sample](samples/AgentBlazor.Starter/README.md)
 - [Advanced CLI](docs/advanced/cli.md)
+
+## Beta
+
+If you are doing a first-pass install review, use the narrow beta path:
+
+1. install the package
+2. wire one support route
+3. submit one prompt
+4. report the first point of friction
+
+Start here:
+
+- [Beta testing](docs/beta-testing.md)

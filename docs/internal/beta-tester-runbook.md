@@ -24,6 +24,9 @@ Send only these links:
 - repo root README
 - `docs/beta-testing.md`
 - support-inbox live demo route
+- direct issue forms:
+  - `/issues/new?template=install-friction.yml`
+  - `/issues/new?template=beta-feedback.yml`
 
 Do not send internal roadmap docs.
 
@@ -61,14 +64,26 @@ Do not expand scope before freeze for:
 For each tester capture:
 
 - name or handle
+- date contacted
 - app type tested
 - SDK version
 - pass/fail on install
 - pass/fail on build
 - pass/fail on prompt result
+- pass/fail on approval understanding
 - first confusion point
 - first blocker
 - issue link
+
+## Fast Operator Reply
+
+If a tester asks what to do, answer with this exact path:
+
+1. create a fresh Blazor app
+2. run `dotnet add package AgentBlazor --version 0.1.0-preview.10`
+3. follow `docs/quickstart.md`
+4. test the support-inbox shape only
+5. submit feedback through one of the issue forms
 
 ## Freeze Rule
 

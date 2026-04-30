@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Beta testing guide
+    url: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/beta-testing.md
+    about: Use the 20-minute beta path before opening an issue.
+  - name: Support-inbox demo source
+    url: https://github.com/ashpeterson/AgentBlazor/tree/master/demo/AgentBlazor.Demo
+    about: Reference the launch-path demo shape while testing.
