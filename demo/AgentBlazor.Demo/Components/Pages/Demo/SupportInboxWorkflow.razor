@@ -14,40 +14,11 @@
         </MudText>
 
         <div class="demo-doc-page__prompt-row">
+            <span>Ask the agent to: </span>
             <span>Show open tickets from this week</span>
             <span>Explain why they need attention</span>
             <span>Draft a reply for ticket TCK-1042</span>
         </div>
-
-        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="mt-4">
-            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
-                Window: @Workflow.CurrentReviewWindowDays days
-            </MudChip>
-            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">
-                Highlighted tickets: @Workflow.HighlightedTicketIds.Count
-            </MudChip>
-            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">
-                Escalated: @Workflow.EscalatedTicketIds.Count
-            </MudChip>
-            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">
-                Approval: @(Workflow.CurrentDraft is null ? "not reached" : "draft ready")
-            </MudChip>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => FocusOpenAsync(7))">
-                Show this week's tickets
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ExplainFocusedAsync">
-                Explain queue
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="PrepareDraftAsync">
-                Draft reply
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="EscalateAsync">
-                Escalate blockers
-            </MudButton>
-            <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="ResetAsync">
-                Reset
-            </MudButton>
-        </MudStack>
     </MudPaper>
 
     <section class="demo-doc-page__section">
@@ -99,7 +70,7 @@
             <MudItem xs="12" xl="5">
                 <MudStack Spacing="2">
                     <WorkflowDecisionSupport Title="Decision support"
-                                             Description="Queue focus, blockers, and reply readiness."
+                                             
                                              PhaseLabel="@GetWorkflowPhase()"
                                              ApprovalBoundarySummary="@(Workflow.CurrentDraft is null ? "not reached" : "draft ready")"
                                              NextStepSummary="@GetNextStepSummary()"

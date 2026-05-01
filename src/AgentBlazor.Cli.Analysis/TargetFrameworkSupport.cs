@@ -31,7 +31,7 @@ internal static class TargetFrameworkSupport
 
     internal static bool IsSupported(string targetFramework)
         => SupportedFrameworks.Contains(Normalize(targetFramework), StringComparer.OrdinalIgnoreCase);
-
+https://localhost:7145/docs/troubleshooting
     internal static string Normalize(string targetFramework)
     {
         var value = targetFramework.Trim();
