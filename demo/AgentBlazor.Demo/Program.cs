@@ -1,10 +1,13 @@
 using AgentBlazor;
+using AgentBlazor.Demo.Configuration;
 using AgentBlazor.Demo.Components;
 using AgentBlazor.Demo.Data;
 using AgentBlazor.Demo.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseStaticWebAssets();
@@ -26,10 +29,13 @@ builder.Services.AddScoped<SupplierComplianceWorkflowService>();
 builder.Services.AddScoped<SupportInboxWorkflowService>();
 builder.Services.AddScoped<ResponseOrchestrationWorkflowService>();
 builder.Services.AddScoped<ReleaseDossierWorkflowService>();
+builder.Services.Configure<DemoSecurityOptions>(builder.Configuration.GetSection(DemoSecurityOptions.SectionName));
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
 builder.Services.AddHttpClient("demo-remote-storage");
 builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
 
+var demoSecurityOptions = builder.Configuration.GetSection(DemoSecurityOptions.SectionName).Get<DemoSecurityOptions>()
+    ?? new DemoSecurityOptions();
 var proLicenseKey = builder.Configuration["AgentBlazor:LicenseKey"]
     ?? Environment.GetEnvironmentVariable("AGENTBLAZOR_LICENSE_KEY");
 var proDataDirectory = builder.Configuration["AgentBlazor:DataDirectory"]
@@ -38,16 +44,20 @@ var proDataDirectory = builder.Configuration["AgentBlazor:DataDirectory"]
 var openAiModel = FirstConfigured(builder.Configuration["OpenAI:Model"], "gpt-4o-mini")!;
 var openAiApiKey = FirstConfigured(
     Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+    Environment.GetEnvironmentVariable("OpenAI__ApiKey"),
     builder.Configuration["OpenAI:ApiKey"]);
 var ollamaModel = FirstConfigured(
     Environment.GetEnvironmentVariable("OLLAMA_MODEL"),
+    Environment.GetEnvironmentVariable("Ollama__Model"),
     builder.Configuration["Ollama:Model"]);
 var ollamaEndpoint = FirstConfigured(
     Environment.GetEnvironmentVariable("OLLAMA_ENDPOINT"),
+    Environment.GetEnvironmentVariable("Ollama__Endpoint"),
     builder.Configuration["Ollama:Endpoint"],
     "http://127.0.0.1:11434/v1")!;
 var ollamaApiKey = FirstConfigured(
     Environment.GetEnvironmentVariable("OLLAMA_API_KEY"),
+    Environment.GetEnvironmentVariable("Ollama__ApiKey"),
     builder.Configuration["Ollama:ApiKey"]);
 var workflowConnectionString = builder.Configuration.GetConnectionString("DemoWorkflow")
     ?? "Data Source=agentblazor-demo.db";
@@ -55,6 +65,67 @@ var sharedAgentInstructionsPath = Path.Combine(builder.Environment.ContentRootPa
 var sharedAgentInstructions = File.Exists(sharedAgentInstructionsPath)
     ? File.ReadAllText(sharedAgentInstructionsPath)
     : null;
+
+var hasOpenAiProvider = !string.IsNullOrWhiteSpace(openAiApiKey);
+var hasOllamaProvider = !string.IsNullOrWhiteSpace(ollamaModel);
+
+if (!builder.Environment.IsDevelopment() &&
+    demoSecurityOptions.RequireProviderInProduction &&
+    !hasOpenAiProvider &&
+    !(demoSecurityOptions.AllowOllamaInProduction && hasOllamaProvider))
+{
+    throw new InvalidOperationException(
+        "The live demo requires a configured provider. Set OPENAI_API_KEY (recommended) or explicitly enable an Ollama production fallback.");
+}
+
+builder.Services.PostConfigure<DemoRemoteStorageOptions>(options =>
+{
+    options.HttpBaseUrl = FirstConfigured(
+        Environment.GetEnvironmentVariable("DEMO_REMOTE_STORAGE_HTTP_BASE_URL"),
+        options.HttpBaseUrl);
+    options.HttpApiKey = FirstConfigured(
+        Environment.GetEnvironmentVariable("DEMO_REMOTE_STORAGE_HTTP_API_KEY"),
+        options.HttpApiKey);
+    options.HttpBearerToken = FirstConfigured(
+        Environment.GetEnvironmentVariable("DEMO_REMOTE_STORAGE_HTTP_BEARER_TOKEN"),
+        options.HttpBearerToken);
+});
+
+if (demoSecurityOptions.TrustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync(
+            """{"error":"Rate limit exceeded. Try again in a moment."}""",
+            token);
+    };
+
+    options.AddPolicy(DemoSecurityOptions.AgentEndpointRateLimitPolicyName, httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = Math.Max(1, demoSecurityOptions.RateLimiting.PermitLimit),
+            Window = TimeSpan.FromSeconds(Math.Max(1, demoSecurityOptions.RateLimiting.WindowSeconds)),
+            QueueLimit = Math.Max(0, demoSecurityOptions.RateLimiting.QueueLimit),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            AutoReplenishment = true
+        });
+    });
+});
 
 builder.Services.AddDbContextFactory<DemoWorkflowDbContext>(options =>
     options.UseSqlite(workflowConnectionString));
@@ -216,15 +287,27 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+if (demoSecurityOptions.TrustForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-app.MapAgentBlazorEndpoints();
+var agentEndpoints = app.MapAgentBlazorEndpoints();
+
+if (demoSecurityOptions.RateLimiting.Enabled)
+{
+    agentEndpoints.RequireRateLimiting(DemoSecurityOptions.AgentEndpointRateLimitPolicyName);
+}
 
 app.Run();
 
