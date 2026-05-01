@@ -20,7 +20,7 @@ module.exports = defineConfig({
     video: "retain-on-failure"
   },
   webServer: {
-    command: "/usr/bin/env AGENTBLAZOR_LICENSE_KEY=AB-PRO-VALID-KEY-12345678 AGENTBLAZOR_DATA_DIRECTORY=./artifacts/playwright-paid-data dotnet run --project ../../demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj -c Release --no-build --no-restore --no-launch-profile -p:RuntimeIdentifier=linux-x64 --urls http://127.0.0.1:5188",
+    command: "/usr/bin/env ASPNETCORE_ENVIRONMENT=Development AGENTBLAZOR_LICENSE_KEY=AB-PRO-VALID-KEY-12345678 AGENTBLAZOR_DATA_DIRECTORY=./artifacts/playwright-paid-data dotnet run --project ../../demo/AgentBlazor.Demo/AgentBlazor.Demo.csproj -c Release --no-build --no-restore --no-launch-profile -p:RuntimeIdentifier=linux-x64 --urls http://127.0.0.1:5188",
     url: "http://127.0.0.1:5188/demo/workflows/response-orchestration?reset=true",
     timeout: 180000,
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "1"
