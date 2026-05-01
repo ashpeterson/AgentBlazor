@@ -228,7 +228,7 @@
 }
 
 .demo-shell__assistant-widget {
-    display: none;
+    display: block;
 }
 
 #blazor-error-ui {
