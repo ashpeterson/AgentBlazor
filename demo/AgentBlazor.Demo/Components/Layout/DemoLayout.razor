@@ -66,7 +66,7 @@
     </div>
 </div>
 
-@if (!ShowAssistantPane)
+@if (ShowAssistantWidget)
 {
     @if (_assistantClientId is not null)
     {
@@ -77,10 +77,10 @@
                          EnableGeneratedUi="true"
                          Placeholder="@AssistantPlaceholder"
                          Theme="_assistantTheme"
-                         Width="26rem"
-                         Height="68vh"
-                         Right="0.85rem"
-                         Bottom="0.85rem"
+                         Width="@AssistantWidgetWidth"
+                         Height="@AssistantWidgetHeight"
+                         Right="@AssistantWidgetRight"
+                         Bottom="@AssistantWidgetBottom"
                          CssClass="demo-shell__assistant-widget" />
     }
 }
@@ -153,7 +153,21 @@
     private bool IsReleaseDossierRoute => CurrentRoutePath.StartsWith("/demo/workflows/release-dossier", StringComparison.OrdinalIgnoreCase);
     private bool IsRuntimeProbeRoute => CurrentRoutePath.StartsWith("/demo/workflows/runtime-probe", StringComparison.OrdinalIgnoreCase);
 
-    private bool ShowAssistantPane => IsWorkflowRoute && !IsComponentsRoute;
+    private bool ShowAssistantPane => IsWorkflowRoute && !IsComponentsRoute && !IsSupportInboxRoute;
+    private bool ShowAssistantWidget => !ShowAssistantPane;
+
+    private string AssistantWidgetWidth =>
+        IsSupportInboxRoute
+            ? "32rem"
+            : "26rem";
+
+    private string AssistantWidgetHeight =>
+        IsSupportInboxRoute
+            ? "80vh"
+            : "68vh";
+
+    private string AssistantWidgetRight => "0.85rem";
+    private string AssistantWidgetBottom => "0.85rem";
 
     private string AssistantTitle =>
         IsWorkflowHubRoute
