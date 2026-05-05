@@ -33,11 +33,17 @@
         <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10
 
 builder.Services.AddMudServices();
-builder.Services.AddAgentBlazor(...);
+builder.Services.AddAgentBlazor(options =&gt; { ... });
 app.MapAgentBlazorEndpoints();
 
+// You must also register one workflow agent.
+options.ConfigureBuilder(agentBuilder =&gt;
+{
+    agentBuilder.AddWorkflow&lt;HelloWorkflow&gt;("hello-workflow");
+});
+
 @@using AgentBlazor.Components
-&lt;AgentChatWidget Title="Support inbox" /&gt;</code></pre>
+&lt;AgentBlazorShell /&gt;</code></pre>
     </section>
 
     <section class="docs-section">

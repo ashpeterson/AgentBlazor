@@ -29,14 +29,24 @@ public sealed class AgentBlazorRegistrationOptions
 
     public void UseOpenAI(string apiKey, string model = "gpt-4o-mini")
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new AgentBlazorConfigurationException(
+                "OpenAI API key is not configured. Set 'OpenAI:ApiKey' in app configuration or provide 'OPENAI_API_KEY'/'OpenAI__ApiKey' before calling options.UseOpenAI(...).");
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         _providerRegistration = services => services.AddOpenAIProvider(model, apiKey);
     }
 
     public void UseOpenAI(string apiKey, string model, string endpoint)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new AgentBlazorConfigurationException(
+                "OpenAI API key is not configured. Set 'OpenAI:ApiKey' in app configuration or provide 'OPENAI_API_KEY'/'OpenAI__ApiKey' before calling options.UseOpenAI(...).");
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
         _providerRegistration = services => services.AddOpenAIProvider(model, apiKey, endpoint);

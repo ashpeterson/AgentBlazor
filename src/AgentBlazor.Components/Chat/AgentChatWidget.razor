@@ -36,7 +36,7 @@
 
         <div class="ab-chat-widget__window-body">
             <AgentChatSurface Title="@Title"
-                             Description="@Description"
+                             Description="@EffectiveDescription"
                              FormName="@FormName"
                              DefaultAgentName="@DefaultAgentName"
                              ShowAgentSelector="@ShowAgentSelector"
@@ -80,8 +80,7 @@
     public string? Title { get; set; } = "AgentBlazor Chat Widget";
 
     [Parameter]
-    public string? Description { get; set; } =
-        "Built-in component-aware agent is active by default. You can also select custom registered agents.";
+    public string? Description { get; set; }
 
     [Parameter]
     public string BubbleLabel { get; set; } = "Ask Agent";
@@ -173,6 +172,11 @@
     private string HeaderLabelId => $"ab-chat-widget-header-{_instanceId}";
 
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
+
+    private string EffectiveDescription =>
+        !string.IsNullOrWhiteSpace(Description)
+            ? Description
+            : "Register an agent with ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) before expecting the widget to respond.";
 
     private string HostStyle
     {

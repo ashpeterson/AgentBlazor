@@ -74,6 +74,20 @@ public class ProviderAdapterIntegrationTests
     }
 
     [Fact]
+    public void AddAgentBlazor_WithUseOpenAIAndMissingApiKey_ThrowsConfigurationException()
+    {
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<AgentBlazorConfigurationException>(() =>
+            AgentBlazorServiceExtensions.AddAgentBlazor(
+                services,
+                options => options.UseOpenAI("", DefaultOpenAiModel)));
+
+        Assert.Contains("OpenAI:ApiKey", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("OPENAI_API_KEY", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OpenAiProvider_RegistersFrameworkChatClient()
     {
         var services = new ServiceCollection();

@@ -9,7 +9,7 @@
        role="complementary"
        aria-label="@(Title ?? "Agent chat panel")">
     <AgentChatSurface Title="@Title"
-                      Description="@Description"
+                      Description="@EffectiveDescription"
                       FormName="@FormName"
                       DefaultAgentName="@DefaultAgentName"
                       ShowAgentSelector="@ShowAgentSelector"
@@ -44,8 +44,7 @@
     public string? Title { get; set; } = "Agent Assistant";
 
     [Parameter]
-    public string? Description { get; set; } =
-        "Built-in component-aware agent is active by default. You can also select custom registered agents.";
+    public string? Description { get; set; }
 
     [Parameter]
     public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
@@ -109,6 +108,11 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    private string EffectiveDescription =>
+        !string.IsNullOrWhiteSpace(Description)
+            ? Description
+            : "Register an agent with ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) before expecting the panel to respond.";
 
     private string _panelStyle
     {

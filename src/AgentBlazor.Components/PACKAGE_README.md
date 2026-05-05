@@ -46,6 +46,8 @@ app.MapRazorComponents<App>()
 app.MapAgentBlazorEndpoints();
 ```
 
+`AddAgentBlazor(...)` alone does not create a responding agent. Register at least one workflow or agent inside `options.ConfigureBuilder(...)`.
+
 ```csharp
 [AgentCapability("support_inbox")]
 public sealed class SupportInboxCapabilities

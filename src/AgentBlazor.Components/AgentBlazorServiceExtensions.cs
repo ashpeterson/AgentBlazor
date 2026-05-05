@@ -103,7 +103,7 @@ public static class AgentBlazorServiceExtensions
         this IEndpointRouteBuilder endpoints,
         string pattern = "/agentblazor/agui/run")
     {
-        return AgentBlazor.Hosting.AgentBlazorAgUiEndpointRouteBuilderExtensions.MapAgentBlazorEndpoints(
+        return AgentBlazor.Hosting.AgentBlazorAgUiEndpointRouteBuilderExtensions.MapAgentBlazorAgUiRun(
             endpoints,
             pattern);
     }
