@@ -1,7 +1,5 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
-@using AgentBlazor.Agents
-@inject IAgentRegistry AgentRegistry
 
 <aside class="ab-chat-panel @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
        data-theme="@(Theme?.DataTheme)"
@@ -114,9 +112,7 @@
     private string EffectiveDescription =>
         !string.IsNullOrWhiteSpace(Description)
             ? Description
-            : AgentRegistry.GetAll().Count > 0
-                ? "Select a registered agent or lock this panel to the current route."
-                : "No agents registered. Call ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) during AddAgentBlazor setup.";
+            : "Register an agent with ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) before expecting the panel to respond.";
 
     private string _panelStyle
     {

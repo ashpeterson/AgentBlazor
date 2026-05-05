@@ -1,12 +1,10 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
-@using AgentBlazor.Agents
 @using AgentBlazor.Core.Runtime.Agents
 @using AgentBlazor.Runtime
 @using Microsoft.AspNetCore.Components.Web
 @implements IDisposable
 @inject IAgentChatWidgetState WidgetState
-@inject IAgentRegistry AgentRegistry
 
 <section class="ab-chat-widget @(WidgetState.IsOpen ? "ab-chat-widget--open" : null) @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
          data-theme="@(Theme?.DataTheme)"
@@ -178,9 +176,7 @@
     private string EffectiveDescription =>
         !string.IsNullOrWhiteSpace(Description)
             ? Description
-            : AgentRegistry.GetAll().Count > 0
-                ? "Select a registered agent or lock this widget to the current route."
-                : "No agents registered. Call ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) during AddAgentBlazor setup.";
+            : "Register an agent with ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) before expecting the widget to respond.";
 
     private string HostStyle
     {
