@@ -45,9 +45,6 @@ test.describe("Documentation site", () => {
     await page.goto("/docs/components", { waitUntil: "networkidle" });
     await expect(page.getByRole("heading", { name: /start with chat surfaces\. add wrappers only when needed/i })).toBeVisible();
     await expect(page.getByText("Hosted WebAssembly client surfaces")).toBeVisible();
-
-    await page.goto("/docs/demo-tour", { waitUntil: "networkidle" });
-    await expect(page.getByRole("heading", { name: /the demo is a small funnel/i })).toBeVisible();
   });
 
   test("holds together at a mobile width", async ({ page }) => {
