@@ -6,8 +6,7 @@ const workflowScenarios = [
     name: "support inbox",
     route: "/demo/workflows/support-inbox",
     heading: /Support inbox/i,
-    marker: "Ticket queue",
-    button: "Show this week's tickets"
+    marker: "Ticket queue"
   },
   {
     name: "response orchestration",
