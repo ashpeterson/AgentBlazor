@@ -1,5 +1,7 @@
 @namespace AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Agents
+@inject IAgentRegistry AgentRegistry
 
 <aside class="ab-chat-panel @(Theme?.CssClass) @(Theme?.GetFeatureClasses())"
        data-theme="@(Theme?.DataTheme)"
@@ -9,7 +11,7 @@
        role="complementary"
        aria-label="@(Title ?? "Agent chat panel")">
     <AgentChatSurface Title="@Title"
-                      Description="@Description"
+                      Description="@EffectiveDescription"
                       FormName="@FormName"
                       DefaultAgentName="@DefaultAgentName"
                       ShowAgentSelector="@ShowAgentSelector"
@@ -44,8 +46,7 @@
     public string? Title { get; set; } = "Agent Assistant";
 
     [Parameter]
-    public string? Description { get; set; } =
-        "Built-in component-aware agent is active by default. You can also select custom registered agents.";
+    public string? Description { get; set; }
 
     [Parameter]
     public string Placeholder { get; set; } = "Type a message… (Enter to send, Shift+Enter for new line)";
@@ -109,6 +110,13 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    private string EffectiveDescription =>
+        !string.IsNullOrWhiteSpace(Description)
+            ? Description
+            : AgentRegistry.GetAll().Count > 0
+                ? "Select a registered agent or lock this panel to the current route."
+                : "No agents registered. Call ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) during AddAgentBlazor setup.";
 
     private string _panelStyle
     {

@@ -5,14 +5,11 @@
         <AgentDialogProvider>
             <AgentSnackbarProvider>
                 <section class="ab-shell">
-                    @if (ChildContent is null)
-                    {
-                        <AgentChatWidget />
-                    }
-                    else
+                    @if (ChildContent is not null)
                     {
                         @ChildContent
                     }
+                    <AgentChatWidget />
                 </section>
             </AgentSnackbarProvider>
         </AgentDialogProvider>

@@ -8,11 +8,6 @@ namespace AgentBlazor.Hosting;
 
 public static class AgentBlazorAgUiEndpointRouteBuilderExtensions
 {
-    public static IEndpointConventionBuilder MapAgentBlazorEndpoints(
-        this IEndpointRouteBuilder endpoints,
-        string pattern = "/agentblazor/agui/run")
-        => endpoints.MapAgentBlazorAgUiRun(pattern);
-
     public static IEndpointConventionBuilder MapAgentBlazorAgUiRun(
         this IEndpointRouteBuilder endpoints,
         string pattern = "/agentblazor/agui/run")

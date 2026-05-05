@@ -795,7 +795,13 @@
             return;
 
         if (_agentNames.Count == 0)
+        {
+            _timeline.Add(ChatTimelineItem.Activity(
+                "No agents are registered. Add a workflow with ConfigureBuilder(builder => builder.AddWorkflow<T>(\"agent-name\")) in your AddAgentBlazor setup."));
+            _scrollRequested = true;
+            StateHasChanged();
             return;
+        }
 
         if (TryHandleAgentListCommand(message))
         {
