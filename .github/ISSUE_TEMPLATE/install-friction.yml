@@ -8,7 +8,7 @@ body:
     id: command
     attributes:
       label: Command that failed
-      placeholder: dotnet add package AgentBlazor --version 0.1.0-preview.10
+      placeholder: dotnet add package AgentBlazor --version 0.1.0-preview.11
     validations:
       required: true
   - type: input

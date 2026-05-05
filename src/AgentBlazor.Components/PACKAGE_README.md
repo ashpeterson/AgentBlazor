@@ -11,7 +11,7 @@ dotnet add package AgentBlazor --prerelease
 Current public releases are prerelease builds. If you prefer a pinned install, use:
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.10
+dotnet add package AgentBlazor --version 0.1.0-preview.11
 ```
 
 If `dotnet` still probes an old custom package source on your machine, remove or disable that source before testing the public NuGet install path.
@@ -47,6 +47,8 @@ app.MapAgentBlazorEndpoints();
 ```
 
 `AddAgentBlazor(...)` alone does not create a responding agent. Register at least one workflow or agent inside `options.ConfigureBuilder(...)`.
+
+For the current public preview, mount `AgentChatWidget` directly in an interactive layout or page. The `AgentBlazorShell` child-content/widget fix lands in the next preview.
 
 ```csharp
 [AgentCapability("support_inbox")]

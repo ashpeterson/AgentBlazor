@@ -38,7 +38,7 @@ Post 4:
 Install path:
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.10
+dotnet add package AgentBlazor --version 0.1.0-preview.11
 ```
 
 CLI exists, but it is the advanced path, not the headline.

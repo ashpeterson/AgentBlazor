@@ -114,7 +114,7 @@ function renderTitleCard(outputPath, config) {
     `drawtext=fontfile=${fontBold}:text='${safeTitle}':x=896:y=208:fontsize=${titleSize}:line_spacing=8:fontcolor=white`,
     `drawtext=fontfile=${fontRegular}:text='${safeBody}':x=896:y=336:fontsize=${bodySize}:fontcolor=white@0.80`,
     `drawtext=fontfile=${fontBold}:text='dotnet new blazor -n FreshAgentBlazor':x=112:y=164:fontsize=22:fontcolor=white@0.82`,
-    `drawtext=fontfile=${fontRegular}:text='dotnet add package AgentBlazor --version 0.1.0-preview.10':x=112:y=208:fontsize=18:fontcolor=white@0.58`,
+    `drawtext=fontfile=${fontRegular}:text='dotnet add package AgentBlazor --version 0.1.0-preview.11':x=112:y=208:fontsize=18:fontcolor=white@0.58`,
     `drawtext=fontfile=${fontRegular}:text='Install. Mount one workflow. Watch the UI move.' :x=112:y=578:fontsize=22:fontcolor=white@0.72`,
     `fade=t=in:st=0:d=0.2,fade=t=out:st=${Math.max(0.1, config.duration - 0.25).toFixed(2)}:d=0.2`
   ].join(",");
