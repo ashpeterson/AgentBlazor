@@ -37,7 +37,7 @@ What it does not try to do at launch:
 The first install path is now the normal one:
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.10
+dotnet add package AgentBlazor --version 0.1.0-preview.11
 ```
 
 Then wire `AddAgentBlazor(...)`, map `MapAgentBlazorEndpoints()`, add one capability class, and mount one chat surface.

@@ -30,5 +30,5 @@ Inside this repo, the starter defaults to local source-project references so the
 To validate the published package path from inside the repo:
 
 ```powershell
-dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.10
+dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj -p:UseLocalAgentBlazorSource=false -p:AgentBlazorPackageVersion=0.1.0-preview.11
 ```

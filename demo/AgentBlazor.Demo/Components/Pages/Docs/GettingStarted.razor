@@ -20,7 +20,7 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10</code></pre>
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.11</code></pre>
     </section>
 
     <section class="docs-section">
@@ -30,7 +30,7 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.10
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.11
 
 builder.Services.AddMudServices();
 builder.Services.AddAgentBlazor(options =&gt; { ... });
@@ -43,7 +43,7 @@ options.ConfigureBuilder(agentBuilder =&gt;
 });
 
 @@using AgentBlazor.Components
-&lt;AgentBlazorShell /&gt;</code></pre>
+&lt;AgentChatWidget @@rendermode="InteractiveServer" Title="Hello workflow" /&gt;</code></pre>
     </section>
 
     <section class="docs-section">
@@ -81,7 +81,7 @@ app.MapAgentBlazorEndpoints();</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.10
+        <pre class="docs-code"><code>dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.11
 agentblazor init ./MySolution.slnx --host MyBlazorApp
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
@@ -96,7 +96,7 @@ dotnet build ./MySolution.slnx --no-restore -nologo</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.10
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp.Client/MyBlazorApp.Client.csproj package AgentBlazor.Client --version 0.1.0-preview.11
 
 // Server
 app.MapAgentBlazorEndpoints();

@@ -9,7 +9,7 @@ AgentBlazor gives a Blazor route a chat surface, explicit capabilities, approval
 ## Install
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.10
+dotnet add package AgentBlazor --version 0.1.0-preview.11
 ```
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
