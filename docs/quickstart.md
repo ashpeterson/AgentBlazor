@@ -40,9 +40,9 @@ var app = builder.Build();
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.MapStaticAssets();
-app.MapAgentBlazorEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+app.MapAgentBlazorEndpoints();
 
 app.Run();
 ```
@@ -58,18 +58,36 @@ app.Run();
 ```razor
 <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
 <link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
-<script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
-<script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+...
+<HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+    <script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
+</body>
 ```
 
 ## Components/Layout/MainLayout.razor
 
 ```razor
 @inherits LayoutComponentBase
+@using MudBlazor
 
-<AgentBlazorShell>
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="page">
     @Body
-</AgentBlazorShell>
+</div>
+
+<AgentChatWidget
+    Title="Hello workflow"
+    Placeholder="Ask the agent to say hello..." />
 ```
 
 ## Workflows/HelloWorkflow.cs
@@ -77,6 +95,8 @@ app.Run();
 ```csharp
 using AgentBlazor.App;
 using AgentBlazor.Attributes;
+
+namespace MyApp.Workflows;
 
 [AgentCapability("hello_workflow")]
 public sealed class HelloWorkflow
@@ -113,7 +133,13 @@ dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
 dotnet run
 ```
 
-You should see the floating widget. Open it and ask: `Say hello`.
+You should see the floating widget in the bottom-right corner. Open it and ask: `Say hello`.
+
+## Notes
+
+- `MapAgentBlazorEndpoints()` is required or the chat UI will render without a working runtime endpoint.
+- The current public package requires an explicit workflow or agent registration before the chat can respond.
+- `AgentBlazorShell` is not the public quickstart path until the next preview release lands its child-content/widget fix.
 
 ## Next
 

@@ -48,6 +48,8 @@ app.MapAgentBlazorEndpoints();
 
 `AddAgentBlazor(...)` alone does not create a responding agent. Register at least one workflow or agent inside `options.ConfigureBuilder(...)`.
 
+For the current public preview, mount `AgentChatWidget` directly in an interactive layout or page. The `AgentBlazorShell` child-content/widget fix lands in the next preview.
+
 ```csharp
 [AgentCapability("support_inbox")]
 public sealed class SupportInboxCapabilities
