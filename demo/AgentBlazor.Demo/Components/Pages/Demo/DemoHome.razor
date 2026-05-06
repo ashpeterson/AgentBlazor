@@ -10,18 +10,24 @@
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Live demo</MudChip>
             <MudText Typo="Typo.h4" Class="mt-4 mb-2">One normal app screen. One support queue.</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Start with the reel, then open the route and run the same ticket flow live: find open tickets, explain the queue, draft a reply, and escalate blockers.
+                Open the support queue and run a concrete ticket flow live: find open tickets, explain the queue, draft a reply, and cross the approval boundary.
             </MudText>
         </div>
 
         <div class="launchpad__feature-grid">
             <article class="launchpad__feature-card">
-                <div class="launchpad__feature-frame">
-                    <video controls preload="metadata" playsinline poster="/videos/agentblazor-capability-reel-poster.jpg" src="/videos/agentblazor-capability-reel.mp4"></video>
+                <div class="launchpad__quickstart-card" aria-label="AgentBlazor quickstart">
+                    <span class="launchpad__eyebrow">Minimal setup</span>
+                    <h2>NuGet package, one workflow, one widget.</h2>
+                    <ol>
+                        <li><code>dotnet add package AgentBlazor --prerelease</code></li>
+                        <li><code>AddAgentBlazor(...).AddWorkflow&lt;HelloWorkflow&gt;("hello-workflow")</code></li>
+                        <li><code>&lt;AgentChatWidget Title="Assistant" /&gt;</code></li>
+                    </ol>
                 </div>
                 <div class="launchpad__feature-copy">
-                    <strong>AgentBlazor in one reel</strong>
-                    <p>CLI install, support-queue workflow code, then a live reply draft and approval boundary on a real Blazor page.</p>
+                    <strong>What to look for in the live route</strong>
+                    <p>The agent reads the current support queue, plans an action, requests approval for the reply draft, then updates the page after approval.</p>
                 </div>
             </article>
 

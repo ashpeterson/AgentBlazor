@@ -12,7 +12,7 @@
     min-height: calc(100svh - 10rem);
 }
 
-.landing-page__hero-player {
+.landing-page__quickstart {
     display: grid;
     gap: 0.9rem;
     padding: 1.1rem;
@@ -25,20 +25,71 @@
     box-shadow: 0 42px 110px rgba(0, 0, 0, 0.3);
 }
 
-.landing-page__hero-frame {
-    overflow: hidden;
-    border-radius: 1.35rem;
-    background: #020610;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    aspect-ratio: 16 / 9;
+.landing-page__quickstart-header {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.3rem 0.2rem;
 }
 
-.landing-page__hero-frame video {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: #020610;
+.landing-page__quickstart-eyebrow {
+    color: #8fc5ff;
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.landing-page__quickstart-header h2 {
+    margin: 0;
+    color: #f1f7ff;
+    font-size: clamp(1.6rem, 3vw, 2.35rem);
+    line-height: 1.02;
+}
+
+.landing-page__quickstart-header p {
+    max-width: 35rem;
+    margin: 0;
+    color: rgba(224, 236, 252, 0.75);
+    line-height: 1.55;
+}
+
+.landing-page__quickstart-steps {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.landing-page__quickstart-steps li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.8rem;
+    border-radius: 1rem;
+    background: rgba(2, 7, 16, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-page__quickstart-steps li span {
+    display: inline-grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 999px;
+    background: rgba(255, 106, 61, 0.18);
+    color: #ffb097;
+    font-size: 0.82rem;
+    font-weight: 900;
+}
+
+.landing-page__quickstart-steps code {
+    overflow: hidden;
+    color: #d8eaff;
+    font-size: 0.86rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .landing-page__hero-meta {
@@ -59,6 +110,26 @@
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.025em;
+}
+
+.landing-page__hero-meta a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(234, 242, 252, 0.88);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.025em;
+    text-decoration: none;
+}
+
+.landing-page__hero-meta a:hover {
+    border-color: rgba(143, 197, 255, 0.42);
+    color: #ffffff;
 }
 
 @media (max-width: 700px) {
