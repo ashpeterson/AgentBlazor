@@ -1,0 +1,15 @@
+.git
+.github
+.tmp
+.vs
+.vscode
+artifacts
+test-results
+**/bin
+**/obj
+**/TestResults
+**/*.user
+**/*.suo
+**/*.nupkg
+**/*.snupkg
+**/.DS_Store
