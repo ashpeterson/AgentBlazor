@@ -9,10 +9,12 @@ test.describe("Landing page", () => {
     await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Live Demo", exact: true })).toBeVisible();
     await expect(page.locator("#hero").getByRole("link", { name: "Docs" })).toBeVisible();
     await expect(page.locator("#hero").getByRole("link", { name: "Live demo" })).toBeVisible();
-    await expect(page.locator(".landing-page__hero-meta")).toContainText("CLI install");
-    await expect(page.locator(".landing-page__hero-meta")).toContainText("Support workflow code");
-    await expect(page.locator(".landing-page__hero-meta")).toContainText("Reply draft with approval");
-    await expect(page.locator(".landing-page__hero-frame video")).toHaveAttribute("src", "/videos/agentblazor-capability-reel.mp4");
+    await expect(page.locator(".landing-page__quickstart")).toContainText("Quickstart");
+    await expect(page.locator(".landing-page__quickstart")).toContainText("dotnet add package AgentBlazor --prerelease");
+    await expect(page.locator(".landing-page__quickstart")).toContainText("AgentChatWidget");
+    await expect(page.locator(".landing-page__hero-meta").getByRole("link", { name: "Read quickstart" })).toBeVisible();
+    await expect(page.locator(".landing-page__hero-meta").getByRole("link", { name: "Try live demo" })).toBeVisible();
+    await expect(page.locator(".landing-page__quickstart video")).toHaveCount(0);
     await expect(page.locator(".landing-page__support-strip")).toHaveCount(0);
 
     await page.locator("#hero").getByRole("link", { name: "Docs" }).click();
