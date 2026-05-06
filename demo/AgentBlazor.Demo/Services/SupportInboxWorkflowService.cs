@@ -45,9 +45,16 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
         });
     }
 
-    [AgentAction("Draft a reply for the highlighted tickets", ActionId = "draft_ticket_reply", RequiresApproval = true)]
-    public Task<CapabilityResult> DraftReplyAsync()
+    [AgentAction("Draft a reply for a ticket or the highlighted tickets", ActionId = "draft_ticket_reply", RequiresApproval = true)]
+    public Task<CapabilityResult> DraftReplyAsync(
+        [AgentParam("Optional ticket id to draft a reply for, for example TCK-1042", Required = false)] string? ticketId = null)
     {
+        if (!string.IsNullOrWhiteSpace(ticketId) && !workflow.FocusTicket(ticketId))
+        {
+            return Task.FromResult(CapabilityResult.NeedsClarification(
+                $"I could not find ticket {ticketId}. Ask me to show open tickets first or choose a visible ticket id."));
+        }
+
         if (!workflow.HighlightedTicketIds.Any())
         {
             return Task.FromResult(CapabilityResult.NeedsClarification(
@@ -161,6 +168,27 @@ internal sealed class SupportInboxWorkflowService
         return _highlightedTicketIds.Count == 0
             ? $"No tickets in the last {CurrentReviewWindowDays} days still need a reply."
             : $"Highlighted {_highlightedTicketIds.Count} tickets from the last {CurrentReviewWindowDays} days that still need a reply.";
+    }
+
+    public bool FocusTicket(string ticketId)
+    {
+        var ticket = _tickets.FirstOrDefault(ticket => string.Equals(ticket.Id, ticketId, StringComparison.OrdinalIgnoreCase));
+        if (ticket is null)
+        {
+            LatestInsight = $"Ticket {ticketId} was not found in the support queue.";
+            NotifyChanged();
+            return false;
+        }
+
+        ShowOnlyHighlighted = true;
+        _highlightedTicketIds.Clear();
+        _highlightedTicketIds.Add(ticket.Id);
+        _latestDraftBlockers.Clear();
+        CurrentDraft = null;
+        IsDraftDialogOpen = false;
+        LatestInsight = BuildInsightSummary(_highlightedTicketIds);
+        NotifyChanged();
+        return true;
     }
 
     public string ExplainFocusedTickets()
