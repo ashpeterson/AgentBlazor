@@ -128,7 +128,7 @@
             @if (Workflow.CurrentDraft is { } draft)
             {
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    This is the approval boundary before the drafted reply is handed back to the queue owner.
+                    The runtime approval is complete. This panel summarizes the prepared draft before it leaves the queue.
                 </MudText>
                 <MudText Typo="Typo.caption" Class="d-block mb-3">
                     Tickets: @string.Join(", ", draft.TicketIds)
@@ -224,7 +224,7 @@
     {
         if (Workflow.CurrentDraft is not null)
         {
-            return "Review the drafted reply and decide whether to approve it.";
+            return "Review the prepared draft in the reply panel.";
         }
 
         if (Workflow.LatestDraftBlockers.Count > 0)
@@ -272,7 +272,7 @@
     {
         if (Workflow.CurrentDraft is not null)
         {
-            return ["Review the reply draft", "Approve the reply draft"];
+            return ["Review the prepared draft", "Send through the normal support workflow"];
         }
 
         if (Workflow.LatestDraftBlockers.Count > 0)

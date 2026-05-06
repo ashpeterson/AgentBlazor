@@ -32,7 +32,7 @@ public class SupportInboxWorkflowIntegrationTests
         Assert.Contains("Escalated", escalationSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Prepared a reply draft", draftSummary, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(workflow.CurrentDraft);
-        Assert.True(workflow.IsDraftDialogOpen);
+        Assert.False(workflow.IsDraftDialogOpen);
         Assert.Empty(workflow.LatestDraftBlockers);
         Assert.Contains("TCK-1055", workflow.EscalatedTicketIds, StringComparer.OrdinalIgnoreCase);
     }
@@ -48,7 +48,7 @@ public class SupportInboxWorkflowIntegrationTests
         Assert.True(result.Succeeded);
         Assert.Contains("Prepared a reply draft", result.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(workflow.CurrentDraft);
-        Assert.True(workflow.IsDraftDialogOpen);
+        Assert.False(workflow.IsDraftDialogOpen);
         Assert.Contains("TCK-1042", workflow.HighlightedTicketIds, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("TCK-1042", workflow.CurrentDraft.TicketIds, StringComparer.OrdinalIgnoreCase);
     }
