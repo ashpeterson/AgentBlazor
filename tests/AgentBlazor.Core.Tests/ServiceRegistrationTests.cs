@@ -721,6 +721,43 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_SuppressesGeneratedUi_WhenRuntimeApprovalIsPending()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<GeneratedUiAndApprovalToolInvokingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<GeneratedUiAndApprovalToolInvokingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalUiContractCapabilities>()
+            .AddAgent("approval-ui-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_ui_contract.draft_reply");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Draft a reply for ticket TCK-1042",
+            AgentName: "approval-ui-agent",
+            SessionId: "approval-ui-contract",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString
+            }));
+
+        Assert.True(response.RequiresApproval);
+        Assert.Null(response.GeneratedUi);
+        Assert.Equal("Approval required for approval_ui_contract.draft_reply.", response.ResponseText);
+
+        var approval = Assert.Single(response.PendingApprovals);
+        Assert.Equal("approval_ui_contract", approval.ComponentId);
+        Assert.Equal("draft_reply", approval.ActionId);
+        Assert.Equal("TCK-1042", approval.Parameters["ticketId"]?.ToString());
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_BlocksImplicitFormSubmitFromGeneratedUiAction()
     {
         var services = new ServiceCollection();
@@ -2162,6 +2199,17 @@ public class ServiceRegistrationTests
             => global::AgentBlazor.App.CapabilityResult.Success("prepared");
     }
 
+    [global::AgentBlazor.App.AgentCapability("approval_ui_contract", Name = "Approval UI Contract")]
+    private sealed class ApprovalUiContractCapabilities
+    {
+        [global::AgentBlazor.Attributes.AgentAction(
+            "Draft a support reply",
+            ActionId = "draft_reply",
+            RequiresApproval = true)]
+        public global::AgentBlazor.App.CapabilityResult DraftReply(string ticketId)
+            => global::AgentBlazor.App.CapabilityResult.Success($"Prepared draft for {ticketId}.");
+    }
+
     private sealed class RecordingChatClient : IChatClient
     {
         private int _callCount;
@@ -2550,6 +2598,60 @@ public class ServiceRegistrationTests
             }), cancellationToken);
 
             return new ChatResponse(new ChatMessage(ChatRole.Assistant, "generated-ui-ready"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class GeneratedUiAndApprovalToolInvokingChatClient : IChatClient
+    {
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var generatedUiTool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    function.Name.Contains("generated_ui_summary_card", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+            await generatedUiTool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["blockId"] = "approval-confirmation",
+                ["title"] = "Approve Draft Reply",
+                ["description"] = "Do you want to approve the draft reply for ticket TCK-1042?"
+            }), cancellationToken);
+
+            var approvalTool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    function.Name.Contains("capability_approval_ui_contract_draft_reply", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+            await approvalTool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["ticketId"] = "TCK-1042"
+            }), cancellationToken);
+
+            return new ChatResponse(new ChatMessage(
+                ChatRole.Assistant,
+                "I can draft the reply, but here is another generated approval request."));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

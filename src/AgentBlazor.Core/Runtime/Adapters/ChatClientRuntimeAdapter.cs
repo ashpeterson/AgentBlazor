@@ -1986,14 +1986,22 @@ public sealed class ChatClientRuntimeAdapter(
         var clarificationQuestion = executionPlan.Steps
             .FirstOrDefault(static step => step.Status is AgentExecutionStepStatus.NeedsClarification)?
             .Message;
+        var pendingApprovals = turnState.GetPendingApprovals();
+        var effectiveResponseText = pendingApprovals.Count > 0
+            ? RuntimePlanApprovals.BuildApprovalRequiredResponseText(pendingApprovals)
+            : RuntimePlanResponses.BuildExecutionResponseText(responseText, executionResults);
+        var generatedUi = pendingApprovals.Count > 0
+            ? null
+            : BuildGeneratedUi(turnState);
+
         return RuntimeTurnResponses.Build(
             agentName,
-            RuntimePlanResponses.BuildExecutionResponseText(responseText, executionResults),
+            effectiveResponseText,
             executionPlan.Steps.Count > 0 ? [] : turnState.GetPlannedActions(),
             responseExecutionResults,
-            generatedUi: BuildGeneratedUi(turnState),
+            generatedUi: generatedUi,
             clarificationQuestion: clarificationQuestion,
-            pendingApprovals: turnState.GetPendingApprovals(),
+            pendingApprovals: pendingApprovals,
             requiresApproval: turnState.RequiresApproval,
             executionPlan: executionPlan);
     }

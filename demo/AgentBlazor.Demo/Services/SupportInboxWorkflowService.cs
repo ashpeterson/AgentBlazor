@@ -93,8 +93,8 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
                     "Draft the reply again once the blockers are cleared"
                 ]
                 : [
-                    "Review the draft reply",
-                    "Approve the reply draft"
+                    "Review the prepared draft",
+                    "Send the reply through the normal support workflow"
                 ]
         };
     }
@@ -241,7 +241,7 @@ internal sealed class SupportInboxWorkflowService
             "Draft customer reply",
             targetedTickets.Select(static ticket => ticket.Id).ToArray(),
             targetedTickets.SelectMany(BuildReplyChecklist).ToArray());
-        IsDraftDialogOpen = true;
+        IsDraftDialogOpen = false;
         LatestInsight = $"Prepared a reply draft for {targetedTickets.Length} highlighted tickets.";
         NotifyChanged();
         return LatestInsight;
