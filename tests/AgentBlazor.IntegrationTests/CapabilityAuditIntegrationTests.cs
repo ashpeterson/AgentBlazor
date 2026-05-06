@@ -52,6 +52,46 @@ public class CapabilityAuditIntegrationTests
     }
 
     [Fact]
+    public async Task CapabilityApprovalContinuation_GlobalApprovalUsesPreservedArgumentKeys()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ApprovalCapabilityChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ApprovalCapabilityChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions(
+                    "approval_workflow.create_complex_change_request",
+                    "approval_workflow.notify_owner");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var approvedResponse = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "Approved. Continue by invoking the approved action(s).",
+            AgentName: "approval-agent",
+            SessionId: "integration-approval-all-args",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentblazor.approvals"] = "all",
+                ["agentblazor.approvalArgs.approval_workflow.create_complex_change_request"] =
+                    """{"request":{"name":"CAB-100","priority":3,"tags":["database","hotfix"]}}""",
+                ["agentblazor.approvalArgs.approval_workflow.notify_owner"] =
+                    """{"owner":"ops","ticketCount":2}"""
+            }));
+
+        var messages = approvedResponse.ExecutionPlan?.Steps
+            .Select(static step => step.Message)
+            .ToArray() ?? [];
+        Assert.Contains("Created 'CAB-100' priority 3 tags database|hotfix.", messages);
+        Assert.Contains("Notified ops about 2 ticket(s).", messages);
+        Assert.False(approvedResponse.RequiresApproval);
+    }
+
+    [Fact]
     public async Task CapabilityExecution_WithAuditLog_DoesNotRequireHttpContextAccessor()
     {
         var services = new ServiceCollection();
@@ -94,7 +134,18 @@ public class CapabilityAuditIntegrationTests
         [AgentAction("Create a change request", ActionId = "create_change_request", RequiresApproval = true)]
         public CapabilityResult CreateChangeRequest(string name = "Default")
             => CapabilityResult.Success($"Created '{name}'.");
+
+        [AgentAction("Create a complex change request", ActionId = "create_complex_change_request", RequiresApproval = true)]
+        public CapabilityResult CreateComplexChangeRequest(ChangeRequest request)
+            => CapabilityResult.Success(
+                $"Created '{request.Name}' priority {request.Priority} tags {string.Join("|", request.Tags)}.");
+
+        [AgentAction("Notify owner", ActionId = "notify_owner", RequiresApproval = true)]
+        public CapabilityResult NotifyOwner(string owner, int ticketCount)
+            => CapabilityResult.Success($"Notified {owner} about {ticketCount} ticket(s).");
     }
+
+    private sealed record ChangeRequest(string Name, int Priority, string[] Tags);
 
     private sealed class ApprovalCapabilityChatClient : IChatClient
     {

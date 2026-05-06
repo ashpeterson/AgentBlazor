@@ -40,6 +40,8 @@ public class AgUiHostingIntegrationTests
             Assert.Contains("TEXT_MESSAGE_CONTENT", body, StringComparison.Ordinal);
             Assert.Contains("STATE_SNAPSHOT", body, StringComparison.Ordinal);
             Assert.Contains("approval_required", body, StringComparison.Ordinal);
+            Assert.Contains("parameters", body, StringComparison.Ordinal);
+            Assert.Contains("agentblazor.session_id", body, StringComparison.Ordinal);
             Assert.Equal(0, executor.CallCount);
         }
         finally
