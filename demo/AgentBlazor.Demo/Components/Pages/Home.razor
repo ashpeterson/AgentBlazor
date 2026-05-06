@@ -10,14 +10,30 @@
     <section class="landing-page__stage">
         <LandingHero />
 
-        <article class="landing-page__hero-player">
-            <div class="landing-page__hero-frame">
-                <video autoplay muted loop preload="auto" playsinline poster="/videos/agentblazor-capability-reel-poster.jpg" src="/videos/agentblazor-capability-reel.mp4"></video>
+        <article class="landing-page__quickstart" aria-label="AgentBlazor quickstart">
+            <div class="landing-page__quickstart-header">
+                <span class="landing-page__quickstart-eyebrow">Quickstart</span>
+                <h2>Add a chat-controlled Blazor workflow</h2>
+                <p>Install the package, register one workflow, then mount the widget in an interactive layout.</p>
             </div>
-            <div class="landing-page__hero-meta" aria-label="Demo sequence">
-                <span>CLI install</span>
-                <span>Support workflow code</span>
-                <span>Reply draft with approval</span>
+            <ol class="landing-page__quickstart-steps">
+                <li>
+                    <span>1</span>
+                    <code>dotnet add package AgentBlazor --prerelease</code>
+                </li>
+                <li>
+                    <span>2</span>
+                    <code>builder.Services.AddAgentBlazor(...).AddWorkflow&lt;HelloWorkflow&gt;("hello-workflow")</code>
+                </li>
+                <li>
+                    <span>3</span>
+                    <code>&lt;AgentChatWidget Title="Assistant" /&gt;</code>
+                </li>
+            </ol>
+            <div class="landing-page__hero-meta" aria-label="Quickstart links">
+                <a href="/docs/quickstart">Read quickstart</a>
+                <a href="/demo/workflows/support-inbox">Try live demo</a>
+                <a href="https://github.com/ashpeterson/AgentBlazor">GitHub</a>
             </div>
         </article>
     </section>

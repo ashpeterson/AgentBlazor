@@ -77,7 +77,7 @@ Render one chat surface:
 
 ## What To Open
 
-- Home video: `/`
+- Home quickstart: `/`
 - Docs: `/docs`
 - Live demo: `/demo/workflows/support-inbox`
 - Starter sample: `samples/AgentBlazor.Starter`
