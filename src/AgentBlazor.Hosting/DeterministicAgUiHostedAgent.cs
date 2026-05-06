@@ -917,21 +917,7 @@ internal sealed class DeterministicAgUiHostedAgent(
         IReadOnlyList<PendingApproval> pendingApprovals)
     {
         var approvals = pendingApprovals
-            .Select(static pending => (object?)new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["componentId"] = pending.ComponentId,
-                ["actionId"] = pending.ActionId,
-                ["description"] = pending.Description,
-                ["policyDecision"] = pending.PolicyDecision is null
-                    ? null
-                    : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["allowed"] = pending.PolicyDecision.Allowed,
-                        ["riskClass"] = pending.PolicyDecision.RiskClass.ToString(),
-                        ["approvalMode"] = pending.PolicyDecision.ApprovalMode.ToString(),
-                        ["reason"] = pending.PolicyDecision.Reason
-                    }
-            })
+            .Select(static pending => (object?)CreatePendingApprovalPayload(pending))
             .ToArray();
 
         return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -940,6 +926,24 @@ internal sealed class DeterministicAgUiHostedAgent(
             ["pendingApprovals"] = approvals
         };
     }
+
+    private static Dictionary<string, object?> CreatePendingApprovalPayload(PendingApproval pending)
+        => new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["componentId"] = pending.ComponentId,
+            ["actionId"] = pending.ActionId,
+            ["description"] = pending.Description,
+            ["parameters"] = pending.Parameters,
+            ["policyDecision"] = pending.PolicyDecision is null
+                ? null
+                : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["allowed"] = pending.PolicyDecision.Allowed,
+                    ["riskClass"] = pending.PolicyDecision.RiskClass.ToString(),
+                    ["approvalMode"] = pending.PolicyDecision.ApprovalMode.ToString(),
+                    ["reason"] = pending.PolicyDecision.Reason
+                }
+        };
 
     private static PlannedComponentAction? ToPlannedAction(AgentExecutionStep step)
     {
@@ -1218,21 +1222,7 @@ internal sealed class DeterministicAgUiHostedAgent(
             case AgentTurnStreamEventKind.ApprovalRequired:
             {
                 var pendingApprovals = streamEvent.PendingApprovals?
-                    .Select(static pending => (object?)new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["componentId"] = pending.ComponentId,
-                        ["actionId"] = pending.ActionId,
-                        ["description"] = pending.Description,
-                        ["policyDecision"] = pending.PolicyDecision is null
-                            ? null
-                            : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-                            {
-                                ["allowed"] = pending.PolicyDecision.Allowed,
-                                ["riskClass"] = pending.PolicyDecision.RiskClass.ToString(),
-                                ["approvalMode"] = pending.PolicyDecision.ApprovalMode.ToString(),
-                                ["reason"] = pending.PolicyDecision.Reason
-                            }
-                    })
+                    .Select(static pending => (object?)CreatePendingApprovalPayload(pending))
                     .ToArray() ?? [];
                 var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                 {

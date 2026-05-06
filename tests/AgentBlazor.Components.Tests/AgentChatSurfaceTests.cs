@@ -10,6 +10,7 @@ using AgentBlazor.Execution;
 using AgentBlazor.Services;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace AgentBlazor.Components.Tests;
 
@@ -323,6 +324,16 @@ public sealed class AgentChatSurfaceTests : TestContext
 
         public async Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
         {
+            if (IsApprovalMessage(request.UserMessage))
+            {
+                Assert.NotNull(request.Context);
+                Assert.True(
+                    request.Context.TryGetValue("agentblazor.approvalArgs.runtime_probe.run_approval_probe", out var rawArguments),
+                    "Approval continuation should include the original pending approval parameters.");
+                using var document = JsonDocument.Parse(rawArguments);
+                Assert.Equal("TCK-1042", document.RootElement.GetProperty("ticketId").GetString());
+            }
+
             var response = IsApprovalMessage(request.UserMessage)
                 ? CreateApprovedResponse(request.GetEffectiveSessionId())
                 : CreateApprovalRequiredResponse(request.GetEffectiveSessionId());
@@ -404,7 +415,10 @@ public sealed class AgentChatSurfaceTests : TestContext
                         "runtime_probe",
                         "run_approval_probe",
                         "Run the runtime approval probe",
-                        new Dictionary<string, object?>(),
+                        new Dictionary<string, object?>
+                        {
+                            ["ticketId"] = "TCK-1042"
+                        },
                         new AgentPolicyDecision(true, AgentRiskClass.SensitiveMutation, AgentApprovalMode.StepApproval))
                 ],
                 ExecutionPlan = executionPlan

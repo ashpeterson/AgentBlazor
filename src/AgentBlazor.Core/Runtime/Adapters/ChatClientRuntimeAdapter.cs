@@ -585,9 +585,14 @@ public sealed class ChatClientRuntimeAdapter(
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (context is null ||
             !context.TryGetValue("agentblazor.approvals", out var approvals) ||
-            string.IsNullOrWhiteSpace(approvals) ||
-            IsGlobalApprovalValue(approvals))
+            string.IsNullOrWhiteSpace(approvals))
         {
+            return keys;
+        }
+
+        if (IsGlobalApprovalValue(approvals))
+        {
+            AddApprovalArgumentKeys(context, keys);
             return keys;
         }
 
@@ -600,6 +605,26 @@ public sealed class ChatClientRuntimeAdapter(
         }
 
         return keys;
+    }
+
+    private static void AddApprovalArgumentKeys(
+        IDictionary<string, string> context,
+        ISet<string> keys)
+    {
+        const string prefix = "agentblazor.approvalArgs.";
+        foreach (var key in context.Keys)
+        {
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var approvalKey = key[prefix.Length..];
+            if (approvalKey.Contains('.', StringComparison.Ordinal))
+            {
+                keys.Add(approvalKey);
+            }
+        }
     }
 
     private static string BuildApprovalKey(string componentId, string actionId)
