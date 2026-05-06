@@ -563,9 +563,11 @@ public sealed class ChatClientRuntimeAdapter(
 
         foreach (var capability in capabilities)
         {
+            var approvalKey = BuildApprovalKey(capability.CapabilityId, capability.LocalActionId);
+            var approvalArguments = ResolveApprovedActionArguments(request.Context, approvalKey);
             await InvokeCapabilityAsync(
                     capability,
-                    new AIFunctionArguments(new Dictionary<string, object?>()),
+                    new AIFunctionArguments(approvalArguments),
                     turnState,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -602,6 +604,29 @@ public sealed class ChatClientRuntimeAdapter(
 
     private static string BuildApprovalKey(string componentId, string actionId)
         => $"{componentId}.{actionId}";
+
+    private static IDictionary<string, object?> ResolveApprovedActionArguments(
+        IDictionary<string, string>? context,
+        string approvalKey)
+    {
+        if (context is null ||
+            string.IsNullOrWhiteSpace(approvalKey) ||
+            !context.TryGetValue($"agentblazor.approvalArgs.{approvalKey}", out var rawArguments) ||
+            string.IsNullOrWhiteSpace(rawArguments))
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object?>>(rawArguments) ??
+                new Dictionary<string, object?>();
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, object?>();
+        }
+    }
 
     private static bool IsGlobalApprovalValue(string value)
         => value.Equals("1", StringComparison.OrdinalIgnoreCase) ||

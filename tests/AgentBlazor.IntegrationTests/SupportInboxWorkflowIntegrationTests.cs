@@ -38,12 +38,12 @@ public class SupportInboxWorkflowIntegrationTests
     }
 
     [Fact]
-    public async Task DraftReplyAsync_TargetsRequestedTicketWithoutPriorHighlight()
+    public async Task DraftReplyForTicketAsync_TargetsRequestedTicketWithoutPriorHighlight()
     {
         var workflow = new SupportInboxWorkflowService();
         var capabilities = new SupportInboxCapabilities(workflow);
 
-        var result = await capabilities.DraftReplyAsync("TCK-1042");
+        var result = await capabilities.DraftReplyForTicketAsync("TCK-1042");
 
         Assert.True(result.Succeeded);
         Assert.Contains("Prepared a reply draft", result.Summary, StringComparison.OrdinalIgnoreCase);
@@ -54,12 +54,12 @@ public class SupportInboxWorkflowIntegrationTests
     }
 
     [Fact]
-    public async Task DraftReplyAsync_ReturnsClarificationForUnknownTicket()
+    public async Task DraftReplyForTicketAsync_ReturnsClarificationForUnknownTicket()
     {
         var workflow = new SupportInboxWorkflowService();
         var capabilities = new SupportInboxCapabilities(workflow);
 
-        var result = await capabilities.DraftReplyAsync("TCK-9999");
+        var result = await capabilities.DraftReplyForTicketAsync("TCK-9999");
 
         Assert.False(result.Succeeded);
         Assert.True(result.RequiresClarification);

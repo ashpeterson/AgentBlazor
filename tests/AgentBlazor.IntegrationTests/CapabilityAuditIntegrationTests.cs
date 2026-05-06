@@ -12,6 +12,46 @@ namespace AgentBlazor.IntegrationTests;
 public class CapabilityAuditIntegrationTests
 {
     [Fact]
+    public async Task CapabilityApprovalContinuation_PreservesApprovedArguments()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ApprovalCapabilityChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ApprovalCapabilityChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var approvalResponse = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "Create the change request",
+            AgentName: "approval-agent",
+            SessionId: "integration-approval-args"));
+
+        var approval = Assert.Single(approvalResponse.PendingApprovals);
+        Assert.Equal("CAB-99", approval.Parameters["name"]?.ToString());
+
+        var approvedResponse = await runtime.RunTurnAsync(new AgentTurnRequest(
+            "Approved. Continue by invoking the approved action(s): approval_workflow.create_change_request.",
+            AgentName: "approval-agent",
+            SessionId: "integration-approval-args",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentblazor.approvals"] = "approval_workflow.create_change_request",
+                ["agentblazor.approvalArgs.approval_workflow.create_change_request"] = """{"name":"CAB-99"}"""
+            }));
+
+        var executionStep = Assert.Single(approvedResponse.ExecutionPlan?.Steps ?? []);
+        Assert.Equal("Created 'CAB-99'.", executionStep.Message);
+        Assert.False(approvedResponse.RequiresApproval);
+    }
+
+    [Fact]
     public async Task CapabilityExecution_WithAuditLog_DoesNotRequireHttpContextAccessor()
     {
         var services = new ServiceCollection();

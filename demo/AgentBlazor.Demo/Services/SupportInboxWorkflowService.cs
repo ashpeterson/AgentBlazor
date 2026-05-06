@@ -45,28 +45,39 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
         });
     }
 
-    [AgentAction("Draft a reply for a ticket or the highlighted tickets", ActionId = "draft_ticket_reply", RequiresApproval = true)]
-    public Task<CapabilityResult> DraftReplyAsync(
-        [AgentParam("Optional ticket id to draft a reply for, for example TCK-1042", Required = false)] string? ticketId = null)
+    [AgentAction("Draft a reply for a specific ticket", ActionId = "draft_ticket_reply_for_ticket", RequiresApproval = true)]
+    public Task<CapabilityResult> DraftReplyForTicketAsync(
+        [AgentParam("Ticket id to draft a reply for, for example TCK-1042", Required = true)] string ticketId)
     {
-        if (!string.IsNullOrWhiteSpace(ticketId) && !workflow.FocusTicket(ticketId))
+        if (!workflow.FocusTicket(ticketId))
         {
             return Task.FromResult(CapabilityResult.NeedsClarification(
                 $"I could not find ticket {ticketId}. Ask me to show open tickets first or choose a visible ticket id."));
         }
 
+        return Task.FromResult(BuildDraftResult(workflow));
+    }
+
+    [AgentAction("Draft a reply for the highlighted tickets", ActionId = "draft_ticket_reply", RequiresApproval = true)]
+    public Task<CapabilityResult> DraftReplyAsync()
+    {
         if (!workflow.HighlightedTicketIds.Any())
         {
             return Task.FromResult(CapabilityResult.NeedsClarification(
                 "No tickets are highlighted yet. Ask me to show open tickets first or tell me which ticket needs a reply."));
         }
 
+        return Task.FromResult(BuildDraftResult(workflow));
+    }
+
+    private static CapabilityResult BuildDraftResult(SupportInboxWorkflowService workflow)
+    {
         var summary = workflow.PrepareReplyDraft();
         var resultFactory = workflow.LatestDraftBlockers.Count > 0
             ? CapabilityResult.Blocked(summary)
             : CapabilityResult.Success(summary);
 
-        return Task.FromResult(resultFactory with
+        return resultFactory with
         {
             Outputs = new Dictionary<string, object?>
             {
@@ -85,7 +96,7 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
                     "Review the draft reply",
                     "Approve the reply draft"
                 ]
-        });
+        };
     }
 
     [AgentAction("Escalate the blocked tickets", ActionId = "escalate_blocked_tickets")]
