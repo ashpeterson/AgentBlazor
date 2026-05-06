@@ -47,10 +47,33 @@ public class SupportInboxWorkflowIntegrationTests
 
         Assert.True(result.Succeeded);
         Assert.Contains("Prepared a reply draft", result.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 highlighted ticket", result.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(workflow.CurrentDraft);
         Assert.False(workflow.IsDraftDialogOpen);
         Assert.Contains("TCK-1042", workflow.HighlightedTicketIds, StringComparer.OrdinalIgnoreCase);
         Assert.Contains("TCK-1042", workflow.CurrentDraft.TicketIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Cannot export monthly invoice pack", workflow.CurrentDraft.IssueSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Billing", workflow.CurrentDraft.NextOwner, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("monthly invoice pack", workflow.CurrentDraft.CustomerReply, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("high priority", workflow.CurrentDraft.CustomerReply, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("TCK-1042", Assert.Single(workflow.CurrentDraft.TicketIds));
+        Assert.Equal(workflow.CurrentDraft.IssueSummary, Convert.ToString(result.Outputs["draftIssueSummary"]));
+        Assert.Equal(workflow.CurrentDraft.NextOwner, Convert.ToString(result.Outputs["draftNextOwner"]));
+        Assert.Equal(workflow.CurrentDraft.CustomerReply, Convert.ToString(result.Outputs["draftCustomerReply"]));
+    }
+
+    [Fact]
+    public void ExplainFocusedTickets_UsesSingularGrammarForSingleTicket()
+    {
+        var workflow = new SupportInboxWorkflowService();
+
+        Assert.True(workflow.FocusTicket("TCK-1042"));
+        var summary = workflow.ExplainFocusedTickets();
+
+        Assert.Contains("1 ticket needing attention", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 ticket has escalation risk", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0 tickets are blocked by missing evidence", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("1 are", summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

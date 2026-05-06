@@ -86,7 +86,7 @@
                                 <MudListItem T="string">Highlighted tickets: @Workflow.HighlightedTicketIds.Count</MudListItem>
                                 <MudListItem T="string">Escalated tickets: @Workflow.EscalatedTicketIds.Count</MudListItem>
                                 <MudListItem T="string">Review window: @Workflow.CurrentReviewWindowDays days</MudListItem>
-                                <MudListItem T="string">Reply checklist items: @(Workflow.CurrentDraft?.Checklist.Count ?? 0)</MudListItem>
+                                <MudListItem T="string">Reply draft: @(Workflow.CurrentDraft is null ? "not prepared" : "ready")</MudListItem>
                             </MudList>
                         </SummaryContent>
                     </WorkflowDecisionSupport>
@@ -100,6 +100,21 @@
                             <MudText Typo="Typo.caption" Class="d-block mb-2">
                                 Tickets: @string.Join(", ", draft.TicketIds)
                             </MudText>
+                            <MudStack Spacing="2" Class="mb-3">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Issue summary</MudText>
+                                    <MudText Typo="Typo.body2">@draft.IssueSummary</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Next owner</MudText>
+                                    <MudText Typo="Typo.body2">@draft.NextOwner</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Customer-safe reply</MudText>
+                                    <MudText Typo="Typo.body2" Style="white-space: pre-line">@draft.CustomerReply</MudText>
+                                </div>
+                            </MudStack>
+                            <MudText Typo="Typo.subtitle2">Before sending</MudText>
                             <MudList T="string" Dense="true">
                                 @foreach (var action in draft.Checklist)
                                 {
@@ -133,6 +148,21 @@
                 <MudText Typo="Typo.caption" Class="d-block mb-3">
                     Tickets: @string.Join(", ", draft.TicketIds)
                 </MudText>
+                <MudStack Spacing="2" Class="mb-3">
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Issue summary</MudText>
+                        <MudText Typo="Typo.body2">@draft.IssueSummary</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Next owner</MudText>
+                        <MudText Typo="Typo.body2">@draft.NextOwner</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Customer-safe reply</MudText>
+                        <MudText Typo="Typo.body2" Style="white-space: pre-line">@draft.CustomerReply</MudText>
+                    </div>
+                </MudStack>
+                <MudText Typo="Typo.subtitle2">Before sending</MudText>
                 <MudList T="string" Dense="true">
                     @foreach (var action in draft.Checklist)
                     {
