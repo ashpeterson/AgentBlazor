@@ -36,4 +36,35 @@ public class SupportInboxWorkflowIntegrationTests
         Assert.Empty(workflow.LatestDraftBlockers);
         Assert.Contains("TCK-1055", workflow.EscalatedTicketIds, StringComparer.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task DraftReplyAsync_TargetsRequestedTicketWithoutPriorHighlight()
+    {
+        var workflow = new SupportInboxWorkflowService();
+        var capabilities = new SupportInboxCapabilities(workflow);
+
+        var result = await capabilities.DraftReplyAsync("TCK-1042");
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("Prepared a reply draft", result.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(workflow.CurrentDraft);
+        Assert.True(workflow.IsDraftDialogOpen);
+        Assert.Contains("TCK-1042", workflow.HighlightedTicketIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("TCK-1042", workflow.CurrentDraft.TicketIds, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DraftReplyAsync_ReturnsClarificationForUnknownTicket()
+    {
+        var workflow = new SupportInboxWorkflowService();
+        var capabilities = new SupportInboxCapabilities(workflow);
+
+        var result = await capabilities.DraftReplyAsync("TCK-9999");
+
+        Assert.False(result.Succeeded);
+        Assert.True(result.RequiresClarification);
+        Assert.Contains("could not find ticket TCK-9999", result.ClarificationQuestion, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(workflow.CurrentDraft);
+        Assert.Empty(workflow.HighlightedTicketIds);
+    }
 }
