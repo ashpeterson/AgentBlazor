@@ -1,14 +1,16 @@
 # Quickstart
 
-Get one working chat route into a fresh Blazor app. AgentBlazor does not create a responding agent by default. You must register one workflow.
+Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.1.0-preview.11`.
 
-## Install
+AgentBlazor does not create a responding agent by default. You must register at least one workflow.
+
+## 1. Install
 
 ```bash
-dotnet add package AgentBlazor --prerelease
+dotnet add package AgentBlazor --version 0.1.0-preview.11
 ```
 
-## Program.cs
+## 2. Program.cs
 
 ```csharp
 using AgentBlazor;
@@ -31,7 +33,7 @@ builder.Services.AddAgentBlazor(options =>
 
     options.ConfigureBuilder(agentBuilder =>
     {
-        agentBuilder.AddWorkflow<HelloWorkflow>("hello-workflow");
+        agentBuilder.AddWorkflow<HelloWorkflow>("hello");
     });
 });
 
@@ -39,6 +41,7 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseAntiforgery();
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
@@ -47,50 +50,73 @@ app.MapAgentBlazorEndpoints();
 app.Run();
 ```
 
-## Components/_Imports.razor
+## 3. Components/_Imports.razor
 
 ```razor
 @using AgentBlazor.Components
 ```
 
-## Components/App.razor
+## 4. Components/App.razor
 
 ```razor
-<link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
-<link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
-...
-<HeadOutlet @rendermode="InteractiveServer" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    <link rel="stylesheet" href="@Assets[AgentBlazorAssetPaths.Css]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["MyApp.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
     <Routes @rendermode="InteractiveServer" />
+    <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
     <script src="@Assets[AgentBlazorAssetPaths.Js]"></script>
 </body>
+</html>
 ```
 
-## Components/Layout/MainLayout.razor
+## 5. Components/Layout/MainLayout.razor
+
+Wrap your existing layout content:
 
 ```razor
 @inherits LayoutComponentBase
-@using MudBlazor
 
-<MudThemeProvider />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<AgentBlazorShell>
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
 
-<div class="page">
-    @Body
-</div>
+        <main>
+            <div class="top-row px-4">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
 
-<AgentChatWidget
-    Title="Hello workflow"
-    Placeholder="Ask the agent to say hello..." />
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+
+    <div id="blazor-error-ui" data-nosnippet>
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+</AgentBlazorShell>
 ```
 
-## Workflows/HelloWorkflow.cs
+## 6. Workflows/HelloWorkflow.cs
 
 ```csharp
 using AgentBlazor.App;
@@ -107,9 +133,9 @@ public sealed class HelloWorkflow
 }
 ```
 
-## API key
+## 7. API Key
 
-Use either appsettings:
+Use either `appsettings.Development.json`:
 
 ```json
 {
@@ -125,23 +151,28 @@ Or user secrets:
 ```bash
 dotnet user-secrets init
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
+dotnet user-secrets set "OpenAI:Model" "gpt-4o-mini"
 ```
 
-## Run
+## 8. Run
 
 ```bash
 dotnet run
 ```
 
-You should see the floating widget in the bottom-right corner. Open it and ask: `Say hello`.
+You should see the floating widget in the bottom-right corner. Open it and ask:
+
+```text
+Say hello
+```
 
 ## Notes
 
-- `MapAgentBlazorEndpoints()` is required or the chat UI will render without a working runtime endpoint.
-- The current public package requires an explicit workflow or agent registration before the chat can respond.
-- `AgentBlazorShell` is not the public quickstart path until the next preview release lands its child-content/widget fix.
+- `MapAgentBlazorEndpoints()` is required. Without it, the widget can render but cannot call the runtime.
+- `AgentBlazorShell` includes the widget in `0.1.0-preview.11`.
+- A registered workflow is required for the chat to respond.
 
 ## Next
 
-- Starter sample: [samples/AgentBlazor.Starter](/home/ashdev/workspace/AgentBlazor/samples/AgentBlazor.Starter)
-- Hosted WebAssembly client: [src/AgentBlazor.Client/PACKAGE_README.md](/home/ashdev/workspace/AgentBlazor/src/AgentBlazor.Client/PACKAGE_README.md)
+- [Starter sample](../samples/AgentBlazor.Starter/README.md)
+- [Hosted WebAssembly client](../src/AgentBlazor.Client/PACKAGE_README.md)
