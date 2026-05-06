@@ -168,6 +168,7 @@
                             <AgentGenerativeSurface Document="@item.GeneratedUi"
                                                     AgentName="@item.RoleLabel"
                                                     SessionId="@EffectiveSessionId"
+                                                    BaseContext="@CreateRequestContext()"
                                                     ForwardActionsToRuntime="true"
                                                     ShowRuntimeResponses="false"
                                                     OnActionInvoked="HandleGeneratedActionInvokedAsync"
@@ -984,18 +985,20 @@
         if (_isBusy || _pendingApprovals.Count == 0)
             return;
 
-        var approvalKeys = _pendingApprovals
-            .Select(static approval => $"{approval.ComponentId}.{approval.ActionId}")
+        var approvalIds = _pendingApprovals
+            .Select(static approval => approval.ApprovalId)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var approvalContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["agentblazor.approvals"] = string.Join(",", approvalKeys)
+            ["agentblazor.approvals"] = string.Join(",", approvalIds)
         };
         foreach (var approval in _pendingApprovals)
         {
-            var approvalKey = $"{approval.ComponentId}.{approval.ActionId}";
-            approvalContext[$"agentblazor.approvalArgs.{approvalKey}"] = JsonSerializer.Serialize(approval.Parameters);
+            var approvalTarget = PendingApprovalIds.BuildTargetKey(approval.ComponentId, approval.ActionId);
+            approvalContext[$"agentblazor.approval.{approval.ComponentId}.{approval.ActionId}"] = bool.TrueString;
+            approvalContext[$"agentblazor.approvalTarget.{approval.ApprovalId}"] = approvalTarget;
+            approvalContext[$"agentblazor.approvalArgs.{approval.ApprovalId}"] = JsonSerializer.Serialize(approval.Parameters);
         }
         
         _timeline.Add(ChatTimelineItem.User("Approved"));
@@ -1015,14 +1018,15 @@
         try
         {
             var approvalMessage =
-                $"Approved. Continue by invoking the approved action(s): {string.Join(", ", approvalKeys)}. " +
+                $"Approved. Continue by invoking the approved action(s): {string.Join(", ", approvalIds)}. " +
                 "Do not request approval again for these action(s); execute the approved tool call(s) now and summarize the result.";
             var conversationTurnCountBefore = await GetConversationTurnCountAsync();
             var turnOutcome = await RunTurnWithOptionalStreamingAsync(new AgentTurnRequest(
                 approvalMessage,
                 _selectedAgent,
                 SessionId: EffectiveSessionId,
-                Context: CreateRequestContext(approvalContext)));
+                Context: CreateRequestContext(approvalContext),
+                ApprovalContinuation: new AgentApprovalContinuation(approvalIds)));
             turnOutcome = EnrichApprovalOutcome(turnOutcome);
             await ApplyTurnOutcomeAsync(approvalMessage, turnOutcome, conversationTurnCountBefore);
             _scrollRequested = true;
@@ -1200,7 +1204,7 @@
                     streamEvent.ExecutionResult is not null)
                 {
                     var resultKey = BuildActivityKey(streamEvent.ExecutionResult.ComponentId, streamEvent.ExecutionResult.ActionId);
-                    var resultStatus = streamEvent.ExecutionResult.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+                    var resultStatus = MapExecutionResultStatus(streamEvent.ExecutionResult);
                     AddStreamingActivityMessage(
                         new ActivityMessage(
                             resultKey,
@@ -1515,6 +1519,7 @@
                 approval.ActionId);
 
             return new PendingApprovalInfo(
+                PendingApprovalIds.Resolve(approval),
                 approval.ComponentId,
                 approval.ActionId,
                 approval.Description,
@@ -1739,7 +1744,7 @@
         ChatTimelineItem item,
         ComponentActionExecutionResult result)
     {
-        var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+        var status = MapExecutionResultStatus(result);
         var args = FindActionArguments(item.LegacyPlannedActions, result.ComponentId, result.ActionId);
         return new ActionRenderContext(
             result.ComponentId,
@@ -1810,6 +1815,14 @@
             ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
             : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
     }
+
+    private static ActionStatus MapExecutionResultStatus(ComponentActionExecutionResult executionResult)
+        => executionResult.Outcome switch
+        {
+            ActionOutcome.Applied => ActionStatus.Complete,
+            ActionOutcome.Queued => ActionStatus.InProgress,
+            _ => ActionStatus.Failed
+        };
 
     private static string FormatExecutionStepActivity(AgentExecutionStep step)
     {
@@ -2880,6 +2893,7 @@
     private sealed record PendingHandoffRequest(string FromAgent, string ToAgent, string? TargetRoute);
     private sealed record PendingClarificationInfo(string Question, string OriginalMessage);
     private sealed record PendingApprovalInfo(
+        string ApprovalId,
         string ComponentId,
         string ActionId,
         string Description,

@@ -33,4 +33,5 @@ public sealed record PendingApproval(
     string ActionId,
     string Description,
     IReadOnlyDictionary<string, object?> Parameters,
-    AgentPolicyDecision? PolicyDecision = null);
+    AgentPolicyDecision? PolicyDecision = null,
+    string? ApprovalId = null);
