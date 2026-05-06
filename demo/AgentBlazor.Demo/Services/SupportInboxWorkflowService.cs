@@ -83,6 +83,9 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
             {
                 ["draftTitle"] = workflow.CurrentDraft?.Title,
                 ["draftTicketIds"] = workflow.CurrentDraft?.TicketIds.ToArray(),
+                ["draftIssueSummary"] = workflow.CurrentDraft?.IssueSummary,
+                ["draftNextOwner"] = workflow.CurrentDraft?.NextOwner,
+                ["draftCustomerReply"] = workflow.CurrentDraft?.CustomerReply,
                 ["draftActionCount"] = workflow.CurrentDraft?.Checklist.Count ?? 0,
                 ["draftBlockers"] = workflow.LatestDraftBlockers.ToArray()
             },
@@ -178,7 +181,7 @@ internal sealed class SupportInboxWorkflowService
 
         return _highlightedTicketIds.Count == 0
             ? $"No tickets in the last {CurrentReviewWindowDays} days still need a reply."
-            : $"Highlighted {_highlightedTicketIds.Count} tickets from the last {CurrentReviewWindowDays} days that still need a reply.";
+            : $"Highlighted {FormatCount(_highlightedTicketIds.Count, "ticket")} from the last {CurrentReviewWindowDays} days that still need a reply.";
     }
 
     public bool FocusTicket(string ticketId)
@@ -240,9 +243,12 @@ internal sealed class SupportInboxWorkflowService
         CurrentDraft = new SupportReplyDraft(
             "Draft customer reply",
             targetedTickets.Select(static ticket => ticket.Id).ToArray(),
+            BuildIssueSummary(targetedTickets),
+            BuildNextOwner(targetedTickets),
+            BuildCustomerReply(targetedTickets),
             targetedTickets.SelectMany(BuildReplyChecklist).ToArray());
         IsDraftDialogOpen = false;
-        LatestInsight = $"Prepared a reply draft for {targetedTickets.Length} highlighted tickets.";
+        LatestInsight = $"Prepared a reply draft for {FormatCount(targetedTickets.Length, "highlighted ticket")}.";
         NotifyChanged();
         return LatestInsight;
     }
@@ -267,7 +273,7 @@ internal sealed class SupportInboxWorkflowService
 
         LatestInsight = blockedTickets.Length == 0
             ? "No blocked tickets needed escalation."
-            : $"Escalated {blockedTickets.Length} blocked tickets so the reply draft can proceed.";
+            : $"Escalated {FormatCount(blockedTickets.Length, "blocked ticket")} so the reply draft can proceed.";
         NotifyChanged();
         return LatestInsight;
     }
@@ -332,7 +338,10 @@ internal sealed class SupportInboxWorkflowService
         var highRiskCount = focused.Count(static ticket => ticket.HasEscalationRisk);
         var evidenceBlockers = focused.Count(static ticket => ticket.MissingEvidence);
 
-        return $"The current queue has {focused.Length} tickets needing attention. {highRiskCount} have escalation risk, {evidenceBlockers} are blocked by missing evidence, and the oldest highlighted ticket is {oldestAge} days old.";
+        return $"The current queue has {FormatCount(focused.Length, "ticket")} needing attention. "
+               + $"{FormatCount(highRiskCount, "ticket")} {PluralVerb(highRiskCount, "has", "have")} escalation risk, "
+               + $"{FormatCount(evidenceBlockers, "ticket")} {PluralVerb(evidenceBlockers, "is", "are")} blocked by missing evidence, "
+               + $"and the oldest highlighted ticket is {oldestAge} days old.";
     }
 
     private static IEnumerable<string> BuildDraftBlockers(
@@ -347,10 +356,89 @@ internal sealed class SupportInboxWorkflowService
 
     private static IEnumerable<string> BuildReplyChecklist(SupportTicketRow ticket)
     {
-        yield return $"Summarize the current issue for {ticket.Id}.";
-        yield return $"Confirm the next owner for the {ticket.Team} follow-up.";
-        yield return $"Draft a customer-safe reply for the {ticket.Priority.ToLowerInvariant()} priority case.";
+        yield return $"Confirm the issue summary still matches the latest notes for {ticket.Id}.";
+        yield return $"Confirm {ticket.Team} accepts the next follow-up before sending.";
+        yield return "Check the reply avoids unsupported promises and customer-internal detail.";
     }
+
+    private static string BuildIssueSummary(IReadOnlyList<SupportTicketRow> tickets)
+    {
+        if (tickets.Count == 1)
+        {
+            var ticket = tickets[0];
+            return $"{ticket.Id}: {ticket.Subject}. This is a {ticket.Priority.ToLowerInvariant()} priority {ticket.Team} ticket, open for {FormatCount(ticket.AgeDays, "day")}, with {DescribeDraftSignals(ticket)}.";
+        }
+
+        var ticketSummaries = tickets.Select(static ticket =>
+            $"{ticket.Id} ({ticket.Team}, {ticket.Priority.ToLowerInvariant()}): {ticket.Subject}");
+
+        return $"The draft covers {FormatCount(tickets.Count, "ticket")}: {string.Join("; ", ticketSummaries)}.";
+    }
+
+    private static string BuildNextOwner(IReadOnlyList<SupportTicketRow> tickets)
+    {
+        var teams = tickets
+            .Select(static ticket => ticket.Team)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return teams.Length == 1
+            ? $"{teams[0]} owns the next follow-up before the reply is sent."
+            : $"Coordinate follow-up across {string.Join(", ", teams)} before sending the reply.";
+    }
+
+    private static string BuildCustomerReply(IReadOnlyList<SupportTicketRow> tickets)
+    {
+        if (tickets.Count == 1)
+        {
+            return BuildSingleTicketReply(tickets[0]);
+        }
+
+        return string.Join(
+            Environment.NewLine + Environment.NewLine,
+            tickets.Select(BuildSingleTicketReply));
+    }
+
+    private static string BuildSingleTicketReply(SupportTicketRow ticket)
+    {
+        var prioritySentence = ticket.HasEscalationRisk
+            ? "I am treating this as high priority because it is currently flagged as a customer risk."
+            : "I will keep this moving and update you as soon as the next check is complete.";
+
+        var blockerSentence = ticket.MissingEvidence
+            ? "Before sending a final answer, we need to confirm the missing order evidence so the response is accurate."
+            : $"The {ticket.Team} team is checking the issue and will confirm the safest next step.";
+
+        return $"Hi, thanks for flagging this. We are looking into \"{ticket.Subject}\" on ticket {ticket.Id}. {blockerSentence} {prioritySentence} I will keep this ticket updated with the outcome and any workaround we can safely share.";
+    }
+
+    private static string DescribeDraftSignals(SupportTicketRow ticket)
+    {
+        var signals = new List<string>();
+
+        if (ticket.NeedsReply)
+        {
+            signals.Add("waiting on reply");
+        }
+
+        if (ticket.HasEscalationRisk)
+        {
+            signals.Add("high customer risk");
+        }
+
+        if (ticket.MissingEvidence)
+        {
+            signals.Add("missing evidence");
+        }
+
+        return signals.Count == 0 ? "no extra risk signals" : string.Join(", ", signals);
+    }
+
+    private static string FormatCount(int count, string noun)
+        => count == 1 ? $"1 {noun}" : $"{count} {noun}s";
+
+    private static string PluralVerb(int count, string singular, string plural)
+        => count == 1 ? singular : plural;
 
     private static bool NeedsAttention(SupportTicketRow ticket, int days)
         => ticket.NeedsReply && ticket.AgeDays <= days;
@@ -373,4 +461,7 @@ internal sealed record SupportTicketRow(
 internal sealed record SupportReplyDraft(
     string Title,
     IReadOnlyList<string> TicketIds,
+    string IssueSummary,
+    string NextOwner,
+    string CustomerReply,
     IReadOnlyList<string> Checklist);
