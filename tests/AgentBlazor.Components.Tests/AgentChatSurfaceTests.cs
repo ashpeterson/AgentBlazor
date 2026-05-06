@@ -327,8 +327,12 @@ public sealed class AgentChatSurfaceTests : TestContext
             if (IsApprovalMessage(request.UserMessage))
             {
                 Assert.NotNull(request.Context);
-                Assert.True(
-                    request.Context.TryGetValue("agentblazor.approvalArgs.runtime_probe.run_approval_probe", out var rawArguments),
+                var rawArguments = request.Context
+                    .Where(static pair => pair.Key.StartsWith("agentblazor.approvalArgs.", StringComparison.OrdinalIgnoreCase))
+                    .Select(static pair => pair.Value)
+                    .SingleOrDefault();
+                Assert.False(
+                    string.IsNullOrWhiteSpace(rawArguments),
                     "Approval continuation should include the original pending approval parameters.");
                 using var document = JsonDocument.Parse(rawArguments);
                 Assert.Equal("TCK-1042", document.RootElement.GetProperty("ticketId").GetString());

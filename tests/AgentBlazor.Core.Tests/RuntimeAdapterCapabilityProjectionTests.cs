@@ -404,6 +404,73 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_ApprovalContinuation_PreservesMultipleApprovalArgumentsForSameAction()
+    {
+        var services = new ServiceCollection();
+        var chatClient = new ThrowingChatClient();
+        services.AddSingleton<IChatClient>(chatClient);
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalCapabilities>()
+            .AddAgent("approval-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_workflow.create_change_request");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Approved.",
+            AgentName: "approval-agent",
+            SessionId: "approval-direct-multiple",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["agentblazor.approvals"] =
+                    "approval_workflow.create_change_request#a,approval_workflow.create_change_request#b",
+                ["agentblazor.approval.approval_workflow.create_change_request"] = "true",
+                ["agentblazor.approvalTarget.approval_workflow.create_change_request#a"] =
+                    "approval_workflow.create_change_request",
+                ["agentblazor.approvalTarget.approval_workflow.create_change_request#b"] =
+                    "approval_workflow.create_change_request",
+                ["agentblazor.approvalArgs.approval_workflow.create_change_request#a"] =
+                    """{"name":"CAB-1"}""",
+                ["agentblazor.approvalArgs.approval_workflow.create_change_request#b"] =
+                    """{"name":"CAB-2"}"""
+            },
+            ApprovalContinuation: new AgentApprovalContinuation(
+            [
+                "approval_workflow.create_change_request#a",
+                "approval_workflow.create_change_request#b"
+            ])));
+
+        Assert.Equal(0, chatClient.CallCount);
+        Assert.False(response.RequiresApproval);
+        Assert.Equal(2, response.ExecutionPlan!.Steps.Count);
+        Assert.Contains(response.ExecutionPlan.Steps, static step =>
+            step.Message?.Contains("CAB-1", StringComparison.Ordinal) == true);
+        Assert.Contains(response.ExecutionPlan.Steps, static step =>
+            step.Message?.Contains("CAB-2", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public void PendingApprovalIds_CreateDistinctIdsForSameActionWithDifferentArguments()
+    {
+        var first = PendingApprovalIds.Create(
+            "support_inbox",
+            "draft_ticket_reply_for_ticket",
+            new Dictionary<string, object?> { ["ticketId"] = "TCK-1042" });
+        var second = PendingApprovalIds.Create(
+            "support_inbox",
+            "draft_ticket_reply_for_ticket",
+            new Dictionary<string, object?> { ["ticketId"] = "TCK-1048" });
+
+        Assert.StartsWith("support_inbox.draft_ticket_reply_for_ticket#", first, StringComparison.Ordinal);
+        Assert.StartsWith("support_inbox.draft_ticket_reply_for_ticket#", second, StringComparison.Ordinal);
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_StreamingApprovalContinuation_EmitsApprovedCapabilityEventsWithoutModelRoundTrip()
     {
         var services = new ServiceCollection();

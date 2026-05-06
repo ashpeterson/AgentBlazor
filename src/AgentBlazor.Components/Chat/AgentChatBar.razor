@@ -522,7 +522,7 @@
             {
                 var result = streamEvent.ExecutionResult;
                 var key = BuildActivityKey(result.ComponentId, result.ActionId);
-                var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+                var status = MapExecutionResultStatus(result);
                 AddStreamingActivityMessage(
                     new ActivityMessage(
                         key,
@@ -815,6 +815,14 @@
             : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
     }
 
+    private static ActionStatus MapExecutionResultStatus(ComponentActionExecutionResult executionResult)
+        => executionResult.Outcome switch
+        {
+            ActionOutcome.Applied => ActionStatus.Complete,
+            ActionOutcome.Queued => ActionStatus.InProgress,
+            _ => ActionStatus.Failed
+        };
+
     private IDictionary<string, string>? CreateRequestContext()
     {
         var context = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -979,7 +987,7 @@
         {
             var key = BuildActivityKey(result.ComponentId, result.ActionId);
             var text = FormatToolCallResultMessage(result);
-            var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            var status = MapExecutionResultStatus(result);
             messages.Add(new ActivityMessage(
                 key,
                 text,

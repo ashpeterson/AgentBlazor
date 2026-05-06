@@ -81,7 +81,13 @@
     public string? SessionId { get; set; }
 
     [Parameter]
+    public IDictionary<string, string>? BaseContext { get; set; }
+
+    [Parameter]
     public bool ForwardActionsToRuntime { get; set; }
+
+    [Parameter]
+    public bool AllowApprovalRequestsFromForwardedActions { get; set; }
 
     [Parameter]
     public bool ShowRuntimeResponses { get; set; } = true;
@@ -230,12 +236,12 @@
         try
         {
             _isBusy = true;
-            var runtimeContext = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                [AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString,
-                [AgentGenerativeUiSpec.BlockIdContextKey] = blockId,
-                [AgentGenerativeUiSpec.ActionIdContextKey] = action.Id
-            };
+            var runtimeContext = BaseContext is null
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(BaseContext, StringComparer.OrdinalIgnoreCase);
+            runtimeContext[AgentGenerativeUiSpec.GenerateUiContextKey] = bool.TrueString;
+            runtimeContext[AgentGenerativeUiSpec.BlockIdContextKey] = blockId;
+            runtimeContext[AgentGenerativeUiSpec.ActionIdContextKey] = action.Id;
             var generatedUiAction = new GeneratedUiActionInvocation(
                 BlockId: blockId,
                 ActionId: action.Id,
@@ -248,6 +254,17 @@
                 SessionId: EffectiveSessionId,
                 Context: runtimeContext,
                 GeneratedUiAction: generatedUiAction));
+            if (response.RequiresApproval && !AllowApprovalRequestsFromForwardedActions)
+            {
+                response = new AgentTurnResponse(
+                    response.AgentName,
+                    "Generated UI action was blocked because it requested approval-gated actions. Ask for the action in chat to review and approve it.",
+                    [],
+                    [])
+                {
+                    ExecutionPlan = response.ExecutionPlan
+                };
+            }
 
             if (ShowRuntimeResponses)
             {

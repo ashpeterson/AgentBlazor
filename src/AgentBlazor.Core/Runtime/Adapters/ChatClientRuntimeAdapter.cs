@@ -537,12 +537,7 @@ public sealed class ChatClientRuntimeAdapter(
             return false;
         }
 
-        var approvedKeys = ResolveApprovedActionKeys(request.Context);
-        if (approvedKeys.Count == 0)
-        {
-            return false;
-        }
-
+        var approvedActions = ResolveApprovedActionContinuations(request.Context);
         var executionServiceProvider = ResolveExecutionServiceProvider();
         if (executionServiceProvider is null)
         {
@@ -553,63 +548,85 @@ public sealed class ChatClientRuntimeAdapter(
             .GetActions(executionServiceProvider)
             .Where(capability =>
                 capability.RequiresApproval &&
-                IsCapabilityToolAllowed(registration, capability.ActionId) &&
-                approvedKeys.Contains(BuildApprovalKey(capability.CapabilityId, capability.LocalActionId)))
-            .ToArray();
-        if (capabilities.Length == 0)
+                IsCapabilityToolAllowed(registration, capability.ActionId))
+            .ToDictionary(
+                capability => BuildApprovalKey(capability.CapabilityId, capability.LocalActionId),
+                StringComparer.OrdinalIgnoreCase);
+        if (capabilities.Count == 0)
         {
             return false;
         }
 
-        foreach (var capability in capabilities)
+        if (approvedActions.Count == 0 && IsGlobalApprovalContinuation(request.Context))
         {
-            var approvalKey = BuildApprovalKey(capability.CapabilityId, capability.LocalActionId);
-            var approvalArguments = ResolveApprovedActionArguments(request.Context, approvalKey);
+            approvedActions = capabilities.Keys
+                .Select(static targetKey => new ApprovedActionContinuation(
+                    targetKey,
+                    targetKey,
+                    new Dictionary<string, object?>()))
+                .ToArray();
+        }
+
+        if (approvedActions.Count == 0)
+        {
+            return false;
+        }
+
+        var executed = false;
+        foreach (var approvedAction in approvedActions)
+        {
+            if (!capabilities.TryGetValue(approvedAction.TargetKey, out var capability))
+            {
+                continue;
+            }
+
             await InvokeCapabilityAsync(
                     capability,
-                    new AIFunctionArguments(approvalArguments),
+                    new AIFunctionArguments(approvedAction.Arguments),
                     turnState,
                     cancellationToken)
                 .ConfigureAwait(false);
+            executed = true;
         }
 
-        return true;
+        return executed;
     }
 
     private static bool IsApprovalContinuationRequest(AgentTurnRequest request)
-        => request.Context is not null &&
+        => request.ApprovalContinuation is not null ||
+           request.Context is not null &&
            request.UserMessage.StartsWith("Approved.", StringComparison.OrdinalIgnoreCase);
 
-    private static HashSet<string> ResolveApprovedActionKeys(IDictionary<string, string>? context)
+    private static IReadOnlyList<ApprovedActionContinuation> ResolveApprovedActionContinuations(
+        IDictionary<string, string>? context)
     {
-        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var actions = new List<ApprovedActionContinuation>();
         if (context is null ||
             !context.TryGetValue("agentblazor.approvals", out var approvals) ||
             string.IsNullOrWhiteSpace(approvals))
         {
-            return keys;
+            return actions;
         }
 
         if (IsGlobalApprovalValue(approvals))
         {
-            AddApprovalArgumentKeys(context, keys);
-            return keys;
+            foreach (var approvalId in EnumerateApprovalArgumentIds(context))
+            {
+                actions.Add(BuildApprovedActionContinuation(context, approvalId));
+            }
+
+            return DeduplicateApprovedActions(actions);
         }
 
         foreach (var entry in approvals.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (entry.Contains('.', StringComparison.Ordinal))
-            {
-                keys.Add(entry);
-            }
+            actions.Add(BuildApprovedActionContinuation(context, entry));
         }
 
-        return keys;
+        return DeduplicateApprovedActions(actions);
     }
 
-    private static void AddApprovalArgumentKeys(
-        IDictionary<string, string> context,
-        ISet<string> keys)
+    private static IEnumerable<string> EnumerateApprovalArgumentIds(IDictionary<string, string> context)
     {
         const string prefix = "agentblazor.approvalArgs.";
         foreach (var key in context.Keys)
@@ -622,22 +639,58 @@ public sealed class ChatClientRuntimeAdapter(
             var approvalKey = key[prefix.Length..];
             if (approvalKey.Contains('.', StringComparison.Ordinal))
             {
-                keys.Add(approvalKey);
+                yield return approvalKey;
             }
         }
     }
+
+    private static ApprovedActionContinuation BuildApprovedActionContinuation(
+        IDictionary<string, string> context,
+        string approvalId)
+    {
+        var targetKey = context.TryGetValue($"agentblazor.approvalTarget.{approvalId}", out var mappedTarget) &&
+                        !string.IsNullOrWhiteSpace(mappedTarget)
+            ? mappedTarget
+            : approvalId.Split('#', 2)[0];
+        return new ApprovedActionContinuation(
+            approvalId,
+            targetKey,
+            ResolveApprovedActionArguments(context, approvalId, targetKey));
+    }
+
+    private static IReadOnlyList<ApprovedActionContinuation> DeduplicateApprovedActions(
+        IReadOnlyList<ApprovedActionContinuation> actions)
+        => actions
+            .Where(static action => action.TargetKey.Contains('.', StringComparison.Ordinal))
+            .GroupBy(static action => action.ApprovalId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .ToArray();
 
     private static string BuildApprovalKey(string componentId, string actionId)
         => $"{componentId}.{actionId}";
 
     private static IDictionary<string, object?> ResolveApprovedActionArguments(
         IDictionary<string, string>? context,
-        string approvalKey)
+        string approvalId,
+        string? legacyApprovalKey = null)
     {
-        if (context is null ||
-            string.IsNullOrWhiteSpace(approvalKey) ||
-            !context.TryGetValue($"agentblazor.approvalArgs.{approvalKey}", out var rawArguments) ||
+        if (context is null || string.IsNullOrWhiteSpace(approvalId))
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        if (!context.TryGetValue($"agentblazor.approvalArgs.{approvalId}", out var rawArguments) ||
             string.IsNullOrWhiteSpace(rawArguments))
+        {
+            if (string.IsNullOrWhiteSpace(legacyApprovalKey) ||
+                !context.TryGetValue($"agentblazor.approvalArgs.{legacyApprovalKey}", out rawArguments) ||
+                string.IsNullOrWhiteSpace(rawArguments))
+            {
+                return new Dictionary<string, object?>();
+            }
+        }
+
+        if (rawArguments is null)
         {
             return new Dictionary<string, object?>();
         }
@@ -660,6 +713,16 @@ public sealed class ChatClientRuntimeAdapter(
            value.Equals("allow", StringComparison.OrdinalIgnoreCase) ||
            value.Equals("approved", StringComparison.OrdinalIgnoreCase) ||
            value.Equals("all", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsGlobalApprovalContinuation(IDictionary<string, string>? context)
+        => context is not null &&
+           context.TryGetValue("agentblazor.approvals", out var approvals) &&
+           IsGlobalApprovalValue(approvals);
+
+    private sealed record ApprovedActionContinuation(
+        string ApprovalId,
+        string TargetKey,
+        IDictionary<string, object?> Arguments);
 
     private static async Task EmitDrainedTurnEventsAsync(
         TurnExecutionState turnState,
@@ -1254,7 +1317,8 @@ public sealed class ChatClientRuntimeAdapter(
                 capability.ActionId,
                 capability.Description,
                 invocationArguments,
-                policyDecision);
+                policyDecision,
+                PendingApprovalIds.Create(componentId, capability.ActionId, invocationArguments));
             turnState?.AddPendingApproval(approval);
             if (stepIndex is int approvalStepIndex && turnState is not null)
             {
@@ -1434,7 +1498,8 @@ public sealed class ChatClientRuntimeAdapter(
                 capability.LocalActionId,
                 capability.Description,
                 invocationArguments,
-                policyDecision);
+                policyDecision,
+                PendingApprovalIds.Create(capability.CapabilityId, capability.LocalActionId, invocationArguments));
             turnState?.AddPendingApproval(approval);
             if (stepIndex is int approvalStepIndex && turnState is not null)
             {
@@ -3112,6 +3177,13 @@ public sealed class ChatClientRuntimeAdapter(
         {
             lock (_gate)
             {
+                var approvalId = PendingApprovalIds.Resolve(approval);
+                if (_pendingApprovals.Any(existing =>
+                    string.Equals(PendingApprovalIds.Resolve(existing), approvalId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return;
+                }
+
                 _pendingApprovals.Add(approval);
             }
         }

@@ -9,13 +9,15 @@ namespace AgentBlazor.Core.Runtime.Agents;
 /// <param name="UserId">Optional user identifier for cross-session preferences.</param>
 /// <param name="Context">Optional context dictionary.</param>
 /// <param name="GeneratedUiAction">Optional typed generated-UI action invocation metadata.</param>
+/// <param name="ApprovalContinuation">Optional typed approval continuation metadata.</param>
 public sealed record AgentTurnRequest(
     string UserMessage,
     string? AgentName = null,
     string? SessionId = null,
     string? UserId = null,
     IDictionary<string, string>? Context = null,
-    GeneratedUiActionInvocation? GeneratedUiAction = null)
+    GeneratedUiActionInvocation? GeneratedUiAction = null,
+    AgentApprovalContinuation? ApprovalContinuation = null)
 {
     /// <summary>
     /// Gets the effective session ID, using the context value if SessionId is not set.
@@ -66,3 +68,9 @@ public sealed record GeneratedUiActionInvocation(
     string ActionId,
     string? Prompt,
     IReadOnlyDictionary<string, object?> Payload);
+
+/// <summary>
+/// Typed approval continuation metadata forwarded by first-party AgentBlazor UI.
+/// </summary>
+public sealed record AgentApprovalContinuation(
+    IReadOnlyList<string> ApprovalIds);

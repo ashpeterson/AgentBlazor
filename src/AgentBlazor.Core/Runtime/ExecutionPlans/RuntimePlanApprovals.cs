@@ -57,7 +57,8 @@ internal static class RuntimePlanApprovals
                 step.ActionId,
                 action.Description,
                 step.Arguments.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase),
-                RuntimeTrustDecisions.BuildPolicyDecision(step.ComponentId, step.ActionId, requiresApproval: true)));
+                RuntimeTrustDecisions.BuildPolicyDecision(step.ComponentId, step.ActionId, requiresApproval: true),
+                PendingApprovalIds.Create(step.ComponentId, step.ActionId, step.Arguments)));
         }
 
         return pending;
