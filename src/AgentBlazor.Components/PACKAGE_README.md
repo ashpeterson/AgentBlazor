@@ -2,6 +2,10 @@
 
 Add an agent chat surface and deterministic app actions to a Blazor app.
 
+Hosted demo:
+
+- https://demo.agentblazor.com/demo/workflows/support-inbox
+
 Install:
 
 ```bash
@@ -78,5 +82,6 @@ public sealed class SupportInboxCapabilities
 Docs and demo:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
+- Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
 - Starter sample: https://github.com/ashpeterson/AgentBlazor/tree/master/samples/AgentBlazor.Starter
