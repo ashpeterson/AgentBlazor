@@ -111,7 +111,7 @@
     public bool EnableGeneratedUi { get; set; }
 
     [Parameter]
-    public bool ShowExecutionDetails { get; set; } = true;
+    public bool ShowExecutionDetails { get; set; }
 
     private string EffectiveDescription =>
         !string.IsNullOrWhiteSpace(Description)

@@ -53,7 +53,6 @@
                                           LockAgentToCurrentRoute="true"
                                           ShowAgentSelector="false"
                                           EnableGeneratedUi="true"
-                                          ShowExecutionDetails="@ShowAssistantExecutionDetails"
                                           Placeholder="@AssistantPlaceholder"
                                           Theme="_assistantTheme"
                                           CssClass="demo-shell__assistant-surface" />
@@ -79,7 +78,6 @@
                          LockAgentToCurrentRoute="@ShouldLockAssistantToRoute"
                          ShowAgentSelector="@ShowAssistantSelector"
                          EnableGeneratedUi="true"
-                         ShowExecutionDetails="@ShowAssistantExecutionDetails"
                          Placeholder="@AssistantPlaceholder"
                          Theme="_assistantTheme"
                          Width="@AssistantWidgetWidth"
@@ -154,7 +152,6 @@
     private bool ShowAssistantWidget => !ShowAssistantPane;
     private bool ShouldLockAssistantToRoute => CurrentScenario is not null && IsWorkflowRoute;
     private bool ShowAssistantSelector => !ShouldLockAssistantToRoute;
-    private bool ShowAssistantExecutionDetails => !IsWorkflowRoute;
 
     private string AssistantWidgetWidth =>
         IsSupportInboxRoute

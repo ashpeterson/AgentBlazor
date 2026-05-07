@@ -204,6 +204,32 @@ public sealed class AgentChatSurfaceTests : TestContext
         });
     }
 
+    [Fact]
+    public void ShowExecutionDetailsTrue_ShowsPlanActivityAndResultDiagnostics()
+    {
+        Services.AddAgentBlazorServices();
+        Services.AgentBlazor().AddAgent("Test Agent");
+        Services.AddSingleton<IAgentActionRenderRegistry, TestActionRenderRegistry>();
+        Services.AddSingleton<IAgentRuntimeAdapter, DiagnosticRuntimeAdapter>();
+
+        var cut = RenderComponent<AgentChatSurface>(parameters => parameters
+            .Add(static surface => surface.ShowAgentSelector, false)
+            .Add(static surface => surface.DefaultAgentName, "Test Agent")
+            .Add(static surface => surface.ShowExecutionDetails, true));
+
+        cut.Find("textarea[aria-label='Message input']").Input("Explain why tickets need attention");
+        cut.Find("button[aria-label='Send message']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("The current queue has 3 tickets needing attention.", cut.Markup);
+            Assert.Contains("Plan:", cut.Markup);
+            Assert.Contains("support_inbox.explain_open_tickets", cut.Markup);
+            Assert.Contains("Next: Draft a reply for the highlighted tickets", cut.Markup);
+            Assert.Contains("Output: highlightedTicketIds", cut.Markup);
+        });
+    }
+
     private sealed class CancellableStreamingRuntimeAdapter : IAgentRuntimeAdapter
     {
         private readonly CancellationTokenSource _runCancellation = new();
