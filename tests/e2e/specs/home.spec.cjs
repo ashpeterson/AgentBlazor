@@ -23,6 +23,11 @@ test.describe("Landing page", () => {
 
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("#hero").getByRole("link", { name: "Live demo" }).click();
+    await expect(page).toHaveURL(/\/demo$/);
+    await expect(page.getByRole("heading", { name: /pick the workflow size you want to see/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Quick: draft one safe reply" })).toBeVisible();
+
+    await page.getByRole("link", { name: "Start with quick demo" }).click();
     await expect(page).toHaveURL(/\/demo\/workflows\/support-inbox/);
   });
 });
