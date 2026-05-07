@@ -34,7 +34,7 @@ public sealed record PlanExecutionResult
     public required bool Succeeded { get; init; }
     public TimeSpan Duration { get; init; }
 
-    public int SuccessCount => StepResults.Count(r => r.Outcome is ActionOutcome.Applied or ActionOutcome.Queued);
+    public int SuccessCount => StepResults.Count(r => r.Outcome is ActionOutcome.Applied);
     public int FailureCount => StepResults.Count(r =>
         r.Outcome is ActionOutcome.Failed or ActionOutcome.Blocked or ActionOutcome.NeedsClarification);
     public int AppliedCount => StepResults.Count(r => r.Outcome is ActionOutcome.Applied);
@@ -53,5 +53,5 @@ public sealed record StepExecutionResult
     public required string Message { get; init; }
     public TimeSpan Duration { get; init; }
 
-    public bool Succeeded => Outcome is ActionOutcome.Applied or ActionOutcome.Queued;
+    public bool Succeeded => Outcome is ActionOutcome.Applied;
 }

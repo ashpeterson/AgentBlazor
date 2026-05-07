@@ -162,9 +162,9 @@ public class ComponentMockingReportTests
         var report = GenerateReport(results, mockDataGrid, mockDialog, mockForm, mockNavMenu, mockTabs);
         _output.WriteLine(report);
 
-        // Verify most scenarios succeeded (some edge cases may fail due to parameter normalization)
-        var successCount = results.Count(static r => r.HasSuccessfulExecution);
-        Assert.True(successCount >= 10, $"Expected at least 10 successful scenarios, got {successCount}");
+        // Queued actions are accepted by the runtime but not completed until the matching component mounts.
+        var acceptedCount = results.Count(static r => r.HasAcceptedExecution);
+        Assert.True(acceptedCount >= 10, $"Expected at least 10 accepted scenarios, got {acceptedCount}");
         Assert.All(results, static r => Assert.True(
             r.HasPlannedSteps,
             "Expected normalized plan steps or legacy planned actions."));
@@ -186,7 +186,7 @@ public class ComponentMockingReportTests
         sb.AppendLine();
         sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine($"Total Scenarios: {results.Count}");
-        sb.AppendLine($"Successful: {results.Count(static r => r.HasSuccessfulExecution)}");
+        sb.AppendLine($"Accepted: {results.Count(static r => r.HasAcceptedExecution)}");
         sb.AppendLine();
 
         sb.AppendLine("───────────────────────────────────────────────────────────────────────────────");
@@ -197,8 +197,8 @@ public class ComponentMockingReportTests
         int scenarioNum = 1;
         foreach (var result in results)
         {
-            var outcome = result.HasSuccessfulExecution ? "SUCCESS" : "FAILED";
-            var outcomeIcon = outcome == "SUCCESS" ? "[OK]" : "[FAIL]";
+            var outcome = result.HasAcceptedExecution ? "ACCEPTED" : "FAILED";
+            var outcomeIcon = outcome == "ACCEPTED" ? "[OK]" : "[FAIL]";
 
             sb.AppendLine($"┌─ Scenario {scenarioNum}: {outcomeIcon}");
             sb.AppendLine($"│");
@@ -305,7 +305,7 @@ public class ComponentMockingReportTests
             var promptTrunc = result.Prompt.Length > 44 ? result.Prompt[..41] + "..." : result.Prompt.PadRight(44);
             var component = result.GetPrimaryTargetId();
             var action = result.GetPrimaryActionId();
-            var status = result.HasSuccessfulExecution ? "SUCCESS" : "FAILED";
+            var status = result.HasAcceptedExecution ? "ACCEPTED" : "FAILED";
 
             sb.AppendLine($"| {scenarioNum,1} | {promptTrunc} | {component,-11} | {action,-13} | {status,-7} |");
             scenarioNum++;
@@ -340,9 +340,11 @@ public class ComponentMockingReportTests
         public bool HasPlannedSteps =>
             ExecutionPlan?.Steps.Count > 0 || LegacyPlannedActions.Count > 0;
 
-        public bool HasSuccessfulExecution =>
-            ExecutionPlan?.Steps.Any(static step => step.Status is AgentExecutionStepStatus.Completed) is true ||
-            LegacyExecutionResults.Any(static result => result.Succeeded);
+        public bool HasAcceptedExecution =>
+            ExecutionPlan?.Steps.Any(static step =>
+                step.Status is AgentExecutionStepStatus.Completed or AgentExecutionStepStatus.Queued) is true ||
+            LegacyExecutionResults.Any(static result =>
+                result.Outcome is ActionOutcome.Applied or ActionOutcome.Queued);
 
         public IEnumerable<string> GetPlannedStepLines()
         {
@@ -390,7 +392,12 @@ public class ComponentMockingReportTests
             {
                 foreach (var step in ExecutionPlan.Steps)
                 {
-                    var status = step.Status is AgentExecutionStepStatus.Completed ? "OK" : "FAIL";
+                    var status = step.Status switch
+                    {
+                        AgentExecutionStepStatus.Completed => "OK",
+                        AgentExecutionStepStatus.Queued => "QUEUED",
+                        _ => "FAIL"
+                    };
                     yield return $"[{status}] {step.TargetId}.{step.ActionId}";
                     if (!string.IsNullOrWhiteSpace(step.Message))
                     {
@@ -403,7 +410,12 @@ public class ComponentMockingReportTests
 
             foreach (var exec in LegacyExecutionResults)
             {
-                var status = exec.Succeeded ? "OK" : "FAIL";
+                var status = exec.Outcome switch
+                {
+                    ActionOutcome.Applied => "OK",
+                    ActionOutcome.Queued => "QUEUED",
+                    _ => "FAIL"
+                };
                 yield return $"[{status}] {exec.ComponentId}.{exec.ActionId}";
                 yield return $"     Message: {exec.Message}";
             }
@@ -726,4 +738,3 @@ public class ComponentMockingReportTests
 
     #endregion
 }
-

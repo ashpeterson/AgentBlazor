@@ -969,6 +969,7 @@ internal sealed class DeterministicAgUiHostedAgent(
         var outcome = step.Status switch
         {
             AgentExecutionStepStatus.Completed => ActionOutcome.Applied,
+            AgentExecutionStepStatus.Queued => ActionOutcome.Queued,
             AgentExecutionStepStatus.ApprovalRequired => ActionOutcome.Failed,
             AgentExecutionStepStatus.NeedsClarification => ActionOutcome.Failed,
             AgentExecutionStepStatus.Blocked => ActionOutcome.Failed,

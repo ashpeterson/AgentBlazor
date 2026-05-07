@@ -195,6 +195,7 @@ internal static class ExecutionPlanNarrativeFormatter
         {
             AgentExecutionStepStatus.ApprovalRequired => "awaiting approval",
             AgentExecutionStepStatus.Completed => "done",
+            AgentExecutionStepStatus.Queued => "queued",
             AgentExecutionStepStatus.NeedsClarification => "needs clarification",
             AgentExecutionStepStatus.Blocked => "blocked",
             AgentExecutionStepStatus.Failed => "failed",

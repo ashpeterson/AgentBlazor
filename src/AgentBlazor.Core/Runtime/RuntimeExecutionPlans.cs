@@ -110,7 +110,8 @@ internal static class RuntimeExecutionPlans
 
         return result.Outcome switch
         {
-            ActionOutcome.Applied or ActionOutcome.Queued => AgentExecutionStepStatus.Completed,
+            ActionOutcome.Applied => AgentExecutionStepStatus.Completed,
+            ActionOutcome.Queued => AgentExecutionStepStatus.Queued,
             ActionOutcome.NeedsClarification => AgentExecutionStepStatus.NeedsClarification,
             ActionOutcome.Blocked => AgentExecutionStepStatus.Blocked,
             ActionOutcome.Failed => AgentExecutionStepStatus.Failed,

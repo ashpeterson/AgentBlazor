@@ -19,6 +19,9 @@ internal static class ExecutionStepNarrativeFormatter
                 case AgentExecutionStepStatus.ApprovalRequired:
                     lines.Add("Awaiting approval before execution.");
                     break;
+                case AgentExecutionStepStatus.Queued:
+                    lines.Add("Execution was queued and is waiting for a matching UI component.");
+                    break;
                 case AgentExecutionStepStatus.Blocked:
                     lines.Add("Execution was blocked.");
                     break;

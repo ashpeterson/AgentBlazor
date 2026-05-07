@@ -58,7 +58,7 @@ internal static class RuntimePersistenceRecords
             {
                 allEvents.Add(new InspectorEvent(
                     DateTimeOffset.UtcNow,
-                    result.Succeeded ? "ToolCallResult" : "ToolCallFailed",
+                    MapExecutionResultEventKind(result.Outcome),
                     result.ComponentId,
                     result.ActionId,
                     result.Message));
@@ -83,10 +83,19 @@ internal static class RuntimePersistenceRecords
         => status switch
         {
             AgentExecutionStepStatus.Completed => "StepCompleted",
+            AgentExecutionStepStatus.Queued => "StepQueued",
             AgentExecutionStepStatus.Failed => "StepFailed",
             AgentExecutionStepStatus.Blocked => "StepBlocked",
             AgentExecutionStepStatus.ApprovalRequired => "StepApprovalRequired",
             AgentExecutionStepStatus.NeedsClarification => "StepClarificationRequired",
             _ => "StepPending"
+        };
+
+    private static string MapExecutionResultEventKind(ActionOutcome outcome)
+        => outcome switch
+        {
+            ActionOutcome.Applied => "ToolCallResult",
+            ActionOutcome.Queued => "ToolCallQueued",
+            _ => "ToolCallFailed"
         };
 }

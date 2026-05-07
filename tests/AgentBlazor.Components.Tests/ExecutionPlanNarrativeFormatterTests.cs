@@ -88,6 +88,29 @@ public sealed class ExecutionPlanNarrativeFormatterTests
     }
 
     [Fact]
+    public void BuildStepLabels_LabelsQueuedSteps()
+    {
+        var plan = new AgentExecutionPlan(
+            "RiskAgent",
+            new AgentExecutionContext("session-1", "run-1"),
+            [
+                new AgentExecutionStep(
+                    "step-1",
+                    0,
+                    AgentExecutionStepKind.UiAction,
+                    "AgentDialog",
+                    "open",
+                    AgentExecutionStepStatus.Queued,
+                    false,
+                    new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None))
+            ]);
+
+        var labels = ExecutionPlanNarrativeFormatter.BuildStepLabels(plan, []);
+
+        Assert.Equal(["UI: AgentDialog.open (queued)"], labels);
+    }
+
+    [Fact]
     public void ApprovalHelpers_BuildSharedSummaryTitleAndPolicyNarrative()
     {
         var summary = ExecutionPlanNarrativeFormatter.BuildApprovalSummary(

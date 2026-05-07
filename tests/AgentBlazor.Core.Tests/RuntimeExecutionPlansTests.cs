@@ -24,6 +24,10 @@ public class RuntimeExecutionPlansTests
                     "show_at_risk_suppliers",
                     "semantic"),
                 new PlannedComponentAction(
+                    "AgentDialog",
+                    "open",
+                    "ui queued"),
+                new PlannedComponentAction(
                     "AgentForm",
                     "submit",
                     "ui")
@@ -34,7 +38,12 @@ public class RuntimeExecutionPlansTests
                     "supplier_compliance",
                     "show_at_risk_suppliers",
                     ActionOutcome.Applied,
-                    "Prepared a review.")
+                    "Prepared a review."),
+                new ComponentActionExecutionResult(
+                    "AgentDialog",
+                    "open",
+                    ActionOutcome.Queued,
+                    "Dialog open was queued.")
             ],
             pendingApprovals:
             [
@@ -65,6 +74,14 @@ public class RuntimeExecutionPlansTests
                 Assert.Equal(AgentApprovalMode.None, semantic.PolicyDecision.ApprovalMode);
                 Assert.Equal("supplier_compliance", semantic.TargetId);
                 Assert.Equal("show_at_risk_suppliers", semantic.ActionId);
+            },
+            queued =>
+            {
+                Assert.Equal(AgentExecutionStepKind.UiAction, queued.Kind);
+                Assert.Equal(AgentExecutionStepStatus.Queued, queued.Status);
+                Assert.False(queued.RequiresApproval);
+                Assert.Equal("AgentDialog", queued.TargetId);
+                Assert.Equal("open", queued.ActionId);
             },
             ui =>
             {
