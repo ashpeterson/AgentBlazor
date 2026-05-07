@@ -1,5 +1,6 @@
 @page "/demo"
 @layout DemoLayout
+@using AgentBlazor.Demo.Services
 @using MudBlazor
 
 <PageTitle>Demo — AgentBlazor</PageTitle>
@@ -8,45 +9,88 @@
     <MudPaper Elevation="0" Class="launchpad__hero">
         <div class="launchpad__hero-copy">
             <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">Live demo</MudChip>
-            <MudText Typo="Typo.h4" Class="mt-4 mb-2">One normal app screen. One support queue.</MudText>
+            <MudText Typo="Typo.h4" Class="mt-4 mb-2">Pick the workflow size you want to see.</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
-                Open the support queue and run a concrete ticket flow live: find open tickets, explain the queue, draft a reply, and cross the approval boundary.
+                Start small with one support reply, scale the same route into blockers and handoff, or open the advanced multi-surface flows.
             </MudText>
         </div>
 
-        <div class="launchpad__feature-grid">
-            <article class="launchpad__feature-card">
-                <div class="launchpad__quickstart-card" aria-label="AgentBlazor quickstart">
-                    <span class="launchpad__eyebrow">Minimal setup</span>
-                    <h2>NuGet package, one workflow, one widget.</h2>
-                    <ol>
-                        <li><code>dotnet add package AgentBlazor --prerelease</code></li>
-                        <li><code>AddAgentBlazor(...).AddWorkflow&lt;HelloWorkflow&gt;("hello-workflow")</code></li>
-                        <li><code>&lt;AgentChatWidget Title="Assistant" /&gt;</code></li>
-                    </ol>
-                </div>
-                <div class="launchpad__feature-copy">
-                    <strong>What to look for in the live route</strong>
-                    <p>The agent reads the current support queue, plans an action, requests approval for the reply draft, then updates the page after approval.</p>
-                </div>
-            </article>
-
-            <aside class="launchpad__guide-card">
-                <span class="launchpad__eyebrow">Try these prompts</span>
-                <div class="launchpad__guide-list">
-                    <span><strong>Show open tickets from this week.</strong> Focus the queue on tickets that still need a reply.</span>
-                    <span><strong>Explain why they need attention.</strong> Summarize the visible blockers before you draft anything.</span>
-                    <span><strong>Draft a reply for ticket TCK-1042.</strong> Hit the approval boundary and see the draft appear on screen.</span>
-                </div>
-                <div class="launchpad__hero-actions">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/demo/workflows/support-inbox">
-                        Open live support queue
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/docs/cli">
-                        Advanced CLI
-                    </MudButton>
-                </div>
-            </aside>
+        <div class="launchpad__quickstart">
+            <span class="launchpad__eyebrow">Fast path</span>
+            <ol>
+                <li>Open the quick support queue.</li>
+                <li>Ask the three visible prompts in order.</li>
+                <li>Approve the draft and watch the page render structured output.</li>
+            </ol>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="@DemoScenarioCatalog.LaunchpadScenarios[0].Route">
+                Start with quick demo
+            </MudButton>
         </div>
     </MudPaper>
+
+    <section class="launchpad__scenario-section">
+        <div class="launchpad__section-head">
+            <span class="launchpad__eyebrow">Scale up or down</span>
+            <MudText Typo="Typo.h5">Same runtime, different workflow sizes</MudText>
+        </div>
+
+        <div class="launchpad__scenario-grid">
+            @foreach (var scenario in DemoScenarioCatalog.LaunchpadScenarios)
+            {
+                <article class="launchpad__scenario-card launchpad__scenario-card--@GetScaleClass(scenario.Scale)">
+                    <div class="launchpad__scenario-topline">
+                        <span>@GetScaleLabel(scenario.Scale)</span>
+                        <small>@scenario.AgentName</small>
+                    </div>
+
+                    <div class="launchpad__scenario-copy">
+                        <h2>@scenario.Title</h2>
+                        <p>@scenario.Summary</p>
+                    </div>
+
+                    <div class="launchpad__prompt-list" aria-label="@($"{scenario.Title} prompts")">
+                        @foreach (var prompt in scenario.Prompts)
+                        {
+                            <span>@prompt</span>
+                        }
+                    </div>
+
+                    <div class="launchpad__proof-list">
+                        @foreach (var proofPoint in scenario.ProofPoints)
+                        {
+                            <span>@proofPoint</span>
+                        }
+                    </div>
+
+                    <MudButton Variant="@(scenario.Scale == DemoScenarioScale.Quick ? Variant.Filled : Variant.Outlined)"
+                               Color="@(scenario.Scale == DemoScenarioScale.Advanced ? Color.Secondary : Color.Primary)"
+                               Href="@scenario.Route">
+                        @scenario.CtaLabel
+                    </MudButton>
+                </article>
+            }
+        </div>
+    </section>
 </div>
+
+@code {
+    private static string GetScaleLabel(DemoScenarioScale scale)
+        => scale switch
+        {
+            DemoScenarioScale.Quick => "Quick",
+            DemoScenarioScale.Full => "Full",
+            DemoScenarioScale.Advanced => "Advanced",
+            _ => scale.ToString()
+        };
+
+    private static string GetScaleClass(DemoScenarioScale scale)
+        => scale switch
+        {
+            DemoScenarioScale.Quick => "quick",
+            DemoScenarioScale.Full => "full",
+            DemoScenarioScale.Advanced => "advanced",
+            _ => "default"
+        };
+}

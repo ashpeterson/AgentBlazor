@@ -79,7 +79,7 @@ Render one chat surface:
 
 - Home quickstart: `/`
 - Docs: `/docs`
-- Live demo: `/demo/workflows/support-inbox`
+- Live demo: `/demo`
 - Starter sample: `samples/AgentBlazor.Starter`
 - Starter sample route: `/ops-review`
 

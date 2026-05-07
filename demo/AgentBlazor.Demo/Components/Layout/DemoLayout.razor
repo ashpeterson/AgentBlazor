@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @using AgentBlazor.Components
 @using AgentBlazor.Components.Chat
+@using AgentBlazor.Demo.Services
 @using Microsoft.JSInterop
 @using MudBlazor
 @implements IDisposable
@@ -138,22 +139,14 @@
     private const int MaxAssistantClientIdLoadAttempts = 8;
 
     private string CurrentRoutePath => new Uri(NavigationManager.Uri).AbsolutePath;
+    private DemoScenario? CurrentScenario => DemoScenarioCatalog.FindByPath(CurrentRoutePath);
     private string AssistantSessionId => $"demo:{_assistantClientId}:{CurrentRoutePath.TrimEnd('/').ToLowerInvariant()}";
 
-    private bool IsWorkflowHubRoute => string.Equals(CurrentRoutePath.TrimEnd('/'), "/demo", StringComparison.OrdinalIgnoreCase);
     private bool IsComponentsRoute => CurrentRoutePath.StartsWith("/demo/components", StringComparison.OrdinalIgnoreCase);
     private bool IsWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows", StringComparison.OrdinalIgnoreCase);
     private bool IsSupportInboxRoute => CurrentRoutePath.StartsWith("/demo/workflows/support-inbox", StringComparison.OrdinalIgnoreCase);
-    private bool IsDashboardRoute => CurrentRoutePath.StartsWith("/demo/dashboard", StringComparison.OrdinalIgnoreCase);
-    private bool IsSupplierWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/supplier-compliance", StringComparison.OrdinalIgnoreCase);
-    private bool IsFileWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/file-audit-bundle", StringComparison.OrdinalIgnoreCase);
-    private bool IsRecipeWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/recipe-release", StringComparison.OrdinalIgnoreCase);
-    private bool IsIncidentWorkflowRoute => CurrentRoutePath.StartsWith("/demo/workflows/incident-escalation", StringComparison.OrdinalIgnoreCase);
-    private bool IsResponseOrchestrationRoute => CurrentRoutePath.StartsWith("/demo/workflows/response-orchestration", StringComparison.OrdinalIgnoreCase);
-    private bool IsReleaseDossierRoute => CurrentRoutePath.StartsWith("/demo/workflows/release-dossier", StringComparison.OrdinalIgnoreCase);
-    private bool IsRuntimeProbeRoute => CurrentRoutePath.StartsWith("/demo/workflows/runtime-probe", StringComparison.OrdinalIgnoreCase);
 
-    private bool ShowAssistantPane => IsWorkflowRoute && !IsComponentsRoute && !IsSupportInboxRoute;
+    private bool ShowAssistantPane => CurrentScenario is not null && IsWorkflowRoute && !IsComponentsRoute && !IsSupportInboxRoute;
     private bool ShowAssistantWidget => !ShowAssistantPane;
 
     private string AssistantWidgetWidth =>
@@ -169,89 +162,13 @@
     private string AssistantWidgetRight => "0.85rem";
     private string AssistantWidgetBottom => "0.85rem";
 
-    private string AssistantTitle =>
-        IsWorkflowHubRoute
-            ? "Demo assistant"
-            : IsSupportInboxRoute
-            ? "Support assistant"
-            : IsResponseOrchestrationRoute
-            ? "Response assistant"
-            : IsReleaseDossierRoute
-                ? "Release assistant"
-                : IsSupplierWorkflowRoute
-                    ? "Supplier assistant"
-                    : IsFileWorkflowRoute
-                        ? "Evidence assistant"
-                        : IsRecipeWorkflowRoute
-                            ? "Recipe assistant"
-                            : IsIncidentWorkflowRoute
-                                ? "Incident assistant"
-                                : IsRuntimeProbeRoute
-                                    ? "Runtime probe assistant"
-                                : "Workflow assistant";
+    private string AssistantTitle => CurrentScenario?.AssistantTitle ?? "Workflow assistant";
 
-    private string AssistantDescription =>
-        IsWorkflowHubRoute
-            ? "Open the main flow first."
-            : IsSupportInboxRoute
-            ? "Find tickets, explain the queue, draft a reply."
-            : IsResponseOrchestrationRoute
-            ? "Assess, advance, recover, prepare."
-            : IsReleaseDossierRoute
-                ? "Assess, advance, recover, prepare."
-                : IsSupplierWorkflowRoute
-                    ? "Review risk, clear blockers, prepare."
-                    : IsFileWorkflowRoute
-                        ? "Prepare, recover, retry."
-                        : IsRecipeWorkflowRoute
-                            ? "Assess, recover, stage."
-                            : IsIncidentWorkflowRoute
-                                ? "Triage, recover, hand off."
-                                : IsRuntimeProbeRoute
-                                    ? "Run the cancellation probe, then stop it."
-                                : "Ask for the next step.";
+    private string AssistantDescription => CurrentScenario?.AssistantDescription ?? "Ask for the next step.";
 
-    private string AssistantPlaceholder =>
-        IsWorkflowHubRoute
-            ? "Open the response flow or the release flow."
-            : IsSupportInboxRoute
-            ? "Show open tickets. Explain the queue. Draft a reply."
-            : IsResponseOrchestrationRoute
-            ? "Assess readiness. Advance next stage. Prepare packet."
-            : IsReleaseDossierRoute
-                ? "Assess readiness. Advance next stage. Prepare dossier."
-                : IsSupplierWorkflowRoute
-                    ? "Explain risk. Recover. Prepare."
-                    : IsFileWorkflowRoute
-                        ? "Explain blockers. Recover. Prepare."
-                        : IsRecipeWorkflowRoute
-                            ? "Assess readiness. Recover. Prepare."
-                            : IsIncidentWorkflowRoute
-                                ? "Summarize triage. Recover. Submit."
-                                : IsRuntimeProbeRoute
-                                    ? "Run the runtime cancellation probe, then stop."
-                                : "What should happen next?";
+    private string AssistantPlaceholder => CurrentScenario?.AssistantPlaceholder ?? "What should happen next?";
 
-    private string? DefaultAssistantAgent =>
-        IsWorkflowHubRoute
-            ? "Workflow Hub Agent"
-            : IsSupportInboxRoute
-            ? "Support Inbox Agent"
-            : IsResponseOrchestrationRoute
-            ? "Response Orchestration Agent"
-            : IsReleaseDossierRoute
-                ? "Release Dossier Agent"
-                : IsSupplierWorkflowRoute
-                    ? "Supplier Compliance Agent"
-                    : IsFileWorkflowRoute
-                        ? "File Workflow Agent"
-                        : IsRecipeWorkflowRoute
-                            ? "Recipe Release Agent"
-                            : IsIncidentWorkflowRoute
-                                ? "Incident Escalation Agent"
-                                : IsRuntimeProbeRoute
-                                    ? "Runtime Probe Agent"
-                                : null;
+    private string? DefaultAssistantAgent => CurrentScenario?.AgentName;
 
     protected override void OnInitialized()
     {
