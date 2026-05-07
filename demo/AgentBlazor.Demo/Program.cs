@@ -30,9 +30,11 @@ builder.Services.AddScoped<SupportInboxWorkflowService>();
 builder.Services.AddScoped<ResponseOrchestrationWorkflowService>();
 builder.Services.AddScoped<ReleaseDossierWorkflowService>();
 builder.Services.Configure<DemoSecurityOptions>(builder.Configuration.GetSection(DemoSecurityOptions.SectionName));
+builder.Services.Configure<DemoLoggingOptions>(builder.Configuration.GetSection(DemoLoggingOptions.SectionName));
 builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSection(DemoRemoteStorageOptions.SectionName));
 builder.Services.AddHttpClient("demo-remote-storage");
 builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
+builder.Services.AddSingleton<IDemoChatRequestLog, JsonlDemoChatRequestLog>();
 
 var demoSecurityOptions = builder.Configuration.GetSection(DemoSecurityOptions.SectionName).Get<DemoSecurityOptions>()
     ?? new DemoSecurityOptions();
@@ -89,6 +91,19 @@ builder.Services.PostConfigure<DemoRemoteStorageOptions>(options =>
     options.HttpBearerToken = FirstConfigured(
         Environment.GetEnvironmentVariable("DEMO_REMOTE_STORAGE_HTTP_BEARER_TOKEN"),
         options.HttpBearerToken);
+});
+
+builder.Services.PostConfigure<DemoLoggingOptions>(options =>
+{
+    options.DirectoryPath = FirstConfigured(
+            Environment.GetEnvironmentVariable("DEMO_LOG_DIRECTORY"),
+            Environment.GetEnvironmentVariable("DemoLogging__DirectoryPath"),
+            options.DirectoryPath)
+        ?? Path.Combine(Path.GetTempPath(), "agentblazor-demo-logs");
+    options.AccessToken = FirstConfigured(
+        Environment.GetEnvironmentVariable("DEMO_LOG_ACCESS_TOKEN"),
+        Environment.GetEnvironmentVariable("DemoLogging__AccessToken"),
+        options.AccessToken);
 });
 
 if (demoSecurityOptions.TrustForwardedHeaders)
@@ -151,6 +166,8 @@ builder.Services.AddAgentBlazor(options =>
     {
         options.UseProLicense(proLicenseKey, proDataDirectory);
     }
+
+    options.UseMiddleware<DemoChatRequestLoggingMiddleware>();
 
     options.ConfigureBuilder(agentBuilder =>
     {
@@ -303,6 +320,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 var agentEndpoints = app.MapAgentBlazorEndpoints();
+app.MapDemoLogEndpoints();
 
 if (demoSecurityOptions.RateLimiting.Enabled)
 {
