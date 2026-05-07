@@ -177,6 +177,33 @@ public sealed class AgentChatSurfaceTests : TestContext
         });
     }
 
+    [Fact]
+    public void ShowExecutionDetailsFalse_HidesPlanActivityAndResultDiagnostics()
+    {
+        Services.AddAgentBlazorServices();
+        Services.AgentBlazor().AddAgent("Test Agent");
+        Services.AddSingleton<IAgentActionRenderRegistry, TestActionRenderRegistry>();
+        Services.AddSingleton<IAgentRuntimeAdapter, DiagnosticRuntimeAdapter>();
+
+        var cut = RenderComponent<AgentChatSurface>(parameters => parameters
+            .Add(static surface => surface.ShowAgentSelector, false)
+            .Add(static surface => surface.DefaultAgentName, "Test Agent")
+            .Add(static surface => surface.ShowExecutionDetails, false));
+
+        cut.Find("textarea[aria-label='Message input']").Input("Explain why tickets need attention");
+        cut.Find("button[aria-label='Send message']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("The current queue has 3 tickets needing attention.", cut.Markup);
+            Assert.DoesNotContain("Plan:", cut.Markup);
+            Assert.DoesNotContain("Executing support_inbox.explain_open_tickets", cut.Markup);
+            Assert.DoesNotContain("Capability: support_inbox.explain_open_tickets", cut.Markup);
+            Assert.DoesNotContain("Next: Draft a reply for the highlighted tickets", cut.Markup);
+            Assert.DoesNotContain("Output: highlightedTicketIds", cut.Markup);
+        });
+    }
+
     private sealed class CancellableStreamingRuntimeAdapter : IAgentRuntimeAdapter
     {
         private readonly CancellationTokenSource _runCancellation = new();
@@ -457,6 +484,76 @@ public sealed class AgentChatSurfaceTests : TestContext
             {
                 ExecutionPlan = executionPlan
             };
+        }
+    }
+
+    private sealed class DiagnosticRuntimeAdapter : IAgentRuntimeAdapter
+    {
+        public bool SupportsStreaming => false;
+
+        public bool SupportsReconnect => false;
+
+        public bool SupportsCancellation => false;
+
+        public Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
+        {
+            _ = request;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var responseText =
+                "The current queue has 3 tickets needing attention. 2 tickets have escalation risk, 1 ticket is blocked by missing evidence, and the oldest highlighted ticket is 6 days old.";
+            var executionPlan = new AgentExecutionPlan(
+                "Test Agent",
+                new AgentExecutionContext("diagnostics-session", "diagnostics-run", Route: "/demo/workflows/support-inbox"),
+                [
+                    new AgentExecutionStep(
+                        "step-1",
+                        1,
+                        AgentExecutionStepKind.SemanticCapability,
+                        "support_inbox",
+                        "explain_open_tickets",
+                        AgentExecutionStepStatus.Completed,
+                        false,
+                        new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None),
+                        Message: responseText,
+                        Outputs: new Dictionary<string, object?>
+                        {
+                            ["highlightedTicketIds"] = new[] { "TCK-1042", "TCK-1048", "TCK-1055" }
+                        },
+                        NextActions: ["Draft a reply for the highlighted tickets"])
+                ]);
+
+            return Task.FromResult(new AgentTurnResponse("Test Agent", responseText, [], [])
+            {
+                ExecutionPlan = executionPlan
+            });
+        }
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
+            AgentTurnRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = request;
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+            string runId,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public Task<bool> StopRunAsync(string runId, CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(false);
         }
     }
 

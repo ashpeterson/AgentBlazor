@@ -85,11 +85,11 @@
                 <article class="ab-chat-bar__message ab-chat-bar__message--@item.Role">
                     <div class="ab-chat-bar__message-role">@GetRoleLabel(item.Role)</div>
                     <div class="ab-chat-bar__message-text">@item.Text</div>
-                    @if (TryGetPlanSummary(item, out var planSummary))
+                    @if (ShowExecutionDetails && TryGetPlanSummary(item, out var planSummary))
                     {
                         <div class="ab-chat-bar__message-text">@planSummary</div>
                     }
-                    @if (GetDisplayStepChips(item).Count > 0)
+                    @if (ShowExecutionDetails && GetDisplayStepChips(item).Count > 0)
                     {
                         <div class="ab-chat-bar__message-actions">
                             @foreach (var action in GetDisplayStepChips(item))
@@ -100,7 +100,7 @@
                             }
                         </div>
                     }
-                    @if (item.ActivityMessages.Count > 0)
+                    @if (ShowExecutionDetails && item.ActivityMessages.Count > 0)
                     {
                         <ul class="ab-chat-bar__activity-list">
                             @foreach (var activity in item.ActivityMessages)
@@ -116,7 +116,7 @@
                             }
                         </ul>
                     }
-                    @if (GetDisplayResultTexts(item).Count > 0)
+                    @if (ShowExecutionDetails && GetDisplayResultTexts(item).Count > 0)
                     {
                         <ul class="ab-chat-bar__activity-list">
                             @foreach (var resultText in GetDisplayResultTexts(item))
@@ -133,7 +133,7 @@
                 <article class="ab-chat-bar__message ab-chat-bar__message--assistant">
                     <div class="ab-chat-bar__message-role">@(_streamingAgentName ?? "Agent")</div>
                     <div class="ab-chat-bar__message-text">@_streamingResponseText</div>
-                    @if (_streamingActivityMessages.Count > 0)
+                    @if (ShowExecutionDetails && _streamingActivityMessages.Count > 0)
                     {
                         <ul class="ab-chat-bar__activity-list">
                             @foreach (var activity in _streamingActivityMessages)
@@ -242,6 +242,9 @@
     /// </summary>
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    [Parameter]
+    public bool ShowExecutionDetails { get; set; } = true;
 
     /// <summary>
     /// Theme configuration for the component.
