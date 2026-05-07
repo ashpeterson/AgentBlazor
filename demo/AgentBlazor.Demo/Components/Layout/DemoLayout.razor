@@ -75,6 +75,8 @@
                          Description="@AssistantDescription"
                          DefaultAgentName="@DefaultAssistantAgent"
                          SessionId="@AssistantSessionId"
+                         LockAgentToCurrentRoute="@ShouldLockAssistantToRoute"
+                         ShowAgentSelector="@ShowAssistantSelector"
                          EnableGeneratedUi="true"
                          Placeholder="@AssistantPlaceholder"
                          Theme="_assistantTheme"
@@ -148,6 +150,8 @@
 
     private bool ShowAssistantPane => CurrentScenario is not null && IsWorkflowRoute && !IsComponentsRoute && !IsSupportInboxRoute;
     private bool ShowAssistantWidget => !ShowAssistantPane;
+    private bool ShouldLockAssistantToRoute => CurrentScenario is not null && IsWorkflowRoute;
+    private bool ShowAssistantSelector => !ShouldLockAssistantToRoute;
 
     private string AssistantWidgetWidth =>
         IsSupportInboxRoute
