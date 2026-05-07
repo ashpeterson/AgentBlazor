@@ -4,6 +4,10 @@ Recommended low-cost host: Azure Container Apps Consumption, using a public GHCR
 
 Use `demo.agentblazor.com` for the live demo. Keep `agentblazor.com` free for the landing page.
 
+Live URL:
+
+- https://demo.agentblazor.com/demo/workflows/support-inbox
+
 ## 1. Build The Image
 
 Run the `Demo Container` GitHub Actions workflow. It publishes:
@@ -79,6 +83,24 @@ DemoSecurity__RateLimiting__WindowSeconds=60
 ```
 
 Do not set `AgentBlazor:LicenseKey` for the public v1 demo unless you intentionally want Pro surfaces visible.
+
+## 5. Logging And Cost Guardrails
+
+Current demo observability is intentionally lightweight:
+
+- ASP.NET Core console logging is enabled at `Information` for `AgentBlazor` categories.
+- Azure Container Apps can stream container `stdout`/`stderr` logs without adding Application Insights code.
+- The Container Apps environment should use `--logs-destination none` to avoid persisted Azure Monitor / Log Analytics ingestion charges.
+- AgentBlazor prompt tracing is enabled in memory for runtime debugging, but traces are not persisted across container restarts.
+- The public agent endpoint is rate limited by client IP. The current deployment uses `20` requests per minute.
+
+What is not wired yet:
+
+- No Application Insights SDK or OpenTelemetry exporter is registered by the demo app.
+- No durable structured chat-request log exists yet for prompt length, route, agent, timing, status, or error.
+- No OpenAI token or cost usage tracker is stored by the demo app.
+
+For a low-cost public demo, prefer structured console logs first and keep Log Analytics/Application Insights ingestion off or minimal unless there is a specific incident to debug.
 
 ## Rollback
 

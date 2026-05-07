@@ -2,6 +2,8 @@
 
 Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.1.0-preview.11`.
 
+Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
+
 AgentBlazor does not create a responding agent by default. You must register at least one workflow.
 
 ## 1. Install
@@ -174,5 +176,6 @@ Say hello
 
 ## Next
 
+- [Hosted demo](https://demo.agentblazor.com/demo/workflows/support-inbox)
 - [Starter sample](../samples/AgentBlazor.Starter/README.md)
 - [Hosted WebAssembly client](../src/AgentBlazor.Client/PACKAGE_README.md)

@@ -6,6 +6,10 @@ Add an agent chat surface and deterministic app actions to a Blazor app.
 
 AgentBlazor gives a Blazor route a chat surface, explicit capabilities, approval-gated actions, and deterministic UI execution without replacing the normal app UI.
 
+Try the hosted demo:
+
+- https://demo.agentblazor.com/demo/workflows/support-inbox
+
 ## Install
 
 ```bash
@@ -80,6 +84,7 @@ Render one chat surface:
 - Home quickstart: `/`
 - Docs: `/docs`
 - Live demo: `/demo`
+- Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 - Starter sample: `samples/AgentBlazor.Starter`
 - Starter sample route: `/ops-review`
 

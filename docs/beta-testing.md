@@ -2,6 +2,8 @@
 
 Use this guide if you are testing AgentBlazor before launch.
 
+Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
+
 ## Goal
 
 Prove four things:
@@ -30,6 +32,10 @@ Use the support-inbox shape only:
 - one workflow
 - one chat surface
 - one approval-gated action
+
+Compare against the hosted support-inbox demo if you want a known-running reference:
+
+- https://demo.agentblazor.com/demo/workflows/support-inbox
 
 ## Exact Checks
 
