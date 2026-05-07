@@ -396,6 +396,79 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_BlocksRequestedAgent_WhenRouteLockDoesNotMatchAgentRoute()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddWorkflow<WorkflowScaffoldCapabilities>("support-agent", agent =>
+            {
+                agent.WithRoutePrefixes("/demo/workflows/support-inbox");
+            })
+            .AddWorkflow<LongCapabilityNameCapabilities>("file-agent", agent =>
+            {
+                agent.WithRoutePrefixes("/demo/workflows/file-audit-bundle");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<RecordingChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show open tickets from this week",
+            AgentName: "file-agent",
+            SessionId: "route-lock-mismatch",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.AgentLock] = bool.TrueString,
+                [AgentRuntimeContextKeys.CurrentRoute] = "/demo/workflows/support-inbox"
+            }));
+
+        Assert.Equal("none", response.AgentName);
+        Assert.Contains("Requested agent 'file-agent' is not configured for route '/demo/workflows/support-inbox'.", response.ResponseText, StringComparison.Ordinal);
+        Assert.Empty(chatClient.Requests);
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_AllowsRequestedAgent_WhenRouteLockMatchesAgentRoute()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<RecordingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<RecordingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddWorkflow<WorkflowScaffoldCapabilities>("support-agent", agent =>
+            {
+                agent.WithRoutePrefixes("/demo/workflows/support-inbox");
+            })
+            .AddWorkflow<LongCapabilityNameCapabilities>("file-agent", agent =>
+            {
+                agent.WithRoutePrefixes("/demo/workflows/file-audit-bundle");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<RecordingChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show open tickets from this week",
+            AgentName: "support-agent",
+            SessionId: "route-lock-match",
+            Context: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [AgentRuntimeContextKeys.AgentLock] = bool.TrueString,
+                [AgentRuntimeContextKeys.CurrentRoute] = "/demo/workflows/support-inbox"
+            }));
+
+        Assert.Equal("support-agent", response.AgentName);
+        Assert.Single(chatClient.Requests);
+    }
+
+    [Fact]
     public void CapabilityResult_HelperMethods_MergeStructuredOutcomeData()
     {
         var result = global::AgentBlazor.App.CapabilityResult.Success("Prepared the workflow.")

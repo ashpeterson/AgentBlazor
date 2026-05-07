@@ -1988,14 +1988,16 @@ public sealed class ChatClientRuntimeAdapter(
         IDictionary<string, string>? context)
     {
         if (!string.IsNullOrWhiteSpace(requestedName) &&
-            _agentRegistry.TryGet(requestedName, out var requested))
+            _agentRegistry.TryGet(requestedName, out var requested) &&
+            RuntimeTurnPreflight.AllowsLockedRoute(requested, context))
         {
             return requested;
         }
 
         if (RuntimeTurnPreflight.TryGetContextAgentName(context, out var contextAgentName) &&
             contextAgentName is not null &&
-            _agentRegistry.TryGet(contextAgentName, out var contextAgent))
+            _agentRegistry.TryGet(contextAgentName, out var contextAgent) &&
+            RuntimeTurnPreflight.AllowsLockedRoute(contextAgent, context))
         {
             return contextAgent;
         }
