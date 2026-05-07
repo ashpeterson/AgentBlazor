@@ -132,7 +132,7 @@ public partial class AgentRuntimeIntegrationTests
             response,
             AgentComponentCapabilityProfile.AgentDataGridComponentId,
             AgentComponentCapabilityProfile.DataGridFilterActionId,
-            succeeded: true,
+            succeeded: false,
             messageContains: "Queued"));
         Assert.DoesNotContain("Which column should I filter", response.ResponseText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("What value should I filter by?", response.ResponseText, StringComparison.OrdinalIgnoreCase);
@@ -1443,4 +1443,3 @@ public partial class AgentRuntimeIntegrationTests
         }
     }
 }
-

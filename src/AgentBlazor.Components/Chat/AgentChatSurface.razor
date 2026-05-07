@@ -1209,7 +1209,7 @@
                         new ActivityMessage(
                             resultKey,
                             FormatToolCallResultMessage(streamEvent.ExecutionResult),
-                            streamEvent.ExecutionResult.Succeeded,
+                            streamEvent.ExecutionResult.Outcome is ActionOutcome.Applied,
                             streamEvent.ExecutionResult.ComponentId,
                             streamEvent.ExecutionResult.ActionId,
                             resultStatus,
@@ -1811,9 +1811,12 @@
             return executionResult.Message;
         }
 
-        return executionResult.Succeeded
-            ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
-            : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
+        return executionResult.Outcome switch
+        {
+            ActionOutcome.Applied => $"Completed {executionResult.ComponentId}.{executionResult.ActionId}.",
+            ActionOutcome.Queued => $"Queued {executionResult.ComponentId}.{executionResult.ActionId}.",
+            _ => $"Failed {executionResult.ComponentId}.{executionResult.ActionId}."
+        };
     }
 
     private static ActionStatus MapExecutionResultStatus(ComponentActionExecutionResult executionResult)
@@ -1843,6 +1846,7 @@
         status switch
         {
             AgentExecutionStepStatus.Completed => ActionStatus.Complete,
+            AgentExecutionStepStatus.Queued => ActionStatus.InProgress,
             AgentExecutionStepStatus.Failed => ActionStatus.Failed,
             AgentExecutionStepStatus.Blocked => ActionStatus.Failed,
             AgentExecutionStepStatus.NeedsClarification => ActionStatus.Failed,
@@ -2234,11 +2238,11 @@
         {
             var key = BuildActivityKey(result.ComponentId, result.ActionId);
             var text = FormatToolCallResultMessage(result);
-            var status = result.Succeeded ? ActionStatus.Complete : ActionStatus.Failed;
+            var status = MapExecutionResultStatus(result);
             messages.Add(new ActivityMessage(
                 key,
                 text,
-                result.Succeeded,
+                result.Outcome is ActionOutcome.Applied,
                 result.ComponentId,
                 result.ActionId,
                 status,

@@ -1303,6 +1303,21 @@ public sealed class ChatClientRuntimeAdapter(
         });
 
         if (capability.RequiresApproval &&
+            ShouldBlockGeneratedUiApprovalRequest(turnState) &&
+            !ComponentActionApprovalPolicy.IsApprovalGranted(
+                componentId,
+                capability.ActionId,
+                turnState?.RuntimeContext))
+        {
+            return RecordBlockedGeneratedUiApprovalRequest(
+                turnState,
+                stepIndex,
+                plannedAction,
+                componentId,
+                capability.ActionId);
+        }
+
+        if (capability.RequiresApproval &&
             !ComponentActionApprovalPolicy.IsApprovalGranted(
                 componentId,
                 capability.ActionId,
@@ -1482,6 +1497,21 @@ public sealed class ChatClientRuntimeAdapter(
             StepIndex = stepIndex,
             ToolArguments = invocationArguments
         });
+
+        if (capability.RequiresApproval &&
+            ShouldBlockGeneratedUiApprovalRequest(turnState) &&
+            !ComponentActionApprovalPolicy.IsApprovalGranted(
+                capability.CapabilityId,
+                capability.LocalActionId,
+                turnState?.RuntimeContext))
+        {
+            return RecordBlockedGeneratedUiApprovalRequest(
+                turnState,
+                stepIndex,
+                plannedAction,
+                capability.CapabilityId,
+                capability.LocalActionId);
+        }
 
         if (capability.RequiresApproval &&
             !ComponentActionApprovalPolicy.IsApprovalGranted(
@@ -1856,7 +1886,8 @@ public sealed class ChatClientRuntimeAdapter(
     private static AgentExecutionStepStatus MapOutcomeToStepStatus(ActionOutcome outcome) =>
         outcome switch
         {
-            ActionOutcome.Applied or ActionOutcome.Queued => AgentExecutionStepStatus.Completed,
+            ActionOutcome.Applied => AgentExecutionStepStatus.Completed,
+            ActionOutcome.Queued => AgentExecutionStepStatus.Queued,
             ActionOutcome.NeedsClarification => AgentExecutionStepStatus.NeedsClarification,
             ActionOutcome.Blocked => AgentExecutionStepStatus.Blocked,
             ActionOutcome.Failed => AgentExecutionStepStatus.Failed,
@@ -2105,6 +2136,59 @@ public sealed class ChatClientRuntimeAdapter(
 
         return !IsExplicitSubmitIntent(turnState.UserMessage) &&
                !IsExplicitSubmitIntent(turnState.GeneratedUiAction.ActionId);
+    }
+
+    private static bool ShouldBlockGeneratedUiApprovalRequest(TurnExecutionState? turnState)
+        => turnState?.GeneratedUiAction is not null;
+
+    private static string RecordBlockedGeneratedUiApprovalRequest(
+        TurnExecutionState? turnState,
+        int? stepIndex,
+        PlannedComponentAction plannedAction,
+        string componentId,
+        string actionId)
+    {
+        var message =
+            $"Generated UI actions cannot request approval-gated action '{componentId}.{actionId}'. Ask for the action in chat to review and approve it.";
+        var result = new ComponentActionExecutionResult(
+            componentId,
+            actionId,
+            ActionOutcome.Blocked,
+            message);
+        turnState?.AddExecutionResult(result);
+        if (stepIndex is int blockedStepIndex && turnState is not null)
+        {
+            turnState.UpdateExecutionStep(
+                blockedStepIndex,
+                AgentExecutionStepStatus.Blocked,
+                message,
+                requiresApproval: false,
+                policyDecision: RuntimeTrustDecisions.BuildPolicyDecision(componentId, actionId, requiresApproval: true));
+        }
+
+        turnState?.AddStreamEvent(new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ToolCallResult,
+            PlannedAction = plannedAction,
+            StepIndex = stepIndex,
+            ExecutionResult = result
+        });
+        turnState?.AddStreamEvent(new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.ToolCallEnd,
+            PlannedAction = plannedAction,
+            StepIndex = stepIndex,
+            ExecutionResult = result
+        });
+        turnState?.AddStreamEvent(new AgentTurnStreamEvent
+        {
+            Kind = AgentTurnStreamEventKind.StepFinished,
+            PlannedAction = plannedAction,
+            StepIndex = stepIndex,
+            StepSucceeded = false,
+            ExecutionResult = result
+        });
+        return message;
     }
 
     private static bool IsExplicitSubmitIntent(string? text)

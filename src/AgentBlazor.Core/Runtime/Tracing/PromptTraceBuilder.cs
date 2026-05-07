@@ -254,8 +254,8 @@ internal sealed class PromptTraceBuilder
         {
             Results = tracedResults,
             TotalDuration = _stageStopwatch.Elapsed,
-            SuccessCount = results.Count(r => r.Succeeded),
-            FailureCount = results.Count(r => !r.Succeeded)
+            SuccessCount = results.Count(static result => result.Outcome is ActionOutcome.Applied),
+            FailureCount = results.Count(static result => result.Outcome is not ActionOutcome.Applied and not ActionOutcome.Queued)
         };
 
         return this;
@@ -283,7 +283,8 @@ internal sealed class PromptTraceBuilder
             Results = tracedResults,
             TotalDuration = _stageStopwatch.Elapsed,
             SuccessCount = tracedResults.Count(static result => result.Succeeded),
-            FailureCount = tracedResults.Count(static result => !result.Succeeded)
+            FailureCount = tracedResults.Count(static result =>
+                result.Outcome is not ActionOutcome.Applied and not ActionOutcome.Queued)
         };
 
         return this;
@@ -396,6 +397,7 @@ internal sealed class PromptTraceBuilder
         => status switch
         {
             AgentExecutionStepStatus.Completed => ActionOutcome.Applied,
+            AgentExecutionStepStatus.Queued => ActionOutcome.Queued,
             AgentExecutionStepStatus.ApprovalRequired => ActionOutcome.Blocked,
             AgentExecutionStepStatus.NeedsClarification => ActionOutcome.NeedsClarification,
             AgentExecutionStepStatus.Blocked => ActionOutcome.Blocked,

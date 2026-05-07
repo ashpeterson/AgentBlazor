@@ -19,5 +19,5 @@ public sealed record ComponentActionExecutionResult(
     {
     }
 
-    public bool Succeeded => Outcome is ActionOutcome.Applied or ActionOutcome.Queued;
+    public bool Succeeded => Outcome is ActionOutcome.Applied;
 }

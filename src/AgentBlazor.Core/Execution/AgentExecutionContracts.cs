@@ -16,7 +16,8 @@ public enum AgentExecutionStepStatus
     ApprovalRequired = 2,
     NeedsClarification = 3,
     Blocked = 4,
-    Failed = 5
+    Failed = 5,
+    Queued = 6
 }
 
 public sealed record AgentExecutionContext(

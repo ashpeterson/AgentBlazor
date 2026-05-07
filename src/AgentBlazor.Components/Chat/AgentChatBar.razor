@@ -527,7 +527,7 @@
                     new ActivityMessage(
                         key,
                         FormatToolCallResultMessage(result),
-                        result.Succeeded,
+                        result.Outcome is ActionOutcome.Applied,
                         result.ComponentId,
                         result.ActionId,
                         status,
@@ -810,9 +810,12 @@
             return executionResult.Message;
         }
 
-        return executionResult.Succeeded
-            ? $"Completed {executionResult.ComponentId}.{executionResult.ActionId}."
-            : $"Failed {executionResult.ComponentId}.{executionResult.ActionId}.";
+        return executionResult.Outcome switch
+        {
+            ActionOutcome.Applied => $"Completed {executionResult.ComponentId}.{executionResult.ActionId}.",
+            ActionOutcome.Queued => $"Queued {executionResult.ComponentId}.{executionResult.ActionId}.",
+            _ => $"Failed {executionResult.ComponentId}.{executionResult.ActionId}."
+        };
     }
 
     private static ActionStatus MapExecutionResultStatus(ComponentActionExecutionResult executionResult)
@@ -991,7 +994,7 @@
             messages.Add(new ActivityMessage(
                 key,
                 text,
-                result.Succeeded,
+                result.Outcome is ActionOutcome.Applied,
                 result.ComponentId,
                 result.ActionId,
                 status,
@@ -1006,6 +1009,7 @@
         status switch
         {
             AgentExecutionStepStatus.Pending => ActionStatus.InProgress,
+            AgentExecutionStepStatus.Queued => ActionStatus.InProgress,
             AgentExecutionStepStatus.ApprovalRequired => ActionStatus.Executing,
             AgentExecutionStepStatus.NeedsClarification => ActionStatus.Failed,
             AgentExecutionStepStatus.Blocked => ActionStatus.Failed,

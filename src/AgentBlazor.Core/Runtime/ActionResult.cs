@@ -6,7 +6,7 @@ public sealed record ActionResult(
     ActionOutcome Outcome,
     string Message)
 {
-    public bool Succeeded => Outcome is ActionOutcome.Applied or ActionOutcome.Queued;
+    public bool Succeeded => Outcome is ActionOutcome.Applied;
 
     public static ActionResult Applied(string message) => new(ActionOutcome.Applied, message);
 

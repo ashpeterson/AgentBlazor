@@ -819,6 +819,46 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_BlocksGeneratedUiActionApprovalCapabilityBeforePendingApproval()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ApprovalToolInvokingChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<ApprovalToolInvokingChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<ApprovalUiContractCapabilities>()
+            .AddAgent("approval-ui-agent", agent =>
+            {
+                agent.WithAllowedActions("approval_ui_contract.draft_reply");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Generated UI action invoked: approval-confirmation.approve-draft.",
+            AgentName: "approval-ui-agent",
+            SessionId: "generated-ui-approval-guard",
+            GeneratedUiAction: new GeneratedUiActionInvocation(
+                "approval-confirmation",
+                "approve-draft",
+                "Approve draft reply",
+                new Dictionary<string, object?> { ["ticketId"] = "TCK-1042" })));
+
+        Assert.False(response.RequiresApproval);
+        Assert.Empty(response.PendingApprovals);
+        var blocked = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Blocked, blocked.Status);
+        Assert.False(blocked.RequiresApproval);
+        Assert.Equal("approval_ui_contract", blocked.TargetId);
+        Assert.Equal("draft_reply", blocked.ActionId);
+        Assert.Equal(
+            "Generated UI actions cannot request approval-gated action 'approval_ui_contract.draft_reply'. Ask for the action in chat to review and approve it.",
+            blocked.Message);
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_PersistsConversationTurnUsingScopedSessionKey()
     {
         var services = new ServiceCollection();
@@ -1827,7 +1867,8 @@ public class ServiceRegistrationTests
                 ["agentId"] = "workspace-tabs"
             }));
 
-        Assert.True(result.Succeeded);
+        Assert.False(result.Succeeded);
+        Assert.Equal(ActionOutcome.Queued, result.Outcome);
         Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.True(intents.HasPending("Tabs", "workspace-tabs"));
     }
@@ -1857,7 +1898,8 @@ public class ServiceRegistrationTests
                 ["value"] = "EMEA"
             }));
 
-        Assert.True(result.Succeeded);
+        Assert.False(result.Succeeded);
+        Assert.Equal(ActionOutcome.Queued, result.Outcome);
         Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.True(intents.HasPending("DataGrid", "supplier-grid-missing"));
     }
@@ -1879,7 +1921,8 @@ public class ServiceRegistrationTests
                 ["agentId"] = "supplier-grid-missing"
             }));
 
-        Assert.True(result.Succeeded);
+        Assert.False(result.Succeeded);
+        Assert.Equal(ActionOutcome.Queued, result.Outcome);
         Assert.Contains("Queued", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.True(intents.HasPending("DataGrid", "supplier-grid-missing"));
     }
