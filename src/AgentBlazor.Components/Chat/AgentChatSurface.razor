@@ -115,12 +115,12 @@
                         <div class="ab-chat-surface__item-text">@item.Text</div>
                     }
 
-                    @if (TryGetPlanSummary(item, out var planSummary))
+                    @if (ShowExecutionDetails && TryGetPlanSummary(item, out var planSummary))
                     {
                         <div class="ab-chat-surface__plan-summary">@planSummary</div>
                     }
 
-                    @if (item.ActivityMessages.Count > 0)
+                    @if (ShowExecutionDetails && item.ActivityMessages.Count > 0)
                     {
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in item.ActivityMessages)
@@ -142,7 +142,7 @@
                         </ul>
                     }
 
-                    @if (GetDisplayStepLabels(item).Count > 0)
+                    @if (ShowExecutionDetails && GetDisplayStepLabels(item).Count > 0)
                     {
                         <ul class="ab-chat-surface__actions" aria-label="Planned actions">
                             @foreach (var step in GetDisplayStepLabels(item))
@@ -152,7 +152,7 @@
                         </ul>
                     }
 
-                    @if (GetDisplayResultTexts(item).Count > 0)
+                    @if (ShowExecutionDetails && GetDisplayResultTexts(item).Count > 0)
                     {
                         <ul class="ab-chat-surface__results" aria-label="Results">
                             @foreach (var resultText in GetDisplayResultTexts(item))
@@ -184,7 +184,7 @@
                 <article class="ab-chat-surface__item ab-chat-surface__item--assistant"
                          aria-label="Assistant">
                     <div class="ab-chat-surface__item-role">@(_streamingAgentName ?? "Assistant")</div>
-                    @if (_streamingActivityMessages.Count > 0)
+                    @if (ShowExecutionDetails && _streamingActivityMessages.Count > 0)
                     {
                         <ul class="ab-chat-surface__activity-list" aria-label="Activity">
                             @foreach (var activity in _streamingActivityMessages)
@@ -601,6 +601,9 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    [Parameter]
+    public bool ShowExecutionDetails { get; set; }
 
     [Parameter]
     public bool? ShowDevTools { get; set; }

@@ -56,6 +56,7 @@
                              SessionId="@SessionId"
                              Placeholder="@Placeholder"
                              EnableGeneratedUi="@EnableGeneratedUi"
+                             ShowExecutionDetails="@ShowExecutionDetails"
                              ShowDevTools="@ShowDevTools"
                              AutoShowDevTools="@AutoShowDevTools"
                              Theme="@Theme"
@@ -162,6 +163,9 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    [Parameter]
+    public bool ShowExecutionDetails { get; set; }
 
     [Parameter]
     public bool? ShowDevTools { get; set; }
