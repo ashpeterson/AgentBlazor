@@ -29,6 +29,7 @@
                       SessionId="@SessionId"
                       Placeholder="@Placeholder"
                       EnableGeneratedUi="@EnableGeneratedUi"
+                      ShowExecutionDetails="@ShowExecutionDetails"
                       Theme="@Theme"
                       CssClass="@CssClass" />
 </aside>
@@ -108,6 +109,9 @@
 
     [Parameter]
     public bool EnableGeneratedUi { get; set; }
+
+    [Parameter]
+    public bool ShowExecutionDetails { get; set; } = true;
 
     private string EffectiveDescription =>
         !string.IsNullOrWhiteSpace(Description)
