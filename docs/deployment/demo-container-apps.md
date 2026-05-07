@@ -33,6 +33,7 @@ Deploy:
 ```bash
 export OPENAI_API_KEY="<live-demo-openai-key>"
 export AGENTBLAZOR_DEMO_IMAGE="ghcr.io/ashpeterson/agentblazor-demo:latest"
+export DEMO_LOG_ACCESS_TOKEN="<long-random-token>"
 
 ./scripts/deploy/azure-container-apps-demo.sh
 ```
@@ -46,7 +47,9 @@ Container app: agentblazor-demo
 Ingress: external, target port 8080
 Scale: 0-2 replicas
 Secret: openai-api-key
+Optional secret: demo-log-access-token
 Rate limit: 20 agent requests per client IP per minute
+Demo request log: /tmp/agentblazor-demo-logs/chat-requests.jsonl
 ```
 
 The script prints the generated Azure hostname. Smoke test it before adding DNS:
@@ -80,6 +83,8 @@ OpenAI__Model=gpt-4o-mini
 DemoSecurity__TrustForwardedHeaders=true
 DemoSecurity__RateLimiting__PermitLimit=20
 DemoSecurity__RateLimiting__WindowSeconds=60
+DemoLogging__DirectoryPath=/tmp/agentblazor-demo-logs
+DemoLogging__AccessToken=secretref:demo-log-access-token
 ```
 
 Do not set `AgentBlazor:LicenseKey` for the public v1 demo unless you intentionally want Pro surfaces visible.
@@ -91,13 +96,36 @@ Current demo observability is intentionally lightweight:
 - ASP.NET Core console logging is enabled at `Information` for `AgentBlazor` categories.
 - Azure Container Apps can stream container `stdout`/`stderr` logs without adding Application Insights code.
 - The Container Apps environment should use `--logs-destination none` to avoid persisted Azure Monitor / Log Analytics ingestion charges.
+- Each agent turn is appended to a local JSONL file inside the container.
 - AgentBlazor prompt tracing is enabled in memory for runtime debugging, but traces are not persisted across container restarts.
 - The public agent endpoint is rate limited by client IP. The current deployment uses `20` requests per minute.
+
+The JSONL file records:
+
+- timestamp, request id, route, agent, hashed session id
+- prompt length, response length, duration, outcome, error type
+- approval/clarification flags and execution counts
+
+It does not record full prompt text unless `DemoLogging__IncludePromptPreview=true` is explicitly set.
+
+Access recent log lines:
+
+```bash
+curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
+  "https://demo.agentblazor.com/internal/demo-logs?lines=200"
+```
+
+Download the current file:
+
+```bash
+curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
+  -o agentblazor-demo-chat-requests.jsonl \
+  "https://demo.agentblazor.com/internal/demo-logs/download"
+```
 
 What is not wired yet:
 
 - No Application Insights SDK or OpenTelemetry exporter is registered by the demo app.
-- No durable structured chat-request log exists yet for prompt length, route, agent, timing, status, or error.
 - No OpenAI token or cost usage tracker is stored by the demo app.
 
 For a low-cost public demo, prefer structured console logs first and keep Log Analytics/Application Insights ingestion off or minimal unless there is a specific incident to debug.
