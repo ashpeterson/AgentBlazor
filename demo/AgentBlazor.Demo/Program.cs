@@ -35,6 +35,7 @@ builder.Services.Configure<DemoRemoteStorageOptions>(builder.Configuration.GetSe
 builder.Services.AddHttpClient("demo-remote-storage");
 builder.Services.AddSingleton<IDemoRemoteStorageAdapter, DemoRemoteStorageAdapter>();
 builder.Services.AddSingleton<IDemoChatRequestLog, JsonlDemoChatRequestLog>();
+builder.Services.AddSingleton<IDemoTrafficLog, JsonlDemoTrafficLog>();
 
 var demoSecurityOptions = builder.Configuration.GetSection(DemoSecurityOptions.SectionName).Get<DemoSecurityOptions>()
     ?? new DemoSecurityOptions();
@@ -310,6 +311,7 @@ if (demoSecurityOptions.TrustForwardedHeaders)
     app.UseForwardedHeaders();
 }
 
+app.UseMiddleware<DemoTrafficLoggingMiddleware>();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 

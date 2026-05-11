@@ -96,31 +96,58 @@ Current demo observability is intentionally lightweight:
 - ASP.NET Core console logging is enabled at `Information` for `AgentBlazor` categories.
 - Azure Container Apps can stream container `stdout`/`stderr` logs without adding Application Insights code.
 - The Container Apps environment should use `--logs-destination none` to avoid persisted Azure Monitor / Log Analytics ingestion charges.
-- Each agent turn is appended to a local JSONL file inside the container.
+- Each page view and agent turn is appended to local JSONL files inside the container.
 - AgentBlazor prompt tracing is enabled in memory for runtime debugging, but traces are not persisted across container restarts.
 - The public agent endpoint is rate limited by client IP. The current deployment uses `20` requests per minute.
 
-The JSONL file records:
+The chat JSONL file records:
 
 - timestamp, request id, route, agent, hashed session id
 - prompt length, response length, duration, outcome, error type
 - approval/clarification flags and execution counts
 
-It does not record full prompt text unless `DemoLogging__IncludePromptPreview=true` is explicitly set.
+The traffic JSONL file records:
 
-Access recent log lines:
+- timestamp, request id, route path, method, status code, duration
+- hashed visitor fingerprint, hashed user agent, referrer host
+
+It does not record full prompt text, raw IP addresses, or raw user agents unless `DemoLogging__IncludePromptPreview=true` is explicitly set for chat prompt previews.
+
+Get the traffic and chat summary:
+
+```bash
+curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
+  "https://demo.agentblazor.com/internal/demo-logs/summary"
+```
+
+Access recent chat log lines:
 
 ```bash
 curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
   "https://demo.agentblazor.com/internal/demo-logs?lines=200"
 ```
 
-Download the current file:
+Access recent traffic log lines:
+
+```bash
+curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
+  "https://demo.agentblazor.com/internal/demo-logs/traffic?lines=200"
+```
+
+Download the current chat file:
 
 ```bash
 curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
   -o agentblazor-demo-chat-requests.jsonl \
   "https://demo.agentblazor.com/internal/demo-logs/download"
+```
+
+Download the current traffic file:
+
+```bash
+curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
+  -o agentblazor-demo-traffic-requests.jsonl \
+  "https://demo.agentblazor.com/internal/demo-logs/traffic/download"
 ```
 
 What is not wired yet:
