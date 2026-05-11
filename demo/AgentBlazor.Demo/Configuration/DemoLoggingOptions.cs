@@ -10,6 +10,8 @@ internal sealed class DemoLoggingOptions
 
     public string FileName { get; set; } = "chat-requests.jsonl";
 
+    public string TrafficFileName { get; set; } = "traffic-requests.jsonl";
+
     public string? AccessToken { get; set; }
 
     public bool IncludePromptPreview { get; set; }

@@ -1,10 +1,10 @@
 namespace AgentBlazor.Demo.Services;
 
-internal interface IDemoChatRequestLog
+internal interface IDemoTrafficLog
 {
     string LogFilePath { get; }
 
-    Task AppendAsync(DemoChatRequestLogEntry entry, CancellationToken cancellationToken = default);
+    Task AppendAsync(DemoTrafficLogEntry entry, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>> ReadTailAsync(int lineCount, CancellationToken cancellationToken = default);
 

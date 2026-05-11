@@ -4,21 +4,21 @@ using Microsoft.Extensions.Options;
 
 namespace AgentBlazor.Demo.Services;
 
-internal sealed class JsonlDemoChatRequestLog : IDemoChatRequestLog
+internal sealed class JsonlDemoTrafficLog : IDemoTrafficLog
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly DemoLoggingOptions _options;
 
-    public JsonlDemoChatRequestLog(IOptions<DemoLoggingOptions> options)
+    public JsonlDemoTrafficLog(IOptions<DemoLoggingOptions> options)
     {
         _options = options.Value;
-        LogFilePath = Path.Combine(_options.DirectoryPath, _options.FileName);
+        LogFilePath = Path.Combine(_options.DirectoryPath, _options.TrafficFileName);
     }
 
     public string LogFilePath { get; }
 
-    public async Task AppendAsync(DemoChatRequestLogEntry entry, CancellationToken cancellationToken = default)
+    public async Task AppendAsync(DemoTrafficLogEntry entry, CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
         {
