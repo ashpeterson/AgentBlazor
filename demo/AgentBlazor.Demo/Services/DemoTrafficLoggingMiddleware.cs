@@ -66,6 +66,7 @@ internal sealed class DemoTrafficLoggingMiddleware(
 
         var path = request.Path.Value ?? "/";
         if (path.StartsWith("/internal", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
