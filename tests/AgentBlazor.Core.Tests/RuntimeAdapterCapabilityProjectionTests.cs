@@ -182,6 +182,44 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_ReturnsStructuredCapabilityResult_ToModelToolCall()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<InvalidCapabilityArgumentChatClient>();
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<InvalidCapabilityArgumentChatClient>());
+        services.AddSingleton(new CapabilityRecorder());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<SupplierCapabilities>()
+            .AddAgent("supplier-agent", agent =>
+            {
+                agent.WithAllowedActions("supplier_compliance.show_at_risk_suppliers");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<InvalidCapabilityArgumentChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Show at-risk suppliers",
+            AgentName: "supplier-agent",
+            SessionId: "capability-structured-error"));
+
+        Assert.Contains("Parameter 'days'", response.ResponseText, StringComparison.Ordinal);
+        Assert.NotNull(chatClient.ToolResult);
+        Assert.Contains("\"errorCode\":\"invalid_argument_shape\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"parameterName\":\"days\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"expectedShape\":\"an integer\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"nextActions\"", chatClient.ToolResult, StringComparison.OrdinalIgnoreCase);
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Failed, step.Status);
+        Assert.Equal("invalid_argument_shape", step.Outputs?["errorCode"]);
+        Assert.Contains(step.NextActions ?? [], action => action.Contains("days", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_RecordsSemanticCapabilityHistory_FromExecutionPlan()
     {
         var services = new ServiceCollection();
@@ -672,6 +710,50 @@ public class RuntimeAdapterCapabilityProjectionTests
             IEnumerable<ChatMessage> messages,
             ChatOptions? options = null,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class InvalidCapabilityArgumentChatClient : IChatClient
+    {
+        public string? ToolResult { get; private set; }
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(static function =>
+                    function.Name.Contains("capability_supplier_compliance_show_at_risk_suppliers", StringComparison.OrdinalIgnoreCase)) ??
+                []);
+            var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["days"] = new { value = "soon" }
+            }), cancellationToken);
+            ToolResult = result?.ToString();
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, "structured-error-observed"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var response = await GetResponseAsync(messages, options, cancellationToken);
             yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
