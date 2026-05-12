@@ -232,25 +232,65 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
             }
 
             var key = ResolveArgumentKey(parameter, parameterAttribute);
-            if (!TryGetArgValue(arguments, key, parameter.ParameterType, out var value))
+            var binding = BindArgument(arguments, key, parameter.ParameterType);
+            if (binding.Status is CapabilityArgumentBindStatus.Bound &&
+                binding.Value is null &&
+                IsParameterRequired(parameter, parameterAttribute))
+            {
+                return CapabilityResult.InvalidArgumentShape(
+                    key,
+                    DescribeExpectedShape(parameter.ParameterType),
+                    "null",
+                    info.ActionId);
+            }
+
+            if (binding.Status is not CapabilityArgumentBindStatus.Bound)
             {
                 if (!string.IsNullOrWhiteSpace(parameterAttribute?.ContextKey))
                 {
-                    return CapabilityResult.Failure(
-                        $"Required runtime context '{parameterAttribute.ContextKey}' is missing for capability action '{info.ActionId}'.");
+                    return CapabilityResult
+                        .InvalidArguments(
+                            $"Required runtime context '{parameterAttribute.ContextKey}' is missing for capability action '{info.ActionId}'.")
+                        .WithOutput("errorCode", "missing_runtime_context")
+                        .WithOutput("parameterName", key)
+                        .WithOutput("expectedShape", DescribeExpectedShape(parameter.ParameterType))
+                        .WithOutput("actionId", info.ActionId)
+                        .WithOutput("contextKey", parameterAttribute.ContextKey)
+                        .WithNextAction(
+                            $"Ensure runtime context '{parameterAttribute.ContextKey}' is supplied before invoking '{info.ActionId}'.");
                 }
 
                 if (IsParameterRequired(parameter, parameterAttribute))
                 {
-                    return CapabilityResult.NeedsClarification(
-                        $"Required parameter '{key}' is missing for capability action '{info.ActionId}'.");
+                    if (binding.Status is CapabilityArgumentBindStatus.InvalidShape)
+                    {
+                        return CapabilityResult.InvalidArgumentShape(
+                            key,
+                            DescribeExpectedShape(parameter.ParameterType),
+                            binding.ActualShape ?? "unknown",
+                            info.ActionId);
+                    }
+
+                    return CapabilityResult.MissingArgument(
+                        key,
+                        DescribeExpectedShape(parameter.ParameterType),
+                        info.ActionId);
+                }
+
+                if (binding.Status is CapabilityArgumentBindStatus.InvalidShape)
+                {
+                    return CapabilityResult.InvalidArgumentShape(
+                        key,
+                        DescribeExpectedShape(parameter.ParameterType),
+                        binding.ActualShape ?? "unknown",
+                        info.ActionId);
                 }
 
                 invocationArgs[i] = parameter.HasDefaultValue ? parameter.DefaultValue : GetDefault(parameter.ParameterType);
                 continue;
             }
 
-            invocationArgs[i] = value;
+            invocationArgs[i] = binding.Value;
         }
 
         try
@@ -295,14 +335,30 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         }
         catch (TargetInvocationException tie) when (tie.InnerException is not null)
         {
-            return CapabilityResult.Failure(
-                $"Capability action '{info.ActionId}' failed: {tie.InnerException.Message}");
+            return BuildInvocationFailure(info, tie.InnerException);
         }
         catch (Exception ex)
         {
-            return CapabilityResult.Failure(
-                $"Capability action '{info.ActionId}' failed: {ex.Message}");
+            return BuildInvocationFailure(info, ex);
         }
+    }
+
+    private static CapabilityResult BuildInvocationFailure(CapabilityActionCacheInfo info, Exception exception)
+    {
+        if (exception is ArgumentException or FormatException or InvalidOperationException)
+        {
+            var summary = $"Capability action '{info.ActionId}' failed: {exception.Message}";
+            return CapabilityResult.RecoverableFailure(summary)
+                .WithOutput("actionId", info.ActionId)
+                .WithOutput("exceptionType", exception.GetType().Name)
+                .WithNextAction(
+                    $"Review the arguments and retry '{info.ActionId}' only if the requested operation can be corrected.");
+        }
+
+        return CapabilityResult.Failure($"Capability action '{info.ActionId}' failed unexpectedly.")
+            .WithOutput("errorCode", "capability_invocation_failed")
+            .WithOutput("actionId", info.ActionId)
+            .WithOutput("exceptionType", exception.GetType().Name);
     }
 
     private static object ResolveInstance(IServiceProvider serviceProvider, Type capabilityType)
@@ -561,38 +617,33 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         return true;
     }
 
-    private static bool TryGetArgValue(
+    private static CapabilityArgumentBinding BindArgument(
         IReadOnlyDictionary<string, object?> arguments,
         string key,
-        Type targetType,
-        out object? value)
+        Type targetType)
     {
-        value = null;
         if (!arguments.TryGetValue(key, out var raw))
         {
-            return false;
+            return CapabilityArgumentBinding.Missing;
         }
 
         if (raw is null)
         {
-            value = null;
-            return true;
+            return CapabilityArgumentBinding.Bound(null);
         }
 
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
         if (underlyingType.IsInstanceOfType(raw))
         {
-            value = raw;
-            return true;
+            return CapabilityArgumentBinding.Bound(raw);
         }
 
         try
         {
             if (raw is JsonElement json)
             {
-                value = JsonSerializer.Deserialize(json.GetRawText(), targetType, JsonOptions);
-                return true;
+                return CapabilityArgumentBinding.Bound(JsonSerializer.Deserialize(json.GetRawText(), targetType, JsonOptions));
             }
 
             if (underlyingType != typeof(string))
@@ -601,24 +652,90 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
                 var deserialized = JsonSerializer.Deserialize(serialized, targetType, JsonOptions);
                 if (deserialized is not null || !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) is not null)
                 {
-                    value = deserialized;
-                    return true;
+                    return CapabilityArgumentBinding.Bound(deserialized);
                 }
             }
 
             if (underlyingType.IsEnum)
             {
-                value = Enum.Parse(underlyingType, raw.ToString()!, ignoreCase: true);
-                return true;
+                return CapabilityArgumentBinding.Bound(Enum.Parse(underlyingType, raw.ToString()!, ignoreCase: true));
             }
 
-            value = Convert.ChangeType(raw, underlyingType);
-            return true;
+            return CapabilityArgumentBinding.Bound(Convert.ChangeType(raw, underlyingType));
         }
         catch
         {
-            return false;
+            return CapabilityArgumentBinding.Invalid(DescribeActualShape(raw));
         }
+    }
+
+    private static string DescribeExpectedShape(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+        if (underlyingType.IsArray)
+        {
+            return $"array of {DescribeExpectedShape(underlyingType.GetElementType()!)}";
+        }
+
+        if (TryGetEnumerableElementType(underlyingType, out var elementType))
+        {
+            return $"array of {DescribeExpectedShape(elementType)}";
+        }
+
+        if (underlyingType.IsEnum)
+        {
+            return $"one of: {string.Join(", ", Enum.GetNames(underlyingType))}";
+        }
+
+        return GetJsonSchemaType(underlyingType) switch
+        {
+            "integer" => "an integer",
+            "number" => "a number",
+            "boolean" => "a boolean",
+            "string" => "a string",
+            "object" => $"an object matching {underlyingType.Name}",
+            var value => value
+        };
+    }
+
+    private static string DescribeActualShape(object value)
+    {
+        if (value is JsonElement json)
+        {
+            return json.ValueKind switch
+            {
+                JsonValueKind.Array => "array",
+                JsonValueKind.Object => "object",
+                JsonValueKind.String => "string",
+                JsonValueKind.Number => "number",
+                JsonValueKind.True or JsonValueKind.False => "boolean",
+                JsonValueKind.Null => "null",
+                _ => json.ValueKind.ToString().ToLowerInvariant()
+            };
+        }
+
+        if (value is string)
+        {
+            return "string";
+        }
+
+        if (value is bool)
+        {
+            return "boolean";
+        }
+
+        if (value is System.Collections.IEnumerable && value is not string)
+        {
+            return "array";
+        }
+
+        var type = value.GetType();
+        if (type.IsPrimitive || type == typeof(decimal))
+        {
+            return "number";
+        }
+
+        return "object";
     }
 
     private static object? GetDefault(Type type) =>
@@ -669,4 +786,26 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         AvailabilityMember? AvailabilityCheck);
 
     private sealed record AvailabilityMember(PropertyInfo? Property, MethodInfo? Method);
+
+    private enum CapabilityArgumentBindStatus
+    {
+        Bound,
+        Missing,
+        InvalidShape
+    }
+
+    private sealed record CapabilityArgumentBinding(
+        CapabilityArgumentBindStatus Status,
+        object? Value,
+        string? ActualShape)
+    {
+        public static CapabilityArgumentBinding Missing { get; } =
+            new(CapabilityArgumentBindStatus.Missing, null, null);
+
+        public static CapabilityArgumentBinding Bound(object? value) =>
+            new(CapabilityArgumentBindStatus.Bound, value, null);
+
+        public static CapabilityArgumentBinding Invalid(string actualShape) =>
+            new(CapabilityArgumentBindStatus.InvalidShape, null, actualShape);
+    }
 }

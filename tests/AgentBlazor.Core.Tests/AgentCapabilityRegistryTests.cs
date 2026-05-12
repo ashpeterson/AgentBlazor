@@ -119,6 +119,142 @@ public class AgentCapabilityRegistryTests
         Assert.False(result.Succeeded);
         Assert.True(result.RequiresClarification);
         Assert.Contains("supplierIds", result.ClarificationQuestion, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("missing_argument", result.Outputs["errorCode"]);
+        Assert.Equal("supplierIds", result.Outputs["parameterName"]);
+        Assert.Equal("supplier_compliance.prepare_remediation", result.Outputs["actionId"]);
+        Assert.Contains(result.NextActions, action => action.Contains("supplierIds", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenRequiredArgumentHasInvalidShape_ReturnsStructuredFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new CapabilityGate { CanPrepare = true });
+        services.AddSingleton<CapabilityRecorder>();
+        services.AddAgentBlazorServices()
+            .AddCapability<SupplierCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "supplier_compliance.show_at_risk_suppliers",
+            new Dictionary<string, object?>
+            {
+                ["days"] = new { value = "soon" }
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.RequiresClarification);
+        Assert.Equal("invalid_argument_shape", result.Outputs["errorCode"]);
+        Assert.Equal("days", result.Outputs["parameterName"]);
+        Assert.Equal("an integer", result.Outputs["expectedShape"]);
+        Assert.Equal("object", result.Outputs["actualShape"]);
+        Assert.Contains("days", result.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(result.NextActions, action => action.Contains("days", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenEnumArgumentHasInvalidValue_ReturnsStructuredFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<TicketCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "ticket_workflow.prioritize_ticket",
+            new Dictionary<string, object?>
+            {
+                ["priority"] = "urgent-ish"
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_argument_shape", result.Outputs["errorCode"]);
+        Assert.Equal("priority", result.Outputs["parameterName"]);
+        Assert.Contains(nameof(TicketPriority.High), result.Outputs["expectedShape"]?.ToString(), StringComparison.Ordinal);
+        Assert.Contains("priority", result.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenRequiredArgumentIsNull_ReturnsStructuredFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<TicketCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "ticket_workflow.summarize_ticket",
+            new Dictionary<string, object?>
+            {
+                ["ticketId"] = null
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_argument_shape", result.Outputs["errorCode"]);
+        Assert.Equal("ticketId", result.Outputs["parameterName"]);
+        Assert.Equal("null", result.Outputs["actualShape"]);
+        Assert.DoesNotContain("Object reference", result.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCapabilityThrowsValidationException_ReturnsRecoverableFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<TicketCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "ticket_workflow.summarize_ticket",
+            new Dictionary<string, object?>
+            {
+                ["ticketId"] = "BAD-1"
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("recoverable_failure", result.Outputs["errorCode"]);
+        Assert.Equal("ticket_workflow.summarize_ticket", result.Outputs["actionId"]);
+        Assert.Equal(nameof(ArgumentException), result.Outputs["exceptionType"]);
+        Assert.Contains("ticketId must start with TCK-", result.Summary, StringComparison.Ordinal);
+        Assert.Contains(result.NextActions, action => action.Contains("summarize_ticket", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenAsyncCapabilityThrowsUnexpectedException_ReturnsTerseFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<TicketCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "ticket_workflow.sync_external_ticket",
+            new Dictionary<string, object?>
+            {
+                ["ticketId"] = "TCK-1042"
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("capability_invocation_failed", result.Outputs["errorCode"]);
+        Assert.Equal("ticket_workflow.sync_external_ticket", result.Outputs["actionId"]);
+        Assert.Equal(nameof(ApplicationException), result.Outputs["exceptionType"]);
+        Assert.Equal("Capability action 'ticket_workflow.sync_external_ticket' failed unexpectedly.", result.Summary);
+        Assert.DoesNotContain("upstream CRM token", result.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -174,6 +310,29 @@ public class AgentCapabilityRegistryTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("ctx-123", recorder.LastSessionId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenRuntimeContextIsMissing_ReturnsStructuredFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<CapabilityRecorder>();
+        services.AddAgentBlazorServices()
+            .AddCapability<ContextCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "context_scoped.capture_session",
+            new Dictionary<string, object?>(),
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.RequiresClarification);
+        Assert.Equal("missing_runtime_context", result.Outputs["errorCode"]);
+        Assert.Equal(AgentRuntimeContextKeys.SessionId, result.Outputs["contextKey"]);
+        Assert.Contains(result.NextActions, action => action.Contains("runtime context", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -256,6 +415,40 @@ public class AgentCapabilityRegistryTests
             await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
             return CapabilityResult.Success("Unexpected completion.");
         }
+    }
+
+    [AgentCapability("ticket_workflow", Name = "Ticket Workflow", Category = "Support")]
+    public sealed class TicketCapabilities
+    {
+        [AgentAction("Prioritize a ticket", ActionId = "prioritize_ticket")]
+        public CapabilityResult PrioritizeTicket(
+            [AgentParam("Ticket priority", Required = true)] TicketPriority priority)
+            => CapabilityResult.Success($"Priority set to {priority}.");
+
+        [AgentAction("Summarize a ticket", ActionId = "summarize_ticket")]
+        public CapabilityResult SummarizeTicket([AgentParam("Ticket ID", Required = true)] string ticketId)
+        {
+            if (!ticketId.StartsWith("TCK-", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("ticketId must start with TCK-.", nameof(ticketId));
+            }
+
+            return CapabilityResult.Success($"Summarized {ticketId}.");
+        }
+
+        [AgentAction("Sync an external ticket", ActionId = "sync_external_ticket")]
+        public async Task<CapabilityResult> SyncExternalTicketAsync([AgentParam("Ticket ID", Required = true)] string ticketId)
+        {
+            await Task.Yield();
+            throw new ApplicationException($"upstream CRM token rejected while syncing {ticketId}");
+        }
+    }
+
+    public enum TicketPriority
+    {
+        Low,
+        Medium,
+        High
     }
 
     public sealed class CapabilityGate

@@ -82,6 +82,40 @@ public sealed record CapabilityResult(string Summary)
         Succeeded = false
     };
 
+    public static CapabilityResult InvalidArguments(string summary) => Failure(summary)
+        .WithOutput("errorCode", "invalid_arguments");
+
+    public static CapabilityResult MissingArgument(
+        string parameterName,
+        string expectedShape,
+        string actionId)
+        => NeedsClarification(
+                $"Required parameter '{parameterName}' is missing for capability action '{actionId}'.")
+            .WithOutput("errorCode", "missing_argument")
+            .WithOutput("parameterName", parameterName)
+            .WithOutput("expectedShape", expectedShape)
+            .WithOutput("actionId", actionId)
+            .WithNextAction(
+                $"Ask the user for '{parameterName}' or retry only if it can be inferred from conversation context.");
+
+    public static CapabilityResult InvalidArgumentShape(
+        string parameterName,
+        string expectedShape,
+        string actualShape,
+        string actionId)
+        => InvalidArguments(
+                $"Parameter '{parameterName}' for capability action '{actionId}' must be {expectedShape}, but received {actualShape}.")
+            .WithOutput("errorCode", "invalid_argument_shape")
+            .WithOutput("parameterName", parameterName)
+            .WithOutput("expectedShape", expectedShape)
+            .WithOutput("actualShape", actualShape)
+            .WithOutput("actionId", actionId)
+            .WithNextAction(
+                $"Retry capability action '{actionId}' with '{parameterName}' as {expectedShape}.");
+
+    public static CapabilityResult RecoverableFailure(string summary) => Failure(summary)
+        .WithOutput("errorCode", "recoverable_failure");
+
     public static CapabilityResult Blocked(string summary) => new(summary)
     {
         Succeeded = false,
