@@ -179,3 +179,4 @@ Say hello
 - [Hosted demo](https://demo.agentblazor.com/demo/workflows/support-inbox)
 - [Starter sample](../samples/AgentBlazor.Starter/README.md)
 - [Hosted WebAssembly client](../src/AgentBlazor.Client/PACKAGE_README.md)
+- [Recoverable capability errors](capability-errors.md)
