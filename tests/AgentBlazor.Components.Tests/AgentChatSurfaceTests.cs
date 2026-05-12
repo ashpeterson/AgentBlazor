@@ -230,6 +230,57 @@ public sealed class AgentChatSurfaceTests : TestContext
         });
     }
 
+    [Fact]
+    public void StructuredCapabilityError_RendersRecoveryDetails_WhenExecutionDetailsEnabled()
+    {
+        Services.AddAgentBlazorServices();
+        Services.AgentBlazor().AddAgent("Test Agent");
+        Services.AddSingleton<IAgentActionRenderRegistry, TestActionRenderRegistry>();
+        Services.AddSingleton<IAgentRuntimeAdapter, StructuredErrorRuntimeAdapter>();
+
+        var cut = RenderComponent<AgentChatSurface>(parameters => parameters
+            .Add(static surface => surface.ShowAgentSelector, false)
+            .Add(static surface => surface.DefaultAgentName, "Test Agent")
+            .Add(static surface => surface.ShowExecutionDetails, true));
+
+        cut.Find("textarea[aria-label='Message input']").Input("Show tickets soon");
+        cut.Find("button[aria-label='Send message']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Parameter 'days'", cut.Markup);
+            Assert.Contains("support_inbox.show_open_tickets", cut.Markup);
+            Assert.Contains("Next: Retry capability action", cut.Markup);
+            Assert.Contains("Output: errorCode=invalid_argument_shape", cut.Markup);
+            Assert.Contains("Output: parameterName=days", cut.Markup);
+        });
+    }
+
+    [Fact]
+    public void StructuredCapabilityError_HidesRecoveryDiagnostics_WhenExecutionDetailsDisabled()
+    {
+        Services.AddAgentBlazorServices();
+        Services.AgentBlazor().AddAgent("Test Agent");
+        Services.AddSingleton<IAgentActionRenderRegistry, TestActionRenderRegistry>();
+        Services.AddSingleton<IAgentRuntimeAdapter, StructuredErrorRuntimeAdapter>();
+
+        var cut = RenderComponent<AgentChatSurface>(parameters => parameters
+            .Add(static surface => surface.ShowAgentSelector, false)
+            .Add(static surface => surface.DefaultAgentName, "Test Agent")
+            .Add(static surface => surface.ShowExecutionDetails, false));
+
+        cut.Find("textarea[aria-label='Message input']").Input("Show tickets soon");
+        cut.Find("button[aria-label='Send message']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Parameter 'days'", cut.Markup);
+            Assert.DoesNotContain("Next: Retry capability action", cut.Markup);
+            Assert.DoesNotContain("Output: errorCode=invalid_argument_shape", cut.Markup);
+            Assert.DoesNotContain("Output: parameterName=days", cut.Markup);
+        });
+    }
+
     private sealed class CancellableStreamingRuntimeAdapter : IAgentRuntimeAdapter
     {
         private readonly CancellationTokenSource _runCancellation = new();
@@ -547,6 +598,82 @@ public sealed class AgentChatSurfaceTests : TestContext
                             ["highlightedTicketIds"] = new[] { "TCK-1042", "TCK-1048", "TCK-1055" }
                         },
                         NextActions: ["Draft a reply for the highlighted tickets"])
+                ]);
+
+            return Task.FromResult(new AgentTurnResponse("Test Agent", responseText, [], [])
+            {
+                ExecutionPlan = executionPlan
+            });
+        }
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> RunTurnStreamingAsync(
+            AgentTurnRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = request;
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public async IAsyncEnumerable<AgentTurnStreamEvent> ConnectRunStreamAsync(
+            string runId,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public Task<bool> StopRunAsync(string runId, CancellationToken cancellationToken = default)
+        {
+            _ = runId;
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(false);
+        }
+    }
+
+    private sealed class StructuredErrorRuntimeAdapter : IAgentRuntimeAdapter
+    {
+        public bool SupportsStreaming => false;
+
+        public bool SupportsReconnect => false;
+
+        public bool SupportsCancellation => false;
+
+        public Task<AgentTurnResponse> RunTurnAsync(AgentTurnRequest request, CancellationToken cancellationToken = default)
+        {
+            _ = request;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            const string responseText =
+                "Parameter 'days' for capability action 'support_inbox.show_open_tickets' must be an integer, but received object.";
+            var executionPlan = new AgentExecutionPlan(
+                "Test Agent",
+                new AgentExecutionContext("structured-error-session", "structured-error-run", Route: "/demo/workflows/support-inbox"),
+                [
+                    new AgentExecutionStep(
+                        "step-1",
+                        1,
+                        AgentExecutionStepKind.SemanticCapability,
+                        "support_inbox",
+                        "show_open_tickets",
+                        AgentExecutionStepStatus.Failed,
+                        false,
+                        new AgentPolicyDecision(true, AgentRiskClass.ReadOnly, AgentApprovalMode.None),
+                        Message: responseText,
+                        Outputs: new Dictionary<string, object?>
+                        {
+                            ["errorCode"] = "invalid_argument_shape",
+                            ["parameterName"] = "days",
+                            ["expectedShape"] = "an integer",
+                            ["actualShape"] = "object"
+                        },
+                        NextActions:
+                        [
+                            "Retry capability action 'support_inbox.show_open_tickets' with 'days' as an integer."
+                        ])
                 ]);
 
             return Task.FromResult(new AgentTurnResponse("Test Agent", responseText, [], [])
