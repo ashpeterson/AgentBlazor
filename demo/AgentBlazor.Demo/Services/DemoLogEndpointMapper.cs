@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using AgentBlazor.Demo.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -6,9 +7,67 @@ namespace AgentBlazor.Demo.Services;
 
 internal static class DemoLogEndpointMapper
 {
+    private const string AccessCookieName = "AgentBlazorDemoLogAccess";
+    private const int DefaultViewLines = 50;
+
     public static void MapDemoLogEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/internal/demo-logs");
+
+        group.MapGet("/login", (
+            HttpContext httpContext,
+            IOptions<DemoLoggingOptions> options,
+            string? token) =>
+        {
+            if (!IsTokenValid(token, options.Value))
+            {
+                return Results.NotFound();
+            }
+
+            httpContext.Response.Cookies.Append(
+                AccessCookieName,
+                token!,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    MaxAge = TimeSpan.FromDays(30),
+                    IsEssential = true
+                });
+
+            return Results.Redirect("/internal/demo-logs/view");
+        });
+
+        group.MapGet("/logout", (HttpContext httpContext) =>
+        {
+            httpContext.Response.Cookies.Delete(AccessCookieName);
+            return Results.Redirect("/");
+        });
+
+        group.MapGet("/view", async (
+            HttpContext httpContext,
+            IDemoChatRequestLog requestLog,
+            IDemoTrafficLog trafficLog,
+            IOptions<DemoLoggingOptions> options,
+            int? lines,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsAuthorized(httpContext, options.Value))
+            {
+                return Results.NotFound();
+            }
+
+            var lineCount = ClampLineCount(lines ?? DefaultViewLines, options.Value);
+            var trafficTail = await trafficLog.ReadTailAsync(lineCount, cancellationToken);
+            var chatTail = await requestLog.ReadTailAsync(lineCount, cancellationToken);
+            var trafficLines = await trafficLog.ReadAllAsync(cancellationToken);
+            var chatLines = await requestLog.ReadAllAsync(cancellationToken);
+
+            return Results.Content(
+                BuildViewerHtml(BuildSummary(trafficLines, chatLines), trafficTail, chatTail, lineCount),
+                "text/html; charset=utf-8");
+        });
 
         group.MapGet("/", async (
             HttpContext httpContext,
@@ -22,7 +81,7 @@ internal static class DemoLogEndpointMapper
                 return Results.NotFound();
             }
 
-            var tail = await requestLog.ReadTailAsync(lines ?? 200, cancellationToken);
+            var tail = await requestLog.ReadTailAsync(ClampLineCount(lines ?? 200, options.Value), cancellationToken);
             return Results.Text(string.Join(Environment.NewLine, tail), "application/x-ndjson");
         });
 
@@ -38,7 +97,7 @@ internal static class DemoLogEndpointMapper
                 return Results.NotFound();
             }
 
-            var tail = await trafficLog.ReadTailAsync(lines ?? 200, cancellationToken);
+            var tail = await trafficLog.ReadTailAsync(ClampLineCount(lines ?? 200, options.Value), cancellationToken);
             return Results.Text(string.Join(Environment.NewLine, tail), "application/x-ndjson");
         });
 
@@ -98,13 +157,30 @@ internal static class DemoLogEndpointMapper
         }
 
         if (httpContext.Request.Headers.TryGetValue("X-Demo-Log-Token", out var headerValues) &&
-            string.Equals(headerValues.ToString(), options.AccessToken, StringComparison.Ordinal))
+            IsTokenValid(headerValues.ToString(), options))
         {
             return true;
         }
 
-        return httpContext.Request.Query.TryGetValue("token", out var queryValues) &&
-               string.Equals(queryValues.ToString(), options.AccessToken, StringComparison.Ordinal);
+        if (httpContext.Request.Query.TryGetValue("token", out var queryValues) &&
+            IsTokenValid(queryValues.ToString(), options))
+        {
+            return true;
+        }
+
+        return httpContext.Request.Cookies.TryGetValue(AccessCookieName, out var cookieValue) &&
+               IsTokenValid(cookieValue, options);
+    }
+
+    private static bool IsTokenValid(string? token, DemoLoggingOptions options)
+    {
+        return !string.IsNullOrWhiteSpace(options.AccessToken) &&
+               string.Equals(token, options.AccessToken, StringComparison.Ordinal);
+    }
+
+    private static int ClampLineCount(int lines, DemoLoggingOptions options)
+    {
+        return Math.Clamp(lines, 1, options.MaxTailLines);
     }
 
     private static object BuildSummary(IReadOnlyList<string> trafficLines, IReadOnlyList<string> chatLines)
@@ -222,4 +298,191 @@ internal static class DemoLogEndpointMapper
         long DurationMs,
         bool RequiresApproval,
         int FailedExecutionCount);
+
+    private static string BuildViewerHtml(object summary, IReadOnlyList<string> trafficTail, IReadOnlyList<string> chatTail, int lineCount)
+    {
+        var summaryJson = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true });
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <meta name="robots" content="noindex,nofollow">
+                <title>AgentBlazor Demo Logs</title>
+                <style>
+                    :root {
+                        color-scheme: light;
+                        --bg: #f6f3ed;
+                        --panel: #fffaf0;
+                        --ink: #201a14;
+                        --muted: #6f6254;
+                        --line: #ddcfbd;
+                        --accent: #b85c38;
+                        --code: #16130f;
+                    }
+                    * { box-sizing: border-box; }
+                    body {
+                        margin: 0;
+                        background: radial-gradient(circle at top left, #fff6d7, transparent 32rem), var(--bg);
+                        color: var(--ink);
+                        font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    }
+                    main {
+                        width: min(1180px, calc(100vw - 32px));
+                        margin: 32px auto;
+                    }
+                    header {
+                        display: flex;
+                        align-items: flex-end;
+                        justify-content: space-between;
+                        gap: 16px;
+                        margin-bottom: 20px;
+                    }
+                    h1 { margin: 0; font-size: clamp(28px, 4vw, 46px); letter-spacing: -0.04em; }
+                    h2 { margin: 0 0 12px; font-size: 18px; }
+                    p { margin: 6px 0 0; color: var(--muted); }
+                    a, button {
+                        color: var(--accent);
+                        font: inherit;
+                    }
+                    .actions {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                    }
+                    .button {
+                        border: 1px solid var(--line);
+                        border-radius: 999px;
+                        background: var(--panel);
+                        padding: 8px 12px;
+                        text-decoration: none;
+                        font-weight: 700;
+                    }
+                    .grid {
+                        display: grid;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        gap: 16px;
+                    }
+                    section {
+                        border: 1px solid var(--line);
+                        border-radius: 20px;
+                        background: color-mix(in srgb, var(--panel) 92%, white);
+                        box-shadow: 0 18px 60px rgb(60 38 20 / 10%);
+                        padding: 18px;
+                        overflow: hidden;
+                    }
+                    .wide { grid-column: 1 / -1; }
+                    pre {
+                        margin: 0;
+                        max-height: 460px;
+                        overflow: auto;
+                        border-radius: 14px;
+                        background: var(--code);
+                        color: #fff8e8;
+                        padding: 14px;
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                        font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+                    }
+                    .raw-line {
+                        padding: 10px 0;
+                        border-top: 1px solid var(--line);
+                        font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+                        font-size: 12px;
+                        overflow-wrap: anywhere;
+                    }
+                    .raw-line:first-of-type { border-top: 0; }
+                    .toolbar {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 12px;
+                        margin-bottom: 12px;
+                    }
+                    input {
+                        width: 5.5rem;
+                        border: 1px solid var(--line);
+                        border-radius: 10px;
+                        padding: 7px 9px;
+                        background: white;
+                    }
+                    @media (max-width: 760px) {
+                        header { align-items: flex-start; flex-direction: column; }
+                        .grid { grid-template-columns: 1fr; }
+                    }
+                </style>
+            </head>
+            <body>
+                <main>
+                    <header>
+                        <div>
+                            <h1>Demo Logs</h1>
+                            <p>Private viewer for traffic and chat diagnostics. Raw prompts, IPs, and user agents are not logged.</p>
+                        </div>
+                        <nav class="actions" aria-label="Log actions">
+                            <a class="button" href="/internal/demo-logs/summary">Summary JSON</a>
+                            <a class="button" href="/internal/demo-logs/traffic/download">Download traffic</a>
+                            <a class="button" href="/internal/demo-logs/download">Download chat</a>
+                            <a class="button" href="/internal/demo-logs/logout">Log out</a>
+                        </nav>
+                    </header>
+
+                    <div class="grid">
+                        <section class="wide">
+                            <div class="toolbar">
+                                <h2>Summary</h2>
+                                <form method="get" action="/internal/demo-logs/view">
+                                    <label>Lines <input name="lines" type="number" min="1" max="500" value="{{lineCount}}"></label>
+                                    <button class="button" type="submit">Refresh</button>
+                                </form>
+                            </div>
+                            <pre>{{Encode(summaryJson)}}</pre>
+                        </section>
+
+                        <section>
+                            <h2>Recent Page Traffic</h2>
+                            {{RenderLines(trafficTail)}}
+                        </section>
+
+                        <section>
+                            <h2>Recent Chat Turns</h2>
+                            {{RenderLines(chatTail)}}
+                        </section>
+                    </div>
+                </main>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string RenderLines(IReadOnlyList<string> lines)
+    {
+        if (lines.Count == 0)
+        {
+            return "<p>No entries yet.</p>";
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            lines.Reverse().Select(static line => $"""<div class="raw-line">{Encode(PrettyJsonLine(line))}</div>"""));
+    }
+
+    private static string PrettyJsonLine(string line)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException)
+        {
+            return line;
+        }
+    }
+
+    private static string Encode(string value)
+    {
+        return HtmlEncoder.Default.Encode(value);
+    }
 }

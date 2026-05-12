@@ -113,6 +113,20 @@ The traffic JSONL file records:
 
 It does not record full prompt text, raw IP addresses, or raw user agents unless `DemoLogging__IncludePromptPreview=true` is explicitly set for chat prompt previews.
 
+Open the browser log viewer from any machine by visiting the one-time login URL with the current access token:
+
+```text
+https://demo.agentblazor.com/internal/demo-logs/login?token=<DEMO_LOG_ACCESS_TOKEN>
+```
+
+That sets a secure HttpOnly cookie for 30 days and redirects to:
+
+```text
+https://demo.agentblazor.com/internal/demo-logs/view
+```
+
+The viewer shows the traffic/chat summary, recent page traffic, recent chat turns, and download links.
+
 Get the traffic and chat summary:
 
 ```bash
