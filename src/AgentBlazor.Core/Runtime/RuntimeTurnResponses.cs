@@ -2,6 +2,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime.Components;
 using AgentBlazor.Execution;
+using Microsoft.Extensions.AI;
 
 namespace AgentBlazor.Core.Runtime;
 
@@ -16,7 +17,8 @@ internal static class RuntimeTurnResponses
         string? clarificationQuestion = null,
         IReadOnlyList<PendingApproval>? pendingApprovals = null,
         bool? requiresApproval = null,
-        AgentExecutionPlan? executionPlan = null)
+        AgentExecutionPlan? executionPlan = null,
+        UsageDetails? usage = null)
     {
         var effectiveClarification = clarificationQuestion
             ?? executionResults.FirstOrDefault(static result => result.Outcome is ActionOutcome.NeedsClarification)?.Message;
@@ -32,7 +34,8 @@ internal static class RuntimeTurnResponses
             ClarificationQuestion = effectiveClarification,
             RequiresApproval = requiresApproval ?? effectivePendingApprovals.Count > 0,
             PendingApprovals = effectivePendingApprovals,
-            ExecutionPlan = executionPlan
+            ExecutionPlan = executionPlan,
+            Usage = usage
         };
 
         return RuntimeGeneratedUi.Attach(response, generatedUi);

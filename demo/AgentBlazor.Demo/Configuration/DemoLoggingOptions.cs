@@ -19,4 +19,8 @@ internal sealed class DemoLoggingOptions
     public int PromptPreviewMaxLength { get; set; } = 160;
 
     public int MaxTailLines { get; set; } = 500;
+
+    public decimal InputTokenCostPerMillion { get; set; } = 0.15m;
+
+    public decimal OutputTokenCostPerMillion { get; set; } = 0.60m;
 }

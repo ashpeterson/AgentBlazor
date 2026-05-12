@@ -183,7 +183,7 @@ public sealed class ChatClientRuntimeAdapter(
                 options: null,
                 effectiveCancellationToken).ConfigureAwait(false);
 
-            var turnResponse = BuildTurnResponse(registration.Name, response.Text, request, turnState);
+            var turnResponse = BuildTurnResponse(registration.Name, response.Text, request, turnState, response.Usage);
             await StoreConversationTurnAsync(registration.Name, request, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
             await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             await StoreTraceAsync(traceBuilder, turnState, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
@@ -414,12 +414,20 @@ public sealed class ChatClientRuntimeAdapter(
 
             var agent = await CreateAgentAsync(registration, request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             CurrentTurnState.Value = turnState;
+            var usage = new UsageDetails();
+            var hasUsage = false;
             await foreach (var update in agent.RunStreamingAsync(
                                new ChatMessage(ChatRole.User, BuildUserMessage(request)),
                                sessionState.Session,
                                options: null,
                                effectiveCancellationToken).ConfigureAwait(false))
             {
+                if (ExtractUsage(update) is { } updateUsage)
+                {
+                    usage.Add(updateUsage);
+                    hasUsage = true;
+                }
+
                 foreach (var queuedEvent in turnState.DrainStreamEvents())
                 {
                     var emitted = queuedEvent with
@@ -511,7 +519,12 @@ public sealed class ChatClientRuntimeAdapter(
                     .ConfigureAwait(false);
             }
 
-            var turnResponse = BuildTurnResponse(registration.Name, responseText.ToString(), request, turnState);
+            var turnResponse = BuildTurnResponse(
+                registration.Name,
+                responseText.ToString(),
+                request,
+                turnState,
+                hasUsage ? usage : null);
             await StoreConversationTurnAsync(registration.Name, request, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
             await RecordActionHistoryAsync(request, turnState, effectiveCancellationToken).ConfigureAwait(false);
             await StoreTraceAsync(traceBuilder, turnState, turnResponse, effectiveCancellationToken).ConfigureAwait(false);
@@ -2067,7 +2080,8 @@ public sealed class ChatClientRuntimeAdapter(
         string agentName,
         string responseText,
         AgentTurnRequest request,
-        TurnExecutionState turnState)
+        TurnExecutionState turnState,
+        UsageDetails? usage = null)
     {
         var executionPlan = RuntimeExecutionPlans.Build(
             agentName,
@@ -2101,7 +2115,20 @@ public sealed class ChatClientRuntimeAdapter(
             clarificationQuestion: clarificationQuestion,
             pendingApprovals: pendingApprovals,
             requiresApproval: turnState.RequiresApproval,
-            executionPlan: executionPlan);
+            executionPlan: executionPlan,
+            usage: usage);
+    }
+
+    private static UsageDetails? ExtractUsage(AgentResponseUpdate update)
+    {
+        UsageDetails? usage = null;
+        foreach (var usageContent in update.Contents.OfType<UsageContent>())
+        {
+            usage ??= new UsageDetails();
+            usage.Add(usageContent.Details);
+        }
+
+        return usage;
     }
 
     private AgentUiDocument? BuildGeneratedUi(TurnExecutionState turnState)

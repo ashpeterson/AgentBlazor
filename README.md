@@ -18,6 +18,12 @@ dotnet add package AgentBlazor --version 0.1.0-preview.11
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
 
+## Dependency Stability
+
+AgentBlazor builds on the Microsoft Agent Framework packages rather than a custom agent runtime. The core package currently depends on four GA packages: `Microsoft.Agents.AI`, `Microsoft.Agents.AI.Abstractions`, `Microsoft.Agents.AI.OpenAI`, and `Microsoft.Agents.AI.Workflows`.
+
+Two hosting packages are still preview dependencies: `Microsoft.Agents.AI.Hosting` and `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore`. AgentBlazor keeps those behind its own registration and endpoint surface so app code does not need to bind directly to the preview hosting APIs for normal setup. Expect preview-version churn around hosted AG-UI transport before 1.0; the component/capability model is the stable surface this package is trying to protect.
+
 ## Minimal Setup
 
 Register the runtime in `Program.cs`:

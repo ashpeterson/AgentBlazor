@@ -224,6 +224,11 @@ internal static class DemoLogEndpointMapper
                 last24hTurns = chats.Count(item => item.TimestampUtc >= now.AddHours(-24)),
                 approvalTurns = chats.Count(static item => item.RequiresApproval),
                 failedExecutionTurns = chats.Count(static item => item.FailedExecutionCount > 0),
+                promptTokens = chats.Sum(static item => item.PromptTokens ?? 0),
+                completionTokens = chats.Sum(static item => item.CompletionTokens ?? 0),
+                totalTokens = chats.Sum(static item => item.TotalTokens ?? 0),
+                estimatedCost = Math.Round(chats.Sum(static item => item.EstimatedCost ?? 0), 8, MidpointRounding.AwayFromZero),
+                estimatedCostCurrency = chats.Any(static item => item.EstimatedCost is not null) ? "USD" : null,
                 averageDurationMs = chats.Length == 0 ? 0 : Math.Round(chats.Average(static item => item.DurationMs), 1),
                 topRoutes = chats
                     .Where(static item => !string.IsNullOrWhiteSpace(item.Route))
@@ -268,7 +273,11 @@ internal static class DemoLogEndpointMapper
                 root.GetProperty("sessionHash").GetString() ?? "unknown",
                 root.GetProperty("durationMs").GetInt64(),
                 root.TryGetProperty("requiresApproval", out var requiresApproval) && requiresApproval.GetBoolean(),
-                root.TryGetProperty("failedExecutionCount", out var failedExecutionCount) ? failedExecutionCount.GetInt32() : 0);
+                root.TryGetProperty("failedExecutionCount", out var failedExecutionCount) ? failedExecutionCount.GetInt32() : 0,
+                TryGetInt64(root, "prompt_tokens"),
+                TryGetInt64(root, "completion_tokens"),
+                TryGetInt64(root, "total_tokens"),
+                TryGetDecimal(root, "estimated_cost"));
         }
         catch (JsonException)
         {
@@ -297,7 +306,29 @@ internal static class DemoLogEndpointMapper
         string SessionHash,
         long DurationMs,
         bool RequiresApproval,
-        int FailedExecutionCount);
+        int FailedExecutionCount,
+        long? PromptTokens,
+        long? CompletionTokens,
+        long? TotalTokens,
+        decimal? EstimatedCost);
+
+    private static long? TryGetInt64(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind is JsonValueKind.Number &&
+               property.TryGetInt64(out var value)
+            ? value
+            : null;
+    }
+
+    private static decimal? TryGetDecimal(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind is JsonValueKind.Number &&
+               property.TryGetDecimal(out var value)
+            ? value
+            : null;
+    }
 
     private static string BuildViewerHtml(object summary, IReadOnlyList<string> trafficTail, IReadOnlyList<string> chatTail, int lineCount)
     {
