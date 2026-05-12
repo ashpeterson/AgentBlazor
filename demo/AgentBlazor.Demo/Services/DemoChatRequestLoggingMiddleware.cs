@@ -5,6 +5,7 @@ using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Demo.Configuration;
 using AgentBlazor.Execution;
+using AgentBlazor.Options;
 using Microsoft.Extensions.Options;
 
 namespace AgentBlazor.Demo.Services;
@@ -12,9 +13,11 @@ namespace AgentBlazor.Demo.Services;
 internal sealed class DemoChatRequestLoggingMiddleware(
     IDemoChatRequestLog requestLog,
     IOptions<DemoLoggingOptions> options,
+    IOptions<AgentBlazorOptions> agentOptions,
     ILogger<DemoChatRequestLoggingMiddleware> logger) : IAgentTurnMiddleware
 {
     private readonly DemoLoggingOptions _options = options.Value;
+    private readonly AgentBlazorOptions _agentOptions = agentOptions.Value;
 
     public async Task InvokeAsync(
         AgentTurnContext context,
@@ -91,9 +94,11 @@ internal sealed class DemoChatRequestLoggingMiddleware(
         Exception? exception = null)
     {
         var executionPlan = response?.ExecutionPlan;
+        var usage = response?.Usage;
         IReadOnlyList<AgentExecutionStep> executionSteps = executionPlan?.Steps ?? [];
         var failedExecutionCount = executionSteps.Count(static step =>
             step.Status is not AgentExecutionStepStatus.Completed);
+        var estimatedCost = EstimateCost(usage?.InputTokenCount, usage?.OutputTokenCount);
 
         return new DemoChatRequestLogEntry
         {
@@ -109,6 +114,12 @@ internal sealed class DemoChatRequestLoggingMiddleware(
             DurationMs = durationMs,
             Status = status,
             ResponseLength = response?.ResponseText.Length ?? 0,
+            Model = _agentOptions.Provider.Model,
+            PromptTokens = usage?.InputTokenCount,
+            CompletionTokens = usage?.OutputTokenCount,
+            TotalTokens = usage?.TotalTokenCount,
+            EstimatedCost = estimatedCost,
+            EstimatedCostCurrency = estimatedCost is null ? null : "USD",
             RequiresApproval = response?.RequiresApproval ?? false,
             RequiresClarification = response?.RequiresClarification ?? false,
             PlannedActionCount = executionPlan?.Steps.Count ?? response?.PlannedActions.Count ?? 0,
@@ -121,6 +132,18 @@ internal sealed class DemoChatRequestLoggingMiddleware(
             ErrorType = exception?.GetType().Name,
             ErrorMessage = exception?.Message
         };
+    }
+
+    private decimal? EstimateCost(long? inputTokens, long? outputTokens)
+    {
+        if (inputTokens is null && outputTokens is null)
+        {
+            return null;
+        }
+
+        var inputCost = (inputTokens ?? 0) / 1_000_000m * _options.InputTokenCostPerMillion;
+        var outputCost = (outputTokens ?? 0) / 1_000_000m * _options.OutputTokenCostPerMillion;
+        return Math.Round(inputCost + outputCost, 8, MidpointRounding.AwayFromZero);
     }
 
     private static string? TryGetContext(AgentTurnRequest request, string key)

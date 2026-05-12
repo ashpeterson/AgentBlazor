@@ -38,6 +38,30 @@ internal sealed record DemoChatRequestLogEntry
     [JsonPropertyName("responseLength")]
     public int ResponseLength { get; init; }
 
+    [JsonPropertyName("model")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("prompt_tokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? PromptTokens { get; init; }
+
+    [JsonPropertyName("completion_tokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? CompletionTokens { get; init; }
+
+    [JsonPropertyName("total_tokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? TotalTokens { get; init; }
+
+    [JsonPropertyName("estimated_cost")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? EstimatedCost { get; init; }
+
+    [JsonPropertyName("estimated_cost_currency")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EstimatedCostCurrency { get; init; }
+
     [JsonPropertyName("requiresApproval")]
     public bool RequiresApproval { get; init; }
 

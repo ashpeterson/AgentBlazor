@@ -95,7 +95,8 @@ Current demo observability is intentionally lightweight:
 
 - ASP.NET Core console logging is enabled at `Information` for `AgentBlazor` categories.
 - Azure Container Apps can stream container `stdout`/`stderr` logs without adding Application Insights code.
-- The Container Apps environment should use `--logs-destination none` to avoid persisted Azure Monitor / Log Analytics ingestion charges.
+- The live Container Apps environment uses `logsDestination: null` / `--logs-destination none` to avoid persisted Azure Monitor / Log Analytics ingestion charges.
+- No Application Insights component is currently attached to the demo. This is deliberate for the free public demo unless there is a specific incident that requires Azure-side telemetry.
 - Each page view and agent turn is appended to local JSONL files inside the container.
 - AgentBlazor prompt tracing is enabled in memory for runtime debugging, but traces are not persisted across container restarts.
 - The public agent endpoint is rate limited by client IP. The current deployment uses `20` requests per minute.
@@ -104,6 +105,7 @@ The chat JSONL file records:
 
 - timestamp, request id, route, agent, hashed session id
 - prompt length, response length, duration, outcome, error type
+- model, prompt tokens, completion tokens, total tokens, estimated cost when provider usage metadata is available
 - approval/clarification flags and execution counts
 
 The traffic JSONL file records:
@@ -164,12 +166,9 @@ curl -H "X-Demo-Log-Token: $DEMO_LOG_ACCESS_TOKEN" \
   "https://demo.agentblazor.com/internal/demo-logs/traffic/download"
 ```
 
-What is not wired yet:
+The token cost estimate currently uses the configured `DemoLogging__InputTokenCostPerMillion` and `DemoLogging__OutputTokenCostPerMillion` values. The defaults match `gpt-4o-mini` text pricing at `$0.15` per 1M input tokens and `$0.60` per 1M output tokens.
 
-- No Application Insights SDK or OpenTelemetry exporter is registered by the demo app.
-- No OpenAI token or cost usage tracker is stored by the demo app.
-
-For a low-cost public demo, prefer structured console logs first and keep Log Analytics/Application Insights ingestion off or minimal unless there is a specific incident to debug.
+For a low-cost public demo, prefer structured file/console logs first and keep Log Analytics/Application Insights ingestion off or minimal unless there is a specific incident to debug.
 
 ## Rollback
 
