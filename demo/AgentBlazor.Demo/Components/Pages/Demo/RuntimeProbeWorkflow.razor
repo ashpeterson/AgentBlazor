@@ -16,9 +16,9 @@
         <article class="wf-card wf-card--reference">
             <h2>Structured error recovery</h2>
             <ol class="wf-list">
-                <li>Send: <code>run the structured error date range probe from 2026-05-10 to 2026-05-01</code></li>
-                <li>Confirm the action returns <code>invalid_date_range</code>, not a raw exception.</li>
-                <li>Confirm the recovery hint says to retry with an end date on or after the start date.</li>
+                <li>Send: <code>run the structured error date range probe</code></li>
+                <li>Confirm the action returns <code>missing_argument</code>, not a raw exception.</li>
+                <li>Confirm the recovery hint names the missing <code>startDate</code> parameter and expected shape.</li>
             </ol>
         </article>
         <article class="wf-card">
