@@ -22,6 +22,7 @@ const outDir = path.resolve(process.argv[2] || path.join(repoRoot, "artifacts/vi
 const baseUrl = process.env.AGENTBLAZOR_DEMO_URL || "https://demo.agentblazor.com";
 const prompt = "Run the structured error date range probe";
 
+fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 
 function sleep(ms) {
@@ -40,6 +41,29 @@ async function waitForSurfaceText(surface, pattern, timeoutMs = 120000) {
   }
 
   throw new Error(`Timed out waiting for chat surface text matching ${pattern}.`);
+}
+
+async function waitForSurfaceSettled(surface, timeoutMs = 60000) {
+  const started = Date.now();
+  let stableTicks = 0;
+  while (Date.now() - started < timeoutMs) {
+    const text = await surface.innerText().catch(() => "");
+    const stillRunning =
+      /Thinking\.\.\.|Sending…|Stop/i.test(text);
+
+    if (!stillRunning) {
+      stableTicks++;
+      if (stableTicks >= 2) {
+        return text;
+      }
+    } else {
+      stableTicks = 0;
+    }
+
+    await sleep(750);
+  }
+
+  throw new Error("Timed out waiting for chat surface to settle.");
 }
 
 (async () => {
@@ -68,13 +92,13 @@ async function waitForSurfaceText(surface, pattern, timeoutMs = 120000) {
     /missing_argument|Required parameter 'startDate' is missing/i
   );
 
-  await sleep(1500);
+  const settledTranscript = await waitForSurfaceSettled(surface);
 
   const screenshotPath = path.join(outDir, "structured-error-runtime-probe.png");
   const transcriptPath = path.join(outDir, "structured-error-runtime-probe.txt");
 
   await page.screenshot({ path: screenshotPath, fullPage: true });
-  fs.writeFileSync(transcriptPath, transcript, "utf8");
+  fs.writeFileSync(transcriptPath, settledTranscript || transcript, "utf8");
 
   await context.close();
   await browser.close();
