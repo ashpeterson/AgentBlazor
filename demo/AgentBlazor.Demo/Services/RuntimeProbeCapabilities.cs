@@ -32,4 +32,27 @@ public sealed class RuntimeProbeCapabilities
         return CapabilityResult.Success("Runtime reconnect probe completed.")
             .WithOutput("probe", "RECONNECTED");
     }
+
+    [AgentAction("Run the structured error date range probe", ActionId = "run_structured_error_date_range_probe")]
+    public Task<CapabilityResult> RunStructuredErrorDateRangeProbeAsync(DateOnly startDate, DateOnly endDate)
+    {
+        if (endDate < startDate)
+        {
+            return Task.FromResult(
+                CapabilityResult
+                    .InvalidArguments("The end date must be on or after the start date.")
+                    .WithOutput("errorCode", "invalid_date_range")
+                    .WithOutput("expectedShape", new { startDate = "yyyy-mm-dd", endDate = "yyyy-mm-dd" })
+                    .WithOutput("startDate", startDate)
+                    .WithOutput("endDate", endDate)
+                    .WithNextAction("Retry with an endDate that is on or after startDate."));
+        }
+
+        return Task.FromResult(
+            CapabilityResult
+                .Success($"Structured error probe accepted the date range from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}.")
+                .WithOutput("probe", "STRUCTURED_ERROR_DATE_RANGE_OK")
+                .WithOutput("startDate", startDate)
+                .WithOutput("endDate", endDate));
+    }
 }

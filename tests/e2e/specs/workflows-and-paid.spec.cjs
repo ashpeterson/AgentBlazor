@@ -54,7 +54,7 @@ const workflowScenarios = [
     name: "runtime probe",
     route: "/demo/workflows/runtime-probe",
     heading: /Runtime probe/i,
-    marker: "run the runtime cancellation probe"
+    marker: "run the structured error date range probe"
   }
 ];
 
