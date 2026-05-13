@@ -22,6 +22,8 @@ Current scripts:
   Runs the prepared official Microsoft movie sample, drives the chat widget with real prompts, and records the resulting page-state changes.
 - `record-support-inbox-demo.cjs`
   Runs the demo app support inbox route, drives the embedded assistant through queue focus, escalation, draft, and approval, and records the visible page-state changes.
+- `record-structured-error-reference.cjs`
+  Records the hosted runtime-probe structured-error path and captures a screenshot/transcript showing a recoverable `missing_argument` response.
 
 Useful commands:
 
@@ -34,6 +36,7 @@ OPENAI_API_KEY=... node scripts/video/record-capability-reel.cjs
 node scripts/video/prepare-ms-movies-demo.cjs
 OPENAI_API_KEY=... node scripts/video/record-ms-movies-demo.cjs
 OPENAI_API_KEY=... node scripts/video/record-support-inbox-demo.cjs
+node scripts/video/record-structured-error-reference.cjs
 ```
 
 Notes:

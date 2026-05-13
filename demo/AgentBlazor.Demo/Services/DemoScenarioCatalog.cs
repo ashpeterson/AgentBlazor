@@ -217,10 +217,10 @@ internal static class DemoScenarioCatalog
             "Open runtime probe",
             "Runtime probe assistant",
             "Run a structured error probe, then inspect the recovery hint.",
-            "Run the structured error date range probe from 2026-05-10 to 2026-05-01.",
+            "Run the structured error date range probe.",
             "Runtime Probe Agent",
             [
-                "Run the structured error date range probe from 2026-05-10 to 2026-05-01",
+                "Run the structured error date range probe",
                 "Run the runtime cancellation probe",
                 "Stop the probe"
             ],
