@@ -41,6 +41,34 @@ public sealed class AgentChatAutomationSelectorTests : TestContext
     }
 
     [Fact]
+    public void ChatPanel_DefaultDescription_DoesNotShowNoAgentGuidance()
+    {
+        AddChatServices();
+
+        var cut = RenderComponent<AgentChatPanel>(parameters => parameters
+            .Add(static panel => panel.ShowAgentSelector, false)
+            .Add(static panel => panel.DefaultAgentName, "Test Agent"));
+
+        Assert.Contains("Ask an agent to work with this Blazor app.", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Register an agent", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChatWidget_DefaultDescription_DoesNotShowNoAgentGuidance()
+    {
+        AddChatServices();
+
+        var cut = RenderComponent<AgentChatWidget>(parameters => parameters
+            .Add(static widget => widget.ShowAgentSelector, false)
+            .Add(static widget => widget.DefaultAgentName, "Test Agent"));
+
+        cut.Find("button.ab-chat-widget__bubble").Click();
+
+        Assert.Contains("Ask an agent to work with this Blazor app.", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Register an agent", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ChatBar_RendersStableAutomationSelectorsAndAccessibleControls()
     {
         AddChatServices();

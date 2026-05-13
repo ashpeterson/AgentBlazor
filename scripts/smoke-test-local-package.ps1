@@ -419,7 +419,6 @@ app.Run();
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.JSInterop
 @using AgentBlazor.Components
-@using MudBlazor
 @using $ProjectName
 @using $ProjectName.Components
 @using $ProjectName.Components.Layout
@@ -428,32 +427,29 @@ app.Run();
     $mainLayoutContent = @"
 @inherits LayoutComponentBase
 
-<MudThemeProvider />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<AgentBlazorShell>
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
         </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <main>
+            <div class="top-row px-4">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">x</span>
-</div>
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+
+    <div id="blazor-error-ui" data-nosnippet>
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">x</span>
+    </div>
+</AgentBlazorShell>
 "@
 
     $homeContent = @"
@@ -464,12 +460,6 @@ app.Run();
 <h1>Package smoke test</h1>
 
 <p>Package restore, host wiring, and chat surface are active.</p>
-
-<AgentChatWidget
-    Title="Assistant"
-    Placeholder="Ask me anything..."
-    Width="28rem"
-    Height="60vh" />
 "@
 
     $serviceInterfaceContent = @"
