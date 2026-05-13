@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Middleware;
 using AgentBlazor.Demo.Configuration;
@@ -35,6 +36,31 @@ internal sealed class DemoChatRequestLoggingMiddleware(
 
         try
         {
+            if (await IsDailyCostLimitExceededAsync(ct))
+            {
+                stopwatch.Stop();
+                context.Response = new AgentTurnResponse(
+                    context.Request.AgentName ?? "AgentBlazor Demo",
+                    "The hosted demo is temporarily unavailable because today's usage cap has been reached. Try the quickstart locally or check back tomorrow.",
+                    [],
+                    []);
+
+                var cappedEntry = CreateEntry(
+                    context.Request,
+                    requestId,
+                    stopwatch.ElapsedMilliseconds,
+                    "cost-limit",
+                    context.Response);
+
+                await requestLog.AppendAsync(cappedEntry, ct);
+                logger.LogWarning(
+                    "Demo chat request {RequestId} blocked by daily cost limit: route={Route} agent={AgentName}",
+                    cappedEntry.RequestId,
+                    cappedEntry.Route,
+                    cappedEntry.AgentName);
+                return;
+            }
+
             await next(ct);
             stopwatch.Stop();
 
@@ -144,6 +170,56 @@ internal sealed class DemoChatRequestLoggingMiddleware(
         var inputCost = (inputTokens ?? 0) / 1_000_000m * _options.InputTokenCostPerMillion;
         var outputCost = (outputTokens ?? 0) / 1_000_000m * _options.OutputTokenCostPerMillion;
         return Math.Round(inputCost + outputCost, 8, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task<bool> IsDailyCostLimitExceededAsync(CancellationToken cancellationToken)
+    {
+        if (!_options.DailyCostLimitEnabled || _options.DailyCostLimitUsd <= 0)
+        {
+            return false;
+        }
+
+        IReadOnlyList<string> lines;
+        try
+        {
+            lines = await requestLog.ReadAllAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            logger.LogWarning(ex, "Unable to read demo chat request log for cost-limit check.");
+            return false;
+        }
+
+        var today = DateTimeOffset.UtcNow.Date;
+        var currentCost = lines.Sum(line => TryReadTodayEstimatedCost(line, today));
+        return currentCost >= _options.DailyCostLimitUsd;
+    }
+
+    private static decimal TryReadTodayEstimatedCost(string line, DateTime todayUtc)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            var root = document.RootElement;
+            if (!root.TryGetProperty("timestampUtc", out var timestampProperty) ||
+                timestampProperty.GetDateTimeOffset().UtcDateTime.Date != todayUtc ||
+                !root.TryGetProperty("estimated_cost", out var costProperty) ||
+                costProperty.ValueKind is not JsonValueKind.Number ||
+                !costProperty.TryGetDecimal(out var cost))
+            {
+                return 0;
+            }
+
+            return cost;
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
+        catch (FormatException)
+        {
+            return 0;
+        }
     }
 
     private static string? TryGetContext(AgentTurnRequest request, string key)

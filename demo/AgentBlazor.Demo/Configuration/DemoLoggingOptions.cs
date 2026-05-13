@@ -23,4 +23,8 @@ internal sealed class DemoLoggingOptions
     public decimal InputTokenCostPerMillion { get; set; } = 0.15m;
 
     public decimal OutputTokenCostPerMillion { get; set; } = 0.60m;
+
+    public bool DailyCostLimitEnabled { get; set; } = true;
+
+    public decimal DailyCostLimitUsd { get; set; } = 2.00m;
 }
