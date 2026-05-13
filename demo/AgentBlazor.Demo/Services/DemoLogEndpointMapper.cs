@@ -189,7 +189,7 @@ internal static class DemoLogEndpointMapper
             .Select(ParseTraffic)
             .Where(static item => item is not null)
             .Select(static item => item!)
-            .Where(static item => IsPageViewRoute(item.Path))
+            .Where(static item => DemoTrafficRouteFilter.IsHumanPageViewRoute(item.Path))
             .ToArray();
         var chats = chatLines
             .Select(ParseChat)
@@ -290,15 +290,6 @@ internal static class DemoLogEndpointMapper
     }
 
     private sealed record TrafficSummaryItem(DateTimeOffset TimestampUtc, string Path, string VisitorHash);
-
-    private static bool IsPageViewRoute(string path)
-    {
-        return !path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) &&
-               !path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) &&
-               !path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) &&
-               !path.StartsWith("/internal", StringComparison.OrdinalIgnoreCase) &&
-               !Path.HasExtension(path);
-    }
 
     private sealed record ChatSummaryItem(
         DateTimeOffset TimestampUtc,
