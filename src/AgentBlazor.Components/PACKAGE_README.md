@@ -52,7 +52,7 @@ app.MapAgentBlazorEndpoints();
 
 `AddAgentBlazor(...)` alone does not create a responding agent. Register at least one workflow or agent inside `options.ConfigureBuilder(...)`.
 
-For the current public preview, mount `AgentChatWidget` directly in an interactive layout or page. The `AgentBlazorShell` child-content/widget fix lands in the next preview.
+Mount `AgentBlazorShell` in an interactive layout or page. It wraps the AgentBlazor providers and includes the floating chat widget.
 
 ```csharp
 [AgentCapability("support_inbox")]
@@ -74,9 +74,9 @@ public sealed class SupportInboxCapabilities
 ```razor
 @using AgentBlazor.Components
 
-<AgentChatWidget
-    Title="Support inbox"
-    Placeholder="Show open tickets, explain the queue, or draft a reply..." />
+<AgentBlazorShell>
+    @Body
+</AgentBlazorShell>
 ```
 
 Docs and demo:
