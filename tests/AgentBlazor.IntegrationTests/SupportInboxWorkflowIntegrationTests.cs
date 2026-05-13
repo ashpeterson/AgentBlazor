@@ -90,4 +90,21 @@ public class SupportInboxWorkflowIntegrationTests
         Assert.Null(workflow.CurrentDraft);
         Assert.Empty(workflow.HighlightedTicketIds);
     }
+
+    [Fact]
+    public async Task ShowOpenTicketsAsync_ReturnsStructuredErrorForInvalidReviewWindow()
+    {
+        var workflow = new SupportInboxWorkflowService();
+        var capabilities = new SupportInboxCapabilities(workflow);
+
+        var result = await capabilities.ShowOpenTicketsAsync(90);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_review_window", result.Outputs["errorCode"]);
+        Assert.Equal("days", result.Outputs["parameterName"]);
+        Assert.Equal("an integer from 1 to 30", result.Outputs["expectedShape"]);
+        Assert.Equal(90, result.Outputs["actualValue"]);
+        Assert.Contains(result.NextActions, action => action.Contains("show_open_tickets", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(workflow.HighlightedTicketIds);
+    }
 }

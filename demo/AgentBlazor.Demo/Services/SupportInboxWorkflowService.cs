@@ -10,6 +10,17 @@ internal sealed class SupportInboxCapabilities(SupportInboxWorkflowService workf
     public Task<CapabilityResult> ShowOpenTicketsAsync(
         [AgentParam("Include tickets from the last N days", Required = false)] int days = 7)
     {
+        if (days is < 1 or > 30)
+        {
+            return Task.FromResult(CapabilityResult
+                .InvalidArguments("The support inbox review window must be between 1 and 30 days.")
+                .WithOutput("errorCode", "invalid_review_window")
+                .WithOutput("parameterName", "days")
+                .WithOutput("expectedShape", "an integer from 1 to 30")
+                .WithOutput("actualValue", days)
+                .WithNextAction("Retry support_inbox.show_open_tickets with days between 1 and 30."));
+        }
+
         var summary = workflow.FocusOpenTickets(days);
         return Task.FromResult(CapabilityResult.Success(summary) with
         {
