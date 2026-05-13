@@ -220,6 +220,126 @@ public class RuntimeAdapterCapabilityProjectionTests
     }
 
     [Fact]
+    public async Task ChatClientRuntimeAdapter_ReturnsMissingArgumentResult_ToModelToolCall()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new TicketCapabilityToolChatClient(
+            "capability_ticket_workflow_summarize_ticket",
+            new Dictionary<string, object?>()));
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<TicketCapabilityToolChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<TicketCapabilities>()
+            .AddAgent("ticket-agent", agent =>
+            {
+                agent.WithAllowedActions("ticket_workflow.summarize_ticket");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<TicketCapabilityToolChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Summarize the ticket",
+            AgentName: "ticket-agent",
+            SessionId: "capability-missing-argument"));
+
+        Assert.NotNull(chatClient.ToolResult);
+        Assert.Contains("\"errorCode\":\"missing_argument\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"parameterName\":\"ticketId\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"clarificationQuestion\"", chatClient.ToolResult, StringComparison.OrdinalIgnoreCase);
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.NeedsClarification, step.Status);
+        Assert.Equal("missing_argument", step.Outputs?["errorCode"]);
+        Assert.Contains(step.NextActions ?? [], action => action.Contains("ticketId", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_ReturnsRecoverableValidationFailure_ToModelToolCall()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new TicketCapabilityToolChatClient(
+            "capability_ticket_workflow_summarize_ticket",
+            new Dictionary<string, object?>
+            {
+                ["ticketId"] = "BAD-1"
+            }));
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<TicketCapabilityToolChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<TicketCapabilities>()
+            .AddAgent("ticket-agent", agent =>
+            {
+                agent.WithAllowedActions("ticket_workflow.summarize_ticket");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<TicketCapabilityToolChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Summarize ticket BAD-1",
+            AgentName: "ticket-agent",
+            SessionId: "capability-recoverable-validation"));
+
+        Assert.NotNull(chatClient.ToolResult);
+        Assert.Contains("\"errorCode\":\"recoverable_failure\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("ticketId must start with TCK-", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"nextActions\"", chatClient.ToolResult, StringComparison.OrdinalIgnoreCase);
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Failed, step.Status);
+        Assert.Equal("recoverable_failure", step.Outputs?["errorCode"]);
+        Assert.Contains(step.NextActions ?? [], action => action.Contains("summarize_ticket", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ChatClientRuntimeAdapter_SanitizesUnexpectedCapabilityException_ToModelToolCall()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new TicketCapabilityToolChatClient(
+            "capability_ticket_workflow_sync_external_ticket",
+            new Dictionary<string, object?>
+            {
+                ["ticketId"] = "TCK-1042"
+            }));
+        services.AddSingleton<IChatClient>(static sp => sp.GetRequiredService<TicketCapabilityToolChatClient>());
+        services.AddAgentBlazorServices()
+            .UseChatClientRuntimeAdapter()
+            .AddCapability<TicketCapabilities>()
+            .AddAgent("ticket-agent", agent =>
+            {
+                agent.WithAllowedActions("ticket_workflow.sync_external_ticket");
+            });
+
+        await using var provider = services.BuildServiceProvider();
+
+        var adapter = provider.GetRequiredService<IAgentRuntimeAdapter>();
+        var chatClient = provider.GetRequiredService<TicketCapabilityToolChatClient>();
+
+        var response = await adapter.RunTurnAsync(new AgentTurnRequest(
+            "Sync ticket TCK-1042",
+            AgentName: "ticket-agent",
+            SessionId: "capability-unexpected-exception"));
+
+        Assert.NotNull(chatClient.ToolResult);
+        Assert.Contains("\"errorCode\":\"capability_invocation_failed\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.Contains("\"exceptionType\":\"ApplicationException\"", chatClient.ToolResult, StringComparison.Ordinal);
+        Assert.DoesNotContain("upstream CRM token", chatClient.ToolResult, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SECRET", chatClient.ToolResult, StringComparison.OrdinalIgnoreCase);
+
+        var step = Assert.Single(response.ExecutionPlan!.Steps);
+        Assert.Equal(AgentExecutionStepStatus.Failed, step.Status);
+        Assert.Equal("capability_invocation_failed", step.Outputs?["errorCode"]);
+        Assert.Equal(
+            "Capability action 'ticket_workflow.sync_external_ticket' failed unexpectedly.",
+            step.Message);
+    }
+
+    [Fact]
     public async Task ChatClientRuntimeAdapter_RecordsSemanticCapabilityHistory_FromExecutionPlan()
     {
         var services = new ServiceCollection();
@@ -629,6 +749,29 @@ public class RuntimeAdapterCapabilityProjectionTests
         public int LastDays { get; set; }
     }
 
+    [AgentCapability("ticket_workflow", Name = "Ticket Workflow", Description = "Support ticket workflows.")]
+    public sealed class TicketCapabilities
+    {
+        [AgentAction("Summarize a ticket", ActionId = "summarize_ticket")]
+        public CapabilityResult SummarizeTicket([AgentParam("Ticket ID", Required = true)] string ticketId)
+        {
+            if (!ticketId.StartsWith("TCK-", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("ticketId must start with TCK-", nameof(ticketId));
+            }
+
+            return CapabilityResult.Success($"Summarized {ticketId}.");
+        }
+
+        [AgentAction("Sync an external ticket", ActionId = "sync_external_ticket")]
+        public async Task<CapabilityResult> SyncExternalTicketAsync(
+            [AgentParam("Ticket ID", Required = true)] string ticketId)
+        {
+            await Task.Yield();
+            throw new ApplicationException($"upstream CRM token SECRET failed while syncing {ticketId}");
+        }
+    }
+
     [AgentCapability("approval_workflow", Name = "Approval Workflow", Description = "Approval-gated change workflow.")]
     public sealed class ApprovalCapabilities
     {
@@ -748,6 +891,51 @@ public class RuntimeAdapterCapabilityProjectionTests
             ToolResult = result?.ToString();
 
             return new ChatResponse(new ChatMessage(ChatRole.Assistant, "structured-error-observed"));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            _ = serviceType;
+            _ = serviceKey;
+            return null;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class TicketCapabilityToolChatClient(
+        string toolNameFragment,
+        IReadOnlyDictionary<string, object?> arguments) : IChatClient
+    {
+        public string? ToolResult { get; private set; }
+
+        public async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            _ = messages;
+            var tool = Assert.Single(
+                options?.Tools?.OfType<AIFunction>().Where(function =>
+                    function.Name.Contains(toolNameFragment, StringComparison.OrdinalIgnoreCase)) ??
+                []);
+            var result = await tool
+                .InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>(arguments)), cancellationToken)
+                .ConfigureAwait(false);
+            ToolResult = result?.ToString();
+
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, ToolResult ?? "capability-result-observed"));
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
