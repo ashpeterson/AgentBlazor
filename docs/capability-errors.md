@@ -73,6 +73,16 @@ return CapabilityResult
 
 Unexpected exceptions are treated as terse failures by the runtime. Do not rely on exception text as the model-facing recovery path.
 
+## Demo Reference
+
+The hosted support-inbox demo includes a simple structured-error path without approval noise:
+
+```text
+Show open tickets from the last 90 days
+```
+
+The `show_open_tickets` capability rejects review windows outside 1-30 days with `errorCode=invalid_review_window`, `parameterName=days`, `expectedShape=an integer from 1 to 30`, and a `NextActions` retry hint. This is the reference pattern for validation that the model can repair without asking the user a new question.
+
 ## Runtime Wrapping
 
 The reflection registry wraps common binding failures before the method runs:
