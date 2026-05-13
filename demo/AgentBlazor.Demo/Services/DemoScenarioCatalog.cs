@@ -212,18 +212,20 @@ internal static class DemoScenarioCatalog
             "runtime-probe",
             DemoScenarioScale.Advanced,
             "Runtime probe",
-            "A narrow runtime behavior probe for cancellation and long-running action handling.",
+            "A narrow runtime behavior probe for structured errors, cancellation, and long-running action handling.",
             "/demo/workflows/runtime-probe",
             "Open runtime probe",
             "Runtime probe assistant",
-            "Run the cancellation probe, then stop it.",
-            "Run the runtime cancellation probe, then stop.",
+            "Run a structured error probe, then inspect the recovery hint.",
+            "Run the structured error date range probe from 2026-05-10 to 2026-05-01.",
             "Runtime Probe Agent",
             [
+                "Run the structured error date range probe from 2026-05-10 to 2026-05-01",
                 "Run the runtime cancellation probe",
                 "Stop the probe"
             ],
             [
+                "Structured errors",
                 "Runtime behavior",
                 "Cancellation",
                 "Long-running action visibility"
