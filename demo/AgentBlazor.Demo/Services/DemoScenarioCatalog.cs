@@ -90,7 +90,10 @@ internal static class DemoScenarioCatalog
                 "Multiple workflow surfaces",
                 "Guided recovery",
                 "Cross-page packet preparation"
-            ]),
+            ])
+        {
+            ShowOnLaunchpad = false
+        },
         new(
             "release-dossier",
             DemoScenarioScale.Advanced,
@@ -111,7 +114,10 @@ internal static class DemoScenarioCatalog
                 "Recipe readiness",
                 "Evidence bundle checks",
                 "Release approval package"
-            ]),
+            ])
+        {
+            ShowOnLaunchpad = false
+        },
         new(
             "supplier-compliance",
             DemoScenarioScale.Advanced,
