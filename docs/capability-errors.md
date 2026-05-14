@@ -75,13 +75,15 @@ Unexpected exceptions are treated as terse failures by the runtime. Do not rely 
 
 ## Demo Reference
 
-The hosted support-inbox demo includes a simple structured-error path without approval noise:
+The hosted runtime-probe demo includes a simple structured-error path without approval or generated-UI noise:
 
 ```text
-Show open tickets from the last 90 days
+Run the structured error date range probe
 ```
 
-The `show_open_tickets` capability rejects review windows outside 1-30 days with `errorCode=invalid_review_window`, `parameterName=days`, `expectedShape=an integer from 1 to 30`, and a `NextActions` retry hint. This is the reference pattern for validation that the model can repair without asking the user a new question.
+The reflection registry rejects the call before invoking the method because the required `startDate` parameter is missing. The chat receives a structured `missing_argument` result with `parameterName=startDate`, an `expectedShape`, a clarification question, and a `NextActions` recovery hint. This is the reference pattern for binding-layer failures that should be recoverable by the model or clarified with the user instead of surfacing raw exception text.
+
+For in-method validation, the same runtime-probe capability returns `errorCode=invalid_date_range` when `endDate` is earlier than `startDate`. Use that shape when your method body can validate supplied arguments but the requested operation is not valid.
 
 ## Runtime Wrapping
 
