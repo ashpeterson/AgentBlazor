@@ -83,5 +83,7 @@ Docs and demo:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
+- Structured error reference: https://demo.agentblazor.com/demo/workflows/runtime-probe
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
+- Recoverable capability errors: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/capability-errors.md
 - Starter sample: https://github.com/ashpeterson/AgentBlazor/tree/master/samples/AgentBlazor.Starter
