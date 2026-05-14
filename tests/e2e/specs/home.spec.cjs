@@ -26,6 +26,8 @@ test.describe("Landing page", () => {
     await expect(page).toHaveURL(/\/demo$/);
     await expect(page.getByRole("heading", { name: /pick the workflow size you want to see/i }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Quick: draft one safe reply" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Advanced: response orchestration" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Advanced: release dossier" })).toHaveCount(0);
 
     await page.getByRole("link", { name: "Start with quick demo" }).click();
     await expect(page).toHaveURL(/\/demo\/workflows\/support-inbox/);
