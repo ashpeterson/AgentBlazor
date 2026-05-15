@@ -180,3 +180,4 @@ Say hello
 - [Starter sample](../samples/AgentBlazor.Starter/README.md)
 - [Hosted WebAssembly client](../src/AgentBlazor.Client/PACKAGE_README.md)
 - [Recoverable capability errors](capability-errors.md)
+- [Entity Framework Core schema exposure](entity-framework.md)

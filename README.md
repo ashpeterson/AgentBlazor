@@ -104,9 +104,20 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 
 - [Quickstart](docs/quickstart.md)
 - [Recoverable capability errors](docs/capability-errors.md)
+- [Entity Framework Core schema exposure](docs/entity-framework.md)
 - [Beta testing](docs/beta-testing.md)
 - [Starter sample](samples/AgentBlazor.Starter/README.md)
 - [Advanced CLI](docs/advanced/cli.md)
+
+## Optional EF Core Schema Exposure
+
+If your app uses EF Core, install `AgentBlazor.EntityFrameworkCore` to expose selected entity shapes as planning context:
+
+```bash
+dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
+```
+
+This is schema-only. It helps an agent understand safe entity fields, but it does not execute queries, generate LINQ or SQL, scan every `DbSet`, or grant write access. Data access still goes through your typed `[AgentAction]` methods.
 
 ## Beta
 

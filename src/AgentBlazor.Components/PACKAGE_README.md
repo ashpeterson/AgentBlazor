@@ -86,4 +86,5 @@ Docs and demo:
 - Structured error reference: https://demo.agentblazor.com/demo/workflows/runtime-probe
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
 - Recoverable capability errors: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/capability-errors.md
+- Optional EF Core schema exposure: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/entity-framework.md
 - Starter sample: https://github.com/ashpeterson/AgentBlazor/tree/master/samples/AgentBlazor.Starter
