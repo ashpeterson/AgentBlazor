@@ -2,9 +2,28 @@
 
 Optional Entity Framework Core integration for exposing read-safe entity schema to AgentBlazor agents.
 
-This package is schema-only. It does not execute queries, generate LINQ, generate SQL, or grant data mutation capability.
+This package is schema-only. It does not execute queries, generate LINQ, generate SQL, scan every `DbSet`, or grant data mutation capability.
+
+Install:
+
+```bash
+dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
+```
+
+Register your `DbContext` with `IDbContextFactory<TContext>`:
 
 ```csharp
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+{
+    options.UseSqlite(builder.Configuration.GetConnectionString("AppDb"));
+});
+```
+
+Expose only safe entities and properties:
+
+```csharp
+using AgentBlazor.EntityFrameworkCore;
+
 options.ConfigureBuilder(agentBuilder =>
 {
     agentBuilder.AddEntitySchema<AppDbContext>("support-data", schema =>
@@ -23,3 +42,7 @@ options.ConfigureBuilder(agentBuilder =>
     });
 });
 ```
+
+Execution remains app-owned. Use normal `[AgentAction]` methods with EF projections, row limits, authorization, and tenant filtering. Do not pass model-generated SQL or LINQ into EF.
+
+Full docs: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/entity-framework.md
