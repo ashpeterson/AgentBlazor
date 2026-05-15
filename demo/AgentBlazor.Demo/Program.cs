@@ -3,6 +3,7 @@ using AgentBlazor.Demo.Configuration;
 using AgentBlazor.Demo.Components;
 using AgentBlazor.Demo.Data;
 using AgentBlazor.Demo.Services;
+using AgentBlazor.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Logging;
@@ -174,6 +175,32 @@ builder.Services.AddAgentBlazor(options =>
     {
         agentBuilder.EnablePromptTracing();
 
+        agentBuilder.AddDataSchema(new AgentDataSchemaSet
+        {
+            Name = "support-data",
+            Description = "Read-safe support ticket fields used by the support inbox workflow. This is planning context only; ticket reads and drafts still go through typed workflow actions.",
+            Entities =
+            [
+                new AgentEntitySchema
+                {
+                    Name = "support_tickets",
+                    Description = "Support tickets visible in the demo queue.",
+                    ClrTypeName = typeof(SupportTicketRow).FullName,
+                    Properties =
+                    [
+                        new AgentEntityPropertySchema { Name = "Id", Type = "string", IsKey = true, Description = "Ticket identifier such as TCK-1042." },
+                        new AgentEntityPropertySchema { Name = "Subject", Type = "string", Description = "Customer-visible ticket subject." },
+                        new AgentEntityPropertySchema { Name = "Team", Type = "string", Description = "Owning support team." },
+                        new AgentEntityPropertySchema { Name = "Priority", Type = "string", Description = "Priority label such as High or Medium." },
+                        new AgentEntityPropertySchema { Name = "AgeDays", Type = "integer", Description = "Age of the ticket in days." },
+                        new AgentEntityPropertySchema { Name = "WaitingOnReply", Type = "boolean", Description = "Whether the customer is waiting on a support reply." },
+                        new AgentEntityPropertySchema { Name = "EscalationRisk", Type = "boolean", Description = "Whether the ticket is at risk of escalation." },
+                        new AgentEntityPropertySchema { Name = "MissingEvidence", Type = "boolean", Description = "Whether draft preparation is blocked by missing evidence." }
+                    ]
+                }
+            ]
+        });
+
         agentBuilder.AddAgent("Workflow Hub Agent", agent =>
         {
             agent.WithDescription("Focused on routing users toward the right semantic workflow showcase and explaining the workflow-first product story.");
@@ -224,6 +251,7 @@ builder.Services.AddAgentBlazor(options =>
                 agent.WithInstructions(sharedAgentInstructions);
             }
             agent.WithAllowedComponents("AgentDataGrid", "AgentDialog");
+            agent.WithDataSchemas("support-data");
             agent.WithRoutePrefixes("/demo/workflows/support-inbox");
         });
 

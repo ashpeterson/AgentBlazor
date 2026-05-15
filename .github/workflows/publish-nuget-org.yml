@@ -122,6 +122,15 @@ jobs:
           --skip-duplicate
           --timeout 120
 
+      - name: Publish Entity Framework Core package to nuget.org
+        run: >
+          dotnet nuget push
+          "src/AgentBlazor.EntityFrameworkCore/bin/Release/AgentBlazor.EntityFrameworkCore.${{ inputs.package_version }}.nupkg"
+          --source "https://api.nuget.org/v3/index.json"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --skip-duplicate
+          --timeout 120
+
       - name: Publish CLI tool package to nuget.org
         run: >
           dotnet nuget push
@@ -148,6 +157,7 @@ jobs:
             src/AgentBlazor.Components/bin/Release/AgentBlazor.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Client/bin/Release/AgentBlazor.Client.${{ inputs.package_version }}.snupkg
+            src/AgentBlazor.EntityFrameworkCore/bin/Release/AgentBlazor.EntityFrameworkCore.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.nupkg
             src/AgentBlazor.Cli/bin/Release/AgentBlazor.Cli.${{ inputs.package_version }}.snupkg
           if-no-files-found: error

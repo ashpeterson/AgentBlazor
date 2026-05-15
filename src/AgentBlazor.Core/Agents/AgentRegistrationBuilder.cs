@@ -7,6 +7,7 @@ public sealed class AgentRegistrationBuilder
     private readonly HashSet<string> _allowedComponents = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _allowedActions = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _allowedCapabilityActions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _allowedDataSchemas = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _toolAssemblyNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _metadata = new(StringComparer.OrdinalIgnoreCase);
 
@@ -95,6 +96,16 @@ public sealed class AgentRegistrationBuilder
         return this;
     }
 
+    public AgentRegistrationBuilder WithDataSchemas(params string[] schemaNames)
+    {
+        foreach (var schemaName in schemaNames.Where(static name => !string.IsNullOrWhiteSpace(name)))
+        {
+            _allowedDataSchemas.Add(schemaName.Trim());
+        }
+
+        return this;
+    }
+
     public AgentRegistrationBuilder WithMetadata(string key, string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -136,6 +147,7 @@ public sealed class AgentRegistrationBuilder
         AllowedActions = new HashSet<string>(_allowedActions, StringComparer.OrdinalIgnoreCase),
         AllowedCapabilityActions = new HashSet<string>(_allowedCapabilityActions, StringComparer.OrdinalIgnoreCase),
         ToolAssemblyNames = _toolAssemblyNames.ToArray(),
+        AllowedDataSchemas = new HashSet<string>(_allowedDataSchemas, StringComparer.OrdinalIgnoreCase),
         Metadata = new Dictionary<string, string>(_metadata, StringComparer.OrdinalIgnoreCase)
     };
 

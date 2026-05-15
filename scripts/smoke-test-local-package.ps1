@@ -60,6 +60,11 @@ $packageDefinitions = @(
         OutputDir = Join-Path $repoRoot "src\AgentBlazor.Client\bin\Release"
     },
     @{
+        Id = "AgentBlazor.EntityFrameworkCore"
+        Project = Join-Path $repoRoot "src\AgentBlazor.EntityFrameworkCore\AgentBlazor.EntityFrameworkCore.csproj"
+        OutputDir = Join-Path $repoRoot "src\AgentBlazor.EntityFrameworkCore\bin\Release"
+    },
+    @{
         Id = "AgentBlazor.Cli"
         Project = Join-Path $repoRoot "src\AgentBlazor.Cli\AgentBlazor.Cli.csproj"
         OutputDir = Join-Path $repoRoot "src\AgentBlazor.Cli\bin\Release"
@@ -134,6 +139,7 @@ function Clear-LocalPackageCache {
         "agentblazor",
         "agentblazor.core",
         "agentblazor.hosting",
+        "agentblazor.entityframeworkcore",
         "agentblazor.licensing",
         "agentblazor.provideradapters",
         "agentblazor.cli"
