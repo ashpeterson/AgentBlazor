@@ -1,6 +1,7 @@
 using AgentBlazor.Agents;
 using AgentBlazor.App;
 using AgentBlazor.Components;
+using AgentBlazor.Core.Data;
 using AgentBlazor.Core.Runtime.Adapters;
 using AgentBlazor.Core.Runtime.Conversation;
 using AgentBlazor.Core.Runtime.Interfaces;
@@ -73,6 +74,23 @@ public sealed class AgentBlazorBuilder
     {
         ArgumentNullException.ThrowIfNull(configure);
         _store.ComponentCatalogConfigurators.Add(configure);
+        return this;
+    }
+
+    public AgentBlazorBuilder AddDataSchema(AgentDataSchemaSet schemaSet)
+    {
+        ArgumentNullException.ThrowIfNull(schemaSet);
+        ArgumentException.ThrowIfNullOrWhiteSpace(schemaSet.Name);
+
+        _store.DataSchemaSets.RemoveAll(s => string.Equals(s.Name, schemaSet.Name, StringComparison.OrdinalIgnoreCase));
+        _store.DataSchemaSets.Add(schemaSet);
+        return this;
+    }
+
+    public AgentBlazorBuilder AddDataSchema(Func<IServiceProvider, AgentDataSchemaSet> schemaFactory)
+    {
+        ArgumentNullException.ThrowIfNull(schemaFactory);
+        _store.DataSchemaFactories.Add(schemaFactory);
         return this;
     }
 

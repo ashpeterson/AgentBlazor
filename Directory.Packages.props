@@ -14,7 +14,7 @@
     <PackageVersion Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="[1.1.0-preview.260410.1]" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="[1.1.0]" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="[1.1.0]" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.4" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.4" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.3" />

@@ -19,6 +19,9 @@ public sealed class AgentRegistration
 
     public IReadOnlyList<string> ToolAssemblyNames { get; init; } = Array.Empty<string>();
 
+    public IReadOnlySet<string> AllowedDataSchemas { get; init; } =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     public IReadOnlyDictionary<string, string> Metadata { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }

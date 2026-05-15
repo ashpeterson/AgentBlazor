@@ -18,6 +18,7 @@ using AgentBlazor.Core.Runtime.Tools;
 using AgentBlazor.Core.Runtime.Tracing;
 using AgentBlazor.Core.Components;
 using AgentBlazor.Core.Runtime;
+using AgentBlazor.Core.Data;
 using AgentBlazor.Core.Paid;
 using AgentBlazor.Core.Paid.Analytics;
 using AgentBlazor.Core.Paid.Audit;
@@ -74,6 +75,10 @@ public static class AgentBlazorServiceCollectionExtensions
         services.TryAddScoped<IAgentComponentRegistry, CircuitAgentComponentRegistry>();
 
         services.TryAddSingleton<IAgentUiToolCatalog, DefaultAgentUiToolCatalog>();
+        services.TryAddSingleton<IAgentDataSchemaCatalog>(sp =>
+            BuildDataSchemaCatalog(
+                sp,
+                sp.GetRequiredService<AgentBlazorConfigurationStore>()));
 
         services.TryAddSingleton<IAgentRuntimeAdapter>(sp =>
         {
@@ -186,5 +191,19 @@ public static class AgentBlazorServiceCollectionExtensions
         }
 
         return registry;
+    }
+
+    private static IAgentDataSchemaCatalog BuildDataSchemaCatalog(
+        IServiceProvider serviceProvider,
+        AgentBlazorConfigurationStore store)
+    {
+        var catalog = new InMemoryAgentDataSchemaCatalog(store.DataSchemaSets);
+
+        foreach (var factory in store.DataSchemaFactories)
+        {
+            catalog.AddOrUpdate(factory(serviceProvider));
+        }
+
+        return catalog;
     }
 }

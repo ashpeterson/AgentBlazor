@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
@@ -21,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentBlazor.EntityFrameworkCore\AgentBlazor.EntityFrameworkCore.csproj" />
   </ItemGroup>
 
 </Project>

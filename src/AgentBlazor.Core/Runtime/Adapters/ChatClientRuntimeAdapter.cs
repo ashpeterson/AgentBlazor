@@ -9,6 +9,7 @@ using AgentBlazor.Agents;
 using AgentBlazor.App;
 using AgentBlazor.Components;
 using AgentBlazor.Core.Components;
+using AgentBlazor.Core.Data;
 using AgentBlazor.Core.Runtime;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Core.Runtime.Components;
@@ -47,6 +48,7 @@ public sealed class ChatClientRuntimeAdapter(
     IActionHistoryStore? actionHistoryStore = null,
     IAgentSharedStateStore? sharedStateStore = null,
     IAgentServiceToolRegistry? serviceToolRegistry = null,
+    IAgentDataSchemaCatalog? dataSchemaCatalog = null,
     IEnumerable<IMcpToolProvider>? mcpToolProviders = null,
     IAgentBlazorEntitlementService? entitlementService = null,
     IOptions<PromptTracingOptions>? promptTracingOptions = null,
@@ -77,6 +79,7 @@ public sealed class ChatClientRuntimeAdapter(
     private readonly IActionHistoryStore? _actionHistoryStore = actionHistoryStore;
     private readonly IAgentSharedStateStore? _sharedStateStore = sharedStateStore;
     private readonly IAgentServiceToolRegistry? _serviceToolRegistry = serviceToolRegistry;
+    private readonly IAgentDataSchemaCatalog? _dataSchemaCatalog = dataSchemaCatalog;
     private readonly IEnumerable<IMcpToolProvider>? _mcpToolProviders = mcpToolProviders;
     private readonly IAgentBlazorEntitlementService? _entitlementService = entitlementService;
     private readonly IOptions<PromptTracingOptions>? _promptTracingOptions = promptTracingOptions;
@@ -2034,12 +2037,86 @@ public sealed class ChatClientRuntimeAdapter(
 
     private string? ResolveInstructions(AgentRegistration registration)
     {
+        var dataSchemaInstructions = BuildDataSchemaInstructions(registration);
+        if (!string.IsNullOrWhiteSpace(registration.Instructions) &&
+            !string.IsNullOrWhiteSpace(dataSchemaInstructions))
+        {
+            return $"{registration.Instructions.Trim()}\n\n{dataSchemaInstructions}";
+        }
+
         if (!string.IsNullOrWhiteSpace(registration.Instructions))
         {
             return registration.Instructions;
         }
 
-        return null;
+        return dataSchemaInstructions;
+    }
+
+    private string? BuildDataSchemaInstructions(AgentRegistration registration)
+    {
+        if (_dataSchemaCatalog is null || registration.AllowedDataSchemas.Count == 0)
+        {
+            return null;
+        }
+
+        var schemaSets = _dataSchemaCatalog.GetAllowed(registration.AllowedDataSchemas);
+        if (schemaSets.Count == 0)
+        {
+            return null;
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("# READ-SAFE DATA SCHEMAS");
+        builder.AppendLine("The following entity schemas are exposed for planning context only. They do not grant query or mutation capability. Use registered workflow actions to read or change data.");
+
+        foreach (var schemaSet in schemaSets)
+        {
+            builder.Append("- Schema: ").Append(schemaSet.Name);
+            if (!string.IsNullOrWhiteSpace(schemaSet.Description))
+            {
+                builder.Append(" - ").Append(schemaSet.Description);
+            }
+
+            builder.AppendLine();
+
+            foreach (var entity in schemaSet.Entities)
+            {
+                builder.Append("  - Entity: ").Append(entity.Name);
+                if (!string.IsNullOrWhiteSpace(entity.Description))
+                {
+                    builder.Append(" - ").Append(entity.Description);
+                }
+
+                builder.AppendLine();
+
+                foreach (var property in entity.Properties)
+                {
+                    builder.Append("    - ")
+                        .Append(property.Name)
+                        .Append(": ")
+                        .Append(property.Type);
+
+                    if (property.IsKey)
+                    {
+                        builder.Append(", key");
+                    }
+
+                    if (property.IsNullable)
+                    {
+                        builder.Append(", nullable");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(property.Description))
+                    {
+                        builder.Append(" - ").Append(property.Description);
+                    }
+
+                    builder.AppendLine();
+                }
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     private async Task<AgentTurnResponse> BuildNoAgentResponseAsync(
