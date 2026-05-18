@@ -16,6 +16,8 @@ Try the hosted demo:
 dotnet add package AgentBlazor --version 0.2.0-preview.2
 ```
 
+Use `0.2.0-preview.2` or later. `0.2.0-preview.1` was superseded after publish because the optional EF package referenced an unpublished internal package.
+
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
 
 ## Dependency Stability
@@ -115,7 +117,7 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 If your app uses EF Core, install `AgentBlazor.EntityFrameworkCore` to expose selected entity shapes as planning context:
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
+dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.2
 ```
 
 This is schema-only. It helps an agent understand safe entity fields, but it does not execute queries, generate LINQ or SQL, scan every `DbSet`, or grant write access. Data access still goes through your typed `[AgentAction]` methods.
