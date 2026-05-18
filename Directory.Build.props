@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.1.0-preview.11</Version>
+    <Version>0.2.0-preview.1</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>Install-path fixes: explicit workflow quickstart, clearer OpenAI configuration errors, and chat shell/widget setup corrections.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2 preview: structured capability error recovery, schema-only EF Core entity exposure, hosted demo observability, and verified package-first quickstart updates.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>

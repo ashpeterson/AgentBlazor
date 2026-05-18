@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli --prerelease
 If you want the exact current preview:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.1.0-preview.11
+dotnet tool install --global AgentBlazor.Cli --version 0.2.0-preview.1
 ```
 
 Example:
@@ -28,3 +28,4 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.0 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.0.md

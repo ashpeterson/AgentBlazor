@@ -80,7 +80,7 @@ For each tester capture:
 If a tester asks what to do, answer with this exact path:
 
 1. create a fresh Blazor app
-2. run `dotnet add package AgentBlazor --version 0.1.0-preview.11`
+2. run `dotnet add package AgentBlazor --version 0.2.0-preview.1`
 3. follow `docs/quickstart.md`
 4. test the support-inbox shape only
 5. submit feedback through one of the issue forms

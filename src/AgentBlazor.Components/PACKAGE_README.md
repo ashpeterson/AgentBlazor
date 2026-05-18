@@ -15,7 +15,7 @@ dotnet add package AgentBlazor --prerelease
 Current public releases are prerelease builds. If you prefer a pinned install, use:
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.11
+dotnet add package AgentBlazor --version 0.2.0-preview.1
 ```
 
 If `dotnet` still probes an old custom package source on your machine, remove or disable that source before testing the public NuGet install path.
@@ -85,6 +85,7 @@ Docs and demo:
 - Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 - Structured error reference: https://demo.agentblazor.com/demo/workflows/runtime-probe
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
+- 0.2.0 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.0.md
 - Recoverable capability errors: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/capability-errors.md
 - Optional EF Core schema exposure: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/entity-framework.md
 - Starter sample: https://github.com/ashpeterson/AgentBlazor/tree/master/samples/AgentBlazor.Starter

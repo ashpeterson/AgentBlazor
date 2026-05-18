@@ -20,7 +20,7 @@
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.1.0-preview.11
+        <pre class="docs-code"><code>dotnet add ./src/MyBlazorApp/MyBlazorApp.csproj package AgentBlazor --version 0.2.0-preview.1
 dotnet build ./MySolution.slnx --nologo
 OpenAI__ApiKey=placeholder-key dotnet run --project ./src/MyBlazorApp/MyBlazorApp.csproj --no-launch-profile --urls http://127.0.0.1:5288
 Open the support route and submit one real prompt</code></pre>
@@ -35,7 +35,7 @@ Open the support route and submit one real prompt</code></pre>
 
         <pre class="docs-code"><code>dotnet new blazor -o FreshAgentBlazor
 cd FreshAgentBlazor
-dotnet add package AgentBlazor --version 0.1.0-preview.11
+dotnet add package AgentBlazor --version 0.2.0-preview.1
 dotnet build FreshAgentBlazor.csproj --nologo</code></pre>
     </section>
 
@@ -46,8 +46,8 @@ dotnet build FreshAgentBlazor.csproj --nologo</code></pre>
             </div>
         </div>
 
-        <pre class="docs-code"><code>dotnet add ./src/MyHostedServer/MyHostedServer.csproj package AgentBlazor --version 0.1.0-preview.11
-dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.1.0-preview.11
+        <pre class="docs-code"><code>dotnet add ./src/MyHostedServer/MyHostedServer.csproj package AgentBlazor --version 0.2.0-preview.1
+dotnet add ./src/MyHostedClient/MyHostedClient.csproj package AgentBlazor.Client --version 0.2.0-preview.1
 
 // Server
 app.MapAgentBlazorEndpoints();
