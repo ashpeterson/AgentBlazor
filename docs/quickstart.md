@@ -1,6 +1,6 @@
 # Quickstart
 
-Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.1.0-preview.11`.
+Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.2.0-preview.1`.
 
 Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 
@@ -9,7 +9,7 @@ AgentBlazor does not create a responding agent by default. You must register at 
 ## 1. Install
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.11
+dotnet add package AgentBlazor --version 0.2.0-preview.1
 ```
 
 ## 2. Program.cs
@@ -171,12 +171,13 @@ Say hello
 ## Notes
 
 - `MapAgentBlazorEndpoints()` is required. Without it, the widget can render but cannot call the runtime.
-- `AgentBlazorShell` includes the widget in `0.1.0-preview.11`.
+- `AgentBlazorShell` includes the widget in `0.2.0-preview.1`.
 - A registered workflow is required for the chat to respond.
 
 ## Next
 
 - [Hosted demo](https://demo.agentblazor.com/demo/workflows/support-inbox)
+- [0.2.0 release notes](releases/0.2.0.md)
 - [Starter sample](../samples/AgentBlazor.Starter/README.md)
 - [Hosted WebAssembly client](../src/AgentBlazor.Client/PACKAGE_README.md)
 - [Recoverable capability errors](capability-errors.md)

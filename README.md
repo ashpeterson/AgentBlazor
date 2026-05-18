@@ -13,7 +13,7 @@ Try the hosted demo:
 ## Install
 
 ```bash
-dotnet add package AgentBlazor --version 0.1.0-preview.11
+dotnet add package AgentBlazor --version 0.2.0-preview.1
 ```
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
@@ -103,6 +103,7 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 ## Docs
 
 - [Quickstart](docs/quickstart.md)
+- [0.2.0 release notes](docs/releases/0.2.0.md)
 - [Recoverable capability errors](docs/capability-errors.md)
 - [Entity Framework Core schema exposure](docs/entity-framework.md)
 - [Beta testing](docs/beta-testing.md)

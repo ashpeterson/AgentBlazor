@@ -7,7 +7,7 @@ var version = typeof(ScaffoldCommand).Assembly
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
     ?.InformationalVersion
     ?? typeof(ScaffoldCommand).Assembly.GetName().Version?.ToString()
-    ?? "0.1.0-preview.11";
+    ?? "0.2.0-preview.1";
 version = version.Split('+', 2)[0];
 
 app.Configure(config =>
