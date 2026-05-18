@@ -19,7 +19,7 @@ What it is:
 Current public package:
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.1
+dotnet add package AgentBlazor --version 0.2.0-preview.2
 ```
 
 Current public demo:

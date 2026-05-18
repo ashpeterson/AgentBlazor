@@ -51,11 +51,11 @@ run_step "dotnet new blazor -n FreshAgentBlazor" \
 
 cd FreshAgentBlazor
 
-run_step "dotnet add package AgentBlazor --version 0.2.0-preview.1" \
-    dotnet add package AgentBlazor --version 0.2.0-preview.1
+run_step "dotnet add package AgentBlazor --version 0.2.0-preview.2" \
+    dotnet add package AgentBlazor --version 0.2.0-preview.2
 
-run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.2.0-preview.1" \
-    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.2.0-preview.1
+run_step "dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.2.0-preview.2" \
+    dotnet tool install AgentBlazor.Cli --tool-path ./.tools --version 0.2.0-preview.2
 
 run_step "./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor" \
     ./.tools/agentblazor init ./FreshAgentBlazor.csproj --host FreshAgentBlazor

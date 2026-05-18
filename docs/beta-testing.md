@@ -20,7 +20,7 @@ Use a fresh app first. Do not start with an existing codebase.
 ```bash
 dotnet new blazor -o FreshAgentBlazor
 cd FreshAgentBlazor
-dotnet add package AgentBlazor --version 0.2.0-preview.1
+dotnet add package AgentBlazor --version 0.2.0-preview.2
 ```
 
 Then follow:
@@ -41,7 +41,7 @@ Compare against the hosted support-inbox demo if you want a known-running refere
 
 Please report pass or fail for each of these:
 
-1. `dotnet add package AgentBlazor --version 0.2.0-preview.1`
+1. `dotnet add package AgentBlazor --version 0.2.0-preview.2`
 2. `dotnet build`
 3. app starts with AgentBlazor assets loaded
 4. chat surface opens

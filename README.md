@@ -13,7 +13,7 @@ Try the hosted demo:
 ## Install
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.1
+dotnet add package AgentBlazor --version 0.2.0-preview.2
 ```
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.

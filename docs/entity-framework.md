@@ -13,8 +13,8 @@ dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
 If you pin versions, use the same AgentBlazor version for the runtime and EF package:
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.1
-dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.1
+dotnet add package AgentBlazor --version 0.2.0-preview.2
+dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.2
 ```
 
 ## DbContext Setup
