@@ -11,7 +11,7 @@ dotnet add package AgentBlazor.Client --prerelease
 If you want the exact current preview:
 
 ```bash
-dotnet add package AgentBlazor.Client --version 0.2.0-preview.1
+dotnet add package AgentBlazor.Client --version 0.2.0-preview.2
 ```
 
 Server project:

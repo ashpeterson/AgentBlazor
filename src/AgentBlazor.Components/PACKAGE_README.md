@@ -15,7 +15,7 @@ dotnet add package AgentBlazor --prerelease
 Current public releases are prerelease builds. If you prefer a pinned install, use:
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.1
+dotnet add package AgentBlazor --version 0.2.0-preview.2
 ```
 
 If `dotnet` still probes an old custom package source on your machine, remove or disable that source before testing the public NuGet install path.

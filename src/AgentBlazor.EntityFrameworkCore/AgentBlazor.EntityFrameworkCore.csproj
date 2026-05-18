@@ -9,10 +9,11 @@
     <PackageTags>blazor;aspnetcore;ai;agents;entity-framework;efcore;schema</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>false</IncludeSymbols>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferenceBuildOutputs</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" />
+    <ProjectReference Include="..\AgentBlazor.Core\AgentBlazor.Core.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,5 +24,11 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="..\AgentBlazor.Components\icon.png" Pack="true" PackagePath="" Link="icon.png" />
   </ItemGroup>
+
+  <Target Name="IncludeProjectReferenceBuildOutputs" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+    </ItemGroup>
+  </Target>
 
 </Project>
