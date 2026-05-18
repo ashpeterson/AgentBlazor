@@ -27,6 +27,8 @@ Then follow:
 
 - [Quickstart](quickstart.md)
 
+For a fuller release validation pass that includes EF Core schema exposure, structured errors, hosted demo checks, and package smoke tests, use the [0.2.0 release test plan](releases/0.2.0-test-plan.md).
+
 Use the support-inbox shape only:
 
 - one workflow
