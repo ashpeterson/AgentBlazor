@@ -394,6 +394,11 @@ public static class AgentActionDiscovery
             _ when underlying == typeof(float) => "number",
             _ when underlying == typeof(decimal) => "number",
             _ when underlying == typeof(bool) => "boolean",
+            _ when underlying == typeof(DateOnly) => "date",
+            _ when underlying == typeof(TimeOnly) => "time",
+            _ when underlying == typeof(DateTime) => "date-time",
+            _ when underlying == typeof(DateTimeOffset) => "date-time",
+            _ when underlying == typeof(Guid) => "uuid",
             _ when underlying.IsEnum => "string",
             _ => "any"
         };

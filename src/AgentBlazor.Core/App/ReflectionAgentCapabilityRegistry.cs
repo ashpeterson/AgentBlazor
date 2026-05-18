@@ -440,14 +440,33 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
 
     private static object BuildParameterSchema(ParameterInfo parameter, AgentParamAttribute? attribute)
     {
+        var parameterType = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
         var schema = new Dictionary<string, object?>
         {
             ["type"] = GetJsonSchemaType(parameter.ParameterType)
         };
 
+        var format = GetJsonSchemaFormat(parameterType);
+        if (!string.IsNullOrWhiteSpace(format))
+        {
+            schema["format"] = format;
+        }
+
         if (!string.IsNullOrWhiteSpace(attribute?.Description))
         {
             schema["description"] = attribute.Description;
+        }
+        else if (parameterType == typeof(DateOnly))
+        {
+            schema["description"] = "Date in yyyy-MM-dd format.";
+        }
+        else if (parameterType == typeof(TimeOnly))
+        {
+            schema["description"] = "Time in HH:mm:ss format.";
+        }
+        else if (parameterType == typeof(DateTime) || parameterType == typeof(DateTimeOffset))
+        {
+            schema["description"] = "Date and time in ISO 8601 format.";
         }
 
         var allowedValues = GetAllowedValues(parameter, attribute);
@@ -546,6 +565,15 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
             return "string";
         }
 
+        if (underlyingType == typeof(DateOnly) ||
+            underlyingType == typeof(TimeOnly) ||
+            underlyingType == typeof(DateTime) ||
+            underlyingType == typeof(DateTimeOffset) ||
+            underlyingType == typeof(Guid))
+        {
+            return "string";
+        }
+
         if (underlyingType == typeof(bool))
         {
             return "boolean";
@@ -571,6 +599,32 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         }
 
         return "object";
+    }
+
+    private static string? GetJsonSchemaFormat(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+        if (underlyingType == typeof(DateOnly))
+        {
+            return "date";
+        }
+
+        if (underlyingType == typeof(TimeOnly))
+        {
+            return "time";
+        }
+
+        if (underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset))
+        {
+            return "date-time";
+        }
+
+        if (underlyingType == typeof(Guid))
+        {
+            return "uuid";
+        }
+
+        return null;
     }
 
     private static string GetJsonSchemaType(Type type)
@@ -685,6 +739,26 @@ internal sealed class ReflectionAgentCapabilityRegistry(IEnumerable<Type> capabi
         if (underlyingType.IsEnum)
         {
             return $"one of: {string.Join(", ", Enum.GetNames(underlyingType))}";
+        }
+
+        if (underlyingType == typeof(DateOnly))
+        {
+            return "a date in yyyy-MM-dd format";
+        }
+
+        if (underlyingType == typeof(TimeOnly))
+        {
+            return "a time in HH:mm:ss format";
+        }
+
+        if (underlyingType == typeof(DateTime) || underlyingType == typeof(DateTimeOffset))
+        {
+            return "a date-time in ISO 8601 format";
+        }
+
+        if (underlyingType == typeof(Guid))
+        {
+            return "a UUID string";
         }
 
         return GetJsonSchemaType(underlyingType) switch

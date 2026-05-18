@@ -3,6 +3,7 @@ using AgentBlazor.Attributes;
 using AgentBlazor.Core.Runtime.Agents;
 using AgentBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace AgentBlazor.Core.Tests;
 
@@ -153,6 +154,67 @@ public class AgentCapabilityRegistryTests
         Assert.Equal("object", result.Outputs["actualShape"]);
         Assert.Contains("days", result.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(result.NextActions, action => action.Contains("days", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GetCapabilities_ProjectsDateOnlyParametersAsDateStrings()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<DateRangeCapabilities>();
+
+        using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var capability = Assert.Single(registry.GetCapabilities(provider));
+        var action = Assert.Single(capability.Actions);
+
+        Assert.Collection(
+            action.Parameters,
+            start =>
+            {
+                Assert.Equal("startDate", start.Name);
+                Assert.Equal("string", start.Type);
+                Assert.True(start.Required);
+            },
+            end =>
+            {
+                Assert.Equal("endDate", end.Name);
+                Assert.Equal("string", end.Type);
+                Assert.True(end.Required);
+            });
+
+        using var schema = JsonDocument.Parse(action.InputSchema);
+        var properties = schema.RootElement.GetProperty("properties");
+        Assert.Equal("string", properties.GetProperty("startDate").GetProperty("type").GetString());
+        Assert.Equal("date", properties.GetProperty("startDate").GetProperty("format").GetString());
+        Assert.Equal("string", properties.GetProperty("endDate").GetProperty("type").GetString());
+        Assert.Equal("date", properties.GetProperty("endDate").GetProperty("format").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BindsDateOnlyArgumentsFromIsoDateStrings()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentBlazorServices()
+            .AddCapability<DateRangeCapabilities>();
+
+        await using var provider = services.BuildServiceProvider();
+        var registry = provider.GetRequiredService<IAgentCapabilityRegistry>();
+
+        var result = await registry.ExecuteAsync(
+            "date_range.find_orders",
+            new Dictionary<string, object?>
+            {
+                ["startDate"] = "2026-05-19",
+                ["endDate"] = "2026-05-18"
+            },
+            provider);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_date_range", result.Outputs["errorCode"]);
+        Assert.Equal(new DateOnly(2026, 5, 19), result.Outputs["startDate"]);
+        Assert.Equal(new DateOnly(2026, 5, 18), result.Outputs["endDate"]);
     }
 
     [Fact]
@@ -403,6 +465,25 @@ public class AgentCapabilityRegistryTests
         {
             recorder.LastSessionId = sessionId;
             return CapabilityResult.Success($"Captured {sessionId}.");
+        }
+    }
+
+    [AgentCapability("date_range", Name = "Date Range", Category = "Workflow")]
+    public sealed class DateRangeCapabilities
+    {
+        [AgentAction("Find orders in a date range", ActionId = "find_orders")]
+        public CapabilityResult FindOrders(DateOnly startDate, DateOnly endDate)
+        {
+            if (endDate < startDate)
+            {
+                return CapabilityResult
+                    .InvalidArguments("The end date must be on or after the start date.")
+                    .WithOutput("errorCode", "invalid_date_range")
+                    .WithOutput("startDate", startDate)
+                    .WithOutput("endDate", endDate);
+            }
+
+            return CapabilityResult.Success("Found matching orders.");
         }
     }
 
