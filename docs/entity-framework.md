@@ -17,6 +17,8 @@ dotnet add package AgentBlazor --version 0.2.0-preview.2
 dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.2
 ```
 
+Use `0.2.0-preview.2` or later. `0.2.0-preview.1` was superseded after publish because this optional package referenced an unpublished internal package.
+
 ## DbContext Setup
 
 Use `IDbContextFactory<TContext>`. This follows the Blazor EF Core guidance to create a context per operation instead of sharing one context across interactive UI work.
