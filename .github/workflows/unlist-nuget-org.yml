@@ -1,0 +1,65 @@
+name: unlist-nuget-org
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: "Package version to unlist from NuGet.org"
+        required: true
+        type: string
+      package_ids:
+        description: "Comma-separated package IDs to unlist"
+        required: true
+        default: "AgentBlazor,AgentBlazor.Client,AgentBlazor.EntityFrameworkCore,AgentBlazor.Cli"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  unlist-nuget:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Validate inputs
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.package_version }}"
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.].+)?$') {
+            throw "package_version must be a valid SemVer string such as 0.2.0-preview.1 or 0.2.0"
+          }
+
+          $ids = "${{ inputs.package_ids }}".Split(',', [System.StringSplitOptions]::RemoveEmptyEntries) |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+
+          if (-not $ids) {
+            throw "package_ids must contain at least one package ID."
+          }
+
+          foreach ($id in $ids) {
+            if ($id -notmatch '^[A-Za-z0-9_.-]+$') {
+              throw "Invalid package ID '$id'."
+            }
+          }
+
+      - name: Unlist packages
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.package_version }}"
+          $ids = "${{ inputs.package_ids }}".Split(',', [System.StringSplitOptions]::RemoveEmptyEntries) |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+
+          foreach ($id in $ids) {
+            Write-Host "Unlisting $id $version from NuGet.org"
+            dotnet nuget delete $id $version `
+              --source "https://api.nuget.org/v3/index.json" `
+              --api-key "${{ secrets.NUGET_API_KEY }}" `
+              --non-interactive
+          }
