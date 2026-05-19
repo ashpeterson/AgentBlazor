@@ -432,6 +432,7 @@ public sealed class ExistingAppScaffoldApplier
         var updated = original;
 
         updated = EnsureLine(updated, "@using static Microsoft.AspNetCore.Components.Web.RenderMode");
+        updated = EnsureLine(updated, "@using AgentBlazor");
         updated = EnsureLine(updated, "@using AgentBlazor.Components");
 
         AddTextChange(
@@ -744,6 +745,7 @@ builder.Services.AddAgentBlazor(options =>
         var original = exists ? await File.ReadAllTextAsync(importsPath, ct).ConfigureAwait(false) : string.Empty;
         var updated = original;
 
+        updated = EnsureLine(updated, "@using AgentBlazor");
         updated = EnsureLine(updated, "@using AgentBlazor.Components");
 
         AddTextChange(

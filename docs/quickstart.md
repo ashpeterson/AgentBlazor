@@ -55,12 +55,15 @@ app.Run();
 ## 3. Components/_Imports.razor
 
 ```razor
+@using AgentBlazor
 @using AgentBlazor.Components
 ```
 
 ## 4. Components/App.razor
 
 ```razor
+@using AgentBlazor
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -91,6 +94,8 @@ app.Run();
 Wrap your existing layout content:
 
 ```razor
+@using AgentBlazor.Components
+
 @inherits LayoutComponentBase
 
 <AgentBlazorShell>
