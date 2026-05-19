@@ -85,6 +85,8 @@ The reflection registry rejects the call before invoking the method because the 
 
 For in-method validation, the same runtime-probe capability returns `errorCode=invalid_date_range` when `endDate` is earlier than `startDate`. Use that shape when your method body can validate supplied arguments but the requested operation is not valid.
 
+In `0.2.0-preview.3` and later, date-like action parameters are projected as string schemas with useful formats. For example, `DateOnly startDate` is exposed to the model as a `string` with `format: date`, so prompts that provide explicit `yyyy-MM-dd` values can bind into the action body instead of failing as missing arguments.
+
 ## Runtime Wrapping
 
 The reflection registry wraps common binding failures before the method runs:
