@@ -74,6 +74,7 @@ public sealed class SupportInboxCapabilities
 ```
 
 ```razor
+@using AgentBlazor
 @using AgentBlazor.Components
 
 <AgentBlazorShell>

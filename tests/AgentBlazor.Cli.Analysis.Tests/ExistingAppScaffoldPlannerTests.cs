@@ -450,6 +450,8 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         var importsChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "_Imports.razor"), StringComparison.Ordinal));
         var layoutChange = Assert.Single(preview.Changes, change => change.Path.EndsWith(Path.Combine("Components", "Layout", "MainLayout.razor"), StringComparison.Ordinal));
         Assert.Contains("@using static Microsoft.AspNetCore.Components.Web.RenderMode", importsChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("@using AgentBlazor", importsChange.UpdatedContent, StringComparison.Ordinal);
+        Assert.Contains("@using AgentBlazor.Components", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.DoesNotContain("@using MudBlazor", importsChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("@using MudBlazor", layoutChange.UpdatedContent, StringComparison.Ordinal);
         Assert.Contains("""<AgentChatWidget @rendermode="InteractiveServer" Title="Assistant" />""", layoutChange.UpdatedContent, StringComparison.Ordinal);
