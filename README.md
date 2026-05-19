@@ -1,6 +1,6 @@
 # AgentBlazor
 
-Last updated: 2026-04-29
+Last updated: 2026-05-19
 
 Add an agent chat surface and deterministic app actions to a Blazor app.
 
@@ -13,10 +13,10 @@ Try the hosted demo:
 ## Install
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.2
+dotnet add package AgentBlazor --version 0.2.0-preview.3
 ```
 
-Use `0.2.0-preview.2` or later. `0.2.0-preview.1` was superseded after publish because the optional EF package referenced an unpublished internal package.
+Use `0.2.0-preview.3` or later. `0.2.0-preview.1` was superseded after publish because the optional EF package referenced an unpublished internal package; `0.2.0-preview.3` also fixes date-like workflow parameters so `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `Guid` project as tool-friendly string schemas.
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
 
@@ -117,7 +117,7 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 If your app uses EF Core, install `AgentBlazor.EntityFrameworkCore` to expose selected entity shapes as planning context:
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.2
+dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.3
 ```
 
 This is schema-only. It helps an agent understand safe entity fields, but it does not execute queries, generate LINQ or SQL, scan every `DbSet`, or grant write access. Data access still goes through your typed `[AgentAction]` methods.

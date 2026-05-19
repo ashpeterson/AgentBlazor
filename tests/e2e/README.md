@@ -39,7 +39,7 @@ The external chat surface runner now verifies scaffold idempotency, submitted pr
 
 For external apps that require authentication before the main layout is reachable, set `AGENTBLAZOR_EXTERNAL_LOGIN_PATH`, `AGENTBLAZOR_EXTERNAL_LOGIN_USERNAME`, and `AGENTBLAZOR_EXTERNAL_LOGIN_PASSWORD`. The runner signs in before opening the installed floating widget and before visiting the injected surface harness. Set `AGENTBLAZOR_EXTERNAL_EXPECTED_TEXT` to require a protected-page marker before chat assertions begin; the matrix uses this for the CleanArchitecture `/identity/users` authenticated route.
 
-Current release context: `0.2.0-preview.2` is the current public prerelease. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
+Current release context: `0.2.0-preview.3` is the current public prerelease. Local e2e runs still require a configured OpenAI, Azure OpenAI, or Ollama provider.
 
 The real-usability runner requires an explicit live provider from environment variables. It intentionally does not treat demo `appsettings.json` sample values as proof that CI can reach a provider, because empty GitHub secrets or missing Ollama services otherwise produce misleading no-provider transcripts instead of a clear preflight failure.
 
