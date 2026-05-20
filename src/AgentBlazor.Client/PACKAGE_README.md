@@ -5,13 +5,13 @@ Browser-safe AgentBlazor chat components for Blazor WebAssembly and hosted WebAs
 Install:
 
 ```bash
-dotnet add package AgentBlazor.Client --prerelease
+dotnet add package AgentBlazor.Client
 ```
 
-If you want the exact current preview:
+If you prefer a pinned install:
 
 ```bash
-dotnet add package AgentBlazor.Client --version 0.2.0-preview.3
+dotnet add package AgentBlazor.Client --version 0.2.0
 ```
 
 Server project:

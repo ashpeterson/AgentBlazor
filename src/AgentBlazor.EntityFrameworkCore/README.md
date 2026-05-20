@@ -7,16 +7,16 @@ This package is schema-only. It does not execute queries, generate LINQ, generat
 Install:
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
+dotnet add package AgentBlazor.EntityFrameworkCore
 ```
 
-Pinned preview:
+Pinned install:
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.3
+dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0
 ```
 
-Use `0.2.0-preview.3` or later. `0.2.0-preview.1` was superseded after publish because this optional package referenced an unpublished internal package; `0.2.0-preview.3` also fixes date-like workflow parameters so they project as tool-friendly string schemas.
+Use `0.2.0` or later. This release includes the corrected EF package shape and tool-friendly schemas for date-like workflow parameters.
 
 Register your `DbContext` with `IDbContextFactory<TContext>`:
 
