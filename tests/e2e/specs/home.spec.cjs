@@ -10,7 +10,7 @@ test.describe("Landing page", () => {
     await expect(page.locator("#hero").getByRole("link", { name: "Docs" })).toBeVisible();
     await expect(page.locator("#hero").getByRole("link", { name: "Live demo" })).toBeVisible();
     await expect(page.locator(".landing-page__quickstart")).toContainText("Quickstart");
-    await expect(page.locator(".landing-page__quickstart")).toContainText("dotnet add package AgentBlazor --prerelease");
+    await expect(page.locator(".landing-page__quickstart")).toContainText("dotnet add package AgentBlazor");
     await expect(page.locator(".landing-page__quickstart")).toContainText("AgentChatWidget");
     await expect(page.locator(".landing-page__hero-meta").getByRole("link", { name: "Read quickstart" })).toBeVisible();
     await expect(page.locator(".landing-page__hero-meta").getByRole("link", { name: "Try live demo" })).toBeVisible();

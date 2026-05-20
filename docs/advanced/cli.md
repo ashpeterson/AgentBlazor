@@ -11,7 +11,7 @@ Use it when:
 Current run order:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.0-preview.3
+dotnet tool install --global AgentBlazor.Cli
 agentblazor init ./MySolution.slnx --host MyBlazorApp
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve

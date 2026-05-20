@@ -7,17 +7,17 @@ This is schema-only planning context. It does not execute queries, generate LINQ
 ## Install
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --prerelease
+dotnet add package AgentBlazor.EntityFrameworkCore
 ```
 
 If you pin versions, use the same AgentBlazor version for the runtime and EF package:
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.0-preview.3
-dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.0-preview.3
+dotnet add package AgentBlazor
+dotnet add package AgentBlazor.EntityFrameworkCore
 ```
 
-Use `0.2.0-preview.3` or later. `0.2.0-preview.1` was superseded after publish because this optional package referenced an unpublished internal package; `0.2.0-preview.3` also fixes date-like workflow parameters so they project as tool-friendly string schemas.
+Use `0.2.0` or later. This release includes the corrected EF package shape and tool-friendly schemas for date-like workflow parameters.
 
 ## DbContext Setup
 

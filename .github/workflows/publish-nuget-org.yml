@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       package_version:
-        description: "Package version to publish (example: 0.1.0-preview.11 or 0.1.0)"
+        description: "Package version to publish (example: 0.2.0-preview.N or 0.2.0)"
         required: true
         type: string
 
@@ -36,7 +36,7 @@ jobs:
         run: |
           $version = "${{ inputs.package_version }}"
           if ($version -notmatch '^\d+\.\d+\.\d+([-.].+)?$') {
-            throw "package_version must be a valid SemVer string such as 0.1.0-preview.11 or 0.1.0"
+            throw "package_version must be a valid SemVer string such as 0.2.0-preview.N or 0.2.0"
           }
 
       - name: Validate Central Package Pinning
