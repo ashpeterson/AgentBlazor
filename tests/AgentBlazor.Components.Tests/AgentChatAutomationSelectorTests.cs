@@ -23,7 +23,9 @@ public sealed class AgentChatAutomationSelectorTests : TestContext
             .Add(static surface => surface.DefaultAgentName, "Test Agent"));
 
         Assert.NotNull(cut.Find("[data-testid='agent-chat-surface']"));
-        Assert.NotNull(cut.Find("textarea[aria-label='Message input']"));
+        var input = cut.Find("textarea[aria-label='Message input']");
+        Assert.NotNull(input);
+        Assert.False(input.HasAttribute("value"));
         Assert.NotNull(cut.Find("button[aria-label='Send message']"));
     }
 
@@ -76,7 +78,9 @@ public sealed class AgentChatAutomationSelectorTests : TestContext
         var cut = RenderComponent<AgentChatBar>();
 
         Assert.NotNull(cut.Find("[data-testid='agent-chat-bar']"));
-        Assert.NotNull(cut.Find("[data-testid='agent-chat-bar-input'][aria-label='Message input']"));
+        var input = cut.Find("[data-testid='agent-chat-bar-input'][aria-label='Message input']");
+        Assert.NotNull(input);
+        Assert.False(input.HasAttribute("value"));
         Assert.NotNull(cut.Find("[data-testid='agent-chat-bar-send'][aria-label='Send message']"));
     }
 
