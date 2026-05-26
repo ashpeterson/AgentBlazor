@@ -240,8 +240,7 @@
                         <input id="@ClarificationInputId"
                                type="text"
                                class="ab-chat-surface__input"
-                               @bind="_clarificationResponse"
-                               @bind:event="oninput"
+                               @oninput="HandleClarificationInput"
                                placeholder="Type your answer..."
                                disabled="@_isBusy"
                                @onkeydown="HandleClarificationKeyDown" />
@@ -410,7 +409,6 @@
             <textarea id="@PromptId"
                       class="ab-chat-surface__input"
                       rows="3"
-                      value="@_prompt"
                       @oninput="HandlePromptInput"
                       @onkeydown="HandlePromptKeyDown"
                       placeholder="@Placeholder"
@@ -795,6 +793,7 @@
         if (_isBusy)
             return;
 
+        _prompt = await ReadPromptElementValueAsync(_prompt);
         var message = _prompt.Trim();
         if (message.Length == 0)
             return;
@@ -810,9 +809,7 @@
 
         if (TryHandleAgentListCommand(message))
         {
-            _prompt = string.Empty;
-            _showSlashMenu = false;
-            _suggestions = [];
+            await ClearPromptAsync();
             _scrollRequested = true;
             StateHasChanged();
             return;
@@ -820,9 +817,7 @@
 
         if (TryHandleHandoffHistoryCommand(message))
         {
-            _prompt = string.Empty;
-            _showSlashMenu = false;
-            _suggestions = [];
+            await ClearPromptAsync();
             _scrollRequested = true;
             StateHasChanged();
             return;
@@ -830,9 +825,7 @@
 
         if (TryHandleHandoffPolicyCommand(message))
         {
-            _prompt = string.Empty;
-            _showSlashMenu = false;
-            _suggestions = [];
+            await ClearPromptAsync();
             _scrollRequested = true;
             StateHasChanged();
             return;
@@ -840,9 +833,7 @@
 
         if (await TryHandleHandoffDecisionCommandAsync(message))
         {
-            _prompt = string.Empty;
-            _showSlashMenu = false;
-            _suggestions = [];
+            await ClearPromptAsync();
             _scrollRequested = true;
             StateHasChanged();
             return;
@@ -850,18 +841,14 @@
 
         if (await TryHandleAgentHandoffCommandAsync(message))
         {
-            _prompt = string.Empty;
-            _showSlashMenu = false;
-            _suggestions = [];
+            await ClearPromptAsync();
             _scrollRequested = true;
             StateHasChanged();
             return;
         }
 
         _timeline.Add(ChatTimelineItem.User(message));
-        _suggestions = [];
-        _prompt = string.Empty;
-        _showSlashMenu = false;
+        await ClearPromptAsync();
         _pendingClarification = null;
         _pendingApprovals.Clear();
         _clarificationResponse = string.Empty;
@@ -906,15 +893,20 @@
     /// <summary>Populates the chat input with <paramref name="text"/> without submitting.</summary>
     public Task SetInputAsync(string text)
     {
-        _prompt = text;
-        _suggestions = [];
-        return InvokeAsync(StateHasChanged);
+        return InvokeAsync(async () =>
+        {
+            _prompt = text;
+            _suggestions = [];
+            await SetPromptElementValueAsync(text);
+            StateHasChanged();
+        });
     }
 
-    private void AcceptSuggestion(string text)
+    private async Task AcceptSuggestion(string text)
     {
         _prompt = text;
         _suggestions = [];
+        await SetPromptElementValueAsync(text);
         StateHasChanged();
     }
 
@@ -2328,10 +2320,16 @@
         }
     }
 
-    private void AcceptSlashItem(SlashItem item)
+    private void HandleClarificationInput(ChangeEventArgs args)
+    {
+        _clarificationResponse = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task AcceptSlashItem(SlashItem item)
     {
         _prompt = item.InsertText;
         _showSlashMenu = false;
+        await SetPromptElementValueAsync(item.InsertText);
         StateHasChanged();
     }
 
@@ -2913,7 +2911,44 @@
     /// <summary>Pre-fills the prompt input with the given text.</summary>
     public Task InjectAsync(string prompt)
     {
-        _prompt = prompt;
-        return InvokeAsync(StateHasChanged);
+        return InvokeAsync(async () =>
+        {
+            _prompt = prompt;
+            await SetPromptElementValueAsync(prompt);
+            StateHasChanged();
+        });
+    }
+
+    private async Task ClearPromptAsync()
+    {
+        _prompt = string.Empty;
+        _showSlashMenu = false;
+        _suggestions = [];
+        await SetPromptElementValueAsync(string.Empty);
+    }
+
+    private async Task SetPromptElementValueAsync(string value)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("AgentBlazor.chat.setInputValue", PromptId, value);
+        }
+        catch
+        {
+            // JS may be unavailable during prerender or component tests; the server-side prompt remains authoritative.
+        }
+    }
+
+    private async Task<string> ReadPromptElementValueAsync(string fallback)
+    {
+        try
+        {
+            return await JSRuntime.InvokeAsync<string>("AgentBlazor.chat.getInputValue", PromptId);
+        }
+        catch
+        {
+            // JS may be unavailable during prerender or component tests; use the latest server-side input event value.
+            return fallback;
+        }
     }
 }
