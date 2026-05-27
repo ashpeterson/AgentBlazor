@@ -1,0 +1,8 @@
+@page "/inventory"
+@inject InventoryWorkflowService Inventory
+
+<MudButton OnClick="Prepare">Prepare restock plan</MudButton>
+
+@code {
+    private Task Prepare() => Inventory.PrepareRestockPlanAsync("north");
+}

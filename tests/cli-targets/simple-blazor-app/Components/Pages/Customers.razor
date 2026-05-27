@@ -1,0 +1,10 @@
+@page "/customers"
+@inject CustomerService Customers
+
+<h1>Customers</h1>
+
+<button @onclick="CreateFollowUp">Create follow-up</button>
+
+@code {
+    private Task CreateFollowUp() => Customers.CreateFollowUpAsync("CUST-1001");
+}
