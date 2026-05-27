@@ -170,6 +170,35 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                             IsAsync = true
                         }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AccountController",
+                    FilePath = "Controllers/AccountController.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "Register",
+                            ReturnType = "Task<ApiResponse>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "EmailFactory",
+                    FilePath = "Factories/EmailFactory.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "BuildTestEmail",
+                            ReturnType = "EmailMessageDto",
+                            IsPublic = true
+                        }
+                    ]
                 }
             ],
             Actions =
@@ -194,6 +223,16 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Score = 0.99,
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Register",
+                    SourceService = "AccountController",
+                    MethodName = "Register",
+                    FilePath = "Controllers/AccountController.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow
                 }
             ]
         };
@@ -205,6 +244,8 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("DialogServiceHelper", content);
         Assert.DoesNotContain("ShowDialogAsync", content);
         Assert.DoesNotContain("HubClient", content);
+        Assert.DoesNotContain("AccountController", content);
+        Assert.DoesNotContain("EmailFactory", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
     }

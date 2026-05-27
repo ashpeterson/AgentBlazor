@@ -111,6 +111,14 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         }
         catch (Exception ex)
         {
+            if (IsSdkResolutionFailure(ex))
+            {
+                AnsiConsole.MarkupLine("[red]SDK resolution failed while loading the project.[/]");
+                AnsiConsole.MarkupLine(Markup.Escape(GetRelevantSdkResolutionMessage(ex.Message)));
+                AnsiConsole.MarkupLine("[grey]Install the requested SDK, or update the target repo's global.json rollForward setting before running analyze.[/]");
+                return 1;
+            }
+
             AnsiConsole.MarkupLine($"[red]Unexpected error:[/] {Markup.Escape(ex.Message)}");
             if (Environment.GetEnvironmentVariable("AGENTBLAZOR_DEBUG") == "1")
             {
@@ -123,6 +131,28 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
 
             return 1;
         }
+    }
+
+    private static bool IsSdkResolutionFailure(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current.Message.Contains("A compatible .NET SDK was not found", StringComparison.OrdinalIgnoreCase) ||
+                current.Message.Contains("hostfxr_resolve_sdk", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetRelevantSdkResolutionMessage(string message)
+    {
+        var learnMoreIndex = message.IndexOf("Learn about SDK resolution:", StringComparison.OrdinalIgnoreCase);
+        return learnMoreIndex > 0
+            ? message[..learnMoreIndex].Trim()
+            : message;
     }
 
     private static string ResolveOutputPath(string? output, string outputDirectory)

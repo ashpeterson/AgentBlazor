@@ -19,8 +19,8 @@ public sealed class WorkflowSuggestionParser
         }
 
         var knownMethods = model.Services
-            .SelectMany(service => service.Methods.Select(method => (Service: service.TypeName, Method: method.Name)))
-            .Concat(model.Actions.Select(action => (Service: action.SourceService, Method: action.MethodName)))
+            .SelectMany(service => service.Methods.Select(method => (Service: service.TypeName, Method: NormalizeMethodReference(method.Name))))
+            .Concat(model.Actions.Select(action => (Service: action.SourceService, Method: NormalizeMethodReference(action.MethodName))))
             .ToHashSet();
 
         var suggestions = new List<WorkflowSuggestion>();
@@ -154,8 +154,8 @@ public sealed class WorkflowSuggestionParser
                 {
                     methods.Add(new WorkflowMethodReference
                     {
-                        Service = methodText[..separatorIndex],
-                        Method = methodText[(separatorIndex + 1)..]
+                        Service = methodText[..separatorIndex].Trim(),
+                        Method = NormalizeMethodReference(methodText[(separatorIndex + 1)..])
                     });
                 }
 
@@ -170,7 +170,7 @@ public sealed class WorkflowSuggestionParser
             methods.Add(new WorkflowMethodReference
             {
                 Service = ReadString(methodElement, "service"),
-                Method = ReadString(methodElement, "method")
+                Method = NormalizeMethodReference(ReadString(methodElement, "method"))
             });
         }
 
@@ -178,6 +178,24 @@ public sealed class WorkflowSuggestionParser
             .Where(method => !string.IsNullOrWhiteSpace(method.Service) && !string.IsNullOrWhiteSpace(method.Method))
             .Distinct()
             .ToList();
+    }
+
+    private static string NormalizeMethodReference(string method)
+    {
+        var normalized = method.Trim();
+        var parameterStart = normalized.IndexOf('(');
+        if (parameterStart > 0)
+        {
+            normalized = normalized[..parameterStart];
+        }
+
+        var whitespaceIndex = normalized.IndexOfAny([' ', '\t', '\r', '\n']);
+        if (whitespaceIndex > 0)
+        {
+            normalized = normalized[..whitespaceIndex];
+        }
+
+        return normalized.Trim();
     }
 
     private static string ExtractJsonObject(string responseText)

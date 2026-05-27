@@ -76,6 +76,21 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ServiceModel
                 {
+                    TypeName = "AccountController",
+                    FilePath = "Controllers/AccountController.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "Register",
+                            ReturnType = "Task<ApiResponse>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
                     TypeName = "OrderCapabilities",
                     FilePath = "Workflows/OrderCapabilities.cs",
                     Methods =
@@ -112,6 +127,7 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.DoesNotContain("SetSelectedNodeAsync", prompt);
         Assert.DoesNotContain("DialogServiceHelper", prompt);
         Assert.DoesNotContain("ShowDialogAsync", prompt);
+        Assert.DoesNotContain("AccountController", prompt);
         Assert.Contains("OrderCapabilities.ShowOpenOrdersAsync", prompt);
         Assert.DoesNotContain("- OrderCapabilities [", prompt);
     }

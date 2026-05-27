@@ -15,7 +15,12 @@ public static class AnalysisModelFilters
 
     private static readonly string[] InfrastructureServiceNameFragments =
     [
+        "Controller",
+        "DbContext",
         "DbContextFactory",
+        "Factory",
+        "Provider",
+        "Notifier",
         "SignInManager",
         "DownloadFileService",
         "DialogService",

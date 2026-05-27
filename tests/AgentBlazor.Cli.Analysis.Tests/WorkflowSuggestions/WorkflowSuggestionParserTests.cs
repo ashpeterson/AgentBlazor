@@ -135,6 +135,35 @@ public sealed class WorkflowSuggestionParserTests
         Assert.Contains("OrderService.DeleteEverythingAsync", rejected.Reason);
     }
 
+    [Fact]
+    public void ParseAndValidate_AcceptsMethodReferencesThatIncludeParameterLists()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel();
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Order follow-up",
+              "description": "Find open orders.",
+              "methods": [
+                { "service": "OrderService", "method": "FindOrdersAsync(DateOnly since)" },
+                "OrderService.DraftFollowUpAsync(string orderId)"
+              ],
+              "confidence": 0.80
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal("FindOrdersAsync", suggestion.Methods[0].Method);
+        Assert.Equal("DraftFollowUpAsync", suggestion.Methods[1].Method);
+        Assert.Empty(result.Rejected);
+    }
+
     private static ProjectModel CreateModel() => new()
     {
         AppName = "OrderApp",

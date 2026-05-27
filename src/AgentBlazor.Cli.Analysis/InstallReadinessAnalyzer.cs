@@ -18,17 +18,14 @@ public sealed class InstallReadinessAnalyzer
             ?? throw new InvalidOperationException($"Could not determine the host project directory for '{hostProject.Name}'.");
 
         var csprojText = await File.ReadAllTextAsync(hostProjectPath, ct).ConfigureAwait(false);
-        var hostTargetFrameworks = TargetFrameworkSupport.ReadTargetFrameworks(csprojText);
+        var hostTargetFrameworks = await TargetFrameworkSupport.ReadTargetFrameworksAsync(hostProjectPath, ct).ConfigureAwait(false);
         var csharpContents = await ReadProjectFilesAsync(hostProjectDirectory, ".cs", ct).ConfigureAwait(false);
         var hostShape = AnalyzeHostShape(hostProjectPath, hostProjectDirectory, csprojText, csharpContents);
         var uiProject = await ResolveUiProjectAsync(hostProjectPath, hostProject.Name, csprojText, hostShape, ct).ConfigureAwait(false);
         var uiProjectPath = uiProject?.ProjectPath;
-        var uiProjectText = uiProjectPath is null
-            ? null
-            : await File.ReadAllTextAsync(uiProjectPath, ct).ConfigureAwait(false);
-        var uiTargetFrameworks = uiProjectText is null
+        var uiTargetFrameworks = uiProjectPath is null
             ? Array.Empty<string>()
-            : TargetFrameworkSupport.ReadTargetFrameworks(uiProjectText).ToArray();
+            : (await TargetFrameworkSupport.ReadTargetFrameworksAsync(uiProjectPath, ct).ConfigureAwait(false)).ToArray();
         var uiProjectDirectory = Path.GetDirectoryName(uiProjectPath ?? hostProjectPath)
             ?? throw new InvalidOperationException($"Could not determine the UI project directory for '{uiProjectPath ?? hostProjectPath}'.");
         var shellProjectDirectory = hostShape.Family == HostFamily.HostedWebAssembly

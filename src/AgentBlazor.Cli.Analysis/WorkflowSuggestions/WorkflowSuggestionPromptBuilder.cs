@@ -16,6 +16,7 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("Rules:");
         sb.AppendLine("- Return JSON only. No markdown.");
         sb.AppendLine("- Only reference methods listed in the static analysis summary.");
+        sb.AppendLine("- In JSON method fields, use method names only, without parameter lists or return types.");
         sb.AppendLine("- Do not invent services, methods, routes, entities, or files.");
         sb.AppendLine("- Prefer 3 to 5 high-value workflows.");
         sb.AppendLine("- Use confidence from 0.0 to 1.0.");
