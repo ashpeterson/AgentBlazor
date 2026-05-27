@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="AgentBlazor" Version="0.2.1" />
-    <PackageReference Include="MudBlazor" Version="9.0.0" />
+    <PackageReference Include="AgentBlazor" />
+    <PackageReference Include="MudBlazor" />
   </ItemGroup>
 </Project>
