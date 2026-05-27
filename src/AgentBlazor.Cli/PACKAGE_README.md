@@ -22,6 +22,14 @@ agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --di
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
 ```
 
+Read-only analysis:
+
+```bash
+agentblazor analyze ./MySolution.slnx --host MyBlazorApp
+```
+
+`analyze` writes `.agentblazor/analysis.md` and does not modify application code. Set `OPENAI_API_KEY` and optionally `AGENTBLAZOR_ANALYZE_MODEL` for LLM workflow suggestions, or pass `--static-only` to generate a static report without an LLM call.
+
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
 
 Docs:
