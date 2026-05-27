@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using AgentBlazor.Cli.Analysis;
+using AgentBlazor.Cli.Analysis.Blazor;
+using AgentBlazor.Cli.Analysis.Frameworks;
 using AgentBlazor.Cli.Analysis.Generation;
 using AgentBlazor.Cli.Analysis.Models;
 using AgentBlazor.Cli.Analysis.WorkflowSuggestions;
@@ -25,8 +27,8 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         public string? Output { get; init; }
 
         [CommandOption("--framework <FRAMEWORK>")]
-        [Description("Framework override. v1 currently supports only 'blazor'.")]
-        public string Framework { get; init; } = "blazor";
+        [Description("Framework override. v1 currently supports 'auto' and 'blazor'.")]
+        public string Framework { get; init; } = "auto";
 
         [CommandOption("--no-readiness")]
         [Description("Skip AgentBlazor install-readiness checks in the report.")]
@@ -45,13 +47,6 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     {
         try
         {
-            if (!settings.Framework.Equals("blazor", StringComparison.OrdinalIgnoreCase))
-            {
-                AnsiConsole.MarkupLine($"[red]Unsupported framework:[/] {Markup.Escape(settings.Framework)}");
-                AnsiConsole.MarkupLine("[grey]v1 currently supports only `--framework blazor`.[/]");
-                return 1;
-            }
-
             var path = await CommandPathResolver.ResolvePathAsync(settings.Path, settings.NonInteractive);
             if (path is null)
             {
@@ -67,28 +62,28 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             var suggestionClient = settings.StaticOnly
                 ? null
                 : WorkflowSuggestionClientFactory.Create(WorkflowSuggestionClientFactory.FromEnvironment(config));
+            var analyzerRegistry = new ProjectAnalyzerRegistry();
+            var analyzer = analyzerRegistry.ResolveBlazor(settings.Framework, path);
 
             var warnings = new List<string>();
             ProjectModel model = null!;
             InstallReadinessReport? readiness = null;
+            BlazorFrameworkContext? blazorContext = null;
             WorkflowSuggestionSet? workflowSuggestions = null;
 
             await AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
                 .StartAsync("Analyzing project...", async status =>
                 {
-                    var modelBuilder = new ModelBuilder();
-                    modelBuilder.OnProgress += message => status.Status(message);
-                    modelBuilder.OnWarning += warning => warnings.Add(warning);
-
-                    model = await modelBuilder.BuildModelAsync(path, hostProject, description, config);
-
-                    if (!settings.NoReadiness)
-                    {
-                        status.Status("Checking AgentBlazor install readiness...");
-                        var readinessAnalyzer = new InstallReadinessAnalyzer();
-                        readiness = await readinessAnalyzer.AnalyzeAsync(path, model.BlazorHostProject);
-                    }
+                    var analysis = await analyzer.AnalyzeAsync(
+                        path,
+                        hostProject,
+                        description,
+                        config,
+                        includeReadiness: !settings.NoReadiness);
+                    model = analysis.Model;
+                    readiness = analysis.Readiness;
+                    blazorContext = analysis.Context;
 
                     if (!settings.StaticOnly)
                     {
@@ -101,7 +96,7 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                     await reportGenerator.GenerateAsync(model, outputPath, readiness, workflowSuggestions);
                 });
 
-            RenderSummary(model, readiness, workflowSuggestions, outputPath, warnings);
+            RenderSummary(model, readiness, blazorContext, workflowSuggestions, outputPath, warnings);
             return 0;
         }
         catch (InvalidOperationException ex)
@@ -145,6 +140,7 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     private static void RenderSummary(
         ProjectModel model,
         InstallReadinessReport? readiness,
+        BlazorFrameworkContext? blazorContext,
         WorkflowSuggestionSet? workflowSuggestions,
         string outputPath,
         IReadOnlyList<string> warnings)
@@ -157,6 +153,10 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         if (readiness is not null)
         {
             AnsiConsole.MarkupLine($"[blue]Readiness:[/] {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
+        }
+        if (blazorContext?.HostShape is not null)
+        {
+            AnsiConsole.MarkupLine($"[blue]Host shape:[/] {Markup.Escape(blazorContext.HostShape.Title)}");
         }
         if (workflowSuggestions is not null)
         {
