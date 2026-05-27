@@ -61,6 +61,21 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ServiceModel
                 {
+                    TypeName = "DialogServiceHelper",
+                    FilePath = "Services/DialogServiceHelper.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ShowDialogAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
                     TypeName = "OrderCapabilities",
                     FilePath = "Workflows/OrderCapabilities.cs",
                     Methods =
@@ -95,6 +110,8 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("FindOrdersAsync", prompt);
         Assert.DoesNotContain("AgentBlazorBuilder", prompt);
         Assert.DoesNotContain("SetSelectedNodeAsync", prompt);
+        Assert.DoesNotContain("DialogServiceHelper", prompt);
+        Assert.DoesNotContain("ShowDialogAsync", prompt);
         Assert.Contains("OrderCapabilities.ShowOpenOrdersAsync", prompt);
         Assert.DoesNotContain("- OrderCapabilities [", prompt);
     }

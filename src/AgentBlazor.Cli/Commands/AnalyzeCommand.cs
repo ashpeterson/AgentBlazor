@@ -146,10 +146,14 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         IReadOnlyList<string> warnings)
     {
         AnsiConsole.Write(new Rule("[green]Analysis Complete[/]").RuleStyle("green"));
+        var reportableActions = model.Actions.Where(AnalysisModelFilters.IsDeveloperFacingAction).ToList();
+        var confirmedActionCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed);
+        var discoveredActionCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Suggested);
+        var reportableServiceCount = model.Services.Count(service => AnalysisModelFilters.IsDeveloperFacingService(service, model));
         AnsiConsole.MarkupLine($"[blue]Host:[/] {Markup.Escape(model.BlazorHostProject)}");
         AnsiConsole.MarkupLine($"[blue]Routes:[/] {model.Routes.Count}");
-        AnsiConsole.MarkupLine($"[blue]Services:[/] {model.Services.Count}");
-        AnsiConsole.MarkupLine($"[blue]Actions:[/] {model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed)} confirmed, {model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Suggested)} discovered");
+        AnsiConsole.MarkupLine($"[blue]Services:[/] {reportableServiceCount}");
+        AnsiConsole.MarkupLine($"[blue]Actions:[/] {confirmedActionCount} confirmed, {discoveredActionCount} discovered");
         if (readiness is not null)
         {
             AnsiConsole.MarkupLine($"[blue]Readiness:[/] {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");

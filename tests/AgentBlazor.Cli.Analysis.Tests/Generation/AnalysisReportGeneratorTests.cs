@@ -140,6 +140,36 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                             IsPublic = true
                         }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "DialogServiceHelper",
+                    FilePath = "Services/DialogServiceHelper.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ShowDialogAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "HubClient",
+                    FilePath = "Hubs/HubClient.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "StartAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
                 }
             ],
             Actions =
@@ -154,6 +184,16 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Score = 0.99,
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Command
+                },
+                new ActionModel
+                {
+                    Name = "Show Dialog",
+                    SourceService = "DialogServiceHelper",
+                    MethodName = "ShowDialogAsync",
+                    FilePath = "Services/DialogServiceHelper.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
                 }
             ]
         };
@@ -162,6 +202,9 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.DoesNotContain("AgentBlazorBuilder", content);
         Assert.DoesNotContain("SetSelectedNodeAsync", content);
+        Assert.DoesNotContain("DialogServiceHelper", content);
+        Assert.DoesNotContain("ShowDialogAsync", content);
+        Assert.DoesNotContain("HubClient", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
     }
@@ -231,6 +274,16 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Classification = ActionClassification.Query,
                     Score = 1,
                     ExposureMode = ActionExposureMode.Confirmed
+                },
+                new ActionModel
+                {
+                    Name = "Prepare Restock Plan",
+                    SourceService = "InventoryService",
+                    MethodName = "PrepareRestockPlanAsync",
+                    FilePath = "Services/InventoryService.cs",
+                    Classification = ActionClassification.Workflow,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
                 }
             ],
             Recommendations =
@@ -256,6 +309,95 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.DoesNotContain("Show Open Tickets", content);
         Assert.Contains("Prepare Restock Plan", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DoesNotRecommendFilteredInfrastructureActions()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Show Dialog",
+                    SourceService = "DialogServiceHelper",
+                    MethodName = "ShowDialogAsync",
+                    FilePath = "Services/DialogServiceHelper.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.95,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Prepare Restock Plan",
+                    SourceService = "InventoryService",
+                    MethodName = "PrepareRestockPlanAsync",
+                    FilePath = "Services/InventoryService.cs",
+                    Classification = ActionClassification.Workflow,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ],
+            Recommendations =
+            [
+                new RecommendationModel
+                {
+                    Type = RecommendationType.AddAgentAction,
+                    TargetName = "DialogServiceHelper.ShowDialogAsync",
+                    Suggestion = "Add `[AgentAction(\"Show Dialog\")]`",
+                    Priority = 1
+                },
+                new RecommendationModel
+                {
+                    Type = RecommendationType.AddAgentAction,
+                    TargetName = "InventoryService.PrepareRestockPlanAsync",
+                    Suggestion = "Add `[AgentAction(\"Prepare Restock Plan\")]`",
+                    Priority = 0.9
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.DoesNotContain("Show Dialog", content);
+        Assert.Contains("Prepare Restock Plan", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DisambiguatesDuplicateStaticCandidateHeadings()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Export",
+                    SourceService = "ExcelService",
+                    MethodName = "ExportAsync",
+                    FilePath = "Services/ExcelService.cs",
+                    Classification = ActionClassification.Export,
+                    Score = 0.95,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Export",
+                    SourceService = "PDFService",
+                    MethodName = "ExportAsync",
+                    FilePath = "Services/PDFService.cs",
+                    Classification = ActionClassification.Export,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("### Export (ExcelService)", content);
+        Assert.Contains("### Export (PDFService)", content);
     }
 
     [Fact]

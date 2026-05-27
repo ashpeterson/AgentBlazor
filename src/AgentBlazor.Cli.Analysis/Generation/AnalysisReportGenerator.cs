@@ -274,8 +274,15 @@ public sealed class AnalysisReportGenerator
             .Where(action => action.Score >= 0.7)
             .OrderByDescending(action => action.Score)
             .ThenBy(action => action.SourceService)
+            .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
             .Take(10)
             .ToList();
+        var duplicateCandidateNames = candidates
+            .GroupBy(action => NormalizeName(action.Name))
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.Ordinal);
 
         sb.AppendLine("> LLM workflow suggestions were not requested. Showing high-confidence static candidates instead.");
         sb.AppendLine();
@@ -289,7 +296,10 @@ public sealed class AnalysisReportGenerator
 
         foreach (var action in candidates)
         {
-            sb.AppendLine($"### {action.Name}");
+            var heading = duplicateCandidateNames.Contains(NormalizeName(action.Name))
+                ? $"{action.Name} ({action.SourceService})"
+                : action.Name;
+            sb.AppendLine($"### {heading}");
             sb.AppendLine();
             sb.AppendLine($"- Existing method: `{action.SourceService}.{action.MethodName}`");
             sb.AppendLine($"- Classification: {action.Classification}");
@@ -345,8 +355,11 @@ public sealed class AnalysisReportGenerator
         }
 
         foreach (var recommendation in model.Recommendations
+            .Where(recommendation => IsDeveloperFacingRecommendation(recommendation, model))
             .Where(recommendation => !DuplicatesConfirmedAction(recommendation, model))
             .OrderByDescending(item => item.Priority)
+            .GroupBy(item => item.Suggestion, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
             .Take(5))
         {
             hasSteps = true;
@@ -386,6 +399,22 @@ public sealed class AnalysisReportGenerator
                 NormalizeName(action.MethodName) == normalizedTarget ||
                 NormalizeName(action.Name) == normalizedTarget ||
                 (!string.IsNullOrWhiteSpace(action.Name) && NormalizeName(recommendation.Suggestion).Contains(NormalizeName(action.Name), StringComparison.Ordinal)));
+    }
+
+    private static bool IsDeveloperFacingRecommendation(RecommendationModel recommendation, ProjectModel model)
+    {
+        return recommendation.Type switch
+        {
+            RecommendationType.AddAgentAction or RecommendationType.AddApprovalTag or RecommendationType.AddDescription or RecommendationType.AddParameterInfo
+                => model.Actions
+                    .Where(action => string.Equals($"{action.SourceService}.{action.MethodName}", recommendation.TargetName, StringComparison.OrdinalIgnoreCase))
+                    .Any(AnalysisModelFilters.IsDeveloperFacingAction),
+            RecommendationType.AddAgentCapability
+                => model.Services
+                    .Where(service => string.Equals(service.TypeName, recommendation.TargetName, StringComparison.OrdinalIgnoreCase))
+                    .Any(service => AnalysisModelFilters.IsDeveloperFacingService(service, model)),
+            _ => true
+        };
     }
 
     private static bool DuplicatesConfirmedAction(ActionModel candidate, ProjectModel model)

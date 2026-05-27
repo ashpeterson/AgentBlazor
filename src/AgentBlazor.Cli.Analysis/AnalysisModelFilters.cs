@@ -2,7 +2,7 @@ using AgentBlazor.Cli.Analysis.Models;
 
 namespace AgentBlazor.Cli.Analysis;
 
-internal static class AnalysisModelFilters
+public static class AnalysisModelFilters
 {
     private static readonly string[] InfrastructureServiceNames =
     [
@@ -11,6 +11,23 @@ internal static class AnalysisModelFilters
         "ComponentCapabilityCatalogBuilder",
         "AgentBlazorEntitlementService",
         "AgentChatActiveRunStore"
+    ];
+
+    private static readonly string[] InfrastructureServiceNameFragments =
+    [
+        "DbContextFactory",
+        "SignInManager",
+        "DownloadFileService",
+        "DialogService",
+        "HubClient",
+        "HubConnection",
+        "ExceptionHandler",
+        "LayoutService",
+        "Cache",
+        "TicketStore",
+        "DataSourceService",
+        "UserProfileState",
+        "ValidationService"
     ];
 
     private static readonly string[] InfrastructurePathFragments =
@@ -24,7 +41,19 @@ internal static class AnalysisModelFilters
         "\\src\\AgentBlazor.Components\\",
         "\\src\\AgentBlazor.Hosting\\",
         "\\src\\AgentBlazor.ProviderAdapters\\",
-        "\\src\\AgentBlazor.Licensing\\"
+        "\\src\\AgentBlazor.Licensing\\",
+        "/Hubs/",
+        "\\Hubs\\",
+        "/Middlewares/",
+        "\\Middlewares\\",
+        "/Services/JsInterop/",
+        "\\Services\\JsInterop\\",
+        "/Services/Layout/",
+        "\\Services\\Layout\\",
+        "/Services/Caching/",
+        "\\Services\\Caching\\",
+        "/Services/Identity/",
+        "\\Services\\Identity\\"
     ];
 
     private static readonly string[] UiStateMethodPrefixes =
@@ -59,6 +88,11 @@ internal static class AnalysisModelFilters
             return false;
         }
 
+        if (InfrastructureServiceNameFragments.Any(fragment => service.TypeName.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
         if (model?.Actions.Any(action =>
                 action.ExposureMode == ActionExposureMode.Confirmed &&
                 string.Equals(action.SourceService, service.TypeName, StringComparison.OrdinalIgnoreCase)) == true)
@@ -77,6 +111,11 @@ internal static class AnalysisModelFilters
     public static bool IsDeveloperFacingAction(ActionModel action)
     {
         if (!IsDeveloperFacingMethod(action.MethodName))
+        {
+            return false;
+        }
+
+        if (InfrastructureServiceNameFragments.Any(fragment => action.SourceService.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
         }
