@@ -105,6 +105,67 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.Contains("MissingService.RunAsync", content);
     }
 
+    [Fact]
+    public void GenerateMarkdown_FiltersFrameworkServicesAndUiStateActions_FromDeveloperFacingSections()
+    {
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                .. CreateModel().Services,
+                new ServiceModel
+                {
+                    TypeName = "AgentBlazorBuilder",
+                    FilePath = "/repo/src/AgentBlazor.Core/Services/AgentBlazorBuilder.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "AddWorkflow",
+                            ReturnType = "AgentBlazorBuilder",
+                            IsPublic = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UiStateService",
+                    FilePath = "Services/UiStateService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "SetSelectedNodeAsync",
+                            ReturnType = "Task",
+                            IsPublic = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Set selected node",
+                    SourceService = "UiStateService",
+                    MethodName = "SetSelectedNodeAsync",
+                    FilePath = "Services/UiStateService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.DoesNotContain("AgentBlazorBuilder", content);
+        Assert.DoesNotContain("SetSelectedNodeAsync", content);
+        Assert.Contains("OrderService", content);
+        Assert.Contains("FindOrdersAsync", content);
+    }
+
     private static ProjectModel CreateModel() => new()
     {
         AppName = "TestApp",

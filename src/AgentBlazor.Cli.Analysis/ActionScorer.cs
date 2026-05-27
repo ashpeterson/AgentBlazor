@@ -73,7 +73,7 @@ public sealed class ActionScorer
         ["Deactivate"] = (ActionClassification.Command, true),
         ["Lock"] = (ActionClassification.Command, true),
         ["Unlock"] = (ActionClassification.Command, true),
-        ["Show"] = (ActionClassification.Command, true),
+        ["Show"] = (ActionClassification.Query, false),
         ["Hide"] = (ActionClassification.Command, true),
         ["Expand"] = (ActionClassification.Command, true),
         ["Collapse"] = (ActionClassification.Command, true),

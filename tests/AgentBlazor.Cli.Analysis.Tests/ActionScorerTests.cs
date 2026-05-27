@@ -16,6 +16,7 @@ public class ActionScorerTests
     [InlineData("SearchProducts", ActionClassification.Query, false)]
     [InlineData("ListOrders", ActionClassification.Query, false)]
     [InlineData("FetchData", ActionClassification.Query, false)]
+    [InlineData("ShowOpenTickets", ActionClassification.Query, false)]
     public void ScoreMethod_QueryVerbs_ClassifiesAsQuery(string methodName, ActionClassification expected, bool isMutation)
     {
         var method = CreateMethod(methodName);

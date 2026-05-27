@@ -59,14 +59,16 @@ public sealed class AnalysisReportGenerator
 
     private static void WriteSummary(StringBuilder sb, ProjectModel model, InstallReadinessReport? readiness)
     {
-        var confirmedCount = model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed);
-        var discoveredCount = model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Suggested);
+        var reportableActions = model.Actions.Where(AnalysisModelFilters.IsDeveloperFacingAction).ToList();
+        var confirmedCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed);
+        var discoveredCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Suggested);
+        var reportableServiceCount = model.Services.Count(AnalysisModelFilters.IsDeveloperFacingService);
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
         sb.AppendLine($"- Projects scanned: {model.Projects.Count}");
         sb.AppendLine($"- Routes discovered: {model.Routes.Count}");
-        sb.AppendLine($"- Services discovered: {model.Services.Count}");
+        sb.AppendLine($"- Developer-facing services discovered: {reportableServiceCount}");
         sb.AppendLine($"- Confirmed actions: {confirmedCount}");
         sb.AppendLine($"- Discovered candidate actions: {discoveredCount}");
         if (readiness is not null)
@@ -100,8 +102,17 @@ public sealed class AnalysisReportGenerator
         {
             var page = model.Pages.FirstOrDefault(page => page.Route == route.Template);
             var actions = page?.SuggestedActions.Count > 0
-                ? string.Join(", ", page.SuggestedActions.Select(EscapeTableCell))
+                ? string.Join(", ", page.SuggestedActions
+                    .Where(actionId => model.Actions.Any(action =>
+                        action.Id == actionId &&
+                        AnalysisModelFilters.IsDeveloperFacingAction(action)))
+                    .Take(5)
+                    .Select(EscapeTableCell))
                 : "-";
+            if (string.IsNullOrWhiteSpace(actions))
+            {
+                actions = "-";
+            }
             sb.AppendLine($"| `{EscapeTableCell(route.Template)}` | `{EscapeTableCell(route.ComponentName)}` | `{EscapeTableCell(route.ComponentFile)}` | {actions} |");
         }
 
@@ -112,6 +123,7 @@ public sealed class AnalysisReportGenerator
     {
         var confirmedActions = model.Actions
             .Where(action => action.ExposureMode == ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .OrderBy(action => action.SourceService)
             .ThenBy(action => action.MethodName)
             .ToList();
@@ -147,7 +159,9 @@ public sealed class AnalysisReportGenerator
             return;
         }
 
-        foreach (var service in model.Services.OrderBy(service => service.TypeName))
+        foreach (var service in model.Services
+            .Where(AnalysisModelFilters.IsDeveloperFacingService)
+            .OrderBy(service => service.TypeName))
         {
             sb.AppendLine($"### `{service.TypeName}`");
             sb.AppendLine();
@@ -161,7 +175,9 @@ public sealed class AnalysisReportGenerator
             }
 
             sb.AppendLine("- Public methods:");
-            foreach (var method in service.Methods.OrderBy(method => method.Name))
+            foreach (var method in service.Methods
+                .Where(method => AnalysisModelFilters.IsDeveloperFacingMethod(method.Name))
+                .OrderBy(method => method.Name))
             {
                 var parameters = method.Parameters.Count == 0
                     ? ""
@@ -253,6 +269,7 @@ public sealed class AnalysisReportGenerator
 
         var candidates = model.Actions
             .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(action => action.Score >= 0.7)
             .OrderByDescending(action => action.Score)
             .ThenBy(action => action.SourceService)
