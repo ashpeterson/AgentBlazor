@@ -78,6 +78,16 @@ public sealed class WorkflowSuggestionParserTests
                 new ActionModel
                 {
                     Name = "Find Orders",
+                    SourceService = "OrderService",
+                    MethodName = "FindOrdersAsync",
+                    FilePath = "Services/OrderService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.8
+                },
+                new ActionModel
+                {
+                    Name = "Find Orders",
                     SourceService = "OrderCapabilities",
                     MethodName = "FindOrdersAsync",
                     FilePath = "Workflows/OrderCapabilities.cs",
@@ -136,6 +146,49 @@ public sealed class WorkflowSuggestionParserTests
     }
 
     [Fact]
+    public void ParseAndValidate_RejectsSuggestions_WhenMethodTermsDoNotMatchWorkflow()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Get Access Token",
+                    SourceService = "AccessTokenService",
+                    MethodName = "GetAccessTokenAsync",
+                    FilePath = "Services/AccessTokenService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.8
+                }
+            ]
+        };
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Role assignment",
+              "description": "Assign roles to users.",
+              "methods": [
+                { "service": "AccessTokenService", "method": "GetAccessTokenAsync" }
+              ],
+              "confidence": 0.82
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        Assert.Empty(result.Suggestions);
+        var rejected = Assert.Single(result.Rejected);
+        Assert.Contains("do not align", rejected.Reason);
+        Assert.Contains("AccessTokenService.GetAccessTokenAsync", rejected.Reason);
+    }
+
+    [Fact]
     public void ParseAndValidate_AcceptsMethodReferencesThatIncludeParameterLists()
     {
         var parser = new WorkflowSuggestionParser();
@@ -145,7 +198,7 @@ public sealed class WorkflowSuggestionParserTests
           "workflows": [
             {
               "name": "Order follow-up",
-              "description": "Find open orders.",
+              "description": "Find open orders and draft follow-up messages.",
               "methods": [
                 { "service": "OrderService", "method": "FindOrdersAsync(DateOnly since)" },
                 "OrderService.DraftFollowUpAsync(string orderId)"
@@ -191,6 +244,29 @@ public sealed class WorkflowSuggestionParserTests
                         IsAsync = true
                     }
                 ]
+            }
+        ],
+        Actions =
+        [
+            new ActionModel
+            {
+                Name = "Find Orders",
+                SourceService = "OrderService",
+                MethodName = "FindOrdersAsync",
+                FilePath = "Services/OrderService.cs",
+                ExposureMode = ActionExposureMode.Suggested,
+                Classification = ActionClassification.Query,
+                Score = 0.8
+            },
+            new ActionModel
+            {
+                Name = "Draft Follow Up",
+                SourceService = "OrderService",
+                MethodName = "DraftFollowUpAsync",
+                FilePath = "Services/OrderService.cs",
+                ExposureMode = ActionExposureMode.Suggested,
+                Classification = ActionClassification.Workflow,
+                Score = 0.8
             }
         ]
     };

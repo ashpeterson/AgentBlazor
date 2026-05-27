@@ -12,7 +12,9 @@ Environment:
 - Model: environment default, currently `gpt-4o-mini` when unset
 - Temporary clone root: `/tmp/agentblazor-cli-v1-realapps`
 - Packaged tool: locally packed `AgentBlazor.Cli.0.2.1.nupkg`, installed via `dotnet tool install AgentBlazor.Cli --tool-path /tmp/agentblazor-cli-v1-tool-smoke/tool --configfile /tmp/agentblazor-cli-v1-tool-smoke/NuGet.config --version 0.2.1`
-- Packaged tool output root: `/tmp/agentblazor-cli-v1-tool-smoke`
+- Initial packaged tool output root: `/tmp/agentblazor-cli-v1-tool-smoke`
+- Expanded real-app clone root: `/tmp/agentblazor-cli-v1-more-realapps`
+- Final packaged tool output root after RCL route and semantic-validation fixes: `/tmp/agentblazor-cli-v1-tool-smoke-final2`
 
 ## Packaged Tool Quality Gates
 
@@ -86,16 +88,77 @@ Environment:
   - Report SDK-resolution failures as SDK setup problems rather than opaque unexpected exceptions.
   - Resolve target frameworks inherited from `Directory.Build.props`.
 
+## Expanded Real-App Matrix
+
+### dotnet-architecture/eShopOnBlazor
+
+- Repo: `https://github.com/dotnet-architecture/eShopOnBlazor`
+- Solution: `eShopOnBlazor.sln`
+- Host: `eShopOnBlazor`
+- Packaged tool result: 5 routes, 2 developer-facing services, 7 discovered actions, 4 accepted, 0 rejected
+- Outcome: pass. Standard Blazor Web App on `net8.0`; workflow suggestions reference real catalog service methods.
+
+### immense/Remotely
+
+- Repo: `https://github.com/immense/Remotely`
+- Solution: `Remotely.sln`
+- Host: `Server`
+- Packaged tool result after stricter validation: 45 routes, 18 developer-facing services, 113 discovered actions, 5 accepted, 0 rejected
+- Outcome: pass. Large production app with many routes and services; useful as a stress test for route volume and workflow candidate filtering.
+
+### CuriousDrive/BlazingChat
+
+- Repo: `https://github.com/CuriousDrive/BlazingChat`
+- Solution: `src/BlazingChat.sln`
+- Host: `BlazingChat.Server`
+- Initial packaged result before RCL route fix: 0 routes, 2 developer-facing services, 2 discovered actions, 2 accepted, 0 rejected
+- Final packaged result after RCL route and semantic-validation fixes: 10 routes, 1 developer-facing service, 2 discovered actions, 2 accepted, 2 rejected
+- Outcome: pass with caveat. The app targets `net6.0` and uses legacy Blazor Server hosting, so readiness correctly flags unsupported target framework and legacy host shape.
+- Fixes driven by this app:
+  - Include routed Razor components from referenced Razor Class Library projects.
+  - Exclude lifecycle/noise methods such as `Dispose` and `OnPropertyChanged` from developer-facing service reports and LLM prompts.
+  - Validate LLM workflow suggestions against scored candidate actions, not every public method.
+  - Reject suggestions whose referenced method terms do not align with the workflow description.
+
+### Yu-Core/SwashbucklerDiary
+
+- Repo: `https://github.com/Yu-Core/SwashbucklerDiary`
+- Solution: `SwashbucklerDiary.Server.slnx`
+- Host: `SwashbucklerDiary.Server`
+- Initial packaged result before RCL route fix: 2 routes, 21 developer-facing services, 79 discovered actions, 5 accepted, 0 rejected
+- Final packaged result after RCL route and semantic-validation fixes: 38 routes, 21 developer-facing services, 79 discovered actions, 3 accepted, 2 rejected
+- Outcome: pass. This validates route discovery across a server host plus referenced RCL projects in a modern `net10.0` app.
+
+### microsoft/FhirBlaze
+
+- Repo: `https://github.com/microsoft/FhirBlaze`
+- Solution: `FhirBlaze.sln`
+- Host: `FhirBlaze`
+- Initial packaged result before RCL route fix: 4 routes, 3 developer-facing services, 24 discovered actions, 5 accepted, 0 rejected
+- Final packaged result after RCL route and semantic-validation fixes: 13 routes, 3 developer-facing services, 24 discovered actions, 3 accepted, 2 rejected
+- Outcome: pass with caveat. Standalone WebAssembly host is reported as unsupported for install readiness, but analysis still discovers module routes and grounded workflow candidates.
+
+### stavroskasidis/BlazorWithIdentity
+
+- Repo: `https://github.com/stavroskasidis/BlazorWithIdentity`
+- Solution: `template/BlazorWithIdentity.sln`
+- Host: `BlazorWithIdentity.Client`
+- Result: completed after temporary clone-only `global.json` roll-forward was added because the repo pins .NET SDK `7.0.100` and this environment has .NET 10 SDK installed.
+- Packaged tool result: 5 routes, 1 developer-facing service, 4 discovered actions, 4 accepted, 0 rejected
+- Outcome: pass with caveat. Initial run against `BlazorWithIdentity.Server` correctly reported the available Blazor host as `BlazorWithIdentity.Client`.
+
 ## Current Evidence
 
-- Automated analysis tests pass: `160`
+- Automated analysis tests pass: `161`
 - CLI build passes: `dotnet build src/AgentBlazor.Cli/AgentBlazor.Cli.csproj`
 - Local packaged tool install passes from `AgentBlazor.Cli.0.2.1.nupkg`.
 - Packaged no-provider and `--static-only` paths pass.
-- Real OpenAI-backed analysis completed on 5 real GitHub Blazor applications.
-- Packaged `dotnet tool` smoke completed on the same 5 real GitHub Blazor applications.
+- Real OpenAI-backed analysis completed on 11 real GitHub Blazor applications.
+- Packaged `dotnet tool` smoke completed on 11 real GitHub Blazor applications.
 - Hallucinated methods were rejected on sparse apps.
 - Accepted workflow suggestions on larger apps reference methods present in the static model.
+- Referenced RCL routes are discovered for hosted/componentized apps.
+- Semantically misaligned LLM suggestions are rejected even when they reference real methods.
 
 ## Remaining Before v1 Complete
 

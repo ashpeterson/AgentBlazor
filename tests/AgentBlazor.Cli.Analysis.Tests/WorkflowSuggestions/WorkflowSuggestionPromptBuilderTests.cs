@@ -109,6 +109,16 @@ public sealed class WorkflowSuggestionPromptBuilderTests
             [
                 new ActionModel
                 {
+                    Name = "Find Orders",
+                    SourceService = "OrderService",
+                    MethodName = "FindOrdersAsync",
+                    FilePath = "Services/OrderService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.8
+                },
+                new ActionModel
+                {
                     Name = "Show Open Orders",
                     SourceService = "OrderCapabilities",
                     MethodName = "ShowOpenOrdersAsync",

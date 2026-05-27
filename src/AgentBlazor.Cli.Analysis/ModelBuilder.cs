@@ -76,7 +76,8 @@ public sealed class ModelBuilder
             OnProgress?.Invoke("Loading project...");
             hostProject = await _solutionLoader.LoadProjectAsync(solutionOrProjectPath, ct);
             ReportDiagnostics(_solutionLoader.Diagnostics);
-            projects = [hostProject];
+            solution = hostProject.Solution;
+            projects = solution.Projects.ToList();
         }
 
         if (hostProject == null)
@@ -93,12 +94,33 @@ public sealed class ModelBuilder
 
         OnProgress?.Invoke($"Analyzing Blazor host: {hostProject.Name}");
 
-        // Get the project directory for Razor analysis
         var projectDir = Path.GetDirectoryName(hostProject.FilePath)!;
+        var relativeBaseDir = isSolution
+            ? Path.GetDirectoryName(Path.GetFullPath(solutionOrProjectPath))!
+            : projectDir;
+        var analysisProjects = solution is null
+            ? [hostProject]
+            : GetAnalysisProjects(solution, hostProject);
 
         // 1. Analyze Razor files
         OnProgress?.Invoke("Scanning Razor components...");
-        var razorAnalyses = await _razorAnalyzer.AnalyzeDirectoryAsync(projectDir, ct);
+        var razorAnalyses = new List<RazorFileAnalysis>();
+        foreach (var project in analysisProjects.Where(SolutionLoader.IsBlazorProject))
+        {
+            var directory = Path.GetDirectoryName(project.FilePath);
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            var projectRazorAnalyses = await _razorAnalyzer.AnalyzeDirectoryAsync(directory, ct).ConfigureAwait(false);
+            razorAnalyses.AddRange(projectRazorAnalyses);
+        }
+
+        razorAnalyses = razorAnalyses
+            .GroupBy(analysis => analysis.FilePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
 
         // 2. Extract routes
         OnProgress?.Invoke("Extracting routes...");
@@ -109,7 +131,7 @@ public sealed class ModelBuilder
                 Id = GenerateRouteId(r.Template),
                 Template = r.Template,
                 ComponentName = r.ComponentName,
-                ComponentFile = MakeRelativePath(projectDir, r.FilePath),
+                ComponentFile = MakeRelativePath(relativeBaseDir, r.FilePath),
                 Parameters = r.Parameters
             })
             .ToList();
@@ -120,7 +142,7 @@ public sealed class ModelBuilder
         {
             Id = GenerateId(r.ComponentName),
             Name = r.ComponentName,
-            FilePath = MakeRelativePath(projectDir, r.FilePath),
+            FilePath = MakeRelativePath(relativeBaseDir, r.FilePath),
             Namespace = r.Namespace,
             IsPage = r.IsPage,
             Routes = r.Routes.Select(rt => rt.Template).ToList(),
@@ -131,17 +153,11 @@ public sealed class ModelBuilder
 
         // 4. Find [AgentCapability] classes
         OnProgress?.Invoke("Detecting AgentBlazor attributes...");
-        var capabilities = await _attributeAnalyzer.FindCapabilityClassesAsync(hostProject, ct);
-
-        // Also check referenced projects
-        if (solution != null)
+        var capabilities = new List<CapabilityInfo>();
+        foreach (var project in analysisProjects)
         {
-            var referencedProjects = GetReferencedProjects(solution, hostProject);
-            foreach (var refProject in referencedProjects)
-            {
-                var refCapabilities = await _attributeAnalyzer.FindCapabilityClassesAsync(refProject, ct);
-                capabilities = capabilities.Concat(refCapabilities).ToList();
-            }
+            var projectCapabilities = await _attributeAnalyzer.FindCapabilityClassesAsync(project, ct).ConfigureAwait(false);
+            capabilities.AddRange(projectCapabilities);
         }
 
         OnProgress?.Invoke($"Found {capabilities.Count} [[AgentCapability]] classes");
@@ -158,17 +174,11 @@ public sealed class ModelBuilder
 
         // 5. Find DI registrations
         OnProgress?.Invoke("Analyzing DI registrations...");
-        var diRegistrations = await _diAnalyzer.FindRegistrationsAsync(hostProject, ct);
-
-        // Also check referenced projects
-        if (solution != null)
+        var diRegistrations = new List<DiRegistrationModel>();
+        foreach (var project in analysisProjects)
         {
-            var referencedProjects = GetReferencedProjects(solution, hostProject);
-            foreach (var refProject in referencedProjects)
-            {
-                var refDiRegs = await _diAnalyzer.FindRegistrationsAsync(refProject, ct);
-                diRegistrations = diRegistrations.Concat(refDiRegs).ToList();
-            }
+            var projectRegistrations = await _diAnalyzer.FindRegistrationsAsync(project, ct).ConfigureAwait(false);
+            diRegistrations.AddRange(projectRegistrations);
         }
 
         OnProgress?.Invoke($"Found {diRegistrations.Count} DI registrations");
@@ -181,17 +191,11 @@ public sealed class ModelBuilder
 
         // 6. Find and analyze services
         OnProgress?.Invoke("Analyzing services...");
-        var services = await _serviceAnalyzer.FindServiceClassesAsync(hostProject, ct);
-
-        // Also check referenced projects
-        if (solution != null)
+        var services = new List<ServiceModel>();
+        foreach (var project in analysisProjects)
         {
-            var referencedProjects = GetReferencedProjects(solution, hostProject);
-            foreach (var refProject in referencedProjects)
-            {
-                var refServices = await _serviceAnalyzer.FindServiceClassesAsync(refProject, ct);
-                services = services.Concat(refServices).ToList();
-            }
+            var projectServices = await _serviceAnalyzer.FindServiceClassesAsync(project, ct).ConfigureAwait(false);
+            services.AddRange(projectServices);
         }
 
         // Enhance services with DI registration info
@@ -259,7 +263,7 @@ public sealed class ModelBuilder
                         Name = GenerateActionName(actionInfo.MethodName),
                         SourceService = capability.ClassName,
                         MethodName = actionInfo.MethodName,
-                        FilePath = MakeRelativePath(projectDir, capability.FilePath),
+                        FilePath = MakeRelativePath(relativeBaseDir, capability.FilePath),
                         IsMutationLikely = actionInfo.RequiresApproval,
                         RequiresApproval = actionInfo.RequiresApproval,
                         Classification = ActionClassification.Workflow,
@@ -297,7 +301,7 @@ public sealed class ModelBuilder
                     Id = GenerateRouteId(route),
                     Route = route,
                     ComponentName = r.ComponentName,
-                    FilePath = MakeRelativePath(projectDir, r.FilePath),
+                    FilePath = MakeRelativePath(relativeBaseDir, r.FilePath),
                     VisibleComponents = r.ChildComponents,
                     InjectedServices = r.InjectedServices.Select(i => i.TypeName).ToList(),
                     SuggestedActions = link?.LinkedActions ?? [],
@@ -320,7 +324,14 @@ public sealed class ModelBuilder
 
         // 10. Calculate file hashes for incremental updates
         OnProgress?.Invoke("Computing file hashes...");
-        var fileHashes = await ComputeFileHashesAsync(projectDir, ct);
+        var fileHashes = await ComputeFileHashesAsync(
+            analysisProjects
+                .Select(project => Path.GetDirectoryName(project.FilePath))
+                .Where(directory => !string.IsNullOrWhiteSpace(directory))
+                .Select(directory => directory!)
+                .Distinct(StringComparer.OrdinalIgnoreCase),
+            relativeBaseDir,
+            ct);
 
         // 11. Build initial model for recommendations analysis
         var initialModel = new ProjectModel
@@ -366,18 +377,29 @@ public sealed class ModelBuilder
         }
     }
 
-    private static IReadOnlyList<Project> GetReferencedProjects(Solution solution, Project project)
+    private static IReadOnlyList<Project> GetAnalysisProjects(Solution solution, Project hostProject)
     {
-        var referenced = new List<Project>();
+        var projects = new List<Project> { hostProject };
+        var visited = new HashSet<ProjectId> { hostProject.Id };
+        AddReferencedProjects(solution, hostProject, projects, visited);
+        return projects;
+    }
+
+    private static void AddReferencedProjects(
+        Solution solution,
+        Project project,
+        ICollection<Project> projects,
+        ISet<ProjectId> visited)
+    {
         foreach (var projectRef in project.ProjectReferences)
         {
             var refProject = solution.GetProject(projectRef.ProjectId);
-            if (refProject != null)
+            if (refProject != null && visited.Add(refProject.Id))
             {
-                referenced.Add(refProject);
+                projects.Add(refProject);
+                AddReferencedProjects(solution, refProject, projects, visited);
             }
         }
-        return referenced;
     }
 
     private static string GenerateId(string name)
@@ -508,19 +530,23 @@ public sealed class ModelBuilder
     }
 
     private static async Task<IReadOnlyDictionary<string, string>> ComputeFileHashesAsync(
-        string directory,
+        IEnumerable<string> directories,
+        string relativeBaseDir,
         CancellationToken ct)
     {
-        var hashes = new Dictionary<string, string>();
+        var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        var files = Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories)
+        var files = directories
+            .Where(Directory.Exists)
+            .SelectMany(directory => Directory.GetFiles(directory, "*.*", SearchOption.AllDirectories))
             .Where(f => f.EndsWith(".razor", StringComparison.OrdinalIgnoreCase) ||
-                       f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase));
+                       f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
 
         foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
-            var relativePath = MakeRelativePath(directory, file);
+            var relativePath = MakeRelativePath(relativeBaseDir, file);
             var content = await File.ReadAllBytesAsync(file, ct).ConfigureAwait(false);
             var hash = Convert.ToHexString(SHA256.HashData(content));
             hashes[relativePath] = hash;

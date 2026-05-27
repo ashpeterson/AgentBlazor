@@ -78,8 +78,11 @@ public static class AnalysisModelFilters
 
     private static readonly string[] UiStateMethodNames =
     [
+        "Dispose",
+        "DisposeAsync",
         "Load",
         "LoadAsync",
+        "OnPropertyChanged",
         "Reset",
         "ResetAsync",
         "IsHighlighted",
