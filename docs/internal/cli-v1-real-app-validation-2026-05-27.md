@@ -11,14 +11,14 @@ Environment:
 - LLM provider: real OpenAI API key from environment
 - Model: environment default, currently `gpt-4o-mini` when unset
 - Temporary clone root: `/tmp/agentblazor-cli-v1-realapps`
-- Packaged tool: locally packed `AgentBlazor.Cli.0.2.1.nupkg`, installed via `dotnet tool install AgentBlazor.Cli --tool-path /tmp/agentblazor-cli-v1-tool-smoke/tool --configfile /tmp/agentblazor-cli-v1-tool-smoke/NuGet.config --version 0.2.1`
+- Packaged tool: locally packed `AgentBlazor.Cli.0.2.2.nupkg`, installed via `dotnet tool install AgentBlazor.Cli --tool-path /tmp/agentblazor-cli-v1-tool-smoke/tool --configfile /tmp/agentblazor-cli-v1-tool-smoke/NuGet.config --version 0.2.2`
 - Initial packaged tool output root: `/tmp/agentblazor-cli-v1-tool-smoke`
 - Expanded real-app clone root: `/tmp/agentblazor-cli-v1-more-realapps`
 - Final packaged tool output root after RCL route and semantic-validation fixes: `/tmp/agentblazor-cli-v1-tool-smoke-final2`
 
 ## Packaged Tool Quality Gates
 
-- Install gate: local `AgentBlazor.Cli.0.2.1.nupkg` installs as a `dotnet tool` into an isolated tool path and reports `0.2.1` from `agentblazor --version`.
+- Install gate: local `AgentBlazor.Cli.0.2.2.nupkg` installs as a `dotnet tool` into an isolated tool path and reports `0.2.2` from `agentblazor --version`.
 - No-provider gate: with OpenAI and Azure OpenAI environment variables removed, `agentblazor analyze` exits cleanly with `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
 - Static-only gate: `agentblazor analyze ... --static-only` writes a report with routes, capabilities, services, static workflow candidates, install readiness, and recommended next steps without requiring an LLM provider.
 
@@ -151,7 +151,7 @@ Environment:
 
 - Automated analysis tests pass: `161`
 - CLI build passes: `dotnet build src/AgentBlazor.Cli/AgentBlazor.Cli.csproj`
-- Local packaged tool install passes from `AgentBlazor.Cli.0.2.1.nupkg`.
+- Local packaged tool install passes from `AgentBlazor.Cli.0.2.2.nupkg`.
 - Packaged no-provider and `--static-only` paths pass.
 - Real OpenAI-backed analysis completed on 11 real GitHub Blazor applications.
 - Packaged `dotnet tool` smoke completed on 11 real GitHub Blazor applications.

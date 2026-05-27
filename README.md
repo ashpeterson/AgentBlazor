@@ -16,7 +16,7 @@ Try the hosted demo:
 dotnet add package AgentBlazor
 ```
 
-Use `0.2.1` or later. This release includes the mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `Guid` workflow parameters.
+Use `0.2.2` or later. This release includes the CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `Guid` workflow parameters.
 
 The CLI is optional. Keep it out of the critical path unless you want scaffold help for an existing app.
 
@@ -105,6 +105,7 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 ## Docs
 
 - [Quickstart](docs/quickstart.md)
+- [0.2.2 release notes](docs/releases/0.2.2.md)
 - [0.2.1 release notes](docs/releases/0.2.1.md)
 - [0.2.0 release notes](docs/releases/0.2.0.md)
 - [Recoverable capability errors](docs/capability-errors.md)
