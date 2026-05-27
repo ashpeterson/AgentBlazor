@@ -2,6 +2,7 @@ using System.ComponentModel;
 using AgentBlazor.Cli.Analysis;
 using AgentBlazor.Cli.Analysis.Generation;
 using AgentBlazor.Cli.Analysis.Models;
+using AgentBlazor.Cli.Analysis.WorkflowSuggestions;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -31,6 +32,10 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         [Description("Skip AgentBlazor install-readiness checks in the report.")]
         public bool NoReadiness { get; init; }
 
+        [CommandOption("--static-only")]
+        [Description("Skip the LLM workflow suggestion call and write a static-analysis-only report.")]
+        public bool StaticOnly { get; init; }
+
         [CommandOption("-y|--non-interactive")]
         [Description("Skip interactive prompts and use defaults.")]
         public bool NonInteractive { get; init; }
@@ -59,10 +64,14 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             var hostProject = settings.HostProject ?? config?.HostProject;
             var description = config?.Description ?? "A Blazor application";
             var outputPath = ResolveOutputPath(settings.Output, outputDirectory);
+            var suggestionClient = settings.StaticOnly
+                ? null
+                : WorkflowSuggestionClientFactory.Create(WorkflowSuggestionClientFactory.FromEnvironment(config));
 
             var warnings = new List<string>();
             ProjectModel model = null!;
             InstallReadinessReport? readiness = null;
+            WorkflowSuggestionSet? workflowSuggestions = null;
 
             await AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
@@ -81,12 +90,18 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                         readiness = await readinessAnalyzer.AnalyzeAsync(path, model.BlazorHostProject);
                     }
 
+                    if (!settings.StaticOnly)
+                    {
+                        status.Status("Generating LLM workflow suggestions...");
+                        workflowSuggestions = await suggestionClient!.GenerateAsync(model);
+                    }
+
                     status.Status("Writing analysis report...");
                     var reportGenerator = new AnalysisReportGenerator();
-                    await reportGenerator.GenerateAsync(model, outputPath, readiness);
+                    await reportGenerator.GenerateAsync(model, outputPath, readiness, workflowSuggestions);
                 });
 
-            RenderSummary(model, readiness, outputPath, warnings);
+            RenderSummary(model, readiness, workflowSuggestions, outputPath, warnings);
             return 0;
         }
         catch (InvalidOperationException ex)
@@ -130,6 +145,7 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     private static void RenderSummary(
         ProjectModel model,
         InstallReadinessReport? readiness,
+        WorkflowSuggestionSet? workflowSuggestions,
         string outputPath,
         IReadOnlyList<string> warnings)
     {
@@ -141,6 +157,10 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         if (readiness is not null)
         {
             AnsiConsole.MarkupLine($"[blue]Readiness:[/] {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
+        }
+        if (workflowSuggestions is not null)
+        {
+            AnsiConsole.MarkupLine($"[blue]Workflow suggestions:[/] {workflowSuggestions.Suggestions.Count} accepted, {workflowSuggestions.Rejected.Count} rejected");
         }
 
         if (warnings.Count > 0)

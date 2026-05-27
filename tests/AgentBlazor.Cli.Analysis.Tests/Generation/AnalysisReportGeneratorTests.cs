@@ -1,5 +1,6 @@
 using AgentBlazor.Cli.Analysis.Generation;
 using AgentBlazor.Cli.Analysis.Models;
+using AgentBlazor.Cli.Analysis.WorkflowSuggestions;
 
 namespace AgentBlazor.Cli.Analysis.Tests.Generation;
 
@@ -62,6 +63,46 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.Contains("## Install Readiness", content);
         Assert.Contains("AgentBlazor service registration", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_IncludesValidatedWorkflowSuggestions_WhenProvided()
+    {
+        var model = CreateModel();
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "Order follow-up",
+                    Description = "Find open orders and draft a follow-up.",
+                    CapabilityClass = "OrderFollowUpCapabilities",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                    ],
+                    Reasoning = "The app has an orders page and an order lookup service.",
+                    Confidence = 0.84
+                }
+            ],
+            Rejected =
+            [
+                new RejectedWorkflowSuggestion
+                {
+                    Name = "Invented workflow",
+                    Reason = "Referenced unknown methods: MissingService.RunAsync"
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+
+        Assert.Contains("Order follow-up", content);
+        Assert.Contains("OrderService.FindOrdersAsync", content);
+        Assert.Contains("Rejected Suggestions", content);
+        Assert.Contains("MissingService.RunAsync", content);
     }
 
     private static ProjectModel CreateModel() => new()

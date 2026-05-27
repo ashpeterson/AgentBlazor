@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using AgentBlazor.Cli.Analysis.Models;
+using AgentBlazor.Cli.Analysis.WorkflowSuggestions;
 
 namespace AgentBlazor.Cli.Analysis.Generation;
 
@@ -10,6 +11,7 @@ public sealed class AnalysisReportGenerator
         ProjectModel model,
         string outputPath,
         InstallReadinessReport? readiness = null,
+        WorkflowSuggestionSet? workflowSuggestions = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -21,11 +23,14 @@ public sealed class AnalysisReportGenerator
             Directory.CreateDirectory(directory);
         }
 
-        var content = GenerateMarkdown(model, readiness);
+        var content = GenerateMarkdown(model, readiness, workflowSuggestions);
         await File.WriteAllTextAsync(outputPath, content, ct).ConfigureAwait(false);
     }
 
-    public string GenerateMarkdown(ProjectModel model, InstallReadinessReport? readiness = null)
+    public string GenerateMarkdown(
+        ProjectModel model,
+        InstallReadinessReport? readiness = null,
+        WorkflowSuggestionSet? workflowSuggestions = null)
     {
         ArgumentNullException.ThrowIfNull(model);
 
@@ -42,7 +47,7 @@ public sealed class AnalysisReportGenerator
         WriteRoutes(sb, model);
         WriteCapabilities(sb, model);
         WriteServices(sb, model);
-        WriteWorkflowSuggestions(sb, model);
+        WriteWorkflowSuggestions(sb, model, workflowSuggestions);
         if (readiness is not null)
         {
             WriteReadiness(sb, readiness);
@@ -168,8 +173,84 @@ public sealed class AnalysisReportGenerator
         }
     }
 
-    private static void WriteWorkflowSuggestions(StringBuilder sb, ProjectModel model)
+    private static void WriteWorkflowSuggestions(
+        StringBuilder sb,
+        ProjectModel model,
+        WorkflowSuggestionSet? workflowSuggestions)
     {
+        sb.AppendLine("## Workflow Suggestions");
+        sb.AppendLine();
+
+        if (workflowSuggestions is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(workflowSuggestions.Model))
+            {
+                sb.AppendLine($"Model: `{workflowSuggestions.Model}`");
+                sb.AppendLine();
+            }
+
+            if (workflowSuggestions.Suggestions.Count > 0)
+            {
+                foreach (var suggestion in workflowSuggestions.Suggestions)
+                {
+                    sb.AppendLine($"### {suggestion.Name}");
+                    sb.AppendLine();
+                    sb.AppendLine(suggestion.Description);
+                    sb.AppendLine();
+                    sb.AppendLine($"- Confidence: {suggestion.Confidence.ToString("0.00", CultureInfo.InvariantCulture)}");
+                    if (!string.IsNullOrWhiteSpace(suggestion.CapabilityClass))
+                    {
+                        sb.AppendLine($"- Suggested capability class: `{suggestion.CapabilityClass}`");
+                    }
+
+                    if (suggestion.Methods.Count > 0)
+                    {
+                        sb.AppendLine("- Existing methods used:");
+                        foreach (var method in suggestion.Methods)
+                        {
+                            sb.AppendLine($"  - `{method.Service}.{method.Method}`");
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(suggestion.Reasoning))
+                    {
+                        sb.AppendLine($"- Reasoning: {suggestion.Reasoning}");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(suggestion.Code))
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("```csharp");
+                        sb.AppendLine(suggestion.Code.Trim());
+                        sb.AppendLine("```");
+                    }
+
+                    sb.AppendLine();
+                }
+            }
+            else
+            {
+                sb.AppendLine("No validated LLM workflow suggestions were returned.");
+                sb.AppendLine();
+            }
+
+            if (workflowSuggestions.Rejected.Count > 0)
+            {
+                sb.AppendLine("### Rejected Suggestions");
+                sb.AppendLine();
+                sb.AppendLine("These suggestions were filtered because they did not validate against the static analysis model.");
+                sb.AppendLine();
+                foreach (var rejected in workflowSuggestions.Rejected)
+                {
+                    sb.AppendLine($"- `{rejected.Name}`: {rejected.Reason}");
+                }
+
+                sb.AppendLine();
+            }
+
+            return;
+        }
+
         var candidates = model.Actions
             .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
             .Where(action => action.Score >= 0.7)
@@ -178,9 +259,7 @@ public sealed class AnalysisReportGenerator
             .Take(10)
             .ToList();
 
-        sb.AppendLine("## Workflow Suggestions");
-        sb.AppendLine();
-        sb.AppendLine("> This first v1 slice uses the static analyser only. LLM-generated workflow grouping and validation will be added on top of this section.");
+        sb.AppendLine("> LLM workflow suggestions were not requested. Showing high-confidence static candidates instead.");
         sb.AppendLine();
 
         if (candidates.Count == 0)
