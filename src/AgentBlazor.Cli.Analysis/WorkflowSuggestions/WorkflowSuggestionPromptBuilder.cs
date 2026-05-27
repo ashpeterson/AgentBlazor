@@ -98,6 +98,12 @@ public sealed class WorkflowSuggestionPromptBuilder
     private static void AppendServices(StringBuilder sb, ProjectModel model)
     {
         sb.AppendLine("Discovered services and public methods:");
+        var candidateMethods = model.Actions
+            .Where(action => action.ExposureMode is ActionExposureMode.Suggested or ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Select(action => (action.SourceService, action.MethodName))
+            .ToHashSet();
+
         foreach (var service in model.Services
             .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
             .OrderBy(service => service.TypeName)
@@ -106,6 +112,7 @@ public sealed class WorkflowSuggestionPromptBuilder
             var methods = service.Methods
                 .Where(method => method.IsPublic)
                 .Where(method => AnalysisModelFilters.IsDeveloperFacingMethod(method.Name))
+                .Where(method => candidateMethods.Contains((service.TypeName, method.Name)))
                 .OrderBy(method => method.Name)
                 .Take(20)
                 .Select(method => $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))})")

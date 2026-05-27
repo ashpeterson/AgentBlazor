@@ -8,7 +8,7 @@ public sealed class CliTargetAnalysisTests
     [Theory]
     [InlineData("simple-blazor-app/SimpleBlazorApp.csproj", 2, "CustomerService")]
     [InlineData("realistic-blazor-app/RealisticBlazorApp.csproj", 3, "OrderService")]
-    [InlineData("hosted-wasm-app/HostedWasmApp.Server/HostedWasmApp.Server.csproj", 0, "AuditBundleService")]
+    [InlineData("hosted-wasm-app/HostedWasmApp.Server/HostedWasmApp.Server.csproj", 1, "AuditBundleService")]
     public async Task BlazorAnalyzer_AnalyzesSyntheticTargetApps(
         string relativeProjectPath,
         int minimumRouteCount,

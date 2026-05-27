@@ -18,9 +18,10 @@ public sealed class WorkflowSuggestionParser
             throw new InvalidOperationException("LLM workflow suggestion response did not contain a 'workflows' array.");
         }
 
-        var knownMethods = model.Services
-            .SelectMany(service => service.Methods.Select(method => (Service: service.TypeName, Method: NormalizeMethodReference(method.Name))))
-            .Concat(model.Actions.Select(action => (Service: action.SourceService, Method: NormalizeMethodReference(action.MethodName))))
+        var knownMethods = model.Actions
+            .Where(action => action.ExposureMode is ActionExposureMode.Suggested or ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Select(action => (Service: action.SourceService, Method: NormalizeMethodReference(action.MethodName)))
             .ToHashSet();
 
         var suggestions = new List<WorkflowSuggestion>();
@@ -69,6 +70,18 @@ public sealed class WorkflowSuggestionParser
                 {
                     Name = suggestion.Name,
                     Reason = "All referenced methods already have confirmed AgentBlazor actions."
+                });
+                continue;
+            }
+
+            var semanticallyMisalignedMethods = FindSemanticallyMisalignedMethods(suggestion);
+            if (semanticallyMisalignedMethods.Count > 0)
+            {
+                rejected.Add(new RejectedWorkflowSuggestion
+                {
+                    Name = suggestion.Name,
+                    Reason = "Referenced methods do not align with the workflow description: " +
+                        string.Join(", ", semanticallyMisalignedMethods.Select(method => $"{method.Service}.{method.Method}"))
                 });
                 continue;
             }
@@ -122,6 +135,103 @@ public sealed class WorkflowSuggestionParser
             suggestion.Methods.Count > 0 &&
             suggestion.Methods.All(method => confirmedMethodNames.Contains(NormalizeName(method.Method)));
     }
+
+    private static IReadOnlyList<WorkflowMethodReference> FindSemanticallyMisalignedMethods(WorkflowSuggestion suggestion)
+    {
+        var workflowText = NormalizeText(string.Join(
+            ' ',
+            suggestion.Name,
+            suggestion.Description,
+            suggestion.CapabilityClass,
+            suggestion.Reasoning));
+
+        return suggestion.Methods
+            .Where(method =>
+            {
+                var methodTokens = ExtractMeaningfulMethodTokens(method.Method);
+                var requiredMatches = Math.Min(2, methodTokens.Count);
+                return methodTokens.Count > 0 &&
+                    methodTokens.Count(token => workflowText.Contains(token, StringComparison.Ordinal)) < requiredMatches;
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ExtractMeaningfulMethodTokens(string methodName)
+    {
+        var normalized = methodName.EndsWith("Async", StringComparison.OrdinalIgnoreCase)
+            ? methodName[..^"Async".Length]
+            : methodName;
+
+        var words = SplitIdentifier(normalized)
+            .Where(word => !IgnoredMethodWords.Contains(word))
+            .Where(word => word.Length >= 4)
+            .ToList();
+
+        return words.Count == 0
+            ? []
+            : words;
+    }
+
+    private static IReadOnlyList<string> SplitIdentifier(string value)
+    {
+        var words = new List<string>();
+        var current = new System.Text.StringBuilder();
+
+        foreach (var character in value)
+        {
+            if (!char.IsLetterOrDigit(character))
+            {
+                Flush();
+                continue;
+            }
+
+            if (current.Length > 0 && char.IsUpper(character) && !char.IsUpper(current[current.Length - 1]))
+            {
+                Flush();
+            }
+
+            current.Append(char.ToLowerInvariant(character));
+        }
+
+        Flush();
+        return words;
+
+        void Flush()
+        {
+            if (current.Length == 0)
+            {
+                return;
+            }
+
+            words.Add(current.ToString());
+            current.Clear();
+        }
+    }
+
+    private static string NormalizeText(string value)
+        => new(value
+            .Select(character => char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ')
+            .ToArray());
+
+    private static readonly HashSet<string> IgnoredMethodWords = new(StringComparer.Ordinal)
+    {
+        "add",
+        "create",
+        "delete",
+        "dispatch",
+        "find",
+        "get",
+        "list",
+        "load",
+        "manage",
+        "query",
+        "remove",
+        "run",
+        "search",
+        "set",
+        "show",
+        "update"
+    };
 
     private static string NormalizeName(string value)
     {
