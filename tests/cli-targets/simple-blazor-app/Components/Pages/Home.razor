@@ -1,0 +1,10 @@
+@page "/"
+@inject TodoService Todos
+
+<h1>Simple Blazor App</h1>
+
+<button @onclick="Load">Load overdue todos</button>
+
+@code {
+    private Task Load() => Todos.GetOverdueTodosAsync();
+}

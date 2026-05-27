@@ -70,6 +70,18 @@ public sealed class AgentBlazorConfig
     public bool? AutoUpdateOnBuild { get; init; }
 
     /// <summary>
+    /// Provider used by `agentblazor analyze` for workflow suggestions.
+    /// Supported v1 values: openai, azure-openai.
+    /// </summary>
+    public string? AnalyzeProvider { get; init; }
+
+    /// <summary>
+    /// Model name used by `agentblazor analyze`.
+    /// API keys should be supplied through environment variables, not this file.
+    /// </summary>
+    public string? AnalyzeModel { get; init; }
+
+    /// <summary>
     /// Reads configuration from .agentblazorc file in the specified directory.
     /// Returns null if file doesn't exist.
     /// </summary>

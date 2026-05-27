@@ -9,6 +9,35 @@ internal static class TargetFrameworkSupport
 
     private static readonly string[] SupportedFrameworks = ["net8.0", "net9.0", "net10.0"];
 
+    internal static async Task<IReadOnlyList<string>> ReadTargetFrameworksAsync(string projectPath, CancellationToken ct = default)
+    {
+        var projectText = await File.ReadAllTextAsync(projectPath, ct).ConfigureAwait(false);
+        var frameworks = ReadTargetFrameworks(projectText);
+        if (frameworks.Count > 0)
+        {
+            return frameworks;
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+        while (!string.IsNullOrWhiteSpace(directory))
+        {
+            var propsPath = Path.Combine(directory, "Directory.Build.props");
+            if (File.Exists(propsPath))
+            {
+                var propsText = await File.ReadAllTextAsync(propsPath, ct).ConfigureAwait(false);
+                frameworks = ReadTargetFrameworks(propsText);
+                if (frameworks.Count > 0)
+                {
+                    return frameworks;
+                }
+            }
+
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+
+        return [];
+    }
+
     internal static IReadOnlyList<string> ReadTargetFrameworks(string csprojText)
     {
         try

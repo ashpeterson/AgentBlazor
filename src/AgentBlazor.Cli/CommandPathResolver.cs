@@ -11,9 +11,12 @@ internal static class CommandPathResolver
             return Task.FromResult<string?>(System.IO.Path.GetFullPath(path));
         }
 
-        var currentDir = Directory.GetCurrentDirectory();
-        var solutionFiles = Directory.GetFiles(currentDir, "*.sln")
-            .Concat(Directory.GetFiles(currentDir, "*.slnx"))
+        var searchDir = !string.IsNullOrEmpty(path) && Directory.Exists(path)
+            ? System.IO.Path.GetFullPath(path)
+            : Directory.GetCurrentDirectory();
+
+        var solutionFiles = Directory.GetFiles(searchDir, "*.sln")
+            .Concat(Directory.GetFiles(searchDir, "*.slnx"))
             .ToList();
 
         if (solutionFiles.Count == 1)
@@ -40,7 +43,7 @@ internal static class CommandPathResolver
             return Task.FromResult<string?>(solutionFiles.First(f => System.IO.Path.GetFileName(f) == selected));
         }
 
-        var csprojFiles = Directory.GetFiles(currentDir, "*.csproj");
+        var csprojFiles = Directory.GetFiles(searchDir, "*.csproj");
         if (csprojFiles.Length == 1)
         {
             return Task.FromResult<string?>(csprojFiles[0]);

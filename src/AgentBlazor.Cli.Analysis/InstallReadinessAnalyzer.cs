@@ -18,17 +18,14 @@ public sealed class InstallReadinessAnalyzer
             ?? throw new InvalidOperationException($"Could not determine the host project directory for '{hostProject.Name}'.");
 
         var csprojText = await File.ReadAllTextAsync(hostProjectPath, ct).ConfigureAwait(false);
-        var hostTargetFrameworks = TargetFrameworkSupport.ReadTargetFrameworks(csprojText);
+        var hostTargetFrameworks = await TargetFrameworkSupport.ReadTargetFrameworksAsync(hostProjectPath, ct).ConfigureAwait(false);
         var csharpContents = await ReadProjectFilesAsync(hostProjectDirectory, ".cs", ct).ConfigureAwait(false);
         var hostShape = AnalyzeHostShape(hostProjectPath, hostProjectDirectory, csprojText, csharpContents);
         var uiProject = await ResolveUiProjectAsync(hostProjectPath, hostProject.Name, csprojText, hostShape, ct).ConfigureAwait(false);
         var uiProjectPath = uiProject?.ProjectPath;
-        var uiProjectText = uiProjectPath is null
-            ? null
-            : await File.ReadAllTextAsync(uiProjectPath, ct).ConfigureAwait(false);
-        var uiTargetFrameworks = uiProjectText is null
+        var uiTargetFrameworks = uiProjectPath is null
             ? Array.Empty<string>()
-            : TargetFrameworkSupport.ReadTargetFrameworks(uiProjectText).ToArray();
+            : (await TargetFrameworkSupport.ReadTargetFrameworksAsync(uiProjectPath, ct).ConfigureAwait(false)).ToArray();
         var uiProjectDirectory = Path.GetDirectoryName(uiProjectPath ?? hostProjectPath)
             ?? throw new InvalidOperationException($"Could not determine the UI project directory for '{uiProjectPath ?? hostProjectPath}'.");
         var shellProjectDirectory = hostShape.Family == HostFamily.HostedWebAssembly
@@ -145,7 +142,7 @@ public sealed class InstallReadinessAnalyzer
             {
                 Kind = HostShapeKind.Standard,
                 Family = HostFamily.StandardWebApp,
-                Title = "Host shape",
+                Title = "Standard Blazor Web App",
                 Message = "Detected a standard Program.cs-based Blazor Web App host shape for scaffold.",
                 FilePath = programPath
             };
@@ -157,7 +154,7 @@ public sealed class InstallReadinessAnalyzer
             {
                 Kind = HostShapeKind.AdvancedReview,
                 Family = HostFamily.OqtaneStyle,
-                Title = "Host shape",
+                Title = "Oqtane-style Blazor host",
                 Message = $"Detected an advanced Blazor host with Oqtane-style signals. Scaffold will keep safe file additions in preview/apply and downgrade startup, shell, layout, and route wiring to manual review. {string.Join(" ", reasons)}",
                 FilePath = evidencePath,
                 SuggestedFix = "Run scaffold preview to review the safe edits and the manual-review items, then patch the host-specific startup and shell files manually."
@@ -170,7 +167,7 @@ public sealed class InstallReadinessAnalyzer
             {
                 Kind = HostShapeKind.AdvancedReview,
                 Family = HostFamily.HostedWebAssembly,
-                Title = "Host shape",
+                Title = "Hosted Blazor WebAssembly",
                 Message = $"Detected a hosted WebAssembly-style Blazor server host. Scaffold can patch the standard server startup path and create server-side AgentBlazor workflow wiring, but browser-client layout, provider, asset, and chat edits remain review-first until a browser-safe or remote/server-backed WebAssembly client chat path is selected. {string.Join(" ", reasons)}",
                 FilePath = evidencePath,
                 SuggestedFix = "Run scaffold preview to review the safe server edits and the explicit client manual-review items, then apply the server path and complete the WebAssembly client integration manually."
@@ -183,7 +180,7 @@ public sealed class InstallReadinessAnalyzer
             {
                 Kind = HostShapeKind.AdvancedReview,
                 Family = HostFamily.LegacyServer,
-                Title = "Host shape",
+                Title = "Legacy Blazor Server host",
                 Message = $"Detected a legacy or custom Blazor host that does not match the standard Program.cs-based Blazor Web App pattern. Scaffold will keep safe file additions in preview/apply and downgrade startup, shell, layout, and route wiring to manual review. {string.Join(" ", reasons)}",
                 FilePath = evidencePath,
                 SuggestedFix = "Run scaffold preview to review the safe edits and the manual-review items, then patch the legacy startup and shell files manually."
@@ -194,7 +191,7 @@ public sealed class InstallReadinessAnalyzer
         {
             Kind = HostShapeKind.Unsupported,
             Family = HostFamily.Unknown,
-            Title = "Host shape",
+            Title = "Unsupported Blazor host",
             Message = $"Scaffold preview/apply could not classify this host into a supported Blazor scaffold path. {string.Join(" ", reasons)}",
             FilePath = evidencePath,
             SuggestedFix = "Run `agentblazor doctor` for a full gap report, then patch this host manually until advanced-host scaffold support is added."

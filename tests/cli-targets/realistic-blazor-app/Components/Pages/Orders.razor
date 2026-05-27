@@ -1,0 +1,11 @@
+@page "/orders"
+@inject OrderService Orders
+
+<MudDataGrid T="OrderSummary">
+</MudDataGrid>
+
+<MudButton OnClick="LoadOrders">Find delayed orders</MudButton>
+
+@code {
+    private Task LoadOrders() => Orders.FindDelayedOrdersAsync(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)));
+}

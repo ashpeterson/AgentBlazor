@@ -1,0 +1,11 @@
+@page "/support"
+@inject SupportTicketService Tickets
+
+<MudTable T="SupportTicket">
+</MudTable>
+
+<MudButton OnClick="ShowOpen">Show open tickets</MudButton>
+
+@code {
+    private Task ShowOpen() => Tickets.ShowOpenTicketsAsync(7);
+}

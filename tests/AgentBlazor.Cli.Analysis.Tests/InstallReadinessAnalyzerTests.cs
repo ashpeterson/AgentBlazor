@@ -196,6 +196,57 @@ public sealed class InstallReadinessAnalyzerTests : IDisposable
     }
 
     [Fact]
+    public async Task AnalyzeAsync_WhenTargetFrameworkComesFromDirectoryBuildProps_ReportsSupportedFramework()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, "Directory.Build.props"),
+            """
+            <Project>
+              <PropertyGroup>
+                <TargetFramework>net9.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        var projectPath = CreateProject(
+            projectName: "InheritedTfmApp",
+            csprojBody: """
+                <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                  </PropertyGroup>
+                </Project>
+                """,
+            programBody: """
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddRazorComponents();
+
+                var app = builder.Build();
+                app.MapRazorComponents<App>();
+                app.Run();
+                """,
+            appRazorBody: """
+                <Routes />
+                """,
+            mainLayoutBody: """
+                @Body
+                """,
+            homeBody: """
+                @page "/"
+                <h1>Hello</h1>
+                """);
+
+        var analyzer = new InstallReadinessAnalyzer();
+
+        var report = await analyzer.AnalyzeAsync(projectPath, hostProjectName: null);
+
+        Assert.Contains(report.Checks, check =>
+            check.Id == "target-framework-support" &&
+            check.Status == InstallReadinessStatus.Pass &&
+            check.Message.Contains("net9.0", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_WhenOqtaneStyleHostIsDetected_ReturnsAdvancedReviewShape()
     {
         var projectPath = CreateProject(

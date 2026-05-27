@@ -21,6 +21,12 @@ app.Configure(config =>
         .WithExample("init", "./MySolution.sln")
         .WithExample("init", "--description", "My app description");
 
+    config.AddCommand<AnalyzeCommand>("analyze")
+        .WithDescription("Analyze an existing Blazor app and write a read-only markdown report")
+        .WithExample("analyze")
+        .WithExample("analyze", "./MySolution.slnx", "--host", "MyBlazorApp")
+        .WithExample("analyze", "./MySolution.slnx", "--output", ".agentblazor/analysis.md");
+
     config.AddCommand<UpdateCommand>("update")
         .WithDescription("Regenerate AGENT.md if code has changed")
         .WithExample("update")
