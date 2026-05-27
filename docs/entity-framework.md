@@ -17,7 +17,7 @@ dotnet add package AgentBlazor
 dotnet add package AgentBlazor.EntityFrameworkCore
 ```
 
-Use `0.2.0` or later. This release includes the corrected EF package shape and tool-friendly schemas for date-like workflow parameters.
+Use `0.2.1` or later. This release includes the mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
 
 ## DbContext Setup
 
