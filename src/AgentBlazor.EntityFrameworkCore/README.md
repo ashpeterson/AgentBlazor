@@ -13,10 +13,10 @@ dotnet add package AgentBlazor.EntityFrameworkCore
 Pinned install:
 
 ```bash
-dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.1
+dotnet add package AgentBlazor.EntityFrameworkCore --version 0.2.2
 ```
 
-Use `0.2.1` or later. This release includes the mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
+Use `0.2.2` or later. This release includes the CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
 
 Register your `DbContext` with `IDbContextFactory<TContext>`:
 
