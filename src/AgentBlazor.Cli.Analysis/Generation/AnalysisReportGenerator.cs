@@ -1,0 +1,272 @@
+using System.Globalization;
+using System.Text;
+using AgentBlazor.Cli.Analysis.Models;
+
+namespace AgentBlazor.Cli.Analysis.Generation;
+
+public sealed class AnalysisReportGenerator
+{
+    public async Task GenerateAsync(
+        ProjectModel model,
+        string outputPath,
+        InstallReadinessReport? readiness = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var content = GenerateMarkdown(model, readiness);
+        await File.WriteAllTextAsync(outputPath, content, ct).ConfigureAwait(false);
+    }
+
+    public string GenerateMarkdown(ProjectModel model, InstallReadinessReport? readiness = null)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("# AgentBlazor Analysis");
+        sb.AppendLine();
+        sb.AppendLine($"Generated: {model.GeneratedAtUtc:O}");
+        sb.AppendLine($"Application: {ValueOrUnknown(model.AppName)}");
+        sb.AppendLine($"Host project: {ValueOrUnknown(model.BlazorHostProject)}");
+        sb.AppendLine($"Schema version: {model.SchemaVersion}");
+        sb.AppendLine();
+
+        WriteSummary(sb, model, readiness);
+        WriteRoutes(sb, model);
+        WriteCapabilities(sb, model);
+        WriteServices(sb, model);
+        WriteWorkflowSuggestions(sb, model);
+        if (readiness is not null)
+        {
+            WriteReadiness(sb, readiness);
+        }
+
+        WriteNextSteps(sb, model, readiness);
+        return sb.ToString();
+    }
+
+    private static void WriteSummary(StringBuilder sb, ProjectModel model, InstallReadinessReport? readiness)
+    {
+        var confirmedCount = model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed);
+        var discoveredCount = model.Actions.Count(action => action.ExposureMode == ActionExposureMode.Suggested);
+
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine($"- Projects scanned: {model.Projects.Count}");
+        sb.AppendLine($"- Routes discovered: {model.Routes.Count}");
+        sb.AppendLine($"- Services discovered: {model.Services.Count}");
+        sb.AppendLine($"- Confirmed actions: {confirmedCount}");
+        sb.AppendLine($"- Discovered candidate actions: {discoveredCount}");
+        if (readiness is not null)
+        {
+            sb.AppendLine($"- Install readiness: {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
+            sb.AppendLine($"- Host shape: {readiness.HostShape.Title}");
+        }
+
+        if (model.Coverage is not null)
+        {
+            sb.AppendLine($"- Action coverage: {model.Coverage.ConfirmedActions}/{model.Coverage.TotalActions} confirmed ({model.Coverage.ActionCoveragePercent.ToString(CultureInfo.InvariantCulture)}%)");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteRoutes(StringBuilder sb, ProjectModel model)
+    {
+        sb.AppendLine("## Routes And Pages");
+        sb.AppendLine();
+        if (model.Routes.Count == 0)
+        {
+            sb.AppendLine("No Razor routes were discovered.");
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine("| Route | Component | File | Suggested actions |");
+        sb.AppendLine("| --- | --- | --- | --- |");
+        foreach (var route in model.Routes.OrderBy(route => route.Template))
+        {
+            var page = model.Pages.FirstOrDefault(page => page.Route == route.Template);
+            var actions = page?.SuggestedActions.Count > 0
+                ? string.Join(", ", page.SuggestedActions.Select(EscapeTableCell))
+                : "-";
+            sb.AppendLine($"| `{EscapeTableCell(route.Template)}` | `{EscapeTableCell(route.ComponentName)}` | `{EscapeTableCell(route.ComponentFile)}` | {actions} |");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteCapabilities(StringBuilder sb, ProjectModel model)
+    {
+        var confirmedActions = model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Confirmed)
+            .OrderBy(action => action.SourceService)
+            .ThenBy(action => action.MethodName)
+            .ToList();
+
+        sb.AppendLine("## Existing Capabilities");
+        sb.AppendLine();
+        if (confirmedActions.Count == 0)
+        {
+            sb.AppendLine("No confirmed `[AgentCapability]` / `[AgentAction]` actions were discovered.");
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine("| Capability class | Action method | Approval | File |");
+        sb.AppendLine("| --- | --- | --- | --- |");
+        foreach (var action in confirmedActions)
+        {
+            var approval = action.RequiresApproval ? "required" : "not required";
+            sb.AppendLine($"| `{EscapeTableCell(action.SourceService)}` | `{EscapeTableCell(action.MethodName)}` | {approval} | `{EscapeTableCell(action.FilePath)}` |");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteServices(StringBuilder sb, ProjectModel model)
+    {
+        sb.AppendLine("## Services");
+        sb.AppendLine();
+        if (model.Services.Count == 0)
+        {
+            sb.AppendLine("No service-like classes were discovered.");
+            sb.AppendLine();
+            return;
+        }
+
+        foreach (var service in model.Services.OrderBy(service => service.TypeName))
+        {
+            sb.AppendLine($"### `{service.TypeName}`");
+            sb.AppendLine();
+            sb.AppendLine($"- Lifetime: {service.Lifetime}");
+            sb.AppendLine($"- File: `{service.FilePath}`");
+            if (service.Methods.Count == 0)
+            {
+                sb.AppendLine("- Public methods: none discovered");
+                sb.AppendLine();
+                continue;
+            }
+
+            sb.AppendLine("- Public methods:");
+            foreach (var method in service.Methods.OrderBy(method => method.Name))
+            {
+                var parameters = method.Parameters.Count == 0
+                    ? ""
+                    : string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"));
+                sb.AppendLine($"  - `{method.Name}({parameters})` -> `{method.ReturnType}`");
+            }
+
+            sb.AppendLine();
+        }
+    }
+
+    private static void WriteWorkflowSuggestions(StringBuilder sb, ProjectModel model)
+    {
+        var candidates = model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
+            .Where(action => action.Score >= 0.7)
+            .OrderByDescending(action => action.Score)
+            .ThenBy(action => action.SourceService)
+            .Take(10)
+            .ToList();
+
+        sb.AppendLine("## Workflow Suggestions");
+        sb.AppendLine();
+        sb.AppendLine("> This first v1 slice uses the static analyser only. LLM-generated workflow grouping and validation will be added on top of this section.");
+        sb.AppendLine();
+
+        if (candidates.Count == 0)
+        {
+            sb.AppendLine("No high-confidence workflow candidates were discovered.");
+            sb.AppendLine();
+            return;
+        }
+
+        foreach (var action in candidates)
+        {
+            sb.AppendLine($"### {action.Name}");
+            sb.AppendLine();
+            sb.AppendLine($"- Existing method: `{action.SourceService}.{action.MethodName}`");
+            sb.AppendLine($"- Classification: {action.Classification}");
+            sb.AppendLine($"- Mutation likely: {FormatBool(action.IsMutationLikely)}");
+            sb.AppendLine($"- Approval recommended: {FormatBool(action.RequiresApproval)}");
+            sb.AppendLine($"- Confidence: {action.Score.ToString("0.00", CultureInfo.InvariantCulture)}");
+            if (action.RelevantRoutes.Count > 0)
+            {
+                sb.AppendLine($"- Relevant routes: {string.Join(", ", action.RelevantRoutes.Select(route => $"`{route}`"))}");
+            }
+            if (!string.IsNullOrWhiteSpace(action.Summary))
+            {
+                sb.AppendLine($"- Reasoning: {action.Summary}");
+            }
+
+            sb.AppendLine();
+        }
+    }
+
+    private static void WriteReadiness(StringBuilder sb, InstallReadinessReport readiness)
+    {
+        sb.AppendLine("## Install Readiness");
+        sb.AppendLine();
+        sb.AppendLine("| Status | Check | Details |");
+        sb.AppendLine("| --- | --- | --- |");
+        foreach (var check in readiness.Checks)
+        {
+            var details = check.Message;
+            if (!string.IsNullOrWhiteSpace(check.SuggestedFix))
+            {
+                details += $" Fix: {check.SuggestedFix}";
+            }
+
+            sb.AppendLine($"| {check.Status} | {EscapeTableCell(check.Title)} | {EscapeTableCell(details)} |");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteNextSteps(StringBuilder sb, ProjectModel model, InstallReadinessReport? readiness)
+    {
+        sb.AppendLine("## Recommended Next Steps");
+        sb.AppendLine();
+
+        var hasSteps = false;
+        if (readiness is not null)
+        {
+            foreach (var check in readiness.Checks.Where(check => check.Status != InstallReadinessStatus.Pass))
+            {
+                hasSteps = true;
+                sb.AppendLine($"- Fix `{check.Id}`: {check.SuggestedFix ?? check.Message}");
+            }
+        }
+
+        foreach (var recommendation in model.Recommendations.OrderByDescending(item => item.Priority).Take(5))
+        {
+            hasSteps = true;
+            sb.AppendLine($"- {recommendation.Suggestion}");
+        }
+
+        if (!hasSteps)
+        {
+            sb.AppendLine("- No immediate setup gaps were found. Review workflow suggestions and decide which actions should become explicit `[AgentAction]` capabilities.");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static string ValueOrUnknown(string value)
+        => string.IsNullOrWhiteSpace(value) ? "unknown" : value;
+
+    private static string FormatBool(bool value)
+        => value ? "yes" : "no";
+
+    private static string EscapeTableCell(string value)
+        => value.Replace("|", "\\|", StringComparison.Ordinal);
+}
