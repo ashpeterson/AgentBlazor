@@ -38,6 +38,77 @@ public sealed class WorkflowSuggestionParserTests
     }
 
     [Fact]
+    public void ParseAndValidate_RemovesIllustrativeCode_WhenItDoesNotUseCapabilityResult()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel();
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Order lookup",
+              "description": "Find open orders.",
+              "methods": [
+                { "service": "OrderService", "method": "FindOrdersAsync" }
+              ],
+              "capabilityClass": "OrderLookupCapabilities",
+              "code": "public sealed class OrderLookupCapabilities { public async Task<List<Order>> FindOrders() { ... } }",
+              "reasoning": "The route and service method align.",
+              "confidence": 0.82
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Empty(suggestion.Code);
+        Assert.Empty(result.Rejected);
+    }
+
+    [Fact]
+    public void ParseAndValidate_RejectsSuggestions_WhenAllReferencedMethodsAlreadyHaveConfirmedActions()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Find Orders",
+                    SourceService = "OrderCapabilities",
+                    MethodName = "FindOrdersAsync",
+                    FilePath = "Workflows/OrderCapabilities.cs",
+                    ExposureMode = ActionExposureMode.Confirmed,
+                    Classification = ActionClassification.Query
+                }
+            ]
+        };
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Order lookup",
+              "description": "Find open orders.",
+              "methods": [
+                { "service": "OrderService", "method": "FindOrdersAsync" }
+              ],
+              "confidence": 0.82
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        Assert.Empty(result.Suggestions);
+        var rejected = Assert.Single(result.Rejected);
+        Assert.Contains("already have confirmed AgentBlazor actions", rejected.Reason);
+    }
+
+    [Fact]
     public void ParseAndValidate_RejectsSuggestionsReferencingUnknownMethods()
     {
         var parser = new WorkflowSuggestionParser();

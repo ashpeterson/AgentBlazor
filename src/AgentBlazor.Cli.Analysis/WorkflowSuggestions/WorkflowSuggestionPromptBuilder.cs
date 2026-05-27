@@ -20,6 +20,8 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Prefer 3 to 5 high-value workflows.");
         sb.AppendLine("- Use confidence from 0.0 to 1.0.");
         sb.AppendLine("- Suggested C# code is illustrative only and must be short.");
+        sb.AppendLine("- Suggested C# code must use AgentBlazor CapabilityResult and only call listed methods.");
+        sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
         sb.AppendLine();
         sb.AppendLine("JSON shape:");
         sb.AppendLine("""
@@ -32,7 +34,7 @@ public sealed class WorkflowSuggestionPromptBuilder
         { "service": "ExistingService", "method": "ExistingMethodAsync" }
       ],
       "capabilityClass": "SuggestedCapabilityClass",
-      "code": "public sealed class SuggestedCapabilityClass { ... }",
+      "code": "public sealed class SuggestedCapabilityClass { public async Task<CapabilityResult> RunAsync() { /* call ExistingService.ExistingMethodAsync */ return CapabilityResult.Success(\"Done.\"); } }",
       "reasoning": "Why this workflow fits the app.",
       "confidence": 0.8
     }
@@ -96,7 +98,7 @@ public sealed class WorkflowSuggestionPromptBuilder
     {
         sb.AppendLine("Discovered services and public methods:");
         foreach (var service in model.Services
-            .Where(AnalysisModelFilters.IsDeveloperFacingService)
+            .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
             .OrderBy(service => service.TypeName)
             .Take(60))
         {

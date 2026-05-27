@@ -52,9 +52,16 @@ internal static class AnalysisModelFilters
         "DescribeSignals"
     ];
 
-    public static bool IsDeveloperFacingService(ServiceModel service)
+    public static bool IsDeveloperFacingService(ServiceModel service, ProjectModel? model = null)
     {
         if (InfrastructureServiceNames.Contains(service.TypeName, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (model?.Actions.Any(action =>
+                action.ExposureMode == ActionExposureMode.Confirmed &&
+                string.Equals(action.SourceService, service.TypeName, StringComparison.OrdinalIgnoreCase)) == true)
         {
             return false;
         }

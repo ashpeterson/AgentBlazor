@@ -63,7 +63,17 @@ public sealed class WorkflowSuggestionParser
                 continue;
             }
 
-            suggestions.Add(suggestion);
+            if (ReferencesOnlyAlreadyExposedMethods(suggestion, model))
+            {
+                rejected.Add(new RejectedWorkflowSuggestion
+                {
+                    Name = suggestion.Name,
+                    Reason = "All referenced methods already have confirmed AgentBlazor actions."
+                });
+                continue;
+            }
+
+            suggestions.Add(SanitizeSuggestionCode(suggestion));
         }
 
         return new WorkflowSuggestionSet
@@ -86,6 +96,43 @@ public sealed class WorkflowSuggestionParser
             Confidence = ReadDouble(element, "confidence"),
             Methods = ReadMethods(element)
         };
+    }
+
+    private static WorkflowSuggestion SanitizeSuggestionCode(WorkflowSuggestion suggestion)
+    {
+        if (string.IsNullOrWhiteSpace(suggestion.Code))
+        {
+            return suggestion;
+        }
+
+        return suggestion.Code.Contains("CapabilityResult", StringComparison.Ordinal)
+            ? suggestion
+            : suggestion with { Code = string.Empty };
+    }
+
+    private static bool ReferencesOnlyAlreadyExposedMethods(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        var confirmedMethodNames = model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Select(action => NormalizeName(action.MethodName))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return confirmedMethodNames.Count > 0 &&
+            suggestion.Methods.Count > 0 &&
+            suggestion.Methods.All(method => confirmedMethodNames.Contains(NormalizeName(method.Method)));
+    }
+
+    private static string NormalizeName(string value)
+    {
+        var normalized = value.EndsWith("Async", StringComparison.OrdinalIgnoreCase)
+            ? value[..^"Async".Length]
+            : value;
+
+        return new string(normalized
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
     }
 
     private static IReadOnlyList<WorkflowMethodReference> ReadMethods(JsonElement element)

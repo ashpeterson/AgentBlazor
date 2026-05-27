@@ -166,6 +166,144 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.Contains("FindOrdersAsync", content);
     }
 
+    [Fact]
+    public void GenerateMarkdown_DoesNotRepeatCapabilityClasses_AsServices()
+    {
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                .. CreateModel().Services,
+                new ServiceModel
+                {
+                    TypeName = "OrderCapabilities",
+                    FilePath = "Workflows/OrderCapabilities.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ShowOpenOrdersAsync",
+                            ReturnType = "Task<CapabilityResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Show Open Orders",
+                    SourceService = "OrderCapabilities",
+                    MethodName = "ShowOpenOrdersAsync",
+                    FilePath = "Workflows/OrderCapabilities.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 1,
+                    ExposureMode = ActionExposureMode.Confirmed
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("OrderCapabilities", content);
+        Assert.Contains("ShowOpenOrdersAsync", content);
+        Assert.DoesNotContain("### `OrderCapabilities`", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DoesNotRecommendAgentAction_WhenMethodNameAlreadyHasConfirmedAction()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Show Open Tickets",
+                    SourceService = "SupportCapabilities",
+                    MethodName = "ShowOpenTicketsAsync",
+                    FilePath = "Workflows/SupportCapabilities.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 1,
+                    ExposureMode = ActionExposureMode.Confirmed
+                }
+            ],
+            Recommendations =
+            [
+                new RecommendationModel
+                {
+                    Type = RecommendationType.AddAgentAction,
+                    TargetName = "SupportTicketService.ShowOpenTicketsAsync",
+                    Suggestion = "Add `[AgentAction(\"Show Open Tickets\")]`",
+                    Priority = 1
+                },
+                new RecommendationModel
+                {
+                    Type = RecommendationType.AddAgentAction,
+                    TargetName = "InventoryService.PrepareRestockPlanAsync",
+                    Suggestion = "Add `[AgentAction(\"Prepare Restock Plan\")]`",
+                    Priority = 0.9
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.DoesNotContain("Show Open Tickets", content);
+        Assert.Contains("Prepare Restock Plan", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DoesNotShowStaticCandidate_WhenEquivalentConfirmedActionExists()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Show Open Tickets",
+                    SourceService = "SupportCapabilities",
+                    MethodName = "ShowOpenTicketsAsync",
+                    FilePath = "Workflows/SupportCapabilities.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 1,
+                    ExposureMode = ActionExposureMode.Confirmed
+                },
+                new ActionModel
+                {
+                    Name = "Show Open Tickets",
+                    SourceService = "SupportTicketService",
+                    MethodName = "ShowOpenTicketsAsync",
+                    FilePath = "Services/SupportTicketService.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Prepare Restock Plan",
+                    SourceService = "InventoryService",
+                    MethodName = "PrepareRestockPlanAsync",
+                    FilePath = "Services/InventoryService.cs",
+                    Classification = ActionClassification.Workflow,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.DoesNotContain("Existing method: `SupportTicketService.ShowOpenTicketsAsync`", content);
+        Assert.Contains("Existing method: `InventoryService.PrepareRestockPlanAsync`", content);
+    }
+
     private static ProjectModel CreateModel() => new()
     {
         AppName = "TestApp",

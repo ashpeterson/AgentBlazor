@@ -58,6 +58,33 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                             IsAsync = true
                         }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "OrderCapabilities",
+                    FilePath = "Workflows/OrderCapabilities.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ShowOpenOrdersAsync",
+                            ReturnType = "Task<CapabilityResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Show Open Orders",
+                    SourceService = "OrderCapabilities",
+                    MethodName = "ShowOpenOrdersAsync",
+                    FilePath = "Workflows/OrderCapabilities.cs",
+                    ExposureMode = ActionExposureMode.Confirmed,
+                    Classification = ActionClassification.Query
                 }
             ]
         };
@@ -68,5 +95,7 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("FindOrdersAsync", prompt);
         Assert.DoesNotContain("AgentBlazorBuilder", prompt);
         Assert.DoesNotContain("SetSelectedNodeAsync", prompt);
+        Assert.Contains("OrderCapabilities.ShowOpenOrdersAsync", prompt);
+        Assert.DoesNotContain("- OrderCapabilities [", prompt);
     }
 }

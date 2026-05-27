@@ -62,7 +62,7 @@ public sealed class AnalysisReportGenerator
         var reportableActions = model.Actions.Where(AnalysisModelFilters.IsDeveloperFacingAction).ToList();
         var confirmedCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Confirmed);
         var discoveredCount = reportableActions.Count(action => action.ExposureMode == ActionExposureMode.Suggested);
-        var reportableServiceCount = model.Services.Count(AnalysisModelFilters.IsDeveloperFacingService);
+        var reportableServiceCount = model.Services.Count(service => AnalysisModelFilters.IsDeveloperFacingService(service, model));
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
@@ -160,7 +160,7 @@ public sealed class AnalysisReportGenerator
         }
 
         foreach (var service in model.Services
-            .Where(AnalysisModelFilters.IsDeveloperFacingService)
+            .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
             .OrderBy(service => service.TypeName))
         {
             sb.AppendLine($"### `{service.TypeName}`");
@@ -270,6 +270,7 @@ public sealed class AnalysisReportGenerator
         var candidates = model.Actions
             .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Where(action => !DuplicatesConfirmedAction(action, model))
             .Where(action => action.Score >= 0.7)
             .OrderByDescending(action => action.Score)
             .ThenBy(action => action.SourceService)
@@ -343,7 +344,10 @@ public sealed class AnalysisReportGenerator
             }
         }
 
-        foreach (var recommendation in model.Recommendations.OrderByDescending(item => item.Priority).Take(5))
+        foreach (var recommendation in model.Recommendations
+            .Where(recommendation => !DuplicatesConfirmedAction(recommendation, model))
+            .OrderByDescending(item => item.Priority)
+            .Take(5))
         {
             hasSteps = true;
             sb.AppendLine($"- {recommendation.Suggestion}");
@@ -365,4 +369,52 @@ public sealed class AnalysisReportGenerator
 
     private static string EscapeTableCell(string value)
         => value.Replace("|", "\\|", StringComparison.Ordinal);
+
+    private static bool DuplicatesConfirmedAction(RecommendationModel recommendation, ProjectModel model)
+    {
+        if (recommendation.Type is not RecommendationType.AddAgentAction)
+        {
+            return false;
+        }
+
+        var targetMethod = recommendation.TargetName.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? recommendation.TargetName;
+        var normalizedTarget = NormalizeName(targetMethod);
+        return model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Any(action =>
+                NormalizeName(action.MethodName) == normalizedTarget ||
+                NormalizeName(action.Name) == normalizedTarget ||
+                (!string.IsNullOrWhiteSpace(action.Name) && NormalizeName(recommendation.Suggestion).Contains(NormalizeName(action.Name), StringComparison.Ordinal)));
+    }
+
+    private static bool DuplicatesConfirmedAction(ActionModel candidate, ProjectModel model)
+    {
+        var normalizedMethod = NormalizeName(candidate.MethodName);
+        var normalizedName = NormalizeName(candidate.Name);
+        return model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Confirmed)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Any(action =>
+                NormalizeName(action.MethodName) == normalizedMethod ||
+                (!string.IsNullOrWhiteSpace(action.Name) && NormalizeName(action.Name) == normalizedName));
+    }
+
+    private static string NormalizeName(string value)
+    {
+        var normalized = value.EndsWith("Async", StringComparison.OrdinalIgnoreCase)
+            ? value[..^"Async".Length]
+            : value;
+
+        var sb = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                sb.Append(char.ToLowerInvariant(character));
+            }
+        }
+
+        return sb.ToString();
+    }
 }
