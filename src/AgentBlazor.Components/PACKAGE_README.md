@@ -15,10 +15,10 @@ dotnet add package AgentBlazor
 If you prefer a pinned install, use:
 
 ```bash
-dotnet add package AgentBlazor --version 0.2.2
+dotnet add package AgentBlazor --version 0.2.3
 ```
 
-Use `0.2.2` or later. This release includes the CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
+Use `0.2.3` or later. This release includes the CLI first-run API-key prompt, CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
 
 If `dotnet` still probes an old custom package source on your machine, remove or disable that source before testing the public NuGet install path.
 
@@ -88,6 +88,7 @@ Docs and demo:
 - Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 - Structured error reference: https://demo.agentblazor.com/demo/workflows/runtime-probe
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
+- 0.2.3 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.3.md
 - 0.2.2 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.2.md
 - 0.2.1 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.1.md
 - 0.2.0 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.0.md

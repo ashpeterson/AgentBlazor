@@ -8,7 +8,7 @@ Read-only analysis:
 agentblazor analyze ./MySolution.slnx --host MyBlazorApp
 ```
 
-Set `OPENAI_API_KEY` and optionally `AGENTBLAZOR_ANALYZE_MODEL` for LLM workflow suggestions, or pass `--static-only` to skip the LLM call.
+If no OpenAI key is configured and the terminal is interactive, `analyze` prompts for one and uses it for that run only. For repeat runs or CI, set `OPENAI_API_KEY` and optionally `AGENTBLAZOR_ANALYZE_MODEL`. Pass `--static-only` to skip the LLM call.
 
 See:
 

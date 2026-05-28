@@ -20,7 +20,7 @@ Environment:
 ## Packaged Tool Quality Gates
 
 - Install gate: local `AgentBlazor.Cli.0.2.2.nupkg` installs as a `dotnet tool` into an isolated tool path and reports `0.2.2` from `agentblazor --version`.
-- No-provider gate: with OpenAI and Azure OpenAI environment variables removed, `agentblazor analyze` exits cleanly with `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
+- No-provider non-interactive gate: with OpenAI and Azure OpenAI environment variables removed, `agentblazor analyze --non-interactive` exits cleanly with `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
 - Static-only gate: `agentblazor analyze ... --static-only` writes a report with routes, capabilities, services, static workflow candidates, install readiness, and recommended next steps without requiring an LLM provider.
 
 ## Applications Tested
@@ -194,6 +194,7 @@ Synthetic target refresh using the NuGet-installed tool:
 
 Additional command-path gates:
 
-- No-provider path exits cleanly with: `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
+- No-provider non-interactive path exits cleanly with: `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
+- No-provider interactive path prompts for an OpenAI API key, masks the input, and uses it for the current run without writing it to disk.
 - `--static-only` works without an LLM provider and writes an analysis report.
 - Rejected suggestions remain visible in the report for now as validation evidence. Hiding them by default is a future UX decision, not a v1 ship blocker.
