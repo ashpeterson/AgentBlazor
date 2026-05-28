@@ -59,9 +59,13 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             var hostProject = settings.HostProject ?? config?.HostProject;
             var description = config?.Description ?? "A Blazor application";
             var outputPath = ResolveOutputPath(settings.Output, outputDirectory);
+            var clientOptions = WorkflowSuggestionClientFactory.FromEnvironment(config);
+            clientOptions = settings.StaticOnly
+                ? clientOptions
+                : PromptForMissingOpenAIApiKey(clientOptions, settings.NonInteractive);
             var suggestionClient = settings.StaticOnly
                 ? null
-                : WorkflowSuggestionClientFactory.Create(WorkflowSuggestionClientFactory.FromEnvironment(config));
+                : WorkflowSuggestionClientFactory.Create(clientOptions);
             var analyzerRegistry = new ProjectAnalyzerRegistry();
             var analyzer = analyzerRegistry.ResolveBlazor(settings.Framework, path);
 
@@ -165,6 +169,32 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         return Path.IsPathRooted(output)
             ? output
             : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), output));
+    }
+
+    private static WorkflowSuggestionClientOptions PromptForMissingOpenAIApiKey(
+        WorkflowSuggestionClientOptions options,
+        bool nonInteractive)
+    {
+        if (!options.Provider.Equals("openai", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrWhiteSpace(options.OpenAIApiKey) ||
+            nonInteractive ||
+            Console.IsInputRedirected ||
+            Console.IsOutputRedirected)
+        {
+            return options;
+        }
+
+        AnsiConsole.MarkupLine("[yellow]No OpenAI API key found.[/]");
+        AnsiConsole.MarkupLine("[grey]Enter a key for this analysis run. It will not be written to disk.[/]");
+
+        var apiKey = AnsiConsole.Prompt(
+            new TextPrompt<string>("OpenAI API key:")
+                .PromptStyle("grey")
+                .Secret());
+
+        return string.IsNullOrWhiteSpace(apiKey)
+            ? options
+            : options with { OpenAIApiKey = apiKey };
     }
 
     private static void RenderSummary(

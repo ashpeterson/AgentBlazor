@@ -52,7 +52,13 @@ agentblazor analyze ./MySolution.slnx --host MyBlazorApp --static-only
 
 ## Analyze Provider Configuration
 
-For OpenAI, set an API key before running `analyze`:
+For OpenAI, run `analyze` directly. If no key is configured and the terminal is interactive, the CLI asks for one and uses it for that run only:
+
+```bash
+agentblazor analyze ./MySolution.slnx --host MyBlazorApp
+```
+
+The key is not written to disk. For repeat runs, CI, or non-interactive shells, set an environment variable:
 
 ```bash
 export OPENAI_API_KEY="<openai-api-key>"
@@ -83,7 +89,7 @@ export AZURE_OPENAI_API_KEY="<azure-openai-api-key>"
 agentblazor analyze ./MySolution.slnx --host MyBlazorApp
 ```
 
-If no provider is configured, `analyze` exits before scanning and tells you which environment variables to set. Use `--static-only` to avoid provider configuration entirely.
+If no provider is configured and the command cannot prompt, `analyze` exits before scanning and tells you which environment variables to set. Use `--static-only` to avoid provider configuration entirely.
 
 ## Analyze Token Cost
 
