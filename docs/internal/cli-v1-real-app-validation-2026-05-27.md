@@ -15,6 +15,7 @@ Environment:
 - Initial packaged tool output root: `/tmp/agentblazor-cli-v1-tool-smoke`
 - Expanded real-app clone root: `/tmp/agentblazor-cli-v1-more-realapps`
 - Final packaged tool output root after RCL route and semantic-validation fixes: `/tmp/agentblazor-cli-v1-tool-smoke-final2`
+- Final NuGet-installed tool output root after publish: `/tmp/agentblazor-cli-v1-nuget-smoke-022`
 
 ## Packaged Tool Quality Gates
 
@@ -152,16 +153,47 @@ Environment:
 - Automated analysis tests pass: `161`
 - CLI build passes: `dotnet build src/AgentBlazor.Cli/AgentBlazor.Cli.csproj`
 - Local packaged tool install passes from `AgentBlazor.Cli.0.2.2.nupkg`.
+- NuGet.org published package is available from `https://api.nuget.org/v3-flatcontainer/agentblazor.cli/0.2.2/agentblazor.cli.0.2.2.nupkg`.
+- NuGet.org package install passes into an isolated tool path using a NuGet-only config, and `agentblazor --version` reports `0.2.2`.
 - Packaged no-provider and `--static-only` paths pass.
 - Real OpenAI-backed analysis completed on 11 real GitHub Blazor applications.
 - Packaged `dotnet tool` smoke completed on 11 real GitHub Blazor applications.
+- Final NuGet-installed `dotnet tool` smoke completed on 5 real GitHub Blazor applications with the real OpenAI provider.
 - Hallucinated methods were rejected on sparse apps.
 - Accepted workflow suggestions on larger apps reference methods present in the static model.
 - Referenced RCL routes are discovered for hosted/componentized apps.
 - Semantically misaligned LLM suggestions are rejected even when they reference real methods.
 
-## Remaining Before v1 Complete
+## Final NuGet-Installed Smoke
 
-- Publish or otherwise cut the CLI package from a green commit.
-- Run final NuGet-installed tool smoke after publish.
-- Decide whether the report should hide rejected suggestions by default or keep them as validation evidence.
+Environment:
+
+- Tool install root: `/tmp/agentblazor-cli-v1-nuget-smoke-022/tool`
+- Report root: `/tmp/agentblazor-cli-v1-nuget-smoke-022/reports`
+- Install command used only `https://api.nuget.org/v3/index.json` via an isolated `NuGet.config`
+- Tool version: `0.2.2`
+- LLM provider: real OpenAI API key from environment
+
+Results:
+
+| App | Host | Routes | Services | Actions | Readiness | Suggestions |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| CuriousDrive/BlazingChat | `BlazingChat.Server` | 10 | 1 | 2 discovered | 0 passed, 4 warnings, 6 missing | 2 accepted, 3 rejected |
+| Yu-Core/SwashbucklerDiary | `SwashbucklerDiary.Server` | 38 | 21 | 79 discovered | 2 passed, 3 warnings, 5 missing | 1 accepted, 4 rejected |
+| microsoft/FhirBlaze | `FhirBlaze` | 13 | 3 | 24 discovered | 0 passed, 4 warnings, 6 missing | 2 accepted, 3 rejected |
+| immense/Remotely | `Server` | 45 | 18 | 113 discovered | 2 passed, 3 warnings, 5 missing | 1 accepted, 4 rejected |
+| neozhu/CleanArchitectureWithBlazorServer | `Server.UI` | 31 | 21 | 19 discovered | 4 passed, 2 warnings, 4 missing | 2 accepted, 3 rejected |
+
+Synthetic target refresh using the NuGet-installed tool:
+
+| Target | Routes | Services | Actions | Readiness | Suggestions | Outcome |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| `simple-blazor-app` | 2 | 2 | 3 discovered | 2 passed, 3 warnings, 5 missing | 3 accepted, 0 rejected | Pass; useful new workflow suggestions were generated from services. |
+| `realistic-blazor-app` | 3 | 3 | 4 confirmed, 6 discovered | 10 passed, 0 warnings, 0 missing | 0 accepted, 4 rejected | Pass; suggestions targeted methods that already have confirmed AgentBlazor actions, so duplicate workflow suggestions were correctly rejected. |
+| `hosted-wasm-app` | 1 | 1 | 2 confirmed, 2 discovered | 4 passed, 5 warnings, 1 missing | 0 accepted, 3 rejected | Pass; suggestions targeted methods that already have confirmed AgentBlazor actions, so duplicate workflow suggestions were correctly rejected. |
+
+Additional command-path gates:
+
+- No-provider path exits cleanly with: `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
+- `--static-only` works without an LLM provider and writes an analysis report.
+- Rejected suggestions remain visible in the report for now as validation evidence. Hiding them by default is a future UX decision, not a v1 ship blocker.
