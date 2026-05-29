@@ -52,6 +52,44 @@ public sealed class BlazorProjectAnalyzerTests : IDisposable
         Assert.Null(analysis.Readiness);
     }
 
+    [Fact]
+    public async Task AnalyzeAsync_StaticWorkspaceFallback_LoadsSolutionProjectsAndRoutes()
+    {
+        var projectPath = CreateMinimalBlazorProject("FallbackBlazor");
+        var solutionPath = Path.Combine(_tempDir, "FallbackBlazor.sln");
+        File.WriteAllText(
+            solutionPath,
+            $$"""
+            Microsoft Visual Studio Solution File, Format Version 12.00
+            # Visual Studio Version 17
+            Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FallbackBlazor", "FallbackBlazor\FallbackBlazor.csproj", "{11111111-1111-1111-1111-111111111111}"
+            EndProject
+            Global
+            EndGlobal
+            """);
+
+        var previous = Environment.GetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE");
+        Environment.SetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE", "1");
+        try
+        {
+            var analyzer = new BlazorProjectAnalyzer();
+
+            var analysis = await analyzer.AnalyzeAsync(
+                solutionPath,
+                hostProjectName: "FallbackBlazor",
+                description: "Fallback app",
+                includeReadiness: true);
+
+            Assert.Equal("FallbackBlazor", analysis.Model.BlazorHostProject);
+            Assert.Contains(analysis.Model.Routes, route => route.Template == "/");
+            Assert.Contains(analysis.Model.Projects, project => project.Name == "FallbackBlazor");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE", previous);
+        }
+    }
+
     private string CreateMinimalBlazorProject(string projectName)
     {
         var projectDirectory = Path.Combine(_tempDir, projectName);

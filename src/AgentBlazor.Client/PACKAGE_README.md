@@ -11,7 +11,7 @@ dotnet add package AgentBlazor.Client
 If you prefer a pinned install:
 
 ```bash
-dotnet add package AgentBlazor.Client --version 0.2.3
+dotnet add package AgentBlazor.Client --version 0.2.4
 ```
 
 Server project:
@@ -35,6 +35,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Quickstart: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/quickstart.md
+- 0.2.4 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.4.md
 - 0.2.3 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.3.md
 - 0.2.2 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.2.md
 - 0.2.1 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.1.md
