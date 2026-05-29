@@ -32,6 +32,10 @@ agentblazor analyze ./MySolution.slnx --host MyBlazorApp
 
 If no OpenAI key is configured and the terminal is interactive, `analyze` prompts for a key and uses it for that run only. The key is not written to disk.
 
+Version `0.2.4` and later include a Windows/Roslyn fallback for MSBuildWorkspace load failures. If a machine has conflicting Visual Studio/MSBuild assemblies, `analyze` falls back to static source-file analysis instead of failing before the report is generated.
+
+Reports filter helper/framework noise, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
+
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
 
 Docs:

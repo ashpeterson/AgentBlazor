@@ -77,9 +77,10 @@ public sealed class AnalysisReportGenerator
             sb.AppendLine($"- Host shape: {readiness.HostShape.Title}");
         }
 
-        if (model.Coverage is not null)
+        var adoptionTotal = confirmedCount + discoveredCount;
+        if (adoptionTotal > 0)
         {
-            sb.AppendLine($"- Action coverage: {model.Coverage.ConfirmedActions}/{model.Coverage.TotalActions} confirmed ({model.Coverage.ActionCoveragePercent.ToString(CultureInfo.InvariantCulture)}%)");
+            sb.AppendLine($"- AgentBlazor action adoption: {confirmedCount} confirmed, {discoveredCount} candidate actions not yet exposed");
         }
 
         sb.AppendLine();
@@ -217,6 +218,13 @@ public sealed class AnalysisReportGenerator
                     if (!string.IsNullOrWhiteSpace(suggestion.CapabilityClass))
                     {
                         sb.AppendLine($"- Suggested capability class: `{suggestion.CapabilityClass}`");
+                    }
+
+                    var referencesMutationLikelyMethod = ReferencesMutationLikelyMethod(suggestion, model);
+                    if (referencesMutationLikelyMethod)
+                    {
+                        sb.AppendLine("- Approval guidance: this workflow references mutating methods. Mark generated `[AgentAction]` methods with `RequiresApproval = true` unless a human-reviewed policy says the action is safe to run automatically.");
+                        sb.AppendLine($"- Suggested attribute: `[AgentAction(\"{EscapeAttributeValue(suggestion.Name)}\", RequiresApproval = true)]`");
                     }
 
                     if (suggestion.Methods.Count > 0)
@@ -383,6 +391,10 @@ public sealed class AnalysisReportGenerator
     private static string EscapeTableCell(string value)
         => value.Replace("|", "\\|", StringComparison.Ordinal);
 
+    private static string EscapeAttributeValue(string value)
+        => value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+
     private static bool DuplicatesConfirmedAction(RecommendationModel recommendation, ProjectModel model)
     {
         if (recommendation.Type is not RecommendationType.AddAgentAction)
@@ -427,6 +439,18 @@ public sealed class AnalysisReportGenerator
             .Any(action =>
                 NormalizeName(action.MethodName) == normalizedMethod ||
                 (!string.IsNullOrWhiteSpace(action.Name) && NormalizeName(action.Name) == normalizedName));
+    }
+
+    private static bool ReferencesMutationLikelyMethod(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        return suggestion.Methods.Any(method => model.Actions
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Any(action =>
+                string.Equals(action.SourceService, method.Service, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(action.MethodName, method.Method, StringComparison.OrdinalIgnoreCase) &&
+                (action.IsMutationLikely ||
+                 action.RequiresApproval ||
+                 action.Classification is ActionClassification.Command or ActionClassification.Workflow)));
     }
 
     private static string NormalizeName(string value)

@@ -27,6 +27,27 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                             ReturnType = "Task<IReadOnlyList<Order>>",
                             IsPublic = true,
                             IsAsync = true
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "CreateOrderAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "ActivityIdHelper",
+                    FilePath = "ActivityIdHelper.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ToString",
+                            ReturnType = "string",
+                            IsPublic = true
                         }
                     ]
                 },
@@ -109,6 +130,17 @@ public sealed class WorkflowSuggestionPromptBuilderTests
             [
                 new ActionModel
                 {
+                    Name = "Create Order",
+                    SourceService = "OrderService",
+                    MethodName = "CreateOrderAsync",
+                    FilePath = "Services/OrderService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.9
+                },
+                new ActionModel
+                {
                     Name = "Find Orders",
                     SourceService = "OrderService",
                     MethodName = "FindOrdersAsync",
@@ -133,6 +165,12 @@ public sealed class WorkflowSuggestionPromptBuilderTests
 
         Assert.Contains("OrderService", prompt);
         Assert.Contains("FindOrdersAsync", prompt);
+        Assert.Contains("approvalRecommended=false", prompt);
+        Assert.Contains("CreateOrderAsync", prompt);
+        Assert.Contains("approvalRecommended=true", prompt);
+        Assert.Contains("RequiresApproval = true", prompt);
+        Assert.DoesNotContain("ActivityIdHelper", prompt);
+        Assert.DoesNotContain("ToString", prompt);
         Assert.DoesNotContain("AgentBlazorBuilder", prompt);
         Assert.DoesNotContain("SetSelectedNodeAsync", prompt);
         Assert.DoesNotContain("DialogServiceHelper", prompt);
