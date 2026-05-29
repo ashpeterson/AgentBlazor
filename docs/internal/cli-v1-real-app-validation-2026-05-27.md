@@ -2,6 +2,8 @@
 
 Purpose: evidence for the CLI v1 scope gate requiring real Blazor applications to produce useful `agentblazor analyze` reports without hallucinated method references.
 
+Status: v1 validation complete. `agentblazor analyze` shipped as the CLI v1 line in `AgentBlazor.Cli` `0.2.5` on May 29 2026.
+
 Environment:
 
 - Source-validation branch: `feature/cli-v1-analyze-spine`
@@ -11,7 +13,8 @@ Environment:
 - LLM provider: real OpenAI API key from environment
 - Model: environment default, currently `gpt-4o-mini` when unset
 - Temporary clone root: `/tmp/agentblazor-cli-v1-realapps`
-- Packaged tool: locally packed `AgentBlazor.Cli.0.2.2.nupkg`, installed via `dotnet tool install AgentBlazor.Cli --tool-path /tmp/agentblazor-cli-v1-tool-smoke/tool --configfile /tmp/agentblazor-cli-v1-tool-smoke/NuGet.config --version 0.2.2`
+- Initial packaged tool: locally packed `AgentBlazor.Cli.0.2.2.nupkg`, installed via `dotnet tool install AgentBlazor.Cli --tool-path /tmp/agentblazor-cli-v1-tool-smoke/tool --configfile /tmp/agentblazor-cli-v1-tool-smoke/NuGet.config --version 0.2.2`
+- Final shipped packaged tool: NuGet.org `AgentBlazor.Cli` `0.2.5`
 - Initial packaged tool output root: `/tmp/agentblazor-cli-v1-tool-smoke`
 - Expanded real-app clone root: `/tmp/agentblazor-cli-v1-more-realapps`
 - Final packaged tool output root after RCL route and semantic-validation fixes: `/tmp/agentblazor-cli-v1-tool-smoke-final2`
@@ -19,9 +22,11 @@ Environment:
 
 ## Packaged Tool Quality Gates
 
-- Install gate: local `AgentBlazor.Cli.0.2.2.nupkg` installs as a `dotnet tool` into an isolated tool path and reports `0.2.2` from `agentblazor --version`.
+- Install gate: NuGet.org `AgentBlazor.Cli` `0.2.5` installs as a `dotnet tool` into an isolated tool path and reports `0.2.5` from `agentblazor --version`.
 - No-provider non-interactive gate: with OpenAI and Azure OpenAI environment variables removed, `agentblazor analyze --non-interactive` exits cleanly with `No OpenAI API key configured for agentblazor analyze. Set OPENAI_API_KEY or OpenAI__ApiKey, and optionally set AGENTBLAZOR_ANALYZE_MODEL.`
 - Static-only gate: `agentblazor analyze ... --static-only` writes a report with routes, capabilities, services, static workflow candidates, install readiness, and recommended next steps without requiring an LLM provider.
+- Windows fallback gate: `AgentBlazor.Cli` `0.2.5` falls back to static source-file analysis when Roslyn `MSBuildWorkspace` fails with known MSBuild/Visual Studio assembly conflicts such as `Microsoft.Build.Shared.XMakeElements`.
+- Report-quality gate: helper/object-method noise is filtered from developer-facing sections, the summary uses AgentBlazor action adoption, and mutating workflow suggestions include explicit `RequiresApproval = true` guidance.
 
 ## Applications Tested
 
@@ -150,21 +155,44 @@ Environment:
 
 ## Current Evidence
 
-- Automated analysis tests pass: `161`
+- Automated analysis tests pass: `163`
 - CLI build passes: `dotnet build src/AgentBlazor.Cli/AgentBlazor.Cli.csproj`
-- Local packaged tool install passes from `AgentBlazor.Cli.0.2.2.nupkg`.
-- NuGet.org published package is available from `https://api.nuget.org/v3-flatcontainer/agentblazor.cli/0.2.2/agentblazor.cli.0.2.2.nupkg`.
-- NuGet.org package install passes into an isolated tool path using a NuGet-only config, and `agentblazor --version` reports `0.2.2`.
+- NuGet.org published package is available from `https://api.nuget.org/v3-flatcontainer/agentblazor.cli/0.2.5/agentblazor.cli.0.2.5.nupkg`.
+- NuGet.org package install passes into an isolated tool path using a NuGet-only config, and `agentblazor --version` reports `0.2.5`.
 - Packaged no-provider and `--static-only` paths pass.
 - Real OpenAI-backed analysis completed on 11 real GitHub Blazor applications.
 - Packaged `dotnet tool` smoke completed on 11 real GitHub Blazor applications.
 - Final NuGet-installed `dotnet tool` smoke completed on 5 real GitHub Blazor applications with the real OpenAI provider.
+- Final `0.2.5` eShopOnBlazor smoke completed with 5 routes, 1 developer-facing service after helper filtering, 7 discovered candidate actions, and mutating LLM suggestions that include approval guidance.
 - Hallucinated methods were rejected on sparse apps.
 - Accepted workflow suggestions on larger apps reference methods present in the static model.
 - Referenced RCL routes are discovered for hosted/componentized apps.
 - Semantically misaligned LLM suggestions are rejected even when they reference real methods.
 
+## Final 0.2.5 Smoke
+
+Environment:
+
+- Tool version: `0.2.5`
+- Command shape: `agentblazor analyze <solution> --host <host> --output <report>`
+- Fallback diagnostic shape: `AGENTBLAZOR_STATIC_WORKSPACE=1 agentblazor analyze <solution> --host <host> --output <report>`
+- LLM provider: real OpenAI API key from environment
+
+Results:
+
+| App | Host | Routes | Services | Actions | Suggestions | Outcome |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| dotnet-architecture/eShopOnBlazor | `eShopOnBlazor` | 5 | 1 | 7 discovered | 3 accepted, 0 rejected | Pass; helper noise filtered, candidate methods grounded in `CatalogService`, mutating suggestions include approval guidance. |
+
+Additional command-path gates:
+
+- Clean NuGet install from `https://api.nuget.org/v3/index.json` reports `agentblazor --version` as `0.2.5`.
+- Forced static workspace fallback on eShopOnBlazor reports 5 routes, 1 developer-facing service, and 7 discovered candidate actions.
+- Full LLM run on eShopOnBlazor reports validated workflow suggestions without hallucinated method references.
+
 ## Final NuGet-Installed Smoke
+
+This section records the earlier `0.2.2` validation matrix. It remains useful as breadth evidence, but the shipped v1 package line is `0.2.5`.
 
 Environment:
 
