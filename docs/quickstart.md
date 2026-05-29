@@ -1,6 +1,6 @@
 # Quickstart
 
-Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.2.3`.
+Get one working AgentBlazor chat widget into a fresh Blazor app. Tested against a clean `dotnet new blazor` project with `AgentBlazor 0.2.4`.
 
 Hosted demo: https://demo.agentblazor.com/demo/workflows/support-inbox
 
@@ -182,6 +182,7 @@ Say hello
 ## Next
 
 - [Hosted demo](https://demo.agentblazor.com/demo/workflows/support-inbox)
+- [0.2.4 release notes](releases/0.2.4.md)
 - [0.2.3 release notes](releases/0.2.3.md)
 - [0.2.2 release notes](releases/0.2.2.md)
 - [0.2.1 release notes](releases/0.2.1.md)

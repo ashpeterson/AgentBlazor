@@ -17,7 +17,7 @@ dotnet add package AgentBlazor
 dotnet add package AgentBlazor.EntityFrameworkCore
 ```
 
-Use `0.2.3` or later. This release includes the CLI first-run API-key prompt, CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
+Use `0.2.4` or later. This release includes the CLI Windows MSBuild fallback and first-run API-key prompt, CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for date-like workflow parameters.
 
 ## DbContext Setup
 
