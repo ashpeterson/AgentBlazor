@@ -68,7 +68,24 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     [Fact]
     public void GenerateMarkdown_IncludesValidatedWorkflowSuggestions_WhenProvided()
     {
-        var model = CreateModel();
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Draft order follow-up",
+                    SourceService = "OrderService",
+                    MethodName = "DraftFollowUpAsync",
+                    FilePath = "Services/OrderService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.88
+                }
+            ]
+        };
         var suggestions = new WorkflowSuggestionSet
         {
             Model = "test-model",
@@ -81,7 +98,8 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     CapabilityClass = "OrderFollowUpCapabilities",
                     Methods =
                     [
-                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" },
+                        new WorkflowMethodReference { Service = "OrderService", Method = "DraftFollowUpAsync" }
                     ],
                     Reasoning = "The app has an orders page and an order lookup service.",
                     Confidence = 0.84
@@ -101,6 +119,7 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.Contains("Order follow-up", content);
         Assert.Contains("OrderService.FindOrdersAsync", content);
+        Assert.Contains("RequiresApproval = true", content);
         Assert.Contains("Rejected Suggestions", content);
         Assert.Contains("MissingService.RunAsync", content);
     }
@@ -113,6 +132,20 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
             Services =
             [
                 .. CreateModel().Services,
+                new ServiceModel
+                {
+                    TypeName = "ActivityIdHelper",
+                    FilePath = "ActivityIdHelper.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ToString",
+                            ReturnType = "string",
+                            IsPublic = true
+                        }
+                    ]
+                },
                 new ServiceModel
                 {
                     TypeName = "AgentBlazorBuilder",
@@ -239,6 +272,8 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         var content = _generator.GenerateMarkdown(model);
 
+        Assert.DoesNotContain("ActivityIdHelper", content);
+        Assert.DoesNotContain("ToString", content);
         Assert.DoesNotContain("AgentBlazorBuilder", content);
         Assert.DoesNotContain("SetSelectedNodeAsync", content);
         Assert.DoesNotContain("DialogServiceHelper", content);
@@ -248,6 +283,15 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("EmailFactory", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_ReportsActionAdoption_FromDeveloperFacingActions()
+    {
+        var content = _generator.GenerateMarkdown(CreateModel());
+
+        Assert.Contains("AgentBlazor action adoption: 0 confirmed, 1 candidate actions not yet exposed", content);
+        Assert.DoesNotContain("Action coverage:", content);
     }
 
     [Fact]

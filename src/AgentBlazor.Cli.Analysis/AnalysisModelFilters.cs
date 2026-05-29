@@ -19,6 +19,8 @@ public static class AnalysisModelFilters
         "DbContext",
         "DbContextFactory",
         "Factory",
+        "Helper",
+        "Utility",
         "Provider",
         "Notifier",
         "SignInManager",
@@ -80,11 +82,15 @@ public static class AnalysisModelFilters
     [
         "Dispose",
         "DisposeAsync",
+        "Equals",
+        "GetHashCode",
+        "GetType",
         "Load",
         "LoadAsync",
         "OnPropertyChanged",
         "Reset",
         "ResetAsync",
+        "ToString",
         "IsHighlighted",
         "DescribeSignals"
     ];

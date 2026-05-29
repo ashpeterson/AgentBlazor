@@ -23,6 +23,7 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Suggested C# code is illustrative only and must be short.");
         sb.AppendLine("- Suggested C# code must use AgentBlazor CapabilityResult and only call listed methods.");
         sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
+        sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
         sb.AppendLine();
         sb.AppendLine("JSON shape:");
         sb.AppendLine("""
@@ -98,11 +99,13 @@ public sealed class WorkflowSuggestionPromptBuilder
     private static void AppendServices(StringBuilder sb, ProjectModel model)
     {
         sb.AppendLine("Discovered services and public methods:");
-        var candidateMethods = model.Actions
+        var candidateActions = model.Actions
             .Where(action => action.ExposureMode is ActionExposureMode.Suggested or ActionExposureMode.Confirmed)
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
-            .Select(action => (action.SourceService, action.MethodName))
-            .ToHashSet();
+            .ToDictionary(
+                action => (action.SourceService, action.MethodName),
+                action => action,
+                new MethodKeyComparer());
 
         foreach (var service in model.Services
             .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
@@ -112,10 +115,17 @@ public sealed class WorkflowSuggestionPromptBuilder
             var methods = service.Methods
                 .Where(method => method.IsPublic)
                 .Where(method => AnalysisModelFilters.IsDeveloperFacingMethod(method.Name))
-                .Where(method => candidateMethods.Contains((service.TypeName, method.Name)))
+                .Where(method => candidateActions.ContainsKey((service.TypeName, method.Name)))
                 .OrderBy(method => method.Name)
                 .Take(20)
-                .Select(method => $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))})")
+                .Select(method =>
+                {
+                    var action = candidateActions[(service.TypeName, method.Name)];
+                    var approvalRecommended = action.IsMutationLikely ||
+                        action.RequiresApproval ||
+                        action.Classification is ActionClassification.Command or ActionClassification.Workflow;
+                    return $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))}) [mutation={approvalRecommended.ToString().ToLowerInvariant()}, approvalRecommended={approvalRecommended.ToString().ToLowerInvariant()}]";
+                })
                 .ToList();
 
             if (methods.Count == 0)
@@ -129,5 +139,17 @@ public sealed class WorkflowSuggestionPromptBuilder
                 sb.AppendLine($"  - {method}");
             }
         }
+    }
+
+    private sealed class MethodKeyComparer : IEqualityComparer<(string SourceService, string MethodName)>
+    {
+        public bool Equals((string SourceService, string MethodName) x, (string SourceService, string MethodName) y)
+            => string.Equals(x.SourceService, y.SourceService, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(x.MethodName, y.MethodName, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string SourceService, string MethodName) obj)
+            => HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.SourceService),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.MethodName));
     }
 }

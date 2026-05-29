@@ -39,10 +39,13 @@ The report includes:
 
 - discovered routes and pages
 - existing `[AgentCapability]` / `[AgentAction]` methods
-- developer-facing services and public methods
+- developer-facing services and public methods, with framework/helper noise filtered out
 - LLM workflow suggestions validated against the static analysis model
+- approval guidance for suggestions that reference mutating methods
 - install-readiness checks
 - recommended next steps
+
+The summary uses "AgentBlazor action adoption" to show how many actions are already confirmed with AgentBlazor attributes versus how many candidate actions were discovered but are not exposed yet.
 
 Run static analysis only when you do not want an LLM call:
 
@@ -90,6 +93,18 @@ agentblazor analyze ./MySolution.slnx --host MyBlazorApp
 ```
 
 If no provider is configured and the command cannot prompt, `analyze` exits before scanning and tells you which environment variables to set. Use `--static-only` to avoid provider configuration entirely.
+
+## Windows MSBuild Fallback
+
+`analyze` normally loads solutions through Roslyn `MSBuildWorkspace`. On machines where Visual Studio/MSBuild assemblies conflict, this can fail before project analysis starts. Version `0.2.4` and later fall back to static source-file analysis for known MSBuildWorkspace failures, including the `Microsoft.Build.Shared.XMakeElements` type-initializer error.
+
+You normally do not need to do anything. To force the fallback for diagnostics:
+
+```powershell
+$env:AGENTBLAZOR_STATIC_WORKSPACE = "1"
+agentblazor analyze .\MySolution.slnx --host MyBlazorApp --output .\analysis.md
+Remove-Item Env:AGENTBLAZOR_STATIC_WORKSPACE
+```
 
 ## Analyze Token Cost
 
