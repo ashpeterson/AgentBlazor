@@ -301,7 +301,7 @@ public sealed class ExistingAppScaffoldApplier
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
             ?? typeof(ExistingAppScaffoldApplier).Assembly.GetName().Version?.ToString()
-            ?? "0.2.4";
+            ?? "0.2.5";
 
         return version.Split('+', 2)[0];
     }
