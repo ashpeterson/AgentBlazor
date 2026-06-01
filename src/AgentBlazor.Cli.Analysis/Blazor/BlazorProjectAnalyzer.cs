@@ -39,10 +39,11 @@ public sealed class BlazorProjectAnalyzer : IProjectAnalyzer<BlazorFrameworkCont
         string description,
         AgentBlazorConfig? config = null,
         bool includeReadiness = true,
+        AnalysisScanScope scanScope = AnalysisScanScope.References,
         CancellationToken ct = default)
     {
         var modelBuilder = new ModelBuilder();
-        var model = await modelBuilder.BuildModelAsync(solutionOrProjectPath, hostProjectName, description, config, ct)
+        var model = await modelBuilder.BuildModelAsync(solutionOrProjectPath, hostProjectName, description, config, scanScope, ct)
             .ConfigureAwait(false);
 
         InstallReadinessReport? readiness = null;

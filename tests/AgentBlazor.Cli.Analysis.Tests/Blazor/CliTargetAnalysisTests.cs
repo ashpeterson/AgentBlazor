@@ -53,6 +53,41 @@ public sealed class CliTargetAnalysisTests
         Assert.True(analysis.Context.HasChatSurface);
     }
 
+    [Fact]
+    public async Task BlazorAnalyzer_SolutionScanScope_IncludesSiblingTenantProjects()
+    {
+        var previousStaticWorkspace = Environment.GetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE");
+        Environment.SetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE", "1");
+
+        try
+        {
+            var solutionPath = Path.Combine(FindRepoRoot(), "tests", "cli-targets", "multitenant-solution", "MultiTenantApp.slnx");
+            var analyzer = new BlazorProjectAnalyzer();
+
+            var referencesOnly = await analyzer.AnalyzeAsync(
+                solutionPath,
+                hostProjectName: "Host",
+                description: "Multi-tenant solution",
+                includeReadiness: false);
+
+            var fullSolution = await analyzer.AnalyzeAsync(
+                solutionPath,
+                hostProjectName: "Host",
+                description: "Multi-tenant solution",
+                includeReadiness: false,
+                scanScope: AnalysisScanScope.Solution);
+
+            Assert.DoesNotContain(referencesOnly.Model.Routes, route => route.Template == "/tenant-a/dashboard");
+            Assert.DoesNotContain(referencesOnly.Model.Services, service => service.TypeName == "TenantBillingService");
+            Assert.Contains(fullSolution.Model.Routes, route => route.Template == "/tenant-a/dashboard");
+            Assert.Contains(fullSolution.Model.Services, service => service.TypeName == "TenantBillingService");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AGENTBLAZOR_STATIC_WORKSPACE", previousStaticWorkspace);
+        }
+    }
+
     private static string FindRepoRoot()
     {
         var directory = Directory.GetCurrentDirectory();

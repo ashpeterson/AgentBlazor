@@ -144,7 +144,7 @@ public sealed class WatchCommand : AsyncCommand<WatchCommand.Settings>
                 state.HostProject,
                 state.Description,
                 config,
-                ct);
+                ct: ct);
 
             var modelWriter = new ModelWriter();
             var markdownGenerator = new MarkdownGenerator();
