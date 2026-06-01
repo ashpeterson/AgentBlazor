@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.5</Version>
+    <Version>0.2.7</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.5: CLI v1 analyze finalization. Filters helper/object-method noise from reports, replaces ambiguous action coverage with AgentBlazor action adoption, adds explicit RequiresApproval guidance for mutating workflow suggestions, and includes the v0.2.4 Windows MSBuildWorkspace static fallback.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.7: CLI multi-tenant solution scan scope. Adds analyze --scan-scope solution and fixes package assembly version metadata.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
