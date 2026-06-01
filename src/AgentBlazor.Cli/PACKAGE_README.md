@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.9
+dotnet tool install --global AgentBlazor.Cli --version 0.2.10
 ```
 
 Example:
@@ -40,6 +40,8 @@ Version `0.2.8` hardens solution-scope workflow suggestions when multiple projec
 
 Version `0.2.9` excludes test projects and test asset folders from default solution-scope analysis.
 
+Version `0.2.10` prioritizes safe read-only workflow suggestions, labels suggestion risk, and requires approval for mutating command suggestions.
+
 Reports filter helper/framework noise, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
 
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
@@ -48,7 +50,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
-- 0.2.9 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.9.md
+- 0.2.10 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.10.md
 - 0.2.5 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.5.md
 - 0.2.3 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.3.md
 - 0.2.2 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.2.md

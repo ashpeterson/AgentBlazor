@@ -549,7 +549,7 @@ public sealed class ActionScorer
             MethodName = method.Name,
             FilePath = service.FilePath,
             IsMutationLikely = score.IsMutation,
-            RequiresApproval = score.IsMutation && score.Classification == ActionClassification.Workflow,
+            RequiresApproval = score.IsMutation,
             Classification = score.Classification,
             Score = score.Score,
             Parameters = method.Parameters,

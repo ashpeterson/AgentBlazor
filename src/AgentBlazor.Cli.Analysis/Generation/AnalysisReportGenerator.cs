@@ -208,13 +208,16 @@ public sealed class AnalysisReportGenerator
 
             if (workflowSuggestions.Suggestions.Count > 0)
             {
-                foreach (var suggestion in workflowSuggestions.Suggestions)
+                foreach (var suggestion in workflowSuggestions.Suggestions
+                    .OrderBy(suggestion => GetSuggestionRiskRank(suggestion, model))
+                    .ThenByDescending(suggestion => suggestion.Confidence))
                 {
                     sb.AppendLine($"### {suggestion.Name}");
                     sb.AppendLine();
                     sb.AppendLine(suggestion.Description);
                     sb.AppendLine();
                     sb.AppendLine($"- Confidence: {suggestion.Confidence.ToString("0.00", CultureInfo.InvariantCulture)}");
+                    sb.AppendLine($"- Risk: {ActionRisk.Describe(GetSuggestionRiskBand(suggestion, model))}");
                     if (!string.IsNullOrWhiteSpace(suggestion.CapabilityClass))
                     {
                         sb.AppendLine($"- Suggested capability class: `{suggestion.CapabilityClass}`");
@@ -280,7 +283,8 @@ public sealed class AnalysisReportGenerator
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(action => !DuplicatesConfirmedAction(action, model))
             .Where(action => action.Score >= 0.7)
-            .OrderByDescending(action => action.Score)
+            .OrderBy(action => (int)ActionRisk.GetRiskBand(action))
+            .ThenByDescending(action => action.Score)
             .ThenBy(action => action.SourceService)
             .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
@@ -311,6 +315,7 @@ public sealed class AnalysisReportGenerator
             sb.AppendLine();
             sb.AppendLine($"- Existing method: `{action.SourceService}.{action.MethodName}`");
             sb.AppendLine($"- Classification: {action.Classification}");
+            sb.AppendLine($"- Risk: {ActionRisk.Describe(ActionRisk.GetRiskBand(action))}");
             sb.AppendLine($"- Mutation likely: {FormatBool(action.IsMutationLikely)}");
             sb.AppendLine($"- Approval recommended: {FormatBool(action.RequiresApproval)}");
             sb.AppendLine($"- Confidence: {action.Score.ToString("0.00", CultureInfo.InvariantCulture)}");
@@ -365,7 +370,8 @@ public sealed class AnalysisReportGenerator
         foreach (var recommendation in model.Recommendations
             .Where(recommendation => IsDeveloperFacingRecommendation(recommendation, model))
             .Where(recommendation => !DuplicatesConfirmedAction(recommendation, model))
-            .OrderByDescending(item => item.Priority)
+            .OrderBy(item => GetRecommendationRiskRank(item, model))
+            .ThenByDescending(item => item.Priority)
             .GroupBy(item => item.Suggestion, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .Take(5))
@@ -451,6 +457,31 @@ public sealed class AnalysisReportGenerator
                 (action.IsMutationLikely ||
                  action.RequiresApproval ||
                  action.Classification is ActionClassification.Command or ActionClassification.Workflow)));
+    }
+
+    private static ActionRiskBand GetSuggestionRiskBand(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        var actions = suggestion.Methods
+            .SelectMany(method => model.Actions
+                .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+                .Where(action =>
+                    string.Equals(action.SourceService, method.Service, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(action.MethodName, method.Method, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        return actions.Count == 0
+            ? ActionRiskBand.ApprovalRequired
+            : actions.Max(ActionRisk.GetRiskBand);
+    }
+
+    private static int GetSuggestionRiskRank(WorkflowSuggestion suggestion, ProjectModel model)
+        => (int)GetSuggestionRiskBand(suggestion, model);
+
+    private static int GetRecommendationRiskRank(RecommendationModel recommendation, ProjectModel model)
+    {
+        var action = model.Actions.FirstOrDefault(action =>
+            string.Equals($"{action.SourceService}.{action.MethodName}", recommendation.TargetName, StringComparison.OrdinalIgnoreCase));
+        return action is null ? (int)ActionRiskBand.ApprovalRequired : (int)ActionRisk.GetRiskBand(action);
     }
 
     private static string NormalizeName(string value)

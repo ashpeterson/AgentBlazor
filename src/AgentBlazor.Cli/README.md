@@ -18,6 +18,8 @@ Version `0.2.8` hardens solution-scope workflow suggestions when multiple scanne
 
 Version `0.2.9` excludes test projects and test asset folders from default solution-scope analysis.
 
+Version `0.2.10` prioritizes safe read-only workflow suggestions, labels suggestion risk, and requires approval for mutating command suggestions.
+
 See:
 
 - `docs/advanced/cli.md`

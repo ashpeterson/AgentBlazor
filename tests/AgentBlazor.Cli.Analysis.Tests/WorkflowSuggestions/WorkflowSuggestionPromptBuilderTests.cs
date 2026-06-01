@@ -168,6 +168,9 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("approvalRecommended=false", prompt);
         Assert.Contains("CreateOrderAsync", prompt);
         Assert.Contains("approvalRecommended=true", prompt);
+        Assert.Contains("risk=safe read-only", prompt);
+        Assert.Contains("risk=approval required", prompt);
+        Assert.Contains("Prefer safe read-only workflows first", prompt);
         Assert.Contains("RequiresApproval = true", prompt);
         Assert.DoesNotContain("ActivityIdHelper", prompt);
         Assert.DoesNotContain("ToString", prompt);
