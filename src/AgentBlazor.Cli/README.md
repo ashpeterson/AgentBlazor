@@ -14,6 +14,8 @@ Version `0.2.5` and later include a static source-file fallback for Windows/Rosl
 
 Version `0.2.7` and later include `--scan-scope solution` for multi-tenant and modular `.slnx` files where sibling projects should be scanned even when the Blazor host project does not reference them directly.
 
+Version `0.2.8` hardens solution-scope workflow suggestions when multiple scanned projects expose the same service and method names.
+
 See:
 
 - `docs/advanced/cli.md`

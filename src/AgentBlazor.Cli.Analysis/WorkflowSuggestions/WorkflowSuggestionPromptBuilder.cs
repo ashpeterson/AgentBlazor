@@ -102,9 +102,15 @@ public sealed class WorkflowSuggestionPromptBuilder
         var candidateActions = model.Actions
             .Where(action => action.ExposureMode is ActionExposureMode.Suggested or ActionExposureMode.Confirmed)
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
-            .ToDictionary(
+            .GroupBy(
                 action => (action.SourceService, action.MethodName),
-                action => action,
+                new MethodKeyComparer())
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(action => action.ExposureMode == ActionExposureMode.Confirmed)
+                    .ThenByDescending(action => action.Score)
+                    .First(),
                 new MethodKeyComparer());
 
         foreach (var service in model.Services

@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.7</Version>
+    <Version>0.2.8</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.7: CLI multi-tenant solution scan scope. Adds analyze --scan-scope solution and fixes package assembly version metadata.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.8: CLI solution-scope analysis hardening. Fixes duplicate service method keys in workflow suggestion prompt generation for multi-project solutions.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>

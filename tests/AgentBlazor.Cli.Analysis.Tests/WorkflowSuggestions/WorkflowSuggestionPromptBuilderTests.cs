@@ -179,4 +179,63 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("OrderCapabilities.ShowOpenOrdersAsync", prompt);
         Assert.DoesNotContain("- OrderCapabilities [", prompt);
     }
+
+    [Fact]
+    public void Build_AllowsDuplicateActionKeysFromSolutionScan()
+    {
+        var builder = new WorkflowSuggestionPromptBuilder();
+        var model = new ProjectModel
+        {
+            AppName = "TestApp",
+            BlazorHostProject = "TestApp",
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "EmailService",
+                    FilePath = "TenantA/EmailService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "SendEmailAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Send Email",
+                    SourceService = "EmailService",
+                    MethodName = "SendEmailAsync",
+                    FilePath = "TenantA/EmailService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.8
+                },
+                new ActionModel
+                {
+                    Name = "Send Email",
+                    SourceService = "EmailService",
+                    MethodName = "SendEmailAsync",
+                    FilePath = "TenantB/EmailService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.7
+                }
+            ]
+        };
+
+        var prompt = builder.Build(model);
+
+        Assert.Contains("EmailService", prompt);
+        Assert.Contains("SendEmailAsync", prompt);
+    }
 }
