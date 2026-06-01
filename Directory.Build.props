@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.9</Version>
+    <Version>0.2.10</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.9: CLI analysis filtering. Excludes test projects and test asset folders from default solution-scope analysis.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.10: CLI recommendation quality. Prioritizes safe read-only workflows, labels suggestion risk, and requires approval for mutating command suggestions.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>

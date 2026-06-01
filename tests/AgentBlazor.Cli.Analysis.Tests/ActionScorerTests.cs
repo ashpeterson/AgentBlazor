@@ -207,6 +207,18 @@ public class ActionScorerTests
         Assert.Equal(ActionExposureMode.Ignored, badAction.ExposureMode);
     }
 
+    [Fact]
+    public void ToActionModel_RequiresApproval_ForMutatingCommands()
+    {
+        var method = CreateMethod("SendEmailAsync");
+        var score = _scorer.ScoreMethod(method, "EmailService");
+
+        var action = _scorer.ToActionModel(method, CreateService("EmailService"), score);
+
+        Assert.True(action.IsMutationLikely);
+        Assert.True(action.RequiresApproval);
+    }
+
     #endregion
 
     #region Helpers

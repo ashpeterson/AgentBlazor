@@ -486,6 +486,114 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void GenerateMarkdown_PrioritizesSafeStaticCandidates_BeforeHighRiskAdminActions()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Reset Password",
+                    SourceService = "UserService",
+                    MethodName = "ResetPasswordAsync",
+                    FilePath = "Services/UserService.cs",
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 1,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Get Status Snapshot",
+                    SourceService = "OriginAIClient",
+                    MethodName = "GetStatusSnapshotAsync",
+                    FilePath = "Services/OriginAIClient.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.75,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ],
+            Recommendations = []
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.True(content.IndexOf("### Get Status Snapshot", StringComparison.Ordinal) <
+            content.IndexOf("### Reset Password", StringComparison.Ordinal));
+        Assert.Contains("- Risk: safe read-only", content);
+        Assert.Contains("- Risk: high-risk/admin", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_SortsLlmSuggestions_ByRiskBeforeConfidence()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Reset Password",
+                    SourceService = "UserService",
+                    MethodName = "ResetPasswordAsync",
+                    FilePath = "Services/UserService.cs",
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 1,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Get Status Snapshot",
+                    SourceService = "OriginAIClient",
+                    MethodName = "GetStatusSnapshotAsync",
+                    FilePath = "Services/OriginAIClient.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.75,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "Password reset",
+                    Description = "Reset user passwords.",
+                    Confidence = 0.95,
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "UserService", Method = "ResetPasswordAsync" }
+                    ]
+                },
+                new WorkflowSuggestion
+                {
+                    Name = "Status snapshot",
+                    Description = "Show current AI status.",
+                    Confidence = 0.70,
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "OriginAIClient", Method = "GetStatusSnapshotAsync" }
+                    ]
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+
+        Assert.True(content.IndexOf("### Status snapshot", StringComparison.Ordinal) <
+            content.IndexOf("### Password reset", StringComparison.Ordinal));
+        Assert.Contains("- Risk: safe read-only", content);
+        Assert.Contains("- Risk: high-risk/admin", content);
+    }
+
+    [Fact]
     public void GenerateMarkdown_DoesNotShowStaticCandidate_WhenEquivalentConfirmedActionExists()
     {
         var model = CreateModel() with

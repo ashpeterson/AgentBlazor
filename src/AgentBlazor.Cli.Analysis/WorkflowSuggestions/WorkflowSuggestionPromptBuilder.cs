@@ -24,6 +24,9 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Suggested C# code must use AgentBlazor CapabilityResult and only call listed methods.");
         sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
         sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
+        sb.AppendLine("- Prefer safe read-only workflows first: show, get, list, find, check, validate, explain, summarize, and status snapshots.");
+        sb.AppendLine("- Avoid auth, password reset, email sending, tenant mutation, message deletion, workflow execution, job execution, database mutation, and permission changes unless no safer workflow exists.");
+        sb.AppendLine("- If you must suggest a mutating or admin workflow, suggest at most one and explain that it needs human approval.");
         sb.AppendLine();
         sb.AppendLine("JSON shape:");
         sb.AppendLine("""
@@ -122,15 +125,15 @@ public sealed class WorkflowSuggestionPromptBuilder
                 .Where(method => method.IsPublic)
                 .Where(method => AnalysisModelFilters.IsDeveloperFacingMethod(method.Name))
                 .Where(method => candidateActions.ContainsKey((service.TypeName, method.Name)))
-                .OrderBy(method => method.Name)
+                .OrderBy(method => (int)ActionRisk.GetRiskBand(candidateActions[(service.TypeName, method.Name)]))
+                .ThenByDescending(method => candidateActions[(service.TypeName, method.Name)].Score)
+                .ThenBy(method => method.Name)
                 .Take(20)
                 .Select(method =>
                 {
                     var action = candidateActions[(service.TypeName, method.Name)];
-                    var approvalRecommended = action.IsMutationLikely ||
-                        action.RequiresApproval ||
-                        action.Classification is ActionClassification.Command or ActionClassification.Workflow;
-                    return $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))}) [mutation={approvalRecommended.ToString().ToLowerInvariant()}, approvalRecommended={approvalRecommended.ToString().ToLowerInvariant()}]";
+                    var approvalRecommended = ActionRisk.GetRiskBand(action) is ActionRiskBand.ApprovalRequired or ActionRiskBand.HighRisk;
+                    return $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))}) [risk={ActionRisk.Describe(ActionRisk.GetRiskBand(action))}, mutation={action.IsMutationLikely.ToString().ToLowerInvariant()}, approvalRecommended={approvalRecommended.ToString().ToLowerInvariant()}]";
                 })
                 .ToList();
 
