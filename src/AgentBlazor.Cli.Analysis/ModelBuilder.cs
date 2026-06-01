@@ -102,6 +102,9 @@ public sealed class ModelBuilder
         var analysisProjects = solution is null
             ? [hostProject]
             : GetAnalysisProjects(solution, hostProject, scanScope);
+        analysisProjects = analysisProjects
+            .Where(project => project.Id == hostProject.Id || !IsTestProject(project))
+            .ToList();
 
         // 1. Analyze Razor files
         OnProgress?.Invoke("Scanning Razor components...");
@@ -313,7 +316,7 @@ public sealed class ModelBuilder
             .ToList();
 
         // 9. Build project nodes
-        var projectNodes = projects.Select(p => new ProjectNode
+        var projectNodes = analysisProjects.Select(p => new ProjectNode
         {
             Name = p.Name,
             Path = MakeRelativePath(Path.GetDirectoryName(solutionOrProjectPath)!, p.FilePath ?? ""),
@@ -392,6 +395,75 @@ public sealed class ModelBuilder
         var visited = new HashSet<ProjectId> { hostProject.Id };
         AddReferencedProjects(solution, hostProject, projects, visited);
         return projects;
+    }
+
+    private static bool IsTestProject(Project project)
+    {
+        if (IsTestLikeName(project.Name))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(project.FilePath))
+        {
+            return false;
+        }
+
+        var fullPath = Path.GetFullPath(project.FilePath);
+        var fileName = Path.GetFileNameWithoutExtension(fullPath);
+        if (IsTestLikeName(fileName))
+        {
+            return true;
+        }
+
+        var segments = fullPath
+            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Where(segment => !string.IsNullOrWhiteSpace(segment));
+
+        foreach (var segment in segments)
+        {
+            if (IsTestLikePathSegment(segment))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsTestLikeName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        return name.Equals("Tests", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("Test", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains(".Tests", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains(".Test", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("Tests", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("Test", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Test", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("xunit", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("nunit", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("mstest", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTestLikePathSegment(string segment)
+    {
+        if (string.IsNullOrWhiteSpace(segment))
+        {
+            return false;
+        }
+
+        return segment.Equals("_tests", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("__tests__", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("testdata", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("test-data", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("testassets", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("test-assets", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("fixtures", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddReferencedProjects(

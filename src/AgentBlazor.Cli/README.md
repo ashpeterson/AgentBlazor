@@ -16,6 +16,8 @@ Version `0.2.7` and later include `--scan-scope solution` for multi-tenant and m
 
 Version `0.2.8` hardens solution-scope workflow suggestions when multiple scanned projects expose the same service and method names.
 
+Version `0.2.9` excludes test projects and test asset folders from default solution-scope analysis.
+
 See:
 
 - `docs/advanced/cli.md`
