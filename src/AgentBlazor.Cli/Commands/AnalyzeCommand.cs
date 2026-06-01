@@ -38,6 +38,10 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
         [Description("Skip the LLM workflow suggestion call and write a static-analysis-only report.")]
         public bool StaticOnly { get; init; }
 
+        [CommandOption("--scan-scope <SCOPE>")]
+        [Description("Projects to scan: 'references' scans the host project plus project references; 'solution' scans every project in the solution.")]
+        public string ScanScope { get; init; } = "references";
+
         [CommandOption("-y|--non-interactive")]
         [Description("Skip interactive prompts and use defaults.")]
         public bool NonInteractive { get; init; }
@@ -68,6 +72,7 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                 : WorkflowSuggestionClientFactory.Create(clientOptions);
             var analyzerRegistry = new ProjectAnalyzerRegistry();
             var analyzer = analyzerRegistry.ResolveBlazor(settings.Framework, path);
+            var scanScope = ParseScanScope(settings.ScanScope);
 
             var warnings = new List<string>();
             ProjectModel model = null!;
@@ -84,7 +89,8 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
                         hostProject,
                         description,
                         config,
-                        includeReadiness: !settings.NoReadiness);
+                        includeReadiness: !settings.NoReadiness,
+                        scanScope: scanScope);
                     model = analysis.Model;
                     readiness = analysis.Readiness;
                     blazorContext = analysis.Context;
@@ -170,6 +176,15 @@ public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
             ? output
             : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), output));
     }
+
+    private static AnalysisScanScope ParseScanScope(string? value)
+        => value?.Trim().ToLowerInvariant() switch
+        {
+            null or "" or "references" or "reference" or "refs" => AnalysisScanScope.References,
+            "solution" or "all" => AnalysisScanScope.Solution,
+            _ => throw new InvalidOperationException(
+                $"Unsupported scan scope '{value}'. Use 'references' or 'solution'.")
+        };
 
     private static WorkflowSuggestionClientOptions PromptForMissingOpenAIApiKey(
         WorkflowSuggestionClientOptions options,

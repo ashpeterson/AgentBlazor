@@ -25,5 +25,6 @@ public interface IProjectAnalyzer<TFrameworkContext>
         string description,
         AgentBlazorConfig? config = null,
         bool includeReadiness = true,
+        AnalysisScanScope scanScope = AnalysisScanScope.References,
         CancellationToken ct = default);
 }

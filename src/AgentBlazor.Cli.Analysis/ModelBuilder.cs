@@ -26,6 +26,7 @@ public sealed class ModelBuilder
         string? hostProjectName,
         string appDescription,
         AgentBlazorConfig? config = null,
+        AnalysisScanScope scanScope = AnalysisScanScope.References,
         CancellationToken ct = default)
     {
         // Apply config to analyzers
@@ -100,7 +101,7 @@ public sealed class ModelBuilder
             : projectDir;
         var analysisProjects = solution is null
             ? [hostProject]
-            : GetAnalysisProjects(solution, hostProject);
+            : GetAnalysisProjects(solution, hostProject, scanScope);
 
         // 1. Analyze Razor files
         OnProgress?.Invoke("Scanning Razor components...");
@@ -377,8 +378,16 @@ public sealed class ModelBuilder
         }
     }
 
-    private static IReadOnlyList<Project> GetAnalysisProjects(Solution solution, Project hostProject)
+    private static IReadOnlyList<Project> GetAnalysisProjects(
+        Solution solution,
+        Project hostProject,
+        AnalysisScanScope scanScope)
     {
+        if (scanScope == AnalysisScanScope.Solution)
+        {
+            return solution.Projects.ToList();
+        }
+
         var projects = new List<Project> { hostProject };
         var visited = new HashSet<ProjectId> { hostProject.Id };
         AddReferencedProjects(solution, hostProject, projects, visited);

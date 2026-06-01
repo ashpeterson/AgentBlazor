@@ -12,6 +12,8 @@ If no OpenAI key is configured and the terminal is interactive, `analyze` prompt
 
 Version `0.2.5` and later include a static source-file fallback for Windows/Roslyn MSBuildWorkspace load failures. Current reports filter helper noise, show AgentBlazor action adoption, and include approval guidance for mutating workflow suggestions.
 
+Version `0.2.6` and later include `--scan-scope solution` for multi-tenant and modular `.slnx` files where sibling projects should be scanned even when the Blazor host project does not reference them directly.
+
 See:
 
 - `docs/advanced/cli.md`

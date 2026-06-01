@@ -35,6 +35,16 @@ By default the report is written to `.agentblazor/analysis.md` next to the solut
 agentblazor analyze ./MySolution.slnx --host MyBlazorApp --output ./agentblazor-analysis.md
 ```
 
+`--host` identifies the Blazor startup project used for host-shape and install-readiness checks. It does not mean "only scan this project." By default `analyze` scans the host project plus its transitive project references.
+
+For multi-tenant or modular solutions where tenant projects live as sibling projects in the same `.slnx` but are not referenced by the host project, use full-solution scope:
+
+```bash
+agentblazor analyze ./MySolution.slnx --host MyBlazorApp --scan-scope solution
+```
+
+Readiness checks still apply to the host project only, because `Program.cs`, shell assets, endpoint mapping, and chat placement belong to the runnable app. Routes, services, capabilities, and candidate actions are scanned from every project in the solution when `--scan-scope solution` is used.
+
 The report includes:
 
 - discovered routes and pages
