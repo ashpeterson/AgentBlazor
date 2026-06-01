@@ -81,6 +81,8 @@ public sealed class CliTargetAnalysisTests
             Assert.DoesNotContain(referencesOnly.Model.Services, service => service.TypeName == "TenantBillingService");
             Assert.Contains(fullSolution.Model.Routes, route => route.Template == "/tenant-a/dashboard");
             Assert.Contains(fullSolution.Model.Services, service => service.TypeName == "TenantBillingService");
+            Assert.DoesNotContain(fullSolution.Model.Projects, project => project.Name == "fwCRUD.Tests");
+            Assert.DoesNotContain(fullSolution.Model.Services, service => service.TypeName == "Restore");
         }
         finally
         {
