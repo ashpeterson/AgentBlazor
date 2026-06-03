@@ -31,8 +31,13 @@ public static class AnalysisModelFilters
         "ExceptionHandler",
         "LayoutService",
         "Cache",
+        "Runner",
+        "Scheduler",
+        "StateStore",
+        "TenantStore",
         "TicketStore",
         "DataSourceService",
+        "MessageAssetService",
         "UserProfileState",
         "ValidationService"
     ];
@@ -60,7 +65,17 @@ public static class AnalysisModelFilters
         "/Services/Caching/",
         "\\Services\\Caching\\",
         "/Services/Identity/",
-        "\\Services\\Identity\\"
+        "\\Services\\Identity\\",
+        "/Services/AI/Chat/",
+        "\\Services\\AI\\Chat\\",
+        "/Services/AI/State/",
+        "\\Services\\AI\\State\\",
+        "/Services/AI/Runner/",
+        "\\Services\\AI\\Runner\\",
+        "/Services/AI/Scheduler/",
+        "\\Services\\AI\\Scheduler\\",
+        "/Tenants/",
+        "\\Tenants\\"
     ];
 
     private static readonly string[] UiStateMethodPrefixes =

@@ -20,6 +20,8 @@ Version `0.2.9` excludes test projects and test asset folders from default solut
 
 Version `0.2.10` prioritizes safe read-only workflow suggestions, labels suggestion risk, and requires approval for mutating command suggestions.
 
+Version `0.2.11` filters internal chat persistence, state store, runner, scheduler, and tenant store services from workflow suggestions and recommended next steps.
+
 See:
 
 - `docs/advanced/cli.md`

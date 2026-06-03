@@ -232,6 +232,51 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                             IsPublic = true
                         }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AIChatMessageAssetService",
+                    FilePath = "Core/Services/AI/Chat/AIChatMessageAssetService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetLatestChatIdAsync",
+                            ReturnType = "Task<string?>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AIJobRunnerService",
+                    FilePath = "Core/Services/AI/Runner/AIJobRunnerService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "RunNowAsync",
+                            ReturnType = "Task<JobResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "TenantStore",
+                    FilePath = "Tenants/TenantStore.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetAllAsync",
+                            ReturnType = "Task<IEnumerable<TenantInfo>>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
                 }
             ],
             Actions =
@@ -266,6 +311,37 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Score = 0.99,
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Workflow
+                },
+                new ActionModel
+                {
+                    Name = "Get Latest Chat ID",
+                    SourceService = "AIChatMessageAssetService",
+                    MethodName = "GetLatestChatIdAsync",
+                    FilePath = "Core/Services/AI/Chat/AIChatMessageAssetService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Run Now",
+                    SourceService = "AIJobRunnerService",
+                    MethodName = "RunNowAsync",
+                    FilePath = "Core/Services/AI/Runner/AIJobRunnerService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true
+                },
+                new ActionModel
+                {
+                    Name = "Get All",
+                    SourceService = "TenantStore",
+                    MethodName = "GetAllAsync",
+                    FilePath = "Tenants/TenantStore.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
                 }
             ]
         };
@@ -281,6 +357,11 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("HubClient", content);
         Assert.DoesNotContain("AccountController", content);
         Assert.DoesNotContain("EmailFactory", content);
+        Assert.DoesNotContain("AIChatMessageAssetService", content);
+        Assert.DoesNotContain("GetLatestChatIdAsync", content);
+        Assert.DoesNotContain("AIJobRunnerService", content);
+        Assert.DoesNotContain("RunNowAsync", content);
+        Assert.DoesNotContain("TenantStore", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
     }
