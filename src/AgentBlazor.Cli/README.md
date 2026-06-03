@@ -24,6 +24,8 @@ Version `0.2.11` filters internal chat persistence, state store, runner, schedul
 
 Version `0.2.12` improves real-project solution scans by linking injected interfaces to implementation services, filtering infrastructure/identity/storage/http plumbing, and clearly reporting when all discovered services were filtered out.
 
+Version `0.2.13` improves framework-style Blazor app analysis by explaining component-driven routing, filtering manager/state/auth/token/http plumbing, and using validated LLM workflow suggestions instead of appending static action guesses when LLM suggestions are available.
+
 See:
 
 - `docs/advanced/cli.md`

@@ -20,6 +20,7 @@ public static class AnalysisModelFilters
         "DbContextFactory",
         "Factory",
         "Builder",
+        "Manager",
         "Helper",
         "Utility",
         "Provider",
@@ -42,9 +43,11 @@ public static class AnalysisModelFilters
         "HubService",
         "HubConnection",
         "HttpClientService",
+        "HttpService",
         "ExceptionHandler",
         "ExecutionContext",
         "LayoutService",
+        "State",
         "Cache",
         "Runner",
         "Scheduler",
@@ -57,6 +60,7 @@ public static class AnalysisModelFilters
         "DataSourceService",
         "FakeData",
         "FakeStorage",
+        "Jwt",
         "JwtService",
         "MessageAssetService",
         "EmbeddingService",
@@ -101,6 +105,8 @@ public static class AnalysisModelFilters
         "\\Services\\Identity\\",
         "/Identity/",
         "\\Identity\\",
+        "/Security/",
+        "\\Security\\",
         "/Services/AI/Chat/",
         "\\Services\\AI\\Chat\\",
         "/Services/AI/State/",
@@ -150,9 +156,11 @@ public static class AnalysisModelFilters
     [
         "Dispose",
         "DisposeAsync",
+        "Clone",
         "Equals",
         "GetHashCode",
         "GetType",
+        "Hydrate",
         "Load",
         "LoadAsync",
         "OnPropertyChanged",
@@ -161,6 +169,21 @@ public static class AnalysisModelFilters
         "ToString",
         "IsHighlighted",
         "DescribeSignals"
+    ];
+
+    private static readonly string[] SensitiveMethodNameFragments =
+    [
+        "AccessToken",
+        "GenerateToken",
+        "GetToken",
+        "LoginUser",
+        "LogoutUser",
+        "Passkey",
+        "PersonalAccessToken",
+        "RefreshToken",
+        "ValidatePassword",
+        "ValidateUser",
+        "VerifyTwoFactor"
     ];
 
     public static bool IsDeveloperFacingService(ServiceModel service, ProjectModel? model = null)
@@ -202,6 +225,11 @@ public static class AnalysisModelFilters
             return false;
         }
 
+        if (SensitiveMethodNameFragments.Any(fragment => action.MethodName.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
         if (InfrastructureServiceNameFragments.Any(fragment => action.SourceService.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
@@ -223,6 +251,11 @@ public static class AnalysisModelFilters
 
         if (UiStateMethodNames.Contains(methodName, StringComparer.OrdinalIgnoreCase) ||
             UiStateMethodNames.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (SensitiveMethodNameFragments.Any(fragment => normalized.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
         }

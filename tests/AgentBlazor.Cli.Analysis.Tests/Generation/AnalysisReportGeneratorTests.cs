@@ -400,6 +400,21 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                 },
                 new ServiceModel
                 {
+                    TypeName = "HttpService",
+                    FilePath = "Blazor.Modules/Core/Services/HttpService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetAccessToken",
+                            ReturnType = "Task<string>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
                     TypeName = "EFCoreConfigurationValidator",
                     FilePath = "Shared/Features/EFCore/Configuration/EFCoreConfigurationValidator.cs",
                     Methods =
@@ -438,6 +453,71 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                             Name = "CreateInstance",
                             ReturnType = "ServerExecutionContext",
                             IsPublic = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserManager",
+                    FilePath = "Oqtane.Server/Managers/UserManager.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ValidateUser",
+                            ReturnType = "Task<UserValidateResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "JwtManager",
+                    FilePath = "Oqtane.Server/Security/JwtManager.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GenerateToken",
+                            ReturnType = "string",
+                            IsPublic = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "PageState",
+                    FilePath = "Oqtane.Client/UI/PageState.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "Clone",
+                            ReturnType = "PageState",
+                            IsPublic = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserService",
+                    FilePath = "Services/UserService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ValidateUserAsync",
+                            ReturnType = "Task<UserValidateResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        },
+                        new ServiceMethodModel
+                        {
+                            Name = "GetTokenAsync",
+                            ReturnType = "Task<string>",
+                            IsPublic = true,
+                            IsAsync = true
                         }
                     ]
                 }
@@ -590,6 +670,16 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                 },
                 new ActionModel
                 {
+                    Name = "Get Access Token",
+                    SourceService = "HttpService",
+                    MethodName = "GetAccessToken",
+                    FilePath = "Blazor.Modules/Core/Services/HttpService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
                     Name = "Validate",
                     SourceService = "EFCoreConfigurationValidator",
                     MethodName = "Validate",
@@ -618,6 +708,56 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Score = 0.99,
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Command
+                },
+                new ActionModel
+                {
+                    Name = "Validate User",
+                    SourceService = "UserManager",
+                    MethodName = "ValidateUser",
+                    FilePath = "Oqtane.Server/Managers/UserManager.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Validation
+                },
+                new ActionModel
+                {
+                    Name = "Generate Token",
+                    SourceService = "JwtManager",
+                    MethodName = "GenerateToken",
+                    FilePath = "Oqtane.Server/Security/JwtManager.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Export
+                },
+                new ActionModel
+                {
+                    Name = "Clone",
+                    SourceService = "PageState",
+                    MethodName = "Clone",
+                    FilePath = "Oqtane.Client/UI/PageState.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command
+                },
+                new ActionModel
+                {
+                    Name = "Validate User",
+                    SourceService = "UserService",
+                    MethodName = "ValidateUserAsync",
+                    FilePath = "Services/UserService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Validation
+                },
+                new ActionModel
+                {
+                    Name = "Get Token",
+                    SourceService = "UserService",
+                    MethodName = "GetTokenAsync",
+                    FilePath = "Services/UserService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
                 }
             ]
         };
@@ -652,14 +792,51 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("Find By Email", content);
         Assert.DoesNotContain("AuthorizedHttpClientService", content);
         Assert.DoesNotContain("Get From A P I", content);
+        Assert.DoesNotContain("HttpService", content);
+        Assert.DoesNotContain("Get Access Token", content);
         Assert.DoesNotContain("EFCoreConfigurationValidator", content);
         Assert.DoesNotContain("ValidateOptionsResult", content);
         Assert.DoesNotContain("NotificationHubService", content);
         Assert.DoesNotContain("Send Notification", content);
         Assert.DoesNotContain("ServerExecutionContext", content);
         Assert.DoesNotContain("Create Instance", content);
+        Assert.DoesNotContain("UserManager", content);
+        Assert.DoesNotContain("Validate User", content);
+        Assert.DoesNotContain("JwtManager", content);
+        Assert.DoesNotContain("Generate Token", content);
+        Assert.DoesNotContain("PageState", content);
+        Assert.DoesNotContain("ValidateUserAsync", content);
+        Assert.DoesNotContain("Validate User", content);
+        Assert.DoesNotContain("GetTokenAsync", content);
+        Assert.DoesNotContain("Get Token", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_ExplainsComponentDrivenRouting_WhenComponentsHaveNoPageRoutes()
+    {
+        var model = CreateModel() with
+        {
+            Routes = [],
+            Pages = [],
+            Components =
+            [
+                new ComponentModel
+                {
+                    Id = "admin_users_index",
+                    Name = "Index",
+                    FilePath = "Modules/Admin/Users/Index.razor",
+                    IsPage = false
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("No Razor `@page` routes were discovered.", content);
+        Assert.Contains("component-driven or framework-managed routing", content);
+        Assert.Contains("route-to-action linking is unavailable", content);
     }
 
     [Fact]
@@ -692,6 +869,46 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.Contains("No developer-facing service-like classes were discovered.", content);
         Assert.DoesNotContain("### `AuthorizedHttpClientService`", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_UsesValidatedWorkflowSuggestions_InsteadOfStaticActionRecommendations()
+    {
+        var model = CreateModel() with
+        {
+            Recommendations =
+            [
+                new RecommendationModel
+                {
+                    Type = RecommendationType.AddAgentAction,
+                    TargetName = "OrderService.FindOrdersAsync",
+                    Suggestion = """Add `[AgentAction("Find Orders")]`""",
+                    Priority = 0.9
+                }
+            ]
+        };
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "Find orders",
+                    Description = "Find open orders.",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                    ],
+                    Confidence = 0.9
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+
+        Assert.Contains("Review the validated workflow suggestions above", content);
+        Assert.DoesNotContain("""Add `[AgentAction("Find Orders")]`""", content);
     }
 
     [Fact]
