@@ -211,7 +211,17 @@ public sealed class ModelBuilder
 
             if (diReg != null)
             {
-                return s with { Lifetime = diReg.Lifetime.ToString() };
+                var serviceTypes = s.ServiceTypes
+                    .Concat([diReg.ServiceType])
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return s with
+                {
+                    Lifetime = diReg.Lifetime.ToString(),
+                    ImplementationType = diReg.ImplementationType,
+                    ServiceTypes = serviceTypes
+                };
             }
             return s;
         }).ToList();

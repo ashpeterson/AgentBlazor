@@ -216,20 +216,26 @@ public sealed class WorkflowSuggestionParser
     private static readonly HashSet<string> IgnoredMethodWords = new(StringComparer.Ordinal)
     {
         "add",
+        "by",
+        "code",
         "create",
         "delete",
         "dispatch",
         "find",
         "get",
+        "id",
+        "key",
         "list",
         "load",
         "manage",
+        "number",
         "query",
         "remove",
         "run",
         "search",
         "set",
         "show",
+        "slug",
         "update"
     };
 

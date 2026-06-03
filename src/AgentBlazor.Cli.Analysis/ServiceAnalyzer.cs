@@ -214,11 +214,20 @@ public sealed class ServiceAnalyzer
             });
         }
 
+        var serviceTypes = classDecl.BaseList?.Types
+            .Select(type => type.Type.ToString())
+            .Where(type => type.StartsWith("I", StringComparison.Ordinal) &&
+                           type.Length > 1 &&
+                           char.IsUpper(type[1]))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+
         return new ServiceModel
         {
             Id = GenerateId(className),
             TypeName = className,
             FilePath = document.FilePath ?? "",
+            ServiceTypes = serviceTypes,
             Methods = methods
         };
     }

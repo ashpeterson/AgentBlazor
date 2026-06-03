@@ -189,6 +189,48 @@ public sealed class WorkflowSuggestionParserTests
     }
 
     [Fact]
+    public void ParseAndValidate_AcceptsLookupMethods_WhenWorkflowMatchesDomainSubject()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Get Product By Slug",
+                    SourceService = "ProductApiService",
+                    MethodName = "GetProductBySlugAsync",
+                    FilePath = "Services/ProductApiService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.8
+                }
+            ]
+        };
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "View Product Details",
+              "description": "Show detailed information about a selected product.",
+              "methods": [
+                { "service": "ProductApiService", "method": "GetProductBySlugAsync" }
+              ],
+              "confidence": 0.82
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal("View Product Details", suggestion.Name);
+        Assert.Empty(result.Rejected);
+    }
+
+    [Fact]
     public void ParseAndValidate_AcceptsMethodReferencesThatIncludeParameterLists()
     {
         var parser = new WorkflowSuggestionParser();

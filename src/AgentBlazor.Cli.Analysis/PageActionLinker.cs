@@ -39,15 +39,14 @@ public sealed partial class PageActionLinker
         // Find services that are injected into this page
         foreach (var service in services)
         {
-            var serviceTypeName = NormalizeTypeName(service.TypeName);
-            if (!injectedTypes.Contains(serviceTypeName)) continue;
+            if (!IsInjectedServiceMatch(service, injectedTypes)) continue;
 
             linkedServices.Add(service.TypeName);
 
             // Look for method calls from this service
             foreach (var method in service.Methods)
             {
-                if (IsMethodCalledInContent(content, page.InjectedServices, service.TypeName, method.Name))
+                if (IsMethodCalledInContent(content, page.InjectedServices, service, method.Name))
                 {
                     methodCallsFound.Add($"{service.TypeName}.{method.Name}");
 
@@ -151,12 +150,13 @@ public sealed partial class PageActionLinker
     private bool IsMethodCalledInContent(
         string content,
         IReadOnlyList<InjectedServiceModel> injections,
-        string serviceType,
+        ServiceModel service,
         string methodName)
     {
         // Find the field name for this service type
         var injection = injections.FirstOrDefault(i =>
-            NormalizeTypeName(i.TypeName).Equals(NormalizeTypeName(serviceType), StringComparison.OrdinalIgnoreCase));
+            GetServiceAliases(service).Any(alias =>
+                NormalizeTypeName(i.TypeName).Equals(NormalizeTypeName(alias), StringComparison.OrdinalIgnoreCase)));
 
         if (injection == null) return false;
 
@@ -182,12 +182,39 @@ public sealed partial class PageActionLinker
 
     private static string NormalizeTypeName(string typeName)
     {
+        var name = typeName.Split('.').Last();
+
         // Remove interface prefix 'I' if present
-        if (typeName.StartsWith('I') && typeName.Length > 1 && char.IsUpper(typeName[1]))
+        if (name.StartsWith('I') && name.Length > 1 && char.IsUpper(name[1]))
         {
-            return typeName[1..];
+            name = name[1..];
         }
-        return typeName;
+
+        return name
+            .Replace("ApiService", "Service", StringComparison.OrdinalIgnoreCase)
+            .Replace("ClientService", "Service", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsInjectedServiceMatch(ServiceModel service, IReadOnlySet<string> injectedTypes)
+    {
+        return GetServiceAliases(service)
+            .Select(NormalizeTypeName)
+            .Any(injectedTypes.Contains);
+    }
+
+    private static IEnumerable<string> GetServiceAliases(ServiceModel service)
+    {
+        yield return service.TypeName;
+
+        if (!string.IsNullOrWhiteSpace(service.ImplementationType))
+        {
+            yield return service.ImplementationType;
+        }
+
+        foreach (var serviceType in service.ServiceTypes)
+        {
+            yield return serviceType;
+        }
     }
 }
 
