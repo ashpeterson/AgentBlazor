@@ -53,7 +53,7 @@ public sealed class AnalysisReportGenerator
             WriteReadiness(sb, readiness);
         }
 
-        WriteNextSteps(sb, model, readiness);
+        WriteNextSteps(sb, model, readiness, workflowSuggestions);
         return sb.ToString();
     }
 
@@ -92,7 +92,15 @@ public sealed class AnalysisReportGenerator
         sb.AppendLine();
         if (model.Routes.Count == 0)
         {
-            sb.AppendLine("No Razor routes were discovered.");
+            if (model.Components.Count > 0)
+            {
+                sb.AppendLine($"No Razor `@page` routes were discovered. {model.Components.Count} Razor components were discovered, so this app likely uses component-driven or framework-managed routing; route-to-action linking is unavailable for those components.");
+            }
+            else
+            {
+                sb.AppendLine("No Razor routes were discovered.");
+            }
+
             sb.AppendLine();
             return;
         }
@@ -355,7 +363,11 @@ public sealed class AnalysisReportGenerator
         sb.AppendLine();
     }
 
-    private static void WriteNextSteps(StringBuilder sb, ProjectModel model, InstallReadinessReport? readiness)
+    private static void WriteNextSteps(
+        StringBuilder sb,
+        ProjectModel model,
+        InstallReadinessReport? readiness,
+        WorkflowSuggestionSet? workflowSuggestions)
     {
         sb.AppendLine("## Recommended Next Steps");
         sb.AppendLine();
@@ -370,17 +382,29 @@ public sealed class AnalysisReportGenerator
             }
         }
 
-        foreach (var recommendation in model.Recommendations
-            .Where(recommendation => IsDeveloperFacingRecommendation(recommendation, model))
-            .Where(recommendation => !DuplicatesConfirmedAction(recommendation, model))
-            .OrderBy(item => GetRecommendationRiskRank(item, model))
-            .ThenByDescending(item => item.Priority)
-            .GroupBy(item => item.Suggestion, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .Take(5))
+        var includeStaticActionRecommendations = workflowSuggestions is null ||
+            workflowSuggestions.Suggestions.Count == 0;
+
+        if (!includeStaticActionRecommendations && workflowSuggestions?.Suggestions.Count > 0)
         {
             hasSteps = true;
-            sb.AppendLine($"- {recommendation.Suggestion}");
+            sb.AppendLine("- Review the validated workflow suggestions above and choose which ones should become explicit `[AgentAction]` capabilities.");
+        }
+
+        if (includeStaticActionRecommendations)
+        {
+            foreach (var recommendation in model.Recommendations
+                .Where(recommendation => IsDeveloperFacingRecommendation(recommendation, model))
+                .Where(recommendation => !DuplicatesConfirmedAction(recommendation, model))
+                .OrderBy(item => GetRecommendationRiskRank(item, model))
+                .ThenByDescending(item => item.Priority)
+                .GroupBy(item => item.Suggestion, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Take(5))
+            {
+                hasSteps = true;
+                sb.AppendLine($"- {recommendation.Suggestion}");
+            }
         }
 
         if (!hasSteps)

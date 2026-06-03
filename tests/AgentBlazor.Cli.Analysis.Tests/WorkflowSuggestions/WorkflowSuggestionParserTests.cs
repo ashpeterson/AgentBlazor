@@ -155,10 +155,10 @@ public sealed class WorkflowSuggestionParserTests
             [
                 new ActionModel
                 {
-                    Name = "Get Access Token",
-                    SourceService = "AccessTokenService",
-                    MethodName = "GetAccessTokenAsync",
-                    FilePath = "Services/AccessTokenService.cs",
+                    Name = "Get Products",
+                    SourceService = "ProductCatalogService",
+                    MethodName = "GetProductsAsync",
+                    FilePath = "Services/ProductCatalogService.cs",
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Query,
                     Score = 0.8
@@ -172,7 +172,7 @@ public sealed class WorkflowSuggestionParserTests
               "name": "Role assignment",
               "description": "Assign roles to users.",
               "methods": [
-                { "service": "AccessTokenService", "method": "GetAccessTokenAsync" }
+                { "service": "ProductCatalogService", "method": "GetProductsAsync" }
               ],
               "confidence": 0.82
             }
@@ -185,7 +185,7 @@ public sealed class WorkflowSuggestionParserTests
         Assert.Empty(result.Suggestions);
         var rejected = Assert.Single(result.Rejected);
         Assert.Contains("do not align", rejected.Reason);
-        Assert.Contains("AccessTokenService.GetAccessTokenAsync", rejected.Reason);
+        Assert.Contains("ProductCatalogService.GetProductsAsync", rejected.Reason);
     }
 
     [Fact]

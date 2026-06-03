@@ -250,7 +250,7 @@ public sealed class ExistingAppScaffoldPlannerTests : IDisposable
         Assert.Contains("""<PackageReference Include="MudBlazor" />""", projectText, StringComparison.Ordinal);
         Assert.DoesNotContain("PackageReference Include=\"AgentBlazor\" Version=", projectText, StringComparison.Ordinal);
         Assert.DoesNotContain("PackageReference Include=\"MudBlazor\" Version=", projectText, StringComparison.Ordinal);
-        Assert.Contains("""<PackageVersion Include="AgentBlazor" Version="0.2.11" />""", centralPackagesText, StringComparison.Ordinal);
+        Assert.Contains("""<PackageVersion Include="AgentBlazor" Version="0.2.13" />""", centralPackagesText, StringComparison.Ordinal);
         Assert.Contains("""<PackageVersion Include="MudBlazor" Version="9.0.0" />""", centralPackagesText, StringComparison.Ordinal);
     }
 
