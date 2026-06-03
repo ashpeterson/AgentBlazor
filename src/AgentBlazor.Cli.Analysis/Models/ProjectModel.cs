@@ -77,6 +77,7 @@ public sealed record ServiceModel
     public string Id { get; init; } = "";
     public string TypeName { get; init; } = "";
     public string? ImplementationType { get; init; }
+    public IReadOnlyList<string> ServiceTypes { get; init; } = [];
     public string FilePath { get; init; } = "";
     public string Lifetime { get; init; } = "Scoped"; // Scoped, Transient, Singleton
     public IReadOnlyList<ServiceMethodModel> Methods { get; init; } = [];

@@ -153,16 +153,19 @@ public sealed class AnalysisReportGenerator
     {
         sb.AppendLine("## Services");
         sb.AppendLine();
-        if (model.Services.Count == 0)
+        var developerFacingServices = model.Services
+            .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
+            .OrderBy(service => service.TypeName)
+            .ToList();
+
+        if (developerFacingServices.Count == 0)
         {
-            sb.AppendLine("No service-like classes were discovered.");
+            sb.AppendLine("No developer-facing service-like classes were discovered.");
             sb.AppendLine();
             return;
         }
 
-        foreach (var service in model.Services
-            .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
-            .OrderBy(service => service.TypeName))
+        foreach (var service in developerFacingServices)
         {
             sb.AppendLine($"### `{service.TypeName}`");
             sb.AppendLine();

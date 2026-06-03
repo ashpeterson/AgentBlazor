@@ -277,6 +277,169 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                             IsAsync = true
                         }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "CouponRepository",
+                    FilePath = "Modules/Pricing/Infrastructure/EFCore/Repositories/CouponRepository.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetAllAsync",
+                            ReturnType = "Task<IEnumerable<Coupon>>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "InventoryMovementCreatedEventHandler",
+                    FilePath = "Modules/Inventory/Application/EventHandlers/InventoryMovementCreatedEventHandler.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "Handle",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "JwtService",
+                    FilePath = "Auth/Services/JwtService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GenerateTokensAsync",
+                            ReturnType = "Task<TokensResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AmazonS3StorageManager",
+                    FilePath = "ClassifiedAds.Infrastructure/Storages/Amazon/AmazonS3StorageManager.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "ArchiveAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "ExportProductsToPdfHandler",
+                    FilePath = "ClassifiedAds.Infrastructure/Pdf/DinkToPdf/ExportProductsToPdfHandler.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "WriteAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "TokenManager",
+                    FilePath = "ClassifiedAds.Infrastructure/Web/Authentication/TokenManager.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "RefreshToken",
+                            ReturnType = "Task<TokenModel>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserStore",
+                    FilePath = "ClassifiedAds.Infrastructure/Identity/UserStore.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "FindByEmailAsync",
+                            ReturnType = "Task<User>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AuthorizedHttpClientService",
+                    FilePath = "Shared/Client/BuildingBlocks/Http/AuthorizedHttpClientService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetFromAPIAsync",
+                            ReturnType = "Task<T>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "EFCoreConfigurationValidator",
+                    FilePath = "Shared/Features/EFCore/Configuration/EFCoreConfigurationValidator.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "Validate",
+                            ReturnType = "ValidateOptionsResult",
+                            IsPublic = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "NotificationHubService",
+                    FilePath = "Shared/Features/SignalR/NotificationHubService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "SendNotificationAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "ServerExecutionContext",
+                    FilePath = "Shared/Features/Misc/ExecutionContext/ServerExecutionContext.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "CreateInstance",
+                            ReturnType = "ServerExecutionContext",
+                            IsPublic = true
+                        }
+                    ]
                 }
             ],
             Actions =
@@ -342,6 +505,119 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     Score = 0.99,
                     ExposureMode = ActionExposureMode.Suggested,
                     Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Get All Coupons",
+                    SourceService = "CouponRepository",
+                    MethodName = "GetAllAsync",
+                    FilePath = "Modules/Pricing/Infrastructure/EFCore/Repositories/CouponRepository.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Handle",
+                    SourceService = "InventoryMovementCreatedEventHandler",
+                    MethodName = "Handle",
+                    FilePath = "Modules/Inventory/Application/EventHandlers/InventoryMovementCreatedEventHandler.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Unknown
+                },
+                new ActionModel
+                {
+                    Name = "Generate Tokens",
+                    SourceService = "JwtService",
+                    MethodName = "GenerateTokensAsync",
+                    FilePath = "Auth/Services/JwtService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Export
+                },
+                new ActionModel
+                {
+                    Name = "Archive",
+                    SourceService = "AmazonS3StorageManager",
+                    MethodName = "ArchiveAsync",
+                    FilePath = "ClassifiedAds.Infrastructure/Storages/Amazon/AmazonS3StorageManager.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true
+                },
+                new ActionModel
+                {
+                    Name = "Write",
+                    SourceService = "ExportProductsToPdfHandler",
+                    MethodName = "WriteAsync",
+                    FilePath = "ClassifiedAds.Infrastructure/Pdf/DinkToPdf/ExportProductsToPdfHandler.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command
+                },
+                new ActionModel
+                {
+                    Name = "Refresh Token",
+                    SourceService = "TokenManager",
+                    MethodName = "RefreshToken",
+                    FilePath = "ClassifiedAds.Infrastructure/Web/Authentication/TokenManager.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true
+                },
+                new ActionModel
+                {
+                    Name = "Find By Email",
+                    SourceService = "UserStore",
+                    MethodName = "FindByEmailAsync",
+                    FilePath = "ClassifiedAds.Infrastructure/Identity/UserStore.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Get From A P I",
+                    SourceService = "AuthorizedHttpClientService",
+                    MethodName = "GetFromAPIAsync",
+                    FilePath = "Shared/Client/BuildingBlocks/Http/AuthorizedHttpClientService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query
+                },
+                new ActionModel
+                {
+                    Name = "Validate",
+                    SourceService = "EFCoreConfigurationValidator",
+                    MethodName = "Validate",
+                    FilePath = "Shared/Features/EFCore/Configuration/EFCoreConfigurationValidator.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Validation
+                },
+                new ActionModel
+                {
+                    Name = "Send Notification",
+                    SourceService = "NotificationHubService",
+                    MethodName = "SendNotificationAsync",
+                    FilePath = "Shared/Features/SignalR/NotificationHubService.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true
+                },
+                new ActionModel
+                {
+                    Name = "Create Instance",
+                    SourceService = "ServerExecutionContext",
+                    MethodName = "CreateInstance",
+                    FilePath = "Shared/Features/Misc/ExecutionContext/ServerExecutionContext.cs",
+                    Score = 0.99,
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command
                 }
             ]
         };
@@ -362,8 +638,60 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("AIJobRunnerService", content);
         Assert.DoesNotContain("RunNowAsync", content);
         Assert.DoesNotContain("TenantStore", content);
+        Assert.DoesNotContain("CouponRepository", content);
+        Assert.DoesNotContain("Get All Coupons", content);
+        Assert.DoesNotContain("InventoryMovementCreatedEventHandler", content);
+        Assert.DoesNotContain("Generate Tokens", content);
+        Assert.DoesNotContain("AmazonS3StorageManager", content);
+        Assert.DoesNotContain("ArchiveAsync", content);
+        Assert.DoesNotContain("ExportProductsToPdfHandler", content);
+        Assert.DoesNotContain("WriteAsync", content);
+        Assert.DoesNotContain("TokenManager", content);
+        Assert.DoesNotContain("Refresh Token", content);
+        Assert.DoesNotContain("UserStore", content);
+        Assert.DoesNotContain("Find By Email", content);
+        Assert.DoesNotContain("AuthorizedHttpClientService", content);
+        Assert.DoesNotContain("Get From A P I", content);
+        Assert.DoesNotContain("EFCoreConfigurationValidator", content);
+        Assert.DoesNotContain("ValidateOptionsResult", content);
+        Assert.DoesNotContain("NotificationHubService", content);
+        Assert.DoesNotContain("Send Notification", content);
+        Assert.DoesNotContain("ServerExecutionContext", content);
+        Assert.DoesNotContain("Create Instance", content);
         Assert.Contains("OrderService", content);
         Assert.Contains("FindOrdersAsync", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_ReportsNoDeveloperFacingServices_WhenAllDiscoveredServicesAreFiltered()
+    {
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "AuthorizedHttpClientService",
+                    FilePath = "Shared/Client/BuildingBlocks/Http/AuthorizedHttpClientService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetFromAPIAsync",
+                            ReturnType = "Task<T>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions = []
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("No developer-facing service-like classes were discovered.", content);
+        Assert.DoesNotContain("### `AuthorizedHttpClientService`", content);
     }
 
     [Fact]

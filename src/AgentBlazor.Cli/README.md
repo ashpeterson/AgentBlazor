@@ -22,6 +22,8 @@ Version `0.2.10` prioritizes safe read-only workflow suggestions, labels suggest
 
 Version `0.2.11` filters internal chat persistence, state store, runner, scheduler, and tenant store services from workflow suggestions and recommended next steps.
 
+Version `0.2.12` improves real-project solution scans by linking injected interfaces to implementation services, filtering infrastructure/identity/storage/http plumbing, and clearly reporting when all discovered services were filtered out.
+
 See:
 
 - `docs/advanced/cli.md`
