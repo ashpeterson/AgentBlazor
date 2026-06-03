@@ -84,6 +84,11 @@ public sealed class RecommendationEngine
             }
             else if (action.ExposureMode == ActionExposureMode.Suggested)
             {
+                if (!AnalysisModelFilters.IsDeveloperFacingAction(action))
+                {
+                    continue;
+                }
+
                 // High-scoring discovered actions should become confirmed
                 if (action.Score >= 0.7 && IsHighValueMethod(action.MethodName))
                 {
@@ -109,6 +114,7 @@ public sealed class RecommendationEngine
             .ToHashSet();
 
         var servicesWithHighValueMethods = model.Actions
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(a => a.ExposureMode == ActionExposureMode.Suggested && a.Score >= 0.7)
             .GroupBy(a => a.SourceService)
             .Where(g => g.Count() >= 2) // At least 2 high-value methods
@@ -148,6 +154,7 @@ public sealed class RecommendationEngine
     {
         // Exclude infrastructure services from coverage calculations
         var relevantActions = model.Actions
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(a => !IsExcludedService(a.SourceService))
             .Where(a => !IsInfrastructureService(a.SourceService))
             .ToList();

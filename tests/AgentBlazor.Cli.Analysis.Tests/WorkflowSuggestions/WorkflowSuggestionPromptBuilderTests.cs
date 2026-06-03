@@ -112,6 +112,51 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ServiceModel
                 {
+                    TypeName = "AIChatMessageAssetService",
+                    FilePath = "Core/Services/AI/Chat/AIChatMessageAssetService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetLatestChatIdAsync",
+                            ReturnType = "Task<string?>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "AIJobRunnerService",
+                    FilePath = "Core/Services/AI/Runner/AIJobRunnerService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "RunNowAsync",
+                            ReturnType = "Task<JobResult>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "TenantStore",
+                    FilePath = "Tenants/TenantStore.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetAllAsync",
+                            ReturnType = "Task<IEnumerable<TenantInfo>>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
                     TypeName = "OrderCapabilities",
                     FilePath = "Workflows/OrderCapabilities.cs",
                     Methods =
@@ -151,6 +196,37 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ActionModel
                 {
+                    Name = "Get Latest Chat ID",
+                    SourceService = "AIChatMessageAssetService",
+                    MethodName = "GetLatestChatIdAsync",
+                    FilePath = "Core/Services/AI/Chat/AIChatMessageAssetService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.95
+                },
+                new ActionModel
+                {
+                    Name = "Run Now",
+                    SourceService = "AIJobRunnerService",
+                    MethodName = "RunNowAsync",
+                    FilePath = "Core/Services/AI/Runner/AIJobRunnerService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    Score = 0.95
+                },
+                new ActionModel
+                {
+                    Name = "Get All",
+                    SourceService = "TenantStore",
+                    MethodName = "GetAllAsync",
+                    FilePath = "Tenants/TenantStore.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.95
+                },
+                new ActionModel
+                {
                     Name = "Show Open Orders",
                     SourceService = "OrderCapabilities",
                     MethodName = "ShowOpenOrdersAsync",
@@ -179,6 +255,11 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.DoesNotContain("DialogServiceHelper", prompt);
         Assert.DoesNotContain("ShowDialogAsync", prompt);
         Assert.DoesNotContain("AccountController", prompt);
+        Assert.DoesNotContain("AIChatMessageAssetService", prompt);
+        Assert.DoesNotContain("GetLatestChatIdAsync", prompt);
+        Assert.DoesNotContain("AIJobRunnerService", prompt);
+        Assert.DoesNotContain("RunNowAsync", prompt);
+        Assert.DoesNotContain("TenantStore", prompt);
         Assert.Contains("OrderCapabilities.ShowOpenOrdersAsync", prompt);
         Assert.DoesNotContain("- OrderCapabilities [", prompt);
     }
