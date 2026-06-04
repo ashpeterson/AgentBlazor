@@ -32,6 +32,8 @@ Version `0.2.15` was superseded by `0.2.16`.
 
 Version `0.2.16` removes the `0.2.15` map-layer workflow framing and filters UI layer applier, renderer, styling, and map-layer infrastructure from workflow suggestion inputs.
 
+Version `0.2.17` improves workflow relevance by demoting pure read-only data/view suggestions from top recommendations when process-oriented workflow candidates exist.
+
 Current reports put top workflow recommendations and install blockers before the detailed inventory. The service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
 
 See:

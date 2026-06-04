@@ -157,6 +157,104 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void GenerateMarkdown_DemotesReadOnlyDataSuggestions_FromTopRecommendations_WhenProcessWorkflowExists()
+    {
+        var model = CreateModel() with
+        {
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Submit Asset",
+                    SourceService = "RevisionSubmissionService",
+                    MethodName = "SubmitAsync",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.9
+                },
+                new ActionModel
+                {
+                    Name = "Get Asset Markers",
+                    SourceService = "AssetMarkersService",
+                    MethodName = "GetAssetMarkersAsync",
+                    FilePath = "Services/AssetMarkersService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.95
+                }
+            ]
+        };
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "View Asset Markers",
+                    Description = "View asset markers.",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "AssetMarkersService", Method = "GetAssetMarkersAsync" }
+                    ],
+                    Confidence = 0.95
+                },
+                new WorkflowSuggestion
+                {
+                    Name = "Submit Asset for Review",
+                    Description = "Submit an asset for review.",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "RevisionSubmissionService", Method = "SubmitAsync" }
+                    ],
+                    Confidence = 0.75
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+        var topRecommendations = ExtractSection(content, "## Top Recommendations", "## Install Blockers");
+
+        Assert.Contains("Submit Asset for Review", topRecommendations);
+        Assert.DoesNotContain("View Asset Markers", topRecommendations);
+        Assert.Contains("1 read-only data/view suggestion(s) were not promoted", topRecommendations);
+        Assert.Contains("### View Asset Markers", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DoesNotPromotePureReadOnlySuggestions_ToTopRecommendations()
+    {
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "View Asset Markers",
+                    Description = "View asset markers.",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                    ],
+                    Confidence = 0.95
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(CreateModel(), workflowSuggestions: suggestions);
+        var topRecommendations = ExtractSection(content, "## Top Recommendations", "## Install Blockers");
+
+        Assert.Contains("No process-oriented workflow candidates were found", topRecommendations);
+        Assert.DoesNotContain("| View Asset Markers |", topRecommendations);
+        Assert.Contains("### View Asset Markers", content);
+    }
+
+    [Fact]
     public void GenerateMarkdown_IncludesCompactInstallBlockers_BeforeDetailedReadiness()
     {
         var readiness = new InstallReadinessReport
@@ -1434,8 +1532,8 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
 
-        Assert.True(content.IndexOf("### Status snapshot", StringComparison.Ordinal) <
-            content.IndexOf("### Password reset", StringComparison.Ordinal));
+        Assert.True(content.IndexOf("### Password reset", StringComparison.Ordinal) <
+            content.IndexOf("### Status snapshot", StringComparison.Ordinal));
         Assert.Contains("- Risk: safe read-only", content);
         Assert.Contains("- Risk: high-risk/admin", content);
     }
@@ -1484,6 +1582,15 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.DoesNotContain("Existing method: `SupportTicketService.ShowOpenTicketsAsync`", content);
         Assert.Contains("Existing method: `InventoryService.PrepareRestockPlanAsync`", content);
+    }
+
+    private static string ExtractSection(string content, string startHeading, string endHeading)
+    {
+        var start = content.IndexOf(startHeading, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find section start `{startHeading}`.");
+        var end = content.IndexOf(endHeading, start + startHeading.Length, StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find section end `{endHeading}`.");
+        return content[start..end];
     }
 
     private static ProjectModel CreateModel() => new()
