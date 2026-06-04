@@ -28,7 +28,9 @@ Version `0.2.13` improves framework-style Blazor app analysis by explaining comp
 
 Version `0.2.14` improves report usability by putting top workflow recommendations and install blockers before the detailed inventory, adding route quality notes, and classifying services by likely agent fit.
 
-Current reports put top workflow recommendations and install blockers before the detailed inventory. The service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
+Version `0.2.15` improves map-heavy app reports by framing map, marker, geo chart, ESG, supplier, and asset geography suggestions as map-layer workflows instead of generic data fetches.
+
+Current reports put top workflow recommendations and install blockers before the detailed inventory. The service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate. Map-related recommendations are framed around the visible map layer users interact with.
 
 See:
 
