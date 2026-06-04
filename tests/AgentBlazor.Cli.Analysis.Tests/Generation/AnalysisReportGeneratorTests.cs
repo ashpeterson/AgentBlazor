@@ -125,6 +125,227 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void GenerateMarkdown_PutsPrioritizedGuidance_BeforeDetailedInventory()
+    {
+        var model = CreateModel();
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                new WorkflowSuggestion
+                {
+                    Name = "Find orders",
+                    Description = "Find open orders.",
+                    Methods =
+                    [
+                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                    ],
+                    Reasoning = "The orders page has a safe lookup method.",
+                    Confidence = 0.9
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+
+        Assert.True(content.IndexOf("## Top Recommendations", StringComparison.Ordinal) <
+            content.IndexOf("## Routes And Pages", StringComparison.Ordinal));
+        Assert.True(content.IndexOf("## Workflow Suggestions", StringComparison.Ordinal) <
+            content.IndexOf("## Service Inventory", StringComparison.Ordinal));
+        Assert.Contains("| Find orders | safe read-only | 0.90 | `OrderService.FindOrdersAsync` |", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_IncludesCompactInstallBlockers_BeforeDetailedReadiness()
+    {
+        var readiness = new InstallReadinessReport
+        {
+            HostProjectName = "TestApp",
+            HostProjectPath = "/tmp/TestApp/TestApp.csproj",
+            HostShape = new HostShapeAssessment { Title = "Standard Blazor Web App" },
+            Checks =
+            [
+                new InstallReadinessCheck
+                {
+                    Id = "package-references",
+                    Title = "Package references",
+                    Status = InstallReadinessStatus.Missing,
+                    Message = "The host project does not reference AgentBlazor yet.",
+                    SuggestedFix = "Add the AgentBlazor package."
+                },
+                new InstallReadinessCheck
+                {
+                    Id = "mud-services",
+                    Title = "MudBlazor service registration",
+                    Status = InstallReadinessStatus.Pass,
+                    Message = "Found AddMudServices()."
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(CreateModel(), readiness);
+
+        Assert.True(content.IndexOf("## Install Blockers", StringComparison.Ordinal) <
+            content.IndexOf("## Routes And Pages", StringComparison.Ordinal));
+        Assert.True(content.IndexOf("## Install Blockers", StringComparison.Ordinal) <
+            content.IndexOf("## Install Readiness", StringComparison.Ordinal));
+        Assert.Contains("| Missing | Package references | Add the AgentBlazor package. |", content);
+        Assert.DoesNotContain("| Pass | MudBlazor service registration | Found AddMudServices(). |", content[..content.IndexOf("## Routes And Pages", StringComparison.Ordinal)]);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_WarnsWhenMostRoutesDoNotMapToActions()
+    {
+        var model = CreateModel() with
+        {
+            Routes =
+            [
+                .. Enumerable.Range(1, 8).Select(index => new RouteModel
+                {
+                    Template = $"/page-{index}",
+                    ComponentName = $"Page{index}",
+                    ComponentFile = $"Pages/Page{index}.razor"
+                })
+            ],
+            Pages =
+            [
+                new PageModel
+                {
+                    Route = "/page-1",
+                    ComponentName = "Page1",
+                    SuggestedActions = ["order_service.find_orders"]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Id = "order_service.find_orders",
+                    Name = "Find Orders",
+                    SourceService = "OrderService",
+                    MethodName = "FindOrdersAsync",
+                    FilePath = "Services/OrderService.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.92,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("Route quality note: only 1 of 8 route(s) mapped to candidate actions", content);
+        Assert.Contains("dynamic, multi-tenant, or component-composed apps", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_ClassifiesServiceInventory_ByAgentFit()
+    {
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                .. CreateModel().Services,
+                new ServiceModel
+                {
+                    TypeName = "MongoService",
+                    FilePath = "Services/MongoDb/MongoService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "AggregateAsync",
+                            ReturnType = "Task<List<T>>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "PermissionsService",
+                    FilePath = "Services/Permissions/PermissionsService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "AddPermission",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "EmailService",
+                    FilePath = "Services/Email/EmailService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "SendEmailAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                .. CreateModel().Actions,
+                new ActionModel
+                {
+                    Name = "Aggregate",
+                    SourceService = "MongoService",
+                    MethodName = "AggregateAsync",
+                    FilePath = "Services/MongoDb/MongoService.cs",
+                    Classification = ActionClassification.Query,
+                    Score = 0.8,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Add Permission",
+                    SourceService = "PermissionsService",
+                    MethodName = "AddPermission",
+                    FilePath = "Services/Permissions/PermissionsService.cs",
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.8,
+                    ExposureMode = ActionExposureMode.Suggested
+                },
+                new ActionModel
+                {
+                    Name = "Send Email",
+                    SourceService = "EmailService",
+                    MethodName = "SendEmailAsync",
+                    FilePath = "Services/Email/EmailService.cs",
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.8,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("| Business/read-only | 1 | Best starting point for first agent actions. |", content);
+        Assert.Contains("| Integration/messaging | 1 | Useful, but external effects or delivery need policy review. |", content);
+        Assert.Contains("| Data access | 1 | Prefer wrapping in business capabilities rather than exposing directly. |", content);
+        Assert.Contains("| Admin/sensitive | 1 | Do not expose directly without explicit approval, auth, and tenant policy. |", content);
+        Assert.Contains("### `MongoService`", content);
+        Assert.Contains("- Classification: Data access", content);
+        Assert.Contains("### `PermissionsService`", content);
+        Assert.Contains("- Classification: Admin/sensitive", content);
+        Assert.Contains("### `EmailService`", content);
+        Assert.Contains("- Classification: Integration/messaging", content);
+    }
+
+    [Fact]
     public void GenerateMarkdown_FiltersFrameworkServicesAndUiStateActions_FromDeveloperFacingSections()
     {
         var model = CreateModel() with

@@ -47,15 +47,20 @@ Readiness checks still apply to the host project only, because `Program.cs`, she
 
 The report includes:
 
+- top workflow recommendations first, so you do not have to read the full service inventory to find useful candidates
+- compact install blockers before the detailed readiness table
 - discovered routes and pages
+- route-to-action mapping notes when dynamic or multi-tenant routing means most routes cannot be linked to candidate actions
 - existing `[AgentCapability]` / `[AgentAction]` methods
-- developer-facing services and public methods, with framework/helper noise filtered out
+- developer-facing services and public methods, with framework/helper noise filtered out and remaining services classified by likely agent fit
 - LLM workflow suggestions validated against the static analysis model
 - approval guidance for suggestions that reference mutating methods
 - install-readiness checks
 - recommended next steps
 
 The summary uses "AgentBlazor action adoption" to show how many actions are already confirmed with AgentBlazor attributes versus how many candidate actions were discovered but are not exposed yet.
+
+The service inventory is deliberately a supporting section. Start with Top Recommendations and Install Blockers, then use Service Inventory to audit the scanned model. Service classifications are guidance only: data-access, admin/sensitive, and integration surfaces should usually be wrapped in narrower business capabilities rather than exposed directly.
 
 Run static analysis only when you do not want an LLM call:
 

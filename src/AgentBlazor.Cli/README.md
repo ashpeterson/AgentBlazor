@@ -26,6 +26,10 @@ Version `0.2.12` improves real-project solution scans by linking injected interf
 
 Version `0.2.13` improves framework-style Blazor app analysis by explaining component-driven routing, filtering manager/state/auth/token/http plumbing, and using validated LLM workflow suggestions instead of appending static action guesses when LLM suggestions are available.
 
+Version `0.2.14` improves report usability by putting top workflow recommendations and install blockers before the detailed inventory, adding route quality notes, and classifying services by likely agent fit.
+
+Current reports put top workflow recommendations and install blockers before the detailed inventory. The service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
+
 See:
 
 - `docs/advanced/cli.md`
