@@ -25,8 +25,8 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
         sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
         sb.AppendLine("- Prefer safe read-only workflows first: show, get, list, find, check, validate, explain, summarize, and status snapshots.");
-        sb.AppendLine("- Name workflows for the user's UI/domain goal, not the raw method verb. For example, map/geo/marker/chart services should become map-layer workflows, not generic get/list data workflows.");
-        sb.AppendLine("- If routes or services indicate maps, markers, geo charts, ESG country data, suppliers, or asset geography, frame the workflow as showing or managing a map layer.");
+        sb.AppendLine("- Name workflows for the user's business outcome, not the raw method verb or UI/rendering mechanism.");
+        sb.AppendLine("- Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing unless the method clearly represents a business workflow.");
         sb.AppendLine("- Avoid auth, password reset, email sending, tenant mutation, message deletion, workflow execution, job execution, database mutation, and permission changes unless no safer workflow exists.");
         sb.AppendLine("- If you must suggest a mutating or admin workflow, suggest at most one and explain that it needs human approval.");
         sb.AppendLine();
