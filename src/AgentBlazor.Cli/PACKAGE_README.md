@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.13
+dotnet tool install --global AgentBlazor.Cli --version 0.2.14
 ```
 
 Example:
@@ -48,7 +48,9 @@ Version `0.2.12` improves real-project solution scans by linking injected interf
 
 Version `0.2.13` improves framework-style Blazor app analysis by explaining component-driven routing, filtering manager/state/auth/token/http plumbing, and using validated LLM workflow suggestions instead of appending static action guesses when LLM suggestions are available.
 
-Reports filter helper/framework noise, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
+Version `0.2.14` improves report usability by putting top workflow recommendations and install blockers before the detailed inventory, adding route quality notes, and classifying services by likely agent fit.
+
+Reports put top workflow recommendations and install blockers before the detailed inventory, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
 
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
 
@@ -56,6 +58,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.14 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.14.md
 - 0.2.13 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.13.md
 - 0.2.12 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.12.md
 - 0.2.11 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.11.md

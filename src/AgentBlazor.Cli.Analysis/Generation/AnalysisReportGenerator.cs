@@ -44,15 +44,17 @@ public sealed class AnalysisReportGenerator
         sb.AppendLine();
 
         WriteSummary(sb, model, readiness);
+        WriteTopRecommendations(sb, model, workflowSuggestions);
+        WriteInstallBlockers(sb, readiness);
         WriteRoutes(sb, model);
         WriteCapabilities(sb, model);
-        WriteServices(sb, model);
         WriteWorkflowSuggestions(sb, model, workflowSuggestions);
         if (readiness is not null)
         {
             WriteReadiness(sb, readiness);
         }
 
+        WriteServices(sb, model);
         WriteNextSteps(sb, model, readiness, workflowSuggestions);
         return sb.ToString();
     }
@@ -81,6 +83,93 @@ public sealed class AnalysisReportGenerator
         if (adoptionTotal > 0)
         {
             sb.AppendLine($"- AgentBlazor action adoption: {confirmedCount} confirmed, {discoveredCount} candidate actions not yet exposed");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteTopRecommendations(
+        StringBuilder sb,
+        ProjectModel model,
+        WorkflowSuggestionSet? workflowSuggestions)
+    {
+        sb.AppendLine("## Top Recommendations");
+        sb.AppendLine();
+
+        if (workflowSuggestions?.Suggestions.Count > 0)
+        {
+            sb.AppendLine("These are the highest-signal workflow candidates. Start here before reading the full service inventory.");
+            sb.AppendLine();
+            sb.AppendLine("| Workflow | Risk | Confidence | Existing methods | Why it matters |");
+            sb.AppendLine("| --- | --- | --- | --- | --- |");
+            foreach (var suggestion in workflowSuggestions.Suggestions
+                .OrderBy(suggestion => GetSuggestionRiskRank(suggestion, model))
+                .ThenByDescending(suggestion => suggestion.Confidence)
+                .Take(5))
+            {
+                var methods = suggestion.Methods.Count == 0
+                    ? "-"
+                    : string.Join("<br>", suggestion.Methods.Select(method => $"`{EscapeTableCell(method.Service)}.{EscapeTableCell(method.Method)}`"));
+                var reasoning = string.IsNullOrWhiteSpace(suggestion.Reasoning)
+                    ? suggestion.Description
+                    : suggestion.Reasoning;
+                sb.AppendLine($"| {EscapeTableCell(suggestion.Name)} | {ActionRisk.Describe(GetSuggestionRiskBand(suggestion, model))} | {suggestion.Confidence.ToString("0.00", CultureInfo.InvariantCulture)} | {methods} | {EscapeTableCell(TrimForTable(reasoning, 180))} |");
+            }
+
+            sb.AppendLine();
+            return;
+        }
+
+        var candidates = GetStaticWorkflowCandidates(model, take: 5);
+        if (candidates.Count == 0)
+        {
+            sb.AppendLine("No high-confidence workflow candidates were discovered yet.");
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine("LLM workflow suggestions were not requested. These are the highest-confidence static candidates.");
+        sb.AppendLine();
+        sb.AppendLine("| Candidate | Risk | Confidence | Existing method | Why it matters |");
+        sb.AppendLine("| --- | --- | --- | --- | --- |");
+        foreach (var action in candidates)
+        {
+            var reasoning = string.IsNullOrWhiteSpace(action.Summary)
+                ? action.Classification.ToString()
+                : action.Summary;
+            sb.AppendLine($"| {EscapeTableCell(action.Name)} | {ActionRisk.Describe(ActionRisk.GetRiskBand(action))} | {action.Score.ToString("0.00", CultureInfo.InvariantCulture)} | `{EscapeTableCell(action.SourceService)}.{EscapeTableCell(action.MethodName)}` | {EscapeTableCell(TrimForTable(reasoning, 180))} |");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteInstallBlockers(StringBuilder sb, InstallReadinessReport? readiness)
+    {
+        if (readiness is null)
+        {
+            return;
+        }
+
+        sb.AppendLine("## Install Blockers");
+        sb.AppendLine();
+
+        var blockers = readiness.Checks
+            .Where(check => check.Status != InstallReadinessStatus.Pass)
+            .ToList();
+        if (blockers.Count == 0)
+        {
+            sb.AppendLine("No install blockers were found.");
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine($"Fix these {blockers.Count} setup item(s) before wiring generated workflows into the app.");
+        sb.AppendLine();
+        sb.AppendLine("| Status | Check | Fix |");
+        sb.AppendLine("| --- | --- | --- |");
+        foreach (var check in blockers)
+        {
+            sb.AppendLine($"| {check.Status} | {EscapeTableCell(check.Title)} | {EscapeTableCell(check.SuggestedFix ?? check.Message)} |");
         }
 
         sb.AppendLine();
@@ -125,6 +214,19 @@ public sealed class AnalysisReportGenerator
             sb.AppendLine($"| `{EscapeTableCell(route.Template)}` | `{EscapeTableCell(route.ComponentName)}` | `{EscapeTableCell(route.ComponentFile)}` | {actions} |");
         }
 
+        var linkedRouteCount = model.Pages
+            .Where(page => page.SuggestedActions.Any(actionId => model.Actions.Any(action =>
+                action.Id == actionId &&
+                AnalysisModelFilters.IsDeveloperFacingAction(action))))
+            .Select(page => page.Route)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        if (model.Routes.Count > 5 && linkedRouteCount * 2 < model.Routes.Count)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"> Route quality note: only {linkedRouteCount} of {model.Routes.Count} route(s) mapped to candidate actions. This can be normal for dynamic, multi-tenant, or component-composed apps; use the workflow recommendations above as the primary signal.");
+        }
+
         sb.AppendLine();
     }
 
@@ -159,7 +261,7 @@ public sealed class AnalysisReportGenerator
 
     private static void WriteServices(StringBuilder sb, ProjectModel model)
     {
-        sb.AppendLine("## Services");
+        sb.AppendLine("## Service Inventory");
         sb.AppendLine();
         var developerFacingServices = model.Services
             .Where(service => AnalysisModelFilters.IsDeveloperFacingService(service, model))
@@ -173,12 +275,31 @@ public sealed class AnalysisReportGenerator
             return;
         }
 
+        var classifications = developerFacingServices
+            .Select(service => ClassifyService(service, model))
+            .ToList();
+        sb.AppendLine($"Detailed inventory for {developerFacingServices.Count} service-like classes. Use this section to audit the model; use Top Recommendations for what to build first.");
+        sb.AppendLine();
+        sb.AppendLine("| Classification | Count | Guidance |");
+        sb.AppendLine("| --- | ---: | --- |");
+        foreach (var group in classifications
+            .GroupBy(classification => classification.Category)
+            .OrderBy(group => GetServiceCategoryRank(group.Key)))
+        {
+            sb.AppendLine($"| {ServiceCategoryLabel(group.Key)} | {group.Count()} | {EscapeTableCell(ServiceCategoryGuidance(group.Key))} |");
+        }
+
+        sb.AppendLine();
+
         foreach (var service in developerFacingServices)
         {
+            var classification = ClassifyService(service, model);
             sb.AppendLine($"### `{service.TypeName}`");
             sb.AppendLine();
             sb.AppendLine($"- Lifetime: {service.Lifetime}");
             sb.AppendLine($"- File: `{service.FilePath}`");
+            sb.AppendLine($"- Classification: {ServiceCategoryLabel(classification.Category)}");
+            sb.AppendLine($"- Agent fit: {classification.AgentFit}");
             if (service.Methods.Count == 0)
             {
                 sb.AppendLine("- Public methods: none discovered");
@@ -289,18 +410,7 @@ public sealed class AnalysisReportGenerator
             return;
         }
 
-        var candidates = model.Actions
-            .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
-            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
-            .Where(action => !DuplicatesConfirmedAction(action, model))
-            .Where(action => action.Score >= 0.7)
-            .OrderBy(action => (int)ActionRisk.GetRiskBand(action))
-            .ThenByDescending(action => action.Score)
-            .ThenBy(action => action.SourceService)
-            .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .Take(10)
-            .ToList();
+        var candidates = GetStaticWorkflowCandidates(model, take: 10);
         var duplicateCandidateNames = candidates
             .GroupBy(action => NormalizeName(action.Name))
             .Where(group => group.Count() > 1)
@@ -428,6 +538,109 @@ public sealed class AnalysisReportGenerator
         => value.Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal);
 
+    private static string TrimForTable(string value, int maxLength)
+    {
+        var normalized = value.ReplaceLineEndings(" ").Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : string.Concat(normalized.AsSpan(0, maxLength - 3), "...");
+    }
+
+    private static IReadOnlyList<ActionModel> GetStaticWorkflowCandidates(ProjectModel model, int take)
+    {
+        return model.Actions
+            .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Where(action => !DuplicatesConfirmedAction(action, model))
+            .Where(action => action.Score >= 0.7)
+            .OrderBy(action => (int)ActionRisk.GetRiskBand(action))
+            .ThenByDescending(action => action.Score)
+            .ThenBy(action => action.SourceService)
+            .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(take)
+            .ToList();
+    }
+
+    private static ServiceClassification ClassifyService(ServiceModel service, ProjectModel model)
+    {
+        var name = service.TypeName;
+        var path = service.FilePath;
+        var methods = service.Methods.Select(method => method.Name).ToList();
+        var actions = model.Actions
+            .Where(action => string.Equals(action.SourceService, service.TypeName, StringComparison.OrdinalIgnoreCase))
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .ToList();
+
+        if (ContainsAny(name, "Permission", "Password", "User", "Setup", "Cookie", "Auth", "Tenant") ||
+            ContainsAny(path, "\\Permissions\\", "/Permissions/", "\\Users\\", "/Users/", "\\Setup\\", "/Setup/", "\\Cookies\\", "/Cookies/") ||
+            methods.Any(method => ContainsAny(method, "ResetPassword", "SendPasswordReset", "AddPermission", "CheckPermission", "AddTenant", "CreateSystemUser", "DeleteCookie")))
+        {
+            return new ServiceClassification(ServiceCategory.AdminOrSensitive, "Use cautiously; likely needs explicit approval policy and tenant/user context before exposing.");
+        }
+
+        if (ContainsAny(name, "Mongo", "Database", "Sql", "Db", "Repository", "Store", "Transaction") ||
+            ContainsAny(path, "\\MongoDb\\", "/MongoDb/", "\\Data\\", "/Data/"))
+        {
+            return new ServiceClassification(ServiceCategory.DataAccess, "Supporting data access surface; usually wrap it in a narrower business capability.");
+        }
+
+        if (ContainsAny(name, "Email", "Message", "Notification", "Chat", "Client", "Upload", "File", "Link"))
+        {
+            return new ServiceClassification(ServiceCategory.IntegrationOrMessaging, "Useful integration surface, but review side effects and external delivery before exposing.");
+        }
+
+        if (actions.Any(action => ActionRisk.GetRiskBand(action) is ActionRiskBand.HighRisk or ActionRiskBand.ApprovalRequired) ||
+            methods.Any(method => ContainsAny(method, "Submit", "Promote", "Upload", "Save", "Add", "Remove", "Delete", "Update", "Create", "Run", "Execute")))
+        {
+            return new ServiceClassification(ServiceCategory.OperationalWorkflow, "Potential workflow candidate; prefer explicit approval for mutating operations.");
+        }
+
+        if (actions.Any(action => action.Classification is ActionClassification.Query or ActionClassification.Validation or ActionClassification.Export) ||
+            methods.Any(method => ContainsAny(method, "Get", "Find", "List", "Check", "Validate", "Generate", "Translate")))
+        {
+            return new ServiceClassification(ServiceCategory.BusinessReadOnly, "Good candidate for a first read-only agent workflow if the data is safe to show.");
+        }
+
+        return new ServiceClassification(ServiceCategory.Unknown, "Review manually; the analyzer found public methods but could not infer a strong workflow role.");
+    }
+
+    private static bool ContainsAny(string value, params string[] fragments)
+        => fragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+
+    private static string ServiceCategoryLabel(ServiceCategory category)
+        => category switch
+        {
+            ServiceCategory.BusinessReadOnly => "Business/read-only",
+            ServiceCategory.OperationalWorkflow => "Operational workflow",
+            ServiceCategory.IntegrationOrMessaging => "Integration/messaging",
+            ServiceCategory.DataAccess => "Data access",
+            ServiceCategory.AdminOrSensitive => "Admin/sensitive",
+            _ => "Needs review"
+        };
+
+    private static string ServiceCategoryGuidance(ServiceCategory category)
+        => category switch
+        {
+            ServiceCategory.BusinessReadOnly => "Best starting point for first agent actions.",
+            ServiceCategory.OperationalWorkflow => "Candidate workflow surface; check mutation and approval requirements.",
+            ServiceCategory.IntegrationOrMessaging => "Useful, but external effects or delivery need policy review.",
+            ServiceCategory.DataAccess => "Prefer wrapping in business capabilities rather than exposing directly.",
+            ServiceCategory.AdminOrSensitive => "Do not expose directly without explicit approval, auth, and tenant policy.",
+            _ => "Inspect manually before exposing."
+        };
+
+    private static int GetServiceCategoryRank(ServiceCategory category)
+        => category switch
+        {
+            ServiceCategory.BusinessReadOnly => 0,
+            ServiceCategory.OperationalWorkflow => 1,
+            ServiceCategory.IntegrationOrMessaging => 2,
+            ServiceCategory.DataAccess => 3,
+            ServiceCategory.AdminOrSensitive => 4,
+            _ => 5
+        };
+
     private static bool DuplicatesConfirmedAction(RecommendationModel recommendation, ProjectModel model)
     {
         if (recommendation.Type is not RecommendationType.AddAgentAction)
@@ -528,4 +741,16 @@ public sealed class AnalysisReportGenerator
 
         return sb.ToString();
     }
+}
+
+internal sealed record ServiceClassification(ServiceCategory Category, string AgentFit);
+
+internal enum ServiceCategory
+{
+    BusinessReadOnly,
+    OperationalWorkflow,
+    IntegrationOrMessaging,
+    DataAccess,
+    AdminOrSensitive,
+    Unknown
 }

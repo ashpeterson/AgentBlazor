@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.13</Version>
+    <Version>0.2.14</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.13: CLI analyzer quality for framework-style Blazor apps. Explains component-driven routing, filters manager/state/auth/token/http plumbing, and prefers validated LLM workflow suggestions over static action guesses.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.14: CLI report prioritisation. Puts top workflow recommendations and install blockers first, adds route quality notes, and classifies service inventory by likely agent fit.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
