@@ -98,14 +98,34 @@ public sealed class AnalysisReportGenerator
 
         if (workflowSuggestions?.Suggestions.Count > 0)
         {
-            sb.AppendLine("These are the highest-signal workflow candidates. Start here before reading the full service inventory.");
+            var promotedSuggestions = workflowSuggestions.Suggestions
+                .Where(suggestion => IsProcessWorkflowSuggestion(suggestion, model))
+                .OrderBy(suggestion => GetSuggestionWorkflowRank(suggestion, model))
+                .ThenBy(suggestion => GetSuggestionRiskRank(suggestion, model))
+                .ThenByDescending(suggestion => suggestion.Confidence)
+                .Take(5)
+                .ToList();
+
+            if (promotedSuggestions.Count == 0)
+            {
+                sb.AppendLine("No process-oriented workflow candidates were found. The validated LLM suggestions are read-only data surfaces; review them below, but treat them as supporting context rather than first workflow work.");
+                sb.AppendLine();
+                return;
+            }
+
+            var readOnlySuggestionCount = workflowSuggestions.Suggestions.Count -
+                workflowSuggestions.Suggestions.Count(suggestion => IsProcessWorkflowSuggestion(suggestion, model));
+
+            sb.AppendLine("These are the highest-signal process-oriented workflow candidates. Start here before reading the full service inventory.");
+            if (readOnlySuggestionCount > 0)
+            {
+                sb.AppendLine($"{readOnlySuggestionCount} read-only data/view suggestion(s) were not promoted to top recommendations.");
+            }
+
             sb.AppendLine();
             sb.AppendLine("| Workflow | Risk | Confidence | Existing methods | Why it matters |");
             sb.AppendLine("| --- | --- | --- | --- | --- |");
-            foreach (var suggestion in workflowSuggestions.Suggestions
-                .OrderBy(suggestion => GetSuggestionRiskRank(suggestion, model))
-                .ThenByDescending(suggestion => suggestion.Confidence)
-                .Take(5))
+            foreach (var suggestion in promotedSuggestions)
             {
                 var methods = suggestion.Methods.Count == 0
                     ? "-"
@@ -341,7 +361,8 @@ public sealed class AnalysisReportGenerator
             if (workflowSuggestions.Suggestions.Count > 0)
             {
                 foreach (var suggestion in workflowSuggestions.Suggestions
-                    .OrderBy(suggestion => GetSuggestionRiskRank(suggestion, model))
+                    .OrderBy(suggestion => GetSuggestionWorkflowRank(suggestion, model))
+                    .ThenBy(suggestion => GetSuggestionRiskRank(suggestion, model))
                     .ThenByDescending(suggestion => suggestion.Confidence))
                 {
                     sb.AppendLine($"### {suggestion.Name}");
@@ -553,7 +574,8 @@ public sealed class AnalysisReportGenerator
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(action => !DuplicatesConfirmedAction(action, model))
             .Where(action => action.Score >= 0.7)
-            .OrderBy(action => (int)ActionRisk.GetRiskBand(action))
+            .OrderBy(GetActionWorkflowRank)
+            .ThenBy(action => (int)ActionRisk.GetRiskBand(action))
             .ThenByDescending(action => action.Score)
             .ThenBy(action => action.SourceService)
             .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
@@ -716,6 +738,61 @@ public sealed class AnalysisReportGenerator
 
     private static int GetSuggestionRiskRank(WorkflowSuggestion suggestion, ProjectModel model)
         => (int)GetSuggestionRiskBand(suggestion, model);
+
+    private static bool IsProcessWorkflowSuggestion(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        return GetReferencedActions(suggestion, model)
+            .Any(action => action.Classification is
+                ActionClassification.Workflow or
+                ActionClassification.Command or
+                ActionClassification.Export);
+    }
+
+    private static int GetSuggestionWorkflowRank(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        var actions = GetReferencedActions(suggestion, model).ToList();
+        if (actions.Any(action => action.Classification == ActionClassification.Workflow))
+        {
+            return 0;
+        }
+
+        if (actions.Any(action => action.Classification == ActionClassification.Command))
+        {
+            return 1;
+        }
+
+        if (actions.Any(action => action.Classification == ActionClassification.Export))
+        {
+            return 2;
+        }
+
+        if (actions.Any(action => action.Classification == ActionClassification.Validation))
+        {
+            return 3;
+        }
+
+        return 4;
+    }
+
+    private static int GetActionWorkflowRank(ActionModel action)
+        => action.Classification switch
+        {
+            ActionClassification.Workflow => 0,
+            ActionClassification.Command => 1,
+            ActionClassification.Export => 2,
+            ActionClassification.Validation => 3,
+            ActionClassification.Query => 4,
+            _ => 5
+        };
+
+    private static IEnumerable<ActionModel> GetReferencedActions(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        return suggestion.Methods.SelectMany(method => model.Actions
+            .Where(AnalysisModelFilters.IsDeveloperFacingAction)
+            .Where(action =>
+                string.Equals(action.SourceService, method.Service, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(action.MethodName, method.Method, StringComparison.OrdinalIgnoreCase)));
+    }
 
     private static int GetRecommendationRiskRank(RecommendationModel recommendation, ProjectModel model)
     {

@@ -246,7 +246,10 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("approvalRecommended=true", prompt);
         Assert.Contains("risk=safe read-only", prompt);
         Assert.Contains("risk=approval required", prompt);
-        Assert.Contains("Prefer safe read-only workflows first", prompt);
+        Assert.Contains("one-method getter/list/view is usually a data surface", prompt);
+        Assert.Contains("Prefer methods classified as Workflow first", prompt);
+        Assert.Contains("classification=Workflow", prompt);
+        Assert.Contains("classification=Query", prompt);
         Assert.Contains("RequiresApproval = true", prompt);
         Assert.Contains("business outcome", prompt);
         Assert.Contains("Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing", prompt);

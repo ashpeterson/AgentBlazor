@@ -24,7 +24,9 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Suggested C# code must use AgentBlazor CapabilityResult and only call listed methods.");
         sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
         sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
-        sb.AppendLine("- Prefer safe read-only workflows first: show, get, list, find, check, validate, explain, summarize, and status snapshots.");
+        sb.AppendLine("- A workflow is a user/business process, task, or decision flow. A one-method getter/list/view is usually a data surface, not a workflow.");
+        sb.AppendLine("- Prefer methods classified as Workflow first. Prefer Command or Export only when the user-facing process is clear and approval guidance is included.");
+        sb.AppendLine("- Use simple Query methods as supporting context for workflows, but do not suggest pure data-view workflows when process-oriented methods are available.");
         sb.AppendLine("- Name workflows for the user's business outcome, not the raw method verb or UI/rendering mechanism.");
         sb.AppendLine("- Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing unless the method clearly represents a business workflow.");
         sb.AppendLine("- Avoid auth, password reset, email sending, tenant mutation, message deletion, workflow execution, job execution, database mutation, and permission changes unless no safer workflow exists.");
@@ -135,7 +137,7 @@ public sealed class WorkflowSuggestionPromptBuilder
                 {
                     var action = candidateActions[(service.TypeName, method.Name)];
                     var approvalRecommended = ActionRisk.GetRiskBand(action) is ActionRiskBand.ApprovalRequired or ActionRiskBand.HighRisk;
-                    return $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))}) [risk={ActionRisk.Describe(ActionRisk.GetRiskBand(action))}, mutation={action.IsMutationLikely.ToString().ToLowerInvariant()}, approvalRecommended={approvalRecommended.ToString().ToLowerInvariant()}]";
+                    return $"{method.Name}({string.Join(", ", method.Parameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))}) [classification={action.Classification}, risk={ActionRisk.Describe(ActionRisk.GetRiskBand(action))}, mutation={action.IsMutationLikely.ToString().ToLowerInvariant()}, approvalRecommended={approvalRecommended.ToString().ToLowerInvariant()}]";
                 })
                 .ToList();
 
