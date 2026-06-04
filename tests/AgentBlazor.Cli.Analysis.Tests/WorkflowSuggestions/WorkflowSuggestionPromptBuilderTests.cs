@@ -248,8 +248,8 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("risk=approval required", prompt);
         Assert.Contains("Prefer safe read-only workflows first", prompt);
         Assert.Contains("RequiresApproval = true", prompt);
-        Assert.Contains("map-layer workflows", prompt);
-        Assert.Contains("frame the workflow as showing or managing a map layer", prompt);
+        Assert.Contains("business outcome", prompt);
+        Assert.Contains("Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing", prompt);
         Assert.DoesNotContain("ActivityIdHelper", prompt);
         Assert.DoesNotContain("ToString", prompt);
         Assert.DoesNotContain("AgentBlazorBuilder", prompt);
