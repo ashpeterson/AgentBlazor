@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.14
+dotnet tool install --global AgentBlazor.Cli --version 0.2.15
 ```
 
 Example:
@@ -50,7 +50,9 @@ Version `0.2.13` improves framework-style Blazor app analysis by explaining comp
 
 Version `0.2.14` improves report usability by putting top workflow recommendations and install blockers before the detailed inventory, adding route quality notes, and classifying services by likely agent fit.
 
-Reports put top workflow recommendations and install blockers before the detailed inventory, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
+Version `0.2.15` improves map-heavy app reports by framing map, marker, geo chart, ESG, supplier, and asset geography suggestions as map-layer workflows instead of generic data fetches.
+
+Reports put top workflow recommendations and install blockers before the detailed inventory, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods. Map-related recommendations are framed around the visible map layer users interact with.
 
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
 
@@ -58,6 +60,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.15 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.15.md
 - 0.2.14 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.14.md
 - 0.2.13 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.13.md
 - 0.2.12 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.12.md

@@ -86,7 +86,7 @@ public sealed class WorkflowSuggestionParser
                 continue;
             }
 
-            suggestions.Add(SanitizeSuggestionCode(suggestion));
+            suggestions.Add(ContextualizeSuggestion(SanitizeSuggestionCode(suggestion), model));
         }
 
         return new WorkflowSuggestionSet
@@ -122,6 +122,152 @@ public sealed class WorkflowSuggestionParser
             ? suggestion
             : suggestion with { Code = string.Empty };
     }
+
+    private static WorkflowSuggestion ContextualizeSuggestion(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        var mapMethods = suggestion.Methods
+            .Select(method => new
+            {
+                Reference = method,
+                Service = model.Services.FirstOrDefault(service =>
+                    string.Equals(service.TypeName, method.Service, StringComparison.OrdinalIgnoreCase))
+            })
+            .Where(item => item.Service is not null && IsMapLayerSurface(item.Service, item.Reference.Method))
+            .ToList();
+
+        if (mapMethods.Count == 0)
+        {
+            return suggestion;
+        }
+
+        var primary = mapMethods[0];
+        var subject = BuildMapLayerSubject(primary.Reference.Method, primary.Service!.TypeName);
+        var name = $"Show {subject} Map Layer";
+        var description = $"Shows {subject.ToLowerInvariant()} as a map layer so users can inspect the spatial view directly.";
+        var reasoning = string.IsNullOrWhiteSpace(suggestion.Reasoning)
+            ? $"The referenced {primary.Service.TypeName}.{primary.Reference.Method} method belongs to a map/geography surface, so the workflow should be framed as a map layer rather than a raw data fetch."
+            : suggestion.Reasoning + " The referenced service is map/geography-oriented, so this is best framed as a map layer workflow.";
+
+        return suggestion with
+        {
+            Name = IsGenericReadName(suggestion.Name) ? name : suggestion.Name,
+            Description = IsGenericReadDescription(suggestion.Description) ? description : suggestion.Description,
+            Reasoning = reasoning,
+            CapabilityClass = IsGenericCapabilityClass(suggestion.CapabilityClass)
+                ? ToIdentifier(name) + "Capability"
+                : suggestion.CapabilityClass
+        };
+    }
+
+    private static bool IsMapLayerSurface(ServiceModel service, string methodName)
+    {
+        return ContainsAny(service.TypeName, "Map", "Marker", "Geo", "Chart") ||
+            ContainsAny(service.FilePath, "/Maps/", "\\Maps\\", "/Geo", "\\Geo") ||
+            ContainsAny(methodName, "Marker", "Geometry", "CountryESG", "CountryRating", "Supplier");
+    }
+
+    private static string BuildMapLayerSubject(string methodName, string serviceName)
+    {
+        var normalized = StripKnownSuffix(methodName, "Async");
+        normalized = StripKnownPrefix(normalized, "Get");
+        normalized = StripKnownPrefix(normalized, "List");
+        normalized = StripKnownPrefix(normalized, "Find");
+        normalized = StripKnownPrefix(normalized, "Fetch");
+        normalized = StripKnownPrefix(normalized, "Show");
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            normalized = StripKnownSuffix(serviceName, "Service");
+        }
+
+        return string.Join(' ', MergeKnownAcronyms(SplitIdentifier(normalized)).Select(FormatDomainWord));
+    }
+
+    private static string FormatDomainWord(string word)
+        => word switch
+        {
+            "esg" => "ESG",
+            "geo" => "Geo",
+            "ai" => "AI",
+            "ui" => "UI",
+            _ => char.ToUpperInvariant(word[0]) + word[1..]
+        };
+
+    private static bool IsGenericReadName(string value)
+    {
+        var normalized = value.Trim();
+        return normalized.StartsWith("Get ", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("List ", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("Fetch ", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("Retrieve ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGenericReadDescription(string value)
+        => string.IsNullOrWhiteSpace(value) ||
+            value.Contains("retrieve", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("fetch", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("get ", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsGenericCapabilityClass(string value)
+        => string.IsNullOrWhiteSpace(value) ||
+            value.StartsWith("Get", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("List", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("Fetch", StringComparison.OrdinalIgnoreCase);
+
+    private static string ToIdentifier(string value)
+    {
+        var words = MergeKnownAcronyms(SplitIdentifier(value));
+        return string.Concat(words.Select(FormatDomainWord));
+    }
+
+    private static IReadOnlyList<string> MergeKnownAcronyms(IReadOnlyList<string> words)
+    {
+        var merged = new List<string>();
+        for (var i = 0; i < words.Count; i++)
+        {
+            if (i + 2 < words.Count &&
+                words[i] == "e" &&
+                words[i + 1] == "s" &&
+                words[i + 2] == "g")
+            {
+                merged.Add("esg");
+                i += 2;
+                continue;
+            }
+
+            if (i + 1 < words.Count &&
+                words[i] == "a" &&
+                words[i + 1] == "i")
+            {
+                merged.Add("ai");
+                i++;
+                continue;
+            }
+
+            if (i + 1 < words.Count &&
+                words[i] == "u" &&
+                words[i + 1] == "i")
+            {
+                merged.Add("ui");
+                i++;
+                continue;
+            }
+
+            merged.Add(words[i]);
+        }
+
+        return merged;
+    }
+
+    private static string StripKnownPrefix(string value, string prefix)
+        => value.StartsWith(prefix, StringComparison.Ordinal)
+            ? value[prefix.Length..]
+            : value;
+
+    private static string StripKnownSuffix(string value, string suffix)
+        => value.EndsWith(suffix, StringComparison.Ordinal)
+            ? value[..^suffix.Length]
+            : value;
 
     private static bool ReferencesOnlyAlreadyExposedMethods(WorkflowSuggestion suggestion, ProjectModel model)
     {
@@ -212,6 +358,9 @@ public sealed class WorkflowSuggestionParser
         => new(value
             .Select(character => char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ')
             .ToArray());
+
+    private static bool ContainsAny(string value, params string[] fragments)
+        => fragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
 
     private static readonly HashSet<string> IgnoredMethodWords = new(StringComparer.Ordinal)
     {

@@ -231,6 +231,102 @@ public sealed class WorkflowSuggestionParserTests
     }
 
     [Fact]
+    public void ParseAndValidate_FramesGenericMapSuggestionsAsMapLayerWorkflows()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "AssetMarkersService",
+                    FilePath = "Core/Services/Maps/AssetMarkersService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "GetAssetMarkersAsync",
+                            ReturnType = "Task<List<AssetMarker>>",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Get Asset Markers",
+                    SourceService = "AssetMarkersService",
+                    MethodName = "GetAssetMarkersAsync",
+                    FilePath = "Core/Services/Maps/AssetMarkersService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Query,
+                    Score = 0.9
+                }
+            ]
+        };
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Get Asset Markers",
+              "description": "Retrieve asset markers.",
+              "methods": [
+                { "service": "AssetMarkersService", "method": "GetAssetMarkersAsync" }
+              ],
+              "capabilityClass": "GetAssetMarkersCapability",
+              "code": "public sealed class GetAssetMarkersCapability { public async Task<CapabilityResult> RunAsync() { return CapabilityResult.Success(\"Done.\"); } }",
+              "reasoning": "Safe read-only marker fetch.",
+              "confidence": 0.90
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal("Show Asset Markers Map Layer", suggestion.Name);
+        Assert.Contains("map layer", suggestion.Description);
+        Assert.Contains("map layer workflow", suggestion.Reasoning);
+        Assert.Equal("ShowAssetMarkersMapLayerCapability", suggestion.CapabilityClass);
+        Assert.Empty(result.Rejected);
+    }
+
+    [Fact]
+    public void ParseAndValidate_DoesNotRewriteGenericReadSuggestionsForNonMapServices()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = CreateModel();
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Get Orders",
+              "description": "Retrieve orders.",
+              "methods": [
+                { "service": "OrderService", "method": "FindOrdersAsync" }
+              ],
+              "capabilityClass": "GetOrdersCapability",
+              "reasoning": "Safe read-only order lookup.",
+              "confidence": 0.80
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal("Get Orders", suggestion.Name);
+        Assert.Equal("GetOrdersCapability", suggestion.CapabilityClass);
+        Assert.Empty(result.Rejected);
+    }
+
+    [Fact]
     public void ParseAndValidate_AcceptsMethodReferencesThatIncludeParameterLists()
     {
         var parser = new WorkflowSuggestionParser();

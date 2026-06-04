@@ -106,6 +106,7 @@ dotnet run --project samples/AgentBlazor.Starter/AgentBlazor.Starter.csproj
 
 - [Quickstart](docs/quickstart.md)
 - [CLI v1 announcement](docs/cli-v1-analyze-announcement.md)
+- [0.2.15 release notes](docs/releases/0.2.15.md)
 - [0.2.14 release notes](docs/releases/0.2.14.md)
 - [0.2.13 release notes](docs/releases/0.2.13.md)
 - [0.2.12 release notes](docs/releases/0.2.12.md)
