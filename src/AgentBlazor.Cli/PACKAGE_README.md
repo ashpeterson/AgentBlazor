@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.17
+dotnet tool install --global AgentBlazor.Cli --version 0.2.18
 ```
 
 Example:
@@ -56,6 +56,8 @@ Version `0.2.16` removes the `0.2.15` map-layer workflow framing and filters UI 
 
 Version `0.2.17` improves workflow relevance by demoting pure read-only data/view suggestions from top recommendations when process-oriented workflow candidates exist.
 
+Version `0.2.18` improves top recommendation quality by demoting raw integration, admin/sensitive, data-access, and infrastructure suggestions so reports prioritize real business/process workflows instead of plumbing.
+
 Reports put top workflow recommendations and install blockers before the detailed inventory, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
 
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
@@ -64,6 +66,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.18 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.18.md
 - 0.2.17 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.17.md
 - 0.2.16 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.16.md
 - 0.2.15 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.15.md
