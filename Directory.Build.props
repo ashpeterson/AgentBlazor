@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.17</Version>
+    <Version>0.2.18</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.17: CLI workflow relevance correction. Demotes pure read-only data/view suggestions from Top Recommendations when process-oriented workflow candidates exist, includes action classification in the LLM prompt, and ranks workflow/process actions ahead of simple query methods.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.18: CLI top recommendation quality patch. Demotes raw integration, admin/sensitive, data-access, and infrastructure suggestions from Top Recommendations so reports prioritize real business/process workflows instead of plumbing such as chat-session starts, file-upload primitives, cache clearing, or direct database operations.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>

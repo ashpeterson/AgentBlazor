@@ -221,7 +221,7 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         Assert.Contains("Submit Asset for Review", topRecommendations);
         Assert.DoesNotContain("View Asset Markers", topRecommendations);
-        Assert.Contains("1 read-only data/view suggestion(s) were not promoted", topRecommendations);
+        Assert.Contains("1 supporting data, integration, admin, or infrastructure suggestion(s) were not promoted", topRecommendations);
         Assert.Contains("### View Asset Markers", content);
     }
 
@@ -252,6 +252,153 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.Contains("No process-oriented workflow candidates were found", topRecommendations);
         Assert.DoesNotContain("| View Asset Markers |", topRecommendations);
         Assert.Contains("### View Asset Markers", content);
+    }
+
+    [Fact]
+    public void GenerateMarkdown_DemotesIntegrationAdminAndDataAccessSuggestions_FromTopRecommendations()
+    {
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "RevisionSubmissionService",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "SubmitAsync", ReturnType = "Task<SubmissionResult>", IsAsync = true, IsPublic = true }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "OriginAIChatClient",
+                    FilePath = "Services/AI/Clients/OriginAIChatClient.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "StartAsync", ReturnType = "Task<AIChatSession>", IsAsync = true, IsPublic = true }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "FileUploaderService",
+                    FilePath = "Services/Files/FileUploaderService.cs",
+                    Lifetime = "Singleton",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "UploadFileAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "ESGUserService",
+                    FilePath = "Plugins/ESG/Services/ESGUserService.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "AddFavouriteCountryAsync", ReturnType = "Task<ESGUserWrapper>", IsAsync = true, IsPublic = true }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "MongoService",
+                    FilePath = "Services/MongoDb/MongoService.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "ClearCache", ReturnType = "void", IsPublic = true }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Submit ESG Rating Package",
+                    SourceService = "RevisionSubmissionService",
+                    MethodName = "SubmitAsync",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.9
+                },
+                new ActionModel
+                {
+                    Name = "Start AI Chat Session",
+                    SourceService = "OriginAIChatClient",
+                    MethodName = "StartAsync",
+                    FilePath = "Services/AI/Clients/OriginAIChatClient.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.85
+                },
+                new ActionModel
+                {
+                    Name = "Upload File for Review",
+                    SourceService = "FileUploaderService",
+                    MethodName = "UploadFileAsync",
+                    FilePath = "Services/Files/FileUploaderService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.8
+                },
+                new ActionModel
+                {
+                    Name = "Add Favourite Country",
+                    SourceService = "ESGUserService",
+                    MethodName = "AddFavouriteCountryAsync",
+                    FilePath = "Plugins/ESG/Services/ESGUserService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.75
+                },
+                new ActionModel
+                {
+                    Name = "Clear Cache",
+                    SourceService = "MongoService",
+                    MethodName = "ClearCache",
+                    FilePath = "Services/MongoDb/MongoService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.7
+                }
+            ]
+        };
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                CreateSuggestion("Submit ESG Rating Package", "RevisionSubmissionService", "SubmitAsync", 0.90),
+                CreateSuggestion("Start AI Chat Session", "OriginAIChatClient", "StartAsync", 0.85),
+                CreateSuggestion("Upload File for Review", "FileUploaderService", "UploadFileAsync", 0.80),
+                CreateSuggestion("Add Favourite Country", "ESGUserService", "AddFavouriteCountryAsync", 0.75),
+                CreateSuggestion("Clear Cache", "MongoService", "ClearCache", 0.70)
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+        var topRecommendations = ExtractSection(content, "## Top Recommendations", "## Install Blockers");
+
+        Assert.Contains("Submit ESG Rating Package", topRecommendations);
+        Assert.DoesNotContain("Start AI Chat Session", topRecommendations);
+        Assert.DoesNotContain("Upload File for Review", topRecommendations);
+        Assert.DoesNotContain("Add Favourite Country", topRecommendations);
+        Assert.DoesNotContain("Clear Cache", topRecommendations);
+        Assert.Contains("4 supporting data, integration, admin, or infrastructure suggestion(s) were not promoted", topRecommendations);
+        Assert.Contains("### Clear Cache", content);
     }
 
     [Fact]
@@ -1591,6 +1738,21 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         var end = content.IndexOf(endHeading, start + startHeading.Length, StringComparison.Ordinal);
         Assert.True(end > start, $"Could not find section end `{endHeading}`.");
         return content[start..end];
+    }
+
+    private static WorkflowSuggestion CreateSuggestion(string name, string service, string method, double confidence)
+    {
+        return new WorkflowSuggestion
+        {
+            Name = name,
+            Description = $"{name}.",
+            Reasoning = $"{name}.",
+            Confidence = confidence,
+            Methods =
+            [
+                new WorkflowMethodReference { Service = service, Method = method }
+            ]
+        };
     }
 
     private static ProjectModel CreateModel() => new()

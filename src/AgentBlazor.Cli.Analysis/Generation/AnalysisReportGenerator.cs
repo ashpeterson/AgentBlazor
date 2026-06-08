@@ -108,18 +108,18 @@ public sealed class AnalysisReportGenerator
 
             if (promotedSuggestions.Count == 0)
             {
-                sb.AppendLine("No process-oriented workflow candidates were found. The validated LLM suggestions are read-only data surfaces; review them below, but treat them as supporting context rather than first workflow work.");
+                sb.AppendLine("No process-oriented workflow candidates were found. The validated LLM suggestions are data, integration, admin, or infrastructure surfaces; review them below, but treat them as supporting context rather than first workflow work.");
                 sb.AppendLine();
                 return;
             }
 
-            var readOnlySuggestionCount = workflowSuggestions.Suggestions.Count -
+            var demotedSuggestionCount = workflowSuggestions.Suggestions.Count -
                 workflowSuggestions.Suggestions.Count(suggestion => IsProcessWorkflowSuggestion(suggestion, model));
 
             sb.AppendLine("These are the highest-signal process-oriented workflow candidates. Start here before reading the full service inventory.");
-            if (readOnlySuggestionCount > 0)
+            if (demotedSuggestionCount > 0)
             {
-                sb.AppendLine($"{readOnlySuggestionCount} read-only data/view suggestion(s) were not promoted to top recommendations.");
+                sb.AppendLine($"{demotedSuggestionCount} supporting data, integration, admin, or infrastructure suggestion(s) were not promoted to top recommendations.");
             }
 
             sb.AppendLine();
@@ -573,6 +573,7 @@ public sealed class AnalysisReportGenerator
             .Where(action => action.ExposureMode == ActionExposureMode.Suggested)
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
             .Where(action => !DuplicatesConfirmedAction(action, model))
+            .Where(action => IsTopRecommendationAction(action, model))
             .Where(action => action.Score >= 0.7)
             .OrderBy(GetActionWorkflowRank)
             .ThenBy(action => (int)ActionRisk.GetRiskBand(action))
@@ -742,10 +743,35 @@ public sealed class AnalysisReportGenerator
     private static bool IsProcessWorkflowSuggestion(WorkflowSuggestion suggestion, ProjectModel model)
     {
         return GetReferencedActions(suggestion, model)
-            .Any(action => action.Classification is
-                ActionClassification.Workflow or
-                ActionClassification.Command or
-                ActionClassification.Export);
+            .Any(action => IsTopRecommendationAction(action, model));
+    }
+
+    private static bool IsTopRecommendationAction(ActionModel action, ProjectModel model)
+    {
+        if (action.Classification is not (
+            ActionClassification.Workflow or
+            ActionClassification.Command or
+            ActionClassification.Export))
+        {
+            return false;
+        }
+
+        var service = model.Services.FirstOrDefault(service =>
+            string.Equals(service.TypeName, action.SourceService, StringComparison.OrdinalIgnoreCase));
+        if (service is null)
+        {
+            return action.Classification == ActionClassification.Workflow;
+        }
+
+        var serviceCategory = ClassifyService(service, model).Category;
+        if (serviceCategory is ServiceCategory.IntegrationOrMessaging or ServiceCategory.DataAccess or ServiceCategory.AdminOrSensitive)
+        {
+            return false;
+        }
+
+        return action.Classification == ActionClassification.Workflow ||
+            serviceCategory is ServiceCategory.OperationalWorkflow or ServiceCategory.Unknown ||
+            (action.Classification == ActionClassification.Export && serviceCategory == ServiceCategory.BusinessReadOnly);
     }
 
     private static int GetSuggestionWorkflowRank(WorkflowSuggestion suggestion, ProjectModel model)

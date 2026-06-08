@@ -29,7 +29,8 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Use simple Query methods as supporting context for workflows, but do not suggest pure data-view workflows when process-oriented methods are available.");
         sb.AppendLine("- Name workflows for the user's business outcome, not the raw method verb or UI/rendering mechanism.");
         sb.AppendLine("- Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing unless the method clearly represents a business workflow.");
-        sb.AppendLine("- Avoid auth, password reset, email sending, tenant mutation, message deletion, workflow execution, job execution, database mutation, and permission changes unless no safer workflow exists.");
+        sb.AppendLine("- Avoid raw integration/client primitives such as starting chat sessions, sending email, file upload plumbing, or message transport unless they are part of a larger listed business process.");
+        sb.AppendLine("- Avoid auth, password reset, tenant mutation, message deletion, workflow execution, job execution, cache clearing, database mutation, and permission changes unless no safer workflow exists.");
         sb.AppendLine("- If you must suggest a mutating or admin workflow, suggest at most one and explain that it needs human approval.");
         sb.AppendLine();
         sb.AppendLine("JSON shape:");
