@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.18
+dotnet tool install --global AgentBlazor.Cli --version 0.2.19
 ```
 
 Example:
@@ -58,7 +58,9 @@ Version `0.2.17` improves workflow relevance by demoting pure read-only data/vie
 
 Version `0.2.18` improves top recommendation quality by demoting raw integration, admin/sensitive, data-access, and infrastructure suggestions so reports prioritize real business/process workflows instead of plumbing.
 
-Reports put top workflow recommendations and install blockers before the detailed inventory, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
+Version `0.2.19` adds workflow-cluster context before LLM suggestion generation. The analyzer now groups lifecycle, route-correlated, and domain-correlated methods into multi-step process candidates so reports can identify pipelines rather than treating every public method as a standalone workflow.
+
+Reports put top workflow recommendations and install blockers before the detailed inventory, show workflow clusters before LLM suggestions, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
 
 The CLI is an advanced path. The default install story is still `dotnet add package AgentBlazor` plus manual runtime wiring.
 
@@ -66,6 +68,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.19 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.19.md
 - 0.2.18 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.18.md
 - 0.2.17 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.17.md
 - 0.2.16 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.16.md

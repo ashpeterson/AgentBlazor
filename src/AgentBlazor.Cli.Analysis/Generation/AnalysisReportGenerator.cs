@@ -48,6 +48,7 @@ public sealed class AnalysisReportGenerator
         WriteInstallBlockers(sb, readiness);
         WriteRoutes(sb, model);
         WriteCapabilities(sb, model);
+        WriteWorkflowClusters(sb, model);
         WriteWorkflowSuggestions(sb, model, workflowSuggestions);
         if (readiness is not null)
         {
@@ -73,6 +74,7 @@ public sealed class AnalysisReportGenerator
         sb.AppendLine($"- Developer-facing services discovered: {reportableServiceCount}");
         sb.AppendLine($"- Confirmed actions: {confirmedCount}");
         sb.AppendLine($"- Discovered candidate actions: {discoveredCount}");
+        sb.AppendLine($"- Workflow clusters discovered: {model.WorkflowClusters.Count}");
         if (readiness is not null)
         {
             sb.AppendLine($"- Install readiness: {readiness.PassCount} passed, {readiness.WarningCount} warnings, {readiness.MissingCount} missing");
@@ -163,10 +165,52 @@ public sealed class AnalysisReportGenerator
         sb.AppendLine();
     }
 
+    private static void WriteWorkflowClusters(StringBuilder sb, ProjectModel model)
+    {
+        sb.AppendLine("## Workflow Clusters");
+        sb.AppendLine();
+
+        if (model.WorkflowClusters.Count == 0)
+        {
+            sb.AppendLine("No multi-method workflow clusters were inferred from the static analysis model.");
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine("Static pre-pass clusters that are sent to the workflow-suggestion model as multi-step process context.");
+        sb.AppendLine();
+        sb.AppendLine("| Cluster | Origin | Risk | Confidence | Routes | Methods | Evidence |");
+        sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
+
+        foreach (var cluster in model.WorkflowClusters
+            .OrderByDescending(cluster => cluster.Confidence)
+            .ThenBy(cluster => cluster.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(12))
+        {
+            var routes = cluster.RouteHints.Count == 0
+                ? "-"
+                : string.Join("<br>", cluster.RouteHints.Select(route => $"`{EscapeTableCell(route)}`"));
+            var methods = cluster.Methods.Count == 0
+                ? "-"
+                : string.Join("<br>", cluster.Methods.Select(method => $"`{EscapeTableCell(method.Service)}.{EscapeTableCell(method.Method)}` ({EscapeTableCell(method.Role)})"));
+            var evidence = cluster.Evidence.Count == 0
+                ? "-"
+                : string.Join("<br>", cluster.Evidence.Take(3).Select(item => EscapeTableCell(TrimForTable(item, 120))));
+
+            sb.AppendLine($"| {EscapeTableCell(cluster.Name)} | {EscapeTableCell(cluster.Origin)} | {EscapeTableCell(cluster.Risk)} | {cluster.Confidence.ToString("0.00", CultureInfo.InvariantCulture)} | {routes} | {methods} | {evidence} |");
+        }
+
+        sb.AppendLine();
+    }
+
     private static void WriteInstallBlockers(StringBuilder sb, InstallReadinessReport? readiness)
     {
         if (readiness is null)
         {
+            sb.AppendLine("## Install Blockers");
+            sb.AppendLine();
+            sb.AppendLine("Install readiness was not evaluated for this analysis run.");
+            sb.AppendLine();
             return;
         }
 
@@ -597,7 +641,8 @@ public sealed class AnalysisReportGenerator
 
         if (ContainsAny(name, "Permission", "Password", "User", "Setup", "Cookie", "Auth", "Tenant") ||
             ContainsAny(path, "\\Permissions\\", "/Permissions/", "\\Users\\", "/Users/", "\\Setup\\", "/Setup/", "\\Cookies\\", "/Cookies/") ||
-            methods.Any(method => ContainsAny(method, "ResetPassword", "SendPasswordReset", "AddPermission", "CheckPermission", "AddTenant", "CreateSystemUser", "DeleteCookie")))
+            methods.Any(method => ContainsAny(method, "ResetPassword", "SendPasswordReset", "AddPermission", "CheckPermission", "AddTenant", "CreateSystemUser", "DeleteCookie")) ||
+            IsGenericWorkflowEngineService(name, methods))
         {
             return new ServiceClassification(ServiceCategory.AdminOrSensitive, "Use cautiously; likely needs explicit approval policy and tenant/user context before exposing.");
         }
@@ -630,6 +675,12 @@ public sealed class AnalysisReportGenerator
 
     private static bool ContainsAny(string value, params string[] fragments)
         => fragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsGenericWorkflowEngineService(string serviceName, IReadOnlyCollection<string> methodNames)
+    {
+        return ContainsAny(serviceName, "Workflow") &&
+            methodNames.Any(method => ContainsAny(method, "ExecuteWorkflow", "RunWorkflow", "LoadWorkflow", "RunWorkflowFromJson"));
+    }
 
     private static string ServiceCategoryLabel(ServiceCategory category)
         => category switch

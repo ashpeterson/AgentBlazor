@@ -17,6 +17,7 @@ public sealed class ModelBuilder
     private readonly AttributeAnalyzer _attributeAnalyzer = new();
     private readonly DiRegistrationAnalyzer _diAnalyzer = new();
     private readonly RecommendationEngine _recommendationEngine = new();
+    private readonly WorkflowClusterAnalyzer _workflowClusterAnalyzer = new();
 
     public event Action<string>? OnProgress;
     public event Action<string>? OnWarning;
@@ -347,7 +348,7 @@ public sealed class ModelBuilder
             relativeBaseDir,
             ct);
 
-        // 11. Build initial model for recommendations analysis
+        // 11. Build initial model and derive workflow clusters before prompting/reporting.
         var initialModel = new ProjectModel
         {
             SchemaVersion = "1",
@@ -364,6 +365,11 @@ public sealed class ModelBuilder
             Pages = pages,
             DiRegistrations = diRegistrations,
             FileHashes = fileHashes
+        };
+        var workflowClusters = _workflowClusterAnalyzer.Analyze(initialModel);
+        initialModel = initialModel with
+        {
+            WorkflowClusters = workflowClusters
         };
 
         // 12. Generate recommendations and coverage stats

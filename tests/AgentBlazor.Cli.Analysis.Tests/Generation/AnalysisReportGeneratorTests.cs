@@ -66,6 +66,51 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void GenerateMarkdown_IncludesWorkflowClusters_WhenDiscovered()
+    {
+        var model = CreateModel() with
+        {
+            WorkflowClusters =
+            [
+                new WorkflowClusterModel
+                {
+                    Name = "Revision Submission Package Pipeline",
+                    Origin = "same-service lifecycle",
+                    SourceService = "RevisionSubmissionService",
+                    Risk = "approval required",
+                    Confidence = 0.91,
+                    RouteHints = ["/developers/"],
+                    Evidence = ["same service contains 5 lifecycle methods", "method names form an ordered process sequence"],
+                    Methods =
+                    [
+                        new WorkflowClusterMethodModel
+                        {
+                            Service = "RevisionSubmissionService",
+                            Method = "GeneratePackageAsync",
+                            Role = "generate"
+                        },
+                        new WorkflowClusterMethodModel
+                        {
+                            Service = "RevisionSubmissionService",
+                            Method = "SubmitAsync",
+                            Role = "submit"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model);
+
+        Assert.Contains("- Workflow clusters discovered: 1", content);
+        Assert.Contains("## Workflow Clusters", content);
+        Assert.Contains("Revision Submission Package Pipeline", content);
+        Assert.Contains("same-service lifecycle", content);
+        Assert.Contains("`RevisionSubmissionService.GeneratePackageAsync` (generate)", content);
+        Assert.Contains("same service contains 5 lifecycle methods", content);
+    }
+
+    [Fact]
     public void GenerateMarkdown_IncludesValidatedWorkflowSuggestions_WhenProvided()
     {
         var model = CreateModel() with
@@ -127,7 +172,36 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     [Fact]
     public void GenerateMarkdown_PutsPrioritizedGuidance_BeforeDetailedInventory()
     {
-        var model = CreateModel();
+        var model = CreateModel() with
+        {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "OrderService",
+                    FilePath = "Services/OrderService.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "CreateOrderAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Create Order",
+                    SourceService = "OrderService",
+                    MethodName = "CreateOrderAsync",
+                    FilePath = "Services/OrderService.cs",
+                    Classification = ActionClassification.Command,
+                    IsMutationLikely = true,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
         var suggestions = new WorkflowSuggestionSet
         {
             Model = "test-model",
@@ -135,13 +209,13 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
             [
                 new WorkflowSuggestion
                 {
-                    Name = "Find orders",
-                    Description = "Find open orders.",
+                    Name = "Create order",
+                    Description = "Create an order.",
                     Methods =
                     [
-                        new WorkflowMethodReference { Service = "OrderService", Method = "FindOrdersAsync" }
+                        new WorkflowMethodReference { Service = "OrderService", Method = "CreateOrderAsync" }
                     ],
-                    Reasoning = "The orders page has a safe lookup method.",
+                    Reasoning = "The orders page has a command method for creating orders.",
                     Confidence = 0.9
                 }
             ]
@@ -153,7 +227,7 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
             content.IndexOf("## Routes And Pages", StringComparison.Ordinal));
         Assert.True(content.IndexOf("## Workflow Suggestions", StringComparison.Ordinal) <
             content.IndexOf("## Service Inventory", StringComparison.Ordinal));
-        Assert.Contains("| Find orders | safe read-only | 0.90 | `OrderService.FindOrdersAsync` |", content);
+        Assert.Contains("| Create order | approval required | 0.90 | `OrderService.CreateOrderAsync` |", content);
     }
 
     [Fact]
@@ -161,6 +235,21 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     {
         var model = CreateModel() with
         {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "ExcelService",
+                    FilePath = "Services/ExcelService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ExportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                },
+                new ServiceModel
+                {
+                    TypeName = "PDFService",
+                    FilePath = "Services/PDFService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ExportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                }
+            ],
             Actions =
             [
                 .. CreateModel().Actions,
@@ -310,6 +399,16 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     [
                         new ServiceMethodModel { Name = "ClearCache", ReturnType = "void", IsPublic = true }
                     ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "WorkflowService",
+                    FilePath = "Services/Workflows/WorkflowService.cs",
+                    Lifetime = "Scoped",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "ExecuteWorkflowAsync", ReturnType = "Task<Workflow>", IsAsync = true, IsPublic = true }
+                    ]
                 }
             ],
             Actions =
@@ -373,6 +472,18 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                     IsMutationLikely = true,
                     RequiresApproval = true,
                     Score = 0.7
+                },
+                new ActionModel
+                {
+                    Name = "Execute Workflow",
+                    SourceService = "WorkflowService",
+                    MethodName = "ExecuteWorkflowAsync",
+                    FilePath = "Services/Workflows/WorkflowService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.85
                 }
             ]
         };
@@ -385,7 +496,8 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                 CreateSuggestion("Start AI Chat Session", "OriginAIChatClient", "StartAsync", 0.85),
                 CreateSuggestion("Upload File for Review", "FileUploaderService", "UploadFileAsync", 0.80),
                 CreateSuggestion("Add Favourite Country", "ESGUserService", "AddFavouriteCountryAsync", 0.75),
-                CreateSuggestion("Clear Cache", "MongoService", "ClearCache", 0.70)
+                CreateSuggestion("Clear Cache", "MongoService", "ClearCache", 0.70),
+                CreateSuggestion("Execute Workflow", "WorkflowService", "ExecuteWorkflowAsync", 0.85)
             ]
         };
 
@@ -397,8 +509,10 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
         Assert.DoesNotContain("Upload File for Review", topRecommendations);
         Assert.DoesNotContain("Add Favourite Country", topRecommendations);
         Assert.DoesNotContain("Clear Cache", topRecommendations);
-        Assert.Contains("4 supporting data, integration, admin, or infrastructure suggestion(s) were not promoted", topRecommendations);
+        Assert.DoesNotContain("Execute Workflow", topRecommendations);
+        Assert.Contains("5 supporting data, integration, admin, or infrastructure suggestion(s) were not promoted", topRecommendations);
         Assert.Contains("### Clear Cache", content);
+        Assert.Contains("### Execute Workflow", content);
     }
 
     [Fact]
@@ -1439,6 +1553,21 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     {
         var model = CreateModel() with
         {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "StatusReportService",
+                    FilePath = "Services/StatusReportService.cs",
+                    Methods = [new ServiceMethodModel { Name = "GenerateStatusReportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserService",
+                    FilePath = "Services/UserService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ResetPasswordAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                }
+            ],
             Actions =
             [
                 .. CreateModel().Actions,
@@ -1546,6 +1675,21 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     {
         var model = CreateModel() with
         {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "ExcelService",
+                    FilePath = "Services/ExcelService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ExportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                },
+                new ServiceModel
+                {
+                    TypeName = "PDFService",
+                    FilePath = "Services/PDFService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ExportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                }
+            ],
             Actions =
             [
                 new ActionModel
@@ -1578,10 +1722,25 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
-    public void GenerateMarkdown_PrioritizesSafeStaticCandidates_BeforeHighRiskAdminActions()
+    public void GenerateMarkdown_DoesNotPromoteHighRiskAdminStaticCandidates()
     {
         var model = CreateModel() with
         {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "StatusReportService",
+                    FilePath = "Services/StatusReportService.cs",
+                    Methods = [new ServiceMethodModel { Name = "GenerateStatusReportAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserService",
+                    FilePath = "Services/UserService.cs",
+                    Methods = [new ServiceMethodModel { Name = "ResetPasswordAsync", ReturnType = "Task", IsAsync = true, IsPublic = true }]
+                }
+            ],
             Actions =
             [
                 new ActionModel
@@ -1598,11 +1757,11 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
                 },
                 new ActionModel
                 {
-                    Name = "Get Status Snapshot",
-                    SourceService = "OriginAIClient",
-                    MethodName = "GetStatusSnapshotAsync",
-                    FilePath = "Services/OriginAIClient.cs",
-                    Classification = ActionClassification.Query,
+                    Name = "Generate Status Report",
+                    SourceService = "StatusReportService",
+                    MethodName = "GenerateStatusReportAsync",
+                    FilePath = "Services/StatusReportService.cs",
+                    Classification = ActionClassification.Export,
                     Score = 0.75,
                     ExposureMode = ActionExposureMode.Suggested
                 }
@@ -1612,10 +1771,9 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
 
         var content = _generator.GenerateMarkdown(model);
 
-        Assert.True(content.IndexOf("### Get Status Snapshot", StringComparison.Ordinal) <
-            content.IndexOf("### Reset Password", StringComparison.Ordinal));
-        Assert.Contains("- Risk: safe read-only", content);
-        Assert.Contains("- Risk: high-risk/admin", content);
+        Assert.Contains("### Generate Status Report", content);
+        Assert.DoesNotContain("### Reset Password", content);
+        Assert.Contains("- Risk: review generated output", content);
     }
 
     [Fact]

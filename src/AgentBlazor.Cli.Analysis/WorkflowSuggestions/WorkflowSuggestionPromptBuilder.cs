@@ -24,13 +24,16 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- Suggested C# code must use AgentBlazor CapabilityResult and only call listed methods.");
         sb.AppendLine("- Do not invent DTO or entity types in code. If a type is unclear, use comments rather than fake types.");
         sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
+        sb.AppendLine("- Prioritize workflow clusters when present. They are static-analysis hints that multiple methods likely form one user process.");
+        sb.AppendLine("- When using a workflow cluster, reference several listed methods in the shown order instead of splitting each method into separate workflow suggestions.");
         sb.AppendLine("- A workflow is a user/business process, task, or decision flow. A one-method getter/list/view is usually a data surface, not a workflow.");
         sb.AppendLine("- Prefer methods classified as Workflow first. Prefer Command or Export only when the user-facing process is clear and approval guidance is included.");
         sb.AppendLine("- Use simple Query methods as supporting context for workflows, but do not suggest pure data-view workflows when process-oriented methods are available.");
         sb.AppendLine("- Name workflows for the user's business outcome, not the raw method verb or UI/rendering mechanism.");
         sb.AppendLine("- Avoid suggesting UI rendering, map layer application, chart drawing, styling, layout, or component state plumbing unless the method clearly represents a business workflow.");
         sb.AppendLine("- Avoid raw integration/client primitives such as starting chat sessions, sending email, file upload plumbing, or message transport unless they are part of a larger listed business process.");
-        sb.AppendLine("- Avoid auth, password reset, tenant mutation, message deletion, workflow execution, job execution, cache clearing, database mutation, and permission changes unless no safer workflow exists.");
+        sb.AppendLine("- Avoid auth, password reset, tenant mutation, message deletion, job execution, cache clearing, database mutation, and permission changes unless no safer workflow exists.");
+        sb.AppendLine("- Avoid generic workflow-engine methods such as ExecuteWorkflowAsync, RunWorkflow, LoadWorkflow, or RunWorkflowFromJsonAsync unless they are wrapped by a domain-specific listed service method.");
         sb.AppendLine("- If you must suggest a mutating or admin workflow, suggest at most one and explain that it needs human approval.");
         sb.AppendLine();
         sb.AppendLine("JSON shape:");
@@ -58,6 +61,7 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine();
         AppendRoutes(sb, model);
         AppendConfirmedActions(sb, model);
+        AppendWorkflowClusters(sb, model);
         AppendServices(sb, model);
         return sb.ToString();
     }
@@ -104,9 +108,60 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine();
     }
 
+    private static void AppendWorkflowClusters(StringBuilder sb, ProjectModel model)
+    {
+        sb.AppendLine("Workflow clusters:");
+        if (model.WorkflowClusters.Count == 0)
+        {
+            sb.AppendLine("- none");
+            sb.AppendLine();
+            return;
+        }
+
+        foreach (var cluster in model.WorkflowClusters
+            .OrderByDescending(cluster => cluster.Confidence)
+            .ThenBy(cluster => cluster.SourceService)
+            .Take(12))
+        {
+            sb.AppendLine($"- {cluster.Name}: origin={cluster.Origin}, service={cluster.SourceService}, risk={cluster.Risk}, approvalRecommended={cluster.RequiresApproval.ToString().ToLowerInvariant()}, confidence={cluster.Confidence:0.00}");
+            if (!string.IsNullOrWhiteSpace(cluster.Summary))
+            {
+                sb.AppendLine($"  summary={cluster.Summary}");
+            }
+
+            if (cluster.DomainTerms.Count > 0)
+            {
+                sb.AppendLine($"  domainTerms={string.Join(", ", cluster.DomainTerms)}");
+            }
+
+            if (cluster.RelatedServices.Count > 1)
+            {
+                sb.AppendLine($"  relatedServices={string.Join(", ", cluster.RelatedServices)}");
+            }
+
+            if (cluster.RouteHints.Count > 0)
+            {
+                sb.AppendLine($"  routeHints={string.Join(", ", cluster.RouteHints)}");
+            }
+
+            foreach (var evidence in cluster.Evidence.Take(4))
+            {
+                sb.AppendLine($"  evidence={evidence}");
+            }
+
+            foreach (var method in cluster.Methods)
+            {
+                sb.AppendLine($"  - {method.Service}.{method.Method} [role={method.Role}, classification={method.Classification}, risk={method.Risk}]");
+            }
+        }
+
+        sb.AppendLine();
+    }
+
     private static void AppendServices(StringBuilder sb, ProjectModel model)
     {
         sb.AppendLine("Discovered services and public methods:");
+        sb.AppendLine("Use this flat catalog as supporting context. Prefer the workflow clusters above when they exist.");
         var candidateActions = model.Actions
             .Where(action => action.ExposureMode is ActionExposureMode.Suggested or ActionExposureMode.Confirmed)
             .Where(AnalysisModelFilters.IsDeveloperFacingAction)
