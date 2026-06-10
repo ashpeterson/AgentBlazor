@@ -36,7 +36,9 @@ Version `0.2.17` improves workflow relevance by demoting pure read-only data/vie
 
 Version `0.2.18` improves top recommendation quality by demoting raw integration, admin/sensitive, data-access, and infrastructure suggestions so reports prioritize real business/process workflows instead of plumbing.
 
-Current reports put top workflow recommendations and install blockers before the detailed inventory. The service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
+Version `0.2.19` adds workflow-cluster context before LLM suggestion generation. The analyzer now groups lifecycle, route-correlated, and domain-correlated methods into multi-step process candidates so reports can identify pipelines rather than treating every public method as a standalone workflow.
+
+Current reports put top workflow recommendations and install blockers before the detailed inventory. Workflow clusters are shown before LLM suggestions, and the service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
 
 See:
 

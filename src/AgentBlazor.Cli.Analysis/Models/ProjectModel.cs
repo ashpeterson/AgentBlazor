@@ -17,6 +17,7 @@ public sealed record ProjectModel
     public IReadOnlyList<ComponentModel> Components { get; init; } = [];
     public IReadOnlyList<ServiceModel> Services { get; init; } = [];
     public IReadOnlyList<ActionModel> Actions { get; init; } = [];
+    public IReadOnlyList<WorkflowClusterModel> WorkflowClusters { get; init; } = [];
     public IReadOnlyList<PageModel> Pages { get; init; } = [];
     public IReadOnlyList<DiRegistrationModel> DiRegistrations { get; init; } = [];
     public IReadOnlyList<RecommendationModel> Recommendations { get; init; } = [];
@@ -138,6 +139,34 @@ public enum ActionExposureMode
     Suggested,  // CLI suggests exposing
     Confirmed,  // Developer confirmed
     Ignored     // Developer chose to ignore
+}
+
+public sealed record WorkflowClusterModel
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string SourceService { get; init; } = "";
+    public string FilePath { get; init; } = "";
+    public string Summary { get; init; } = "";
+    public double Confidence { get; init; }
+    public bool RequiresApproval { get; init; }
+    public string Risk { get; init; } = "";
+    public string Origin { get; init; } = "";
+    public IReadOnlyList<string> DomainTerms { get; init; } = [];
+    public IReadOnlyList<string> RelatedServices { get; init; } = [];
+    public IReadOnlyList<string> Evidence { get; init; } = [];
+    public IReadOnlyList<WorkflowClusterMethodModel> Methods { get; init; } = [];
+    public IReadOnlyList<string> RouteHints { get; init; } = [];
+}
+
+public sealed record WorkflowClusterMethodModel
+{
+    public string Service { get; init; } = "";
+    public string Method { get; init; } = "";
+    public string Role { get; init; } = "";
+    public ActionClassification Classification { get; init; }
+    public string Risk { get; init; } = "";
+    public string Summary { get; init; } = "";
 }
 
 public sealed record PageModel

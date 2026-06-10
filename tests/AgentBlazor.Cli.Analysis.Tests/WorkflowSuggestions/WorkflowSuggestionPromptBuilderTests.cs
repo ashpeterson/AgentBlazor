@@ -39,6 +39,21 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ServiceModel
                 {
+                    TypeName = "OrderWorkflowService",
+                    FilePath = "Services/OrderWorkflowService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel
+                        {
+                            Name = "SubmitOrderAsync",
+                            ReturnType = "Task",
+                            IsPublic = true,
+                            IsAsync = true
+                        }
+                    ]
+                },
+                new ServiceModel
+                {
                     TypeName = "ActivityIdHelper",
                     FilePath = "ActivityIdHelper.cs",
                     Methods =
@@ -196,6 +211,17 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                 },
                 new ActionModel
                 {
+                    Name = "Submit Order",
+                    SourceService = "OrderWorkflowService",
+                    MethodName = "SubmitOrderAsync",
+                    FilePath = "Services/OrderWorkflowService.cs",
+                    ExposureMode = ActionExposureMode.Suggested,
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    Score = 0.9
+                },
+                new ActionModel
+                {
                     Name = "Get Latest Chat ID",
                     SourceService = "AIChatMessageAssetService",
                     MethodName = "GetLatestChatIdAsync",
@@ -327,4 +353,101 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("EmailService", prompt);
         Assert.Contains("SendEmailAsync", prompt);
     }
+
+    [Fact]
+    public void Build_IncludesWorkflowClustersBeforeFlatServiceCatalog()
+    {
+        var builder = new WorkflowSuggestionPromptBuilder();
+        var model = new ProjectModel
+        {
+            AppName = "TestApp",
+            BlazorHostProject = "TestApp",
+            WorkflowClusters =
+            [
+                new WorkflowClusterModel
+                {
+                    Name = "Revision Submission Package Pipeline",
+                    SourceService = "RevisionSubmissionService",
+                    Risk = "approval required",
+                    Origin = "same-service lifecycle",
+                    RequiresApproval = true,
+                    Confidence = 0.88,
+                    Summary = "Revision Submission Package Pipeline appears to be a multi-step process: GeneratePackageAsync -> UploadPackageAsync -> SubmitAsync -> CheckStatusAsync -> PromoteAsync.",
+                    DomainTerms = ["Revision", "Submission", "Package"],
+                    RelatedServices = ["RevisionSubmissionService"],
+                    Evidence = ["same service contains 5 lifecycle methods", "method names form an ordered process sequence"],
+                    RouteHints = ["/developers/"],
+                    Methods =
+                    [
+                        CreateClusterMethod("GeneratePackageAsync", "generate"),
+                        CreateClusterMethod("UploadPackageAsync", "upload"),
+                        CreateClusterMethod("SubmitAsync", "submit"),
+                        CreateClusterMethod("CheckStatusAsync", "status"),
+                        CreateClusterMethod("PromoteAsync", "promote")
+                    ]
+                }
+            ],
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "RevisionSubmissionService",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "GeneratePackageAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "UploadPackageAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "SubmitAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "CheckStatusAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "PromoteAsync", IsPublic = true, IsAsync = true }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                CreateAction("GeneratePackageAsync"),
+                CreateAction("UploadPackageAsync"),
+                CreateAction("SubmitAsync"),
+                CreateAction("CheckStatusAsync"),
+                CreateAction("PromoteAsync")
+            ]
+        };
+
+        var prompt = builder.Build(model);
+
+        Assert.Contains("Prioritize workflow clusters when present", prompt);
+        Assert.Contains("Workflow clusters:", prompt);
+        Assert.Contains("Revision Submission Package Pipeline", prompt);
+        Assert.Contains("origin=same-service lifecycle", prompt);
+        Assert.Contains("domainTerms=Revision, Submission, Package", prompt);
+        Assert.Contains("evidence=same service contains 5 lifecycle methods", prompt);
+        Assert.Contains("routeHints=/developers/", prompt);
+        Assert.Contains("RevisionSubmissionService.GeneratePackageAsync [role=generate", prompt);
+        Assert.Contains("RevisionSubmissionService.PromoteAsync [role=promote", prompt);
+        Assert.True(prompt.IndexOf("Workflow clusters:", StringComparison.Ordinal) <
+            prompt.IndexOf("Discovered services and public methods:", StringComparison.Ordinal));
+        Assert.Contains("Use this flat catalog as supporting context", prompt);
+    }
+
+    private static WorkflowClusterMethodModel CreateClusterMethod(string method, string role) => new()
+    {
+        Service = "RevisionSubmissionService",
+        Method = method,
+        Role = role,
+        Classification = ActionClassification.Workflow,
+        Risk = "approval required"
+    };
+
+    private static ActionModel CreateAction(string method) => new()
+    {
+        Name = method,
+        SourceService = "RevisionSubmissionService",
+        MethodName = method,
+        FilePath = "Services/RevisionSubmissionService.cs",
+        ExposureMode = ActionExposureMode.Suggested,
+        Classification = ActionClassification.Workflow,
+        IsMutationLikely = true,
+        RequiresApproval = true,
+        Score = 0.8
+    };
 }
