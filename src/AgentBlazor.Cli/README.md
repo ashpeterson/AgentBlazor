@@ -40,6 +40,8 @@ Version `0.2.19` adds workflow-cluster context before LLM suggestion generation.
 
 Version `0.2.20` tightens clustered workflow analysis by preferring non-admin process clusters in the LLM prompt, validating cluster-backed suggestions against the whole pipeline instead of every method verb, and falling back to preferred static clusters when LLM suggestions are only sensitive or supporting surfaces.
 
+Version `0.2.21` is a corrective package release for `0.2.20`; it carries the same clustered workflow ranking fixes and ensures the packaged CLI executable reports the same version as the NuGet package.
+
 Current reports put top workflow recommendations and install blockers before the detailed inventory. Workflow clusters are shown before LLM suggestions, preferred process clusters are separated from sensitive/supporting clusters in the prompt, and the service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
 
 See:

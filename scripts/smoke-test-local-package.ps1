@@ -245,6 +245,7 @@ Invoke-Step "Preparing local package feed" {
                 "-c", "Release",
                 "-o", $localFeed,
                 "/p:UseSharedCompilation=false",
+                "/p:Version=$PackageVersion",
                 "/p:PackageVersion=$PackageVersion",
                 "/p:RestoreLockedMode=false",
                 "/p:RestoreForceEvaluate=true"
@@ -589,6 +590,16 @@ Invoke-Step "Installing the local CLI package" {
         "--tool-path", $toolPath,
         "--configfile", $nugetConfigPath
     ) -WorkingDirectory $scratchRoot
+
+    $cliExe = Resolve-AgentBlazorToolPath
+    $cliVersion = (& $cliExe --version).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "agentblazor --version failed."
+    }
+
+    if ($cliVersion -ne $PackageVersion) {
+        throw "Installed AgentBlazor.Cli reported version '$cliVersion', expected '$PackageVersion'."
+    }
 }
 
 Invoke-Step "Generating AGENT.md with the CLI" {
