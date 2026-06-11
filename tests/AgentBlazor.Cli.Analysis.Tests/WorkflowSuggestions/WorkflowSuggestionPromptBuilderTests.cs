@@ -385,6 +385,24 @@ public sealed class WorkflowSuggestionPromptBuilderTests
                         CreateClusterMethod("CheckStatusAsync", "status"),
                         CreateClusterMethod("PromoteAsync", "promote")
                     ]
+                },
+                new WorkflowClusterModel
+                {
+                    Name = "Password Reset Token Pipeline",
+                    SourceService = "UserService",
+                    Risk = "high-risk/admin",
+                    Origin = "same-service lifecycle",
+                    RequiresApproval = true,
+                    Confidence = 0.91,
+                    Summary = "Password Reset Token Pipeline appears to be a sensitive account recovery process.",
+                    DomainTerms = ["Password", "Reset", "Token"],
+                    RelatedServices = ["UserService"],
+                    Methods =
+                    [
+                        CreateClusterMethod("UserService", "GenerateResetTokenAsync", "generate"),
+                        CreateClusterMethod("UserService", "ValidateResetTokenAsync", "validate"),
+                        CreateClusterMethod("UserService", "SendPasswordResetEmailAsync", "submit")
+                    ]
                 }
             ],
             Services =
@@ -416,7 +434,7 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         var prompt = builder.Build(model);
 
         Assert.Contains("Prioritize workflow clusters when present", prompt);
-        Assert.Contains("Workflow clusters:", prompt);
+        Assert.Contains("Preferred workflow clusters:", prompt);
         Assert.Contains("Revision Submission Package Pipeline", prompt);
         Assert.Contains("origin=same-service lifecycle", prompt);
         Assert.Contains("domainTerms=Revision, Submission, Package", prompt);
@@ -424,14 +442,21 @@ public sealed class WorkflowSuggestionPromptBuilderTests
         Assert.Contains("routeHints=/developers/", prompt);
         Assert.Contains("RevisionSubmissionService.GeneratePackageAsync [role=generate", prompt);
         Assert.Contains("RevisionSubmissionService.PromoteAsync [role=promote", prompt);
-        Assert.True(prompt.IndexOf("Workflow clusters:", StringComparison.Ordinal) <
+        Assert.Contains("Sensitive/supporting workflow clusters:", prompt);
+        Assert.Contains("Do not suggest these before preferred clusters", prompt);
+        Assert.Contains("Password Reset Token Pipeline: origin=same-service lifecycle, risk=high-risk/admin", prompt);
+        Assert.DoesNotContain("UserService.GenerateResetTokenAsync [role=generate", prompt);
+        Assert.True(prompt.IndexOf("Preferred workflow clusters:", StringComparison.Ordinal) <
             prompt.IndexOf("Discovered services and public methods:", StringComparison.Ordinal));
         Assert.Contains("Use this flat catalog as supporting context", prompt);
     }
 
-    private static WorkflowClusterMethodModel CreateClusterMethod(string method, string role) => new()
+    private static WorkflowClusterMethodModel CreateClusterMethod(string method, string role)
+        => CreateClusterMethod("RevisionSubmissionService", method, role);
+
+    private static WorkflowClusterMethodModel CreateClusterMethod(string service, string method, string role) => new()
     {
-        Service = "RevisionSubmissionService",
+        Service = service,
         Method = method,
         Role = role,
         Classification = ActionClassification.Workflow,

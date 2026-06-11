@@ -344,6 +344,90 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void GenerateMarkdown_UsesPreferredWorkflowClusters_WhenValidatedSuggestionsAreOnlySensitive()
+    {
+        var model = CreateModel() with
+        {
+            WorkflowClusters =
+            [
+                new WorkflowClusterModel
+                {
+                    Name = "Revision Submission Package Pipeline",
+                    SourceService = "RevisionSubmissionService",
+                    Risk = "approval required",
+                    Origin = "same-service lifecycle",
+                    Confidence = 0.88,
+                    Summary = "Revision submission appears to be a multi-step package process.",
+                    Methods =
+                    [
+                        CreateClusterMethod("RevisionSubmissionService", "GeneratePackageAsync", "generate", ActionClassification.Workflow),
+                        CreateClusterMethod("RevisionSubmissionService", "UploadPackageAsync", "upload", ActionClassification.Workflow),
+                        CreateClusterMethod("RevisionSubmissionService", "SubmitAsync", "submit", ActionClassification.Workflow),
+                        CreateClusterMethod("RevisionSubmissionService", "CheckStatusAsync", "status", ActionClassification.Workflow)
+                    ]
+                }
+            ],
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "RevisionSubmissionService",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "GeneratePackageAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "UploadPackageAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "SubmitAsync", IsPublic = true, IsAsync = true },
+                        new ServiceMethodModel { Name = "CheckStatusAsync", IsPublic = true, IsAsync = true }
+                    ]
+                },
+                new ServiceModel
+                {
+                    TypeName = "UserService",
+                    FilePath = "Services/Users/UserService.cs",
+                    Methods =
+                    [
+                        new ServiceMethodModel { Name = "ResetPasswordAsync", IsPublic = true, IsAsync = true }
+                    ]
+                }
+            ],
+            Actions =
+            [
+                new ActionModel
+                {
+                    Name = "Reset Password",
+                    SourceService = "UserService",
+                    MethodName = "ResetPasswordAsync",
+                    FilePath = "Services/Users/UserService.cs",
+                    Classification = ActionClassification.Workflow,
+                    IsMutationLikely = true,
+                    RequiresApproval = true,
+                    Score = 0.9,
+                    ExposureMode = ActionExposureMode.Suggested
+                }
+            ]
+        };
+        var suggestions = new WorkflowSuggestionSet
+        {
+            Model = "test-model",
+            Suggestions =
+            [
+                CreateSuggestion("Reset User Password", "UserService", "ResetPasswordAsync", 0.90)
+            ]
+        };
+
+        var content = _generator.GenerateMarkdown(model, workflowSuggestions: suggestions);
+        var topRecommendations = ExtractSection(content, "## Top Recommendations", "## Install Blockers");
+
+        Assert.Contains("Use these static workflow clusters as the first workflow candidates", topRecommendations);
+        Assert.Contains("Revision Submission Package Pipeline", topRecommendations);
+        Assert.Contains("RevisionSubmissionService.GeneratePackageAsync", topRecommendations);
+        Assert.DoesNotContain("No process-oriented workflow candidates were found", topRecommendations);
+        Assert.DoesNotContain("| Reset User Password |", topRecommendations);
+        Assert.Contains("### Reset User Password", content);
+    }
+
+    [Fact]
     public void GenerateMarkdown_DemotesIntegrationAdminAndDataAccessSuggestions_FromTopRecommendations()
     {
         var model = CreateModel() with
@@ -1912,6 +1996,19 @@ public sealed class AnalysisReportGeneratorTests : IDisposable
             ]
         };
     }
+
+    private static WorkflowClusterMethodModel CreateClusterMethod(
+        string service,
+        string method,
+        string role,
+        ActionClassification classification) => new()
+    {
+        Service = service,
+        Method = method,
+        Role = role,
+        Classification = classification,
+        Risk = "approval required"
+    };
 
     private static ProjectModel CreateModel() => new()
     {

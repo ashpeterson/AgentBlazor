@@ -289,6 +289,81 @@ public sealed class WorkflowSuggestionParserTests
         Assert.Empty(result.Rejected);
     }
 
+    [Fact]
+    public void ParseAndValidate_AcceptsClusterBackedSuggestion_WhenLifecycleVerbsAreNotInWorkflowText()
+    {
+        var parser = new WorkflowSuggestionParser();
+        var model = new ProjectModel
+        {
+            AppName = "RevisionApp",
+            BlazorHostProject = "RevisionApp",
+            WorkflowClusters =
+            [
+                new WorkflowClusterModel
+                {
+                    Name = "Revision Submission Package Pipeline",
+                    SourceService = "RevisionSubmissionService",
+                    Risk = "approval required",
+                    Origin = "same-service lifecycle",
+                    Confidence = 0.88,
+                    DomainTerms = ["Revision", "Submission", "Package"],
+                    Methods =
+                    [
+                        CreateClusterMethod("GeneratePackageAsync", "generate"),
+                        CreateClusterMethod("UploadPackageAsync", "upload"),
+                        CreateClusterMethod("SubmitAsync", "submit"),
+                        CreateClusterMethod("CheckStatusAsync", "status")
+                    ]
+                }
+            ],
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "RevisionSubmissionService",
+                    FilePath = "Services/RevisionSubmissionService.cs",
+                    Methods =
+                    [
+                        CreateMethod("GeneratePackageAsync"),
+                        CreateMethod("UploadPackageAsync"),
+                        CreateMethod("SubmitAsync"),
+                        CreateMethod("CheckStatusAsync")
+                    ]
+                }
+            ],
+            Actions =
+            [
+                CreateAction("GeneratePackageAsync"),
+                CreateAction("UploadPackageAsync"),
+                CreateAction("SubmitAsync"),
+                CreateAction("CheckStatusAsync")
+            ]
+        };
+        var json = """
+        {
+          "workflows": [
+            {
+              "name": "Revision Submission Process",
+              "description": "Coordinates the revision package submission lifecycle for approval.",
+              "methods": [
+                { "service": "RevisionSubmissionService", "method": "GeneratePackageAsync" },
+                { "service": "RevisionSubmissionService", "method": "UploadPackageAsync" },
+                { "service": "RevisionSubmissionService", "method": "SubmitAsync" },
+                { "service": "RevisionSubmissionService", "method": "CheckStatusAsync" }
+              ],
+              "confidence": 0.86
+            }
+          ]
+        }
+        """;
+
+        var result = parser.ParseAndValidate(json, model, "test-model");
+
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal("Revision Submission Process", suggestion.Name);
+        Assert.Empty(result.Rejected);
+    }
+
     private static ProjectModel CreateModel() => new()
     {
         AppName = "OrderApp",
@@ -341,5 +416,35 @@ public sealed class WorkflowSuggestionParserTests
                 Score = 0.8
             }
         ]
+    };
+
+    private static ServiceMethodModel CreateMethod(string name) => new()
+    {
+        Name = name,
+        ReturnType = "Task",
+        IsPublic = true,
+        IsAsync = name.EndsWith("Async", StringComparison.Ordinal)
+    };
+
+    private static WorkflowClusterMethodModel CreateClusterMethod(string method, string role) => new()
+    {
+        Service = "RevisionSubmissionService",
+        Method = method,
+        Role = role,
+        Classification = ActionClassification.Workflow,
+        Risk = "approval required"
+    };
+
+    private static ActionModel CreateAction(string method) => new()
+    {
+        Name = method,
+        SourceService = "RevisionSubmissionService",
+        MethodName = method,
+        FilePath = "Services/RevisionSubmissionService.cs",
+        ExposureMode = ActionExposureMode.Suggested,
+        Classification = ActionClassification.Workflow,
+        IsMutationLikely = true,
+        RequiresApproval = true,
+        Score = 0.8
     };
 }
