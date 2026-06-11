@@ -74,7 +74,7 @@ public sealed class WorkflowSuggestionParser
                 continue;
             }
 
-            var semanticallyMisalignedMethods = FindSemanticallyMisalignedMethods(suggestion);
+            var semanticallyMisalignedMethods = FindSemanticallyMisalignedMethods(suggestion, model);
             if (semanticallyMisalignedMethods.Count > 0)
             {
                 rejected.Add(new RejectedWorkflowSuggestion
@@ -136,8 +136,15 @@ public sealed class WorkflowSuggestionParser
             suggestion.Methods.All(method => confirmedMethodNames.Contains(NormalizeName(method.Method)));
     }
 
-    private static IReadOnlyList<WorkflowMethodReference> FindSemanticallyMisalignedMethods(WorkflowSuggestion suggestion)
+    private static IReadOnlyList<WorkflowMethodReference> FindSemanticallyMisalignedMethods(
+        WorkflowSuggestion suggestion,
+        ProjectModel model)
     {
+        if (IsAlignedWithWorkflowCluster(suggestion, model))
+        {
+            return [];
+        }
+
         var workflowText = NormalizeText(string.Join(
             ' ',
             suggestion.Name,
@@ -154,6 +161,56 @@ public sealed class WorkflowSuggestionParser
                     methodTokens.Count(token => workflowText.Contains(token, StringComparison.Ordinal)) < requiredMatches;
             })
             .ToList();
+    }
+
+    private static bool IsAlignedWithWorkflowCluster(WorkflowSuggestion suggestion, ProjectModel model)
+    {
+        if (suggestion.Methods.Count < 2 || model.WorkflowClusters.Count == 0)
+        {
+            return false;
+        }
+
+        var suggestionMethods = suggestion.Methods
+            .Select(method => BuildMethodReferenceKey(method.Service, method.Method))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var workflowText = NormalizeText(string.Join(
+            ' ',
+            suggestion.Name,
+            suggestion.Description,
+            suggestion.CapabilityClass,
+            suggestion.Reasoning));
+
+        foreach (var cluster in model.WorkflowClusters)
+        {
+            var clusterMethods = cluster.Methods
+                .Select(method => BuildMethodReferenceKey(method.Service, method.Method))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!suggestionMethods.All(clusterMethods.Contains))
+            {
+                continue;
+            }
+
+            var coverage = suggestionMethods.Count / (double)Math.Max(1, clusterMethods.Count);
+            if (suggestionMethods.Count < 3 && coverage < 0.5)
+            {
+                continue;
+            }
+
+            var clusterTerms = SplitIdentifier(cluster.Name)
+                .Concat(cluster.DomainTerms.SelectMany(SplitIdentifier))
+                .Concat(SplitIdentifier(cluster.SourceService))
+                .Where(term => !IgnoredClusterWords.Contains(term))
+                .Where(term => term.Length >= 4)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (clusterTerms.Count == 0 ||
+                clusterTerms.Any(term => workflowText.Contains(term, StringComparison.Ordinal)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IReadOnlyList<string> ExtractMeaningfulMethodTokens(string methodName)
@@ -250,6 +307,20 @@ public sealed class WorkflowSuggestionParser
             .Select(char.ToLowerInvariant)
             .ToArray());
     }
+
+    private static string BuildMethodReferenceKey(string service, string method)
+        => $"{NormalizeName(service)}.{NormalizeName(method)}";
+
+    private static readonly HashSet<string> IgnoredClusterWords = new(StringComparer.Ordinal)
+    {
+        "admin",
+        "async",
+        "business",
+        "pipeline",
+        "process",
+        "service",
+        "workflow"
+    };
 
     private static IReadOnlyList<WorkflowMethodReference> ReadMethods(JsonElement element)
     {

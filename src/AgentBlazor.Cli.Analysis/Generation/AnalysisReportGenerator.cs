@@ -110,6 +110,20 @@ public sealed class AnalysisReportGenerator
 
             if (promotedSuggestions.Count == 0)
             {
+                var preferredClusters = GetPreferredWorkflowClusters(model, take: 5);
+                if (preferredClusters.Count > 0)
+                {
+                    sb.AppendLine("The validated LLM suggestions were data, integration, admin, or infrastructure surfaces. Use these static workflow clusters as the first workflow candidates instead.");
+                    var fallbackDemotedSuggestionCount = workflowSuggestions.Suggestions.Count;
+                    if (fallbackDemotedSuggestionCount > 0)
+                    {
+                        sb.AppendLine($"{fallbackDemotedSuggestionCount} supporting data, integration, admin, or infrastructure suggestion(s) were not promoted to top recommendations.");
+                    }
+
+                    WriteClusterRecommendationTable(sb, preferredClusters);
+                    return;
+                }
+
                 sb.AppendLine("No process-oriented workflow candidates were found. The validated LLM suggestions are data, integration, admin, or infrastructure surfaces; review them below, but treat them as supporting context rather than first workflow work.");
                 sb.AppendLine();
                 return;
@@ -142,6 +156,14 @@ public sealed class AnalysisReportGenerator
             return;
         }
 
+        var clusterCandidates = GetPreferredWorkflowClusters(model, take: 5);
+        if (clusterCandidates.Count > 0)
+        {
+            sb.AppendLine("LLM workflow suggestions were not requested. These are the highest-confidence static workflow clusters.");
+            WriteClusterRecommendationTable(sb, clusterCandidates);
+            return;
+        }
+
         var candidates = GetStaticWorkflowCandidates(model, take: 5);
         if (candidates.Count == 0)
         {
@@ -160,6 +182,22 @@ public sealed class AnalysisReportGenerator
                 ? action.Classification.ToString()
                 : action.Summary;
             sb.AppendLine($"| {EscapeTableCell(action.Name)} | {ActionRisk.Describe(ActionRisk.GetRiskBand(action))} | {action.Score.ToString("0.00", CultureInfo.InvariantCulture)} | `{EscapeTableCell(action.SourceService)}.{EscapeTableCell(action.MethodName)}` | {EscapeTableCell(TrimForTable(reasoning, 180))} |");
+        }
+
+        sb.AppendLine();
+    }
+
+    private static void WriteClusterRecommendationTable(StringBuilder sb, IReadOnlyList<WorkflowClusterModel> clusters)
+    {
+        sb.AppendLine();
+        sb.AppendLine("| Workflow | Risk | Confidence | Existing methods | Why it matters |");
+        sb.AppendLine("| --- | --- | --- | --- | --- |");
+        foreach (var cluster in clusters)
+        {
+            var methods = cluster.Methods.Count == 0
+                ? "-"
+                : string.Join("<br>", cluster.Methods.Select(method => $"`{EscapeTableCell(method.Service)}.{EscapeTableCell(method.Method)}`"));
+            sb.AppendLine($"| {EscapeTableCell(cluster.Name)} | {EscapeTableCell(cluster.Risk)} | {cluster.Confidence.ToString("0.00", CultureInfo.InvariantCulture)} | {methods} | {EscapeTableCell(TrimForTable(cluster.Summary, 180))} |");
         }
 
         sb.AppendLine();
@@ -625,6 +663,20 @@ public sealed class AnalysisReportGenerator
             .ThenBy(action => action.SourceService)
             .GroupBy(action => $"{action.SourceService}.{action.MethodName}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
+            .Take(take)
+            .ToList();
+    }
+
+    private static IReadOnlyList<WorkflowClusterModel> GetPreferredWorkflowClusters(ProjectModel model, int take)
+    {
+        return model.WorkflowClusters
+            .Where(cluster => !cluster.Risk.Equals("high-risk/admin", StringComparison.OrdinalIgnoreCase))
+            .Where(cluster => cluster.Methods.Any(method =>
+                method.Classification is ActionClassification.Workflow or ActionClassification.Command or ActionClassification.Export))
+            .OrderBy(cluster => cluster.Risk.Equals("approval required", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ThenByDescending(cluster => cluster.Confidence)
+            .ThenByDescending(cluster => cluster.Methods.Count)
+            .ThenBy(cluster => cluster.Name, StringComparer.OrdinalIgnoreCase)
             .Take(take)
             .ToList();
     }

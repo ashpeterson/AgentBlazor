@@ -44,6 +44,7 @@ public sealed partial class WorkflowClusterAnalyzer
         "Status",
         "Workflow",
         "Workflows",
+        "Pipeline",
         "Check",
         "User",
         "Users",
@@ -68,7 +69,7 @@ public sealed partial class WorkflowClusterAnalyzer
         clusters.AddRange(BuildRouteCorrelatedClusters(model, candidates));
         clusters.AddRange(BuildDomainCorrelatedClusters(model, candidates));
 
-        return clusters
+        return RemoveOverlappingClusters(clusters)
             .GroupBy(cluster => BuildClusterKey(cluster), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(cluster => cluster.Confidence).First())
             .OrderByDescending(cluster => cluster.Confidence)
@@ -234,7 +235,7 @@ public sealed partial class WorkflowClusterAnalyzer
 
             yield return BuildCluster(
                 origin: "domain-correlated workflow",
-                serviceName: $"{termGroup.Key} Pipeline",
+                serviceName: termGroup.Key,
                 servicePath: "",
                 methods: methods,
                 routeHints: BuildRouteHints(model, methods.Select(method => method.Action)),
@@ -448,7 +449,12 @@ public sealed partial class WorkflowClusterAnalyzer
             words.Add("Business");
         }
 
-        words.Add("Pipeline");
+        if (words.Count == 0 ||
+            !words[^1].Equals("Pipeline", StringComparison.OrdinalIgnoreCase))
+        {
+            words.Add("Pipeline");
+        }
+
         return string.Join(' ', words);
     }
 
@@ -508,7 +514,7 @@ public sealed partial class WorkflowClusterAnalyzer
             return "promote";
         }
 
-        if (ContainsAny(normalized, "Notify", "Email"))
+        if (StartsWithAny(normalized, "Notify", "Email", "SendEmail"))
         {
             return "notify";
         }
@@ -541,6 +547,63 @@ public sealed partial class WorkflowClusterAnalyzer
 
     private static bool ContainsAny(string value, params string[] fragments)
         => fragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+
+    private static bool StartsWithAny(string value, params string[] fragments)
+        => fragments.Any(fragment => value.StartsWith(fragment, StringComparison.OrdinalIgnoreCase));
+
+    private static IReadOnlyList<WorkflowClusterModel> RemoveOverlappingClusters(IReadOnlyList<WorkflowClusterModel> clusters)
+    {
+        var retained = new List<WorkflowClusterModel>();
+        foreach (var cluster in clusters
+            .OrderBy(GetOriginRank)
+            .ThenBy(cluster => (int)ParseRiskBand(cluster.Risk))
+            .ThenByDescending(cluster => cluster.Confidence)
+            .ThenByDescending(cluster => cluster.Methods.Count))
+        {
+            if (retained.Any(existing => HasHighMethodOverlap(existing, cluster)))
+            {
+                continue;
+            }
+
+            retained.Add(cluster);
+        }
+
+        return retained;
+    }
+
+    private static int GetOriginRank(WorkflowClusterModel cluster)
+        => cluster.Origin switch
+        {
+            "same-service lifecycle" => 0,
+            "route-correlated workflow" => 1,
+            "domain-correlated workflow" => 2,
+            _ => 3
+        };
+
+    private static ActionRiskBand ParseRiskBand(string risk)
+        => risk.Equals("high-risk/admin", StringComparison.OrdinalIgnoreCase)
+            ? ActionRiskBand.HighRisk
+            : risk.Equals("approval required", StringComparison.OrdinalIgnoreCase)
+                ? ActionRiskBand.ApprovalRequired
+                : ActionRiskBand.SafeReadOnly;
+
+    private static bool HasHighMethodOverlap(WorkflowClusterModel existing, WorkflowClusterModel candidate)
+    {
+        var existingMethods = existing.Methods
+            .Select(method => $"{method.Service}.{method.Method}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var candidateMethods = candidate.Methods
+            .Select(method => $"{method.Service}.{method.Method}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (existingMethods.Count == 0 || candidateMethods.Count == 0)
+        {
+            return false;
+        }
+
+        var intersection = candidateMethods.Count(existingMethods.Contains);
+        var overlap = intersection / (double)Math.Min(existingMethods.Count, candidateMethods.Count);
+        return overlap >= 0.75;
+    }
 
     private static IReadOnlyList<string> SplitIdentifier(string value)
     {

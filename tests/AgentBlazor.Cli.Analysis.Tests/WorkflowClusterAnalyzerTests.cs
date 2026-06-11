@@ -138,6 +138,44 @@ public sealed class WorkflowClusterAnalyzerTests
         Assert.Empty(clusters);
     }
 
+    [Fact]
+    public void Analyze_DoesNotTreatFindByEmailAsNotificationStep()
+    {
+        var analyzer = new WorkflowClusterAnalyzer();
+        var model = new ProjectModel
+        {
+            Services =
+            [
+                new ServiceModel
+                {
+                    TypeName = "UserService",
+                    FilePath = "Services/Users/UserService.cs",
+                    Methods =
+                    [
+                        CreateMethod("FindByEmailAsync"),
+                        CreateMethod("GenerateResetTokenAsync"),
+                        CreateMethod("SendPasswordResetEmailAsync"),
+                        CreateMethod("ValidateResetTokenAsync")
+                    ]
+                }
+            ],
+            Actions =
+            [
+                CreateAction("UserService", "FindByEmailAsync", false, 0.7),
+                CreateAction("UserService", "GenerateResetTokenAsync", true, 0.8),
+                CreateAction("UserService", "SendPasswordResetEmailAsync", true, 0.8),
+                CreateAction("UserService", "ValidateResetTokenAsync", false, 0.8)
+            ]
+        };
+
+        var cluster = Assert.Single(analyzer.Analyze(model));
+
+        Assert.DoesNotContain(cluster.Methods, method => method.Method == "FindByEmailAsync");
+        Assert.Equal(
+            ["GenerateResetTokenAsync", "ValidateResetTokenAsync", "SendPasswordResetEmailAsync"],
+            cluster.Methods.Select(method => method.Method).ToArray());
+    }
+
     private static ServiceMethodModel CreateMethod(string name) => new()
     {
         Name = name,

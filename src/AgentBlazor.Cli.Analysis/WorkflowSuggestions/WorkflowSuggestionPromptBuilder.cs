@@ -26,6 +26,8 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("- If a listed method has approvalRecommended=true, the suggested [AgentAction] example must include RequiresApproval = true.");
         sb.AppendLine("- Prioritize workflow clusters when present. They are static-analysis hints that multiple methods likely form one user process.");
         sb.AppendLine("- When using a workflow cluster, reference several listed methods in the shown order instead of splitting each method into separate workflow suggestions.");
+        sb.AppendLine("- Prefer preferred workflow clusters over the flat service catalog and over sensitive/supporting clusters.");
+        sb.AppendLine("- Do not suggest high-risk/admin password, auth, tenant, permission, cache, database, message, or generic workflow-engine flows when a preferred business process cluster exists.");
         sb.AppendLine("- A workflow is a user/business process, task, or decision flow. A one-method getter/list/view is usually a data surface, not a workflow.");
         sb.AppendLine("- Prefer methods classified as Workflow first. Prefer Command or Export only when the user-facing process is clear and approval guidance is included.");
         sb.AppendLine("- Use simple Query methods as supporting context for workflows, but do not suggest pure data-view workflows when process-oriented methods are available.");
@@ -110,7 +112,25 @@ public sealed class WorkflowSuggestionPromptBuilder
 
     private static void AppendWorkflowClusters(StringBuilder sb, ProjectModel model)
     {
-        sb.AppendLine("Workflow clusters:");
+        var preferredClusters = model.WorkflowClusters
+            .Where(IsPreferredWorkflowCluster)
+            .OrderByDescending(cluster => cluster.Confidence)
+            .ThenBy(cluster => cluster.SourceService)
+            .Take(12)
+            .ToList();
+        var supportingClusters = model.WorkflowClusters
+            .Except(preferredClusters)
+            .OrderByDescending(cluster => cluster.Confidence)
+            .ThenBy(cluster => cluster.SourceService)
+            .Take(12)
+            .ToList();
+        var clustersToShow = preferredClusters.Count > 0
+            ? preferredClusters
+            : supportingClusters;
+
+        sb.AppendLine(preferredClusters.Count > 0
+            ? "Preferred workflow clusters:"
+            : "Workflow clusters:");
         if (model.WorkflowClusters.Count == 0)
         {
             sb.AppendLine("- none");
@@ -118,10 +138,7 @@ public sealed class WorkflowSuggestionPromptBuilder
             return;
         }
 
-        foreach (var cluster in model.WorkflowClusters
-            .OrderByDescending(cluster => cluster.Confidence)
-            .ThenBy(cluster => cluster.SourceService)
-            .Take(12))
+        foreach (var cluster in clustersToShow)
         {
             sb.AppendLine($"- {cluster.Name}: origin={cluster.Origin}, service={cluster.SourceService}, risk={cluster.Risk}, approvalRecommended={cluster.RequiresApproval.ToString().ToLowerInvariant()}, confidence={cluster.Confidence:0.00}");
             if (!string.IsNullOrWhiteSpace(cluster.Summary))
@@ -155,8 +172,22 @@ public sealed class WorkflowSuggestionPromptBuilder
             }
         }
 
+        if (preferredClusters.Count > 0 && supportingClusters.Count > 0)
+        {
+            sb.AppendLine("Sensitive/supporting workflow clusters:");
+            sb.AppendLine("- Do not suggest these before preferred clusters. They are included only as audit context.");
+            foreach (var cluster in supportingClusters.Take(6))
+            {
+                sb.AppendLine($"- {cluster.Name}: origin={cluster.Origin}, risk={cluster.Risk}, confidence={cluster.Confidence:0.00}");
+            }
+        }
+
         sb.AppendLine();
     }
+
+    private static bool IsPreferredWorkflowCluster(WorkflowClusterModel cluster)
+        => !cluster.Risk.Equals("high-risk/admin", StringComparison.OrdinalIgnoreCase) &&
+           cluster.Methods.Any(method => method.Classification is ActionClassification.Workflow or ActionClassification.Command or ActionClassification.Export);
 
     private static void AppendServices(StringBuilder sb, ProjectModel model)
     {
