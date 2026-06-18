@@ -1,8 +1,10 @@
 # NuGet Prerelease Checklist
 
-Last updated: 2026-04-20
+Last updated: 2026-06-18
 
 Use this before publishing `AgentBlazor`, `AgentBlazor.Client`, and `AgentBlazor.Cli` prerelease packages for real-project validation.
+
+CLI V2 workflow onboarding release-testing readiness is tracked in `docs/internal/cli-v2-nuget-release-testing-readiness-2026-06-18.md`.
 
 ## Goal
 
@@ -31,11 +33,15 @@ Ship a package that:
    - `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-local-package.ps1 -Pack -PackageVersion 0.1.0-preview.N`
    - add `-OpenAIApiKey $env:OPENAI_API_KEY` to include a live AG-UI workflow run
    - add `-KeepScratch` if you want to inspect the generated consumer app after the build
-6. After the package is published, repeat the clean-app install using the published feed:
+6. Run the CLI V2 workflow onboarding package smoke:
+   - `scripts/smoke-test-cli-v2-workflows.sh`
+   - this packs `AgentBlazor.Cli`, installs the packaged tool through an isolated NuGet config, runs `agentblazor scaffold workflows --diff`, approves the inventory workflow with `--reviewed-by`, verifies SOUL/skill/review/audit artifacts, and confirms non-interactive approval refuses to run without reviewer identity
+7. After the package is published, repeat the clean-app install using the published feed:
    - install `AgentBlazor` from the feed
    - install `AgentBlazor.Client` from the feed for hosted WebAssembly client validation
    - install `AgentBlazor.Cli` from the same feed
    - run `agentblazor --version`, `agentblazor scaffold --diff`, `agentblazor scaffold --approve`, `dotnet restore`, `dotnet build`, `agentblazor doctor`, and `agentblazor validate`
+   - run `agentblazor scaffold workflows --diff`, then approve one workflow with `--reviewed-by`, and verify `.agentblazor/SOUL.md`, `.agentblazor/skills/index.json`, at least one `SKILL.md`, and `.agentblazor/audit/workflow-onboarding-*.json`
 
 ## What The Smoke Test Proves
 
@@ -49,6 +55,16 @@ The smoke test script:
 - starts the app and verifies the home route loads
 - optionally runs a live AG-UI semantic workflow turn when an OpenAI key is supplied
 
+The CLI V2 workflow smoke script:
+
+- creates an isolated local feed for the packed `AgentBlazor.Cli`
+- installs the packaged CLI as a local tool
+- runs workflow onboarding preview against `tests/cli-targets/realistic-blazor-app`
+- applies an approved workflow through the agent-loop patch proposal path
+- verifies `.agentblazor/workflow-onboarding.json`, `.agentblazor/workflow-onboarding.md`, `.agentblazor/workflow-onboarding.html`, `.agentblazor/SOUL.md`, skill index, skill metadata, `SKILL.md`, evidence reference, and audit JSON
+- verifies the audit record contains reviewer, workflow ID, and agent-loop tools without absolute scratch paths
+- verifies non-interactive approval fails without `--reviewed-by`
+
 This catches packaging regressions such as:
 
 - unresolved internal package dependencies
@@ -57,6 +73,7 @@ This catches packaging regressions such as:
 - missing host-shell assets or endpoint wiring in the documented setup
 - CLI packaging regressions that would break `agentblazor init`
 - CLI/runtime package-version drift that would scaffold a different `AgentBlazor` version than the installed CLI package
+- V2 workflow onboarding packaging regressions that would break packaged `scaffold workflows`, SOUL/skill generation, reviewer-gated approval, or audit output
 
 ## Current Release Position
 

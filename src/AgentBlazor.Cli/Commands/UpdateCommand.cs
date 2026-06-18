@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using AgentBlazor.Cli.Analysis;
@@ -112,6 +113,7 @@ public sealed class UpdateCommand : AsyncCommand<UpdateCommand.Settings>
 
             await markdownGenerator.GenerateAsync(model, outputDir);
             await modelWriter.WriteStateAsync(model, outputDir);
+            var workflowArtifactCount = await RefreshWorkflowArtifactsIfPresentAsync(model, outputDir, settings.NonInteractive);
 
             // Report warnings
             if (!settings.Quiet && warnings.Count > 0)
@@ -133,6 +135,10 @@ public sealed class UpdateCommand : AsyncCommand<UpdateCommand.Settings>
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[green]Updated.[/]");
                 AnsiConsole.MarkupLine($"[blue]Routes:[/] {model.Routes.Count}  [blue]Actions:[/] {model.Actions.Count(a => a.ExposureMode != ActionExposureMode.Ignored)}");
+                if (workflowArtifactCount > 0)
+                {
+                    AnsiConsole.MarkupLine($"[blue]Workflow artifacts refreshed:[/] {workflowArtifactCount}");
+                }
             }
 
             return 0;
@@ -171,6 +177,81 @@ public sealed class UpdateCommand : AsyncCommand<UpdateCommand.Settings>
             }
             return 1;
         }
+    }
+
+    private static async Task<int> RefreshWorkflowArtifactsIfPresentAsync(
+        ProjectModel model,
+        string outputDir,
+        bool nonInteractive)
+    {
+        var agentDir = Path.Combine(outputDir, ".agentblazor");
+        var soulPath = Path.Combine(agentDir, "SOUL.md");
+        var metadataPath = Path.Combine(agentDir, "skills", ".metadata.json");
+        if (!File.Exists(soulPath) && !File.Exists(metadataPath))
+        {
+            return 0;
+        }
+
+        var plan = new WorkflowOnboardingPlanner().Plan(model, outputDir);
+        var approvedIds = await ReadApprovedWorkflowIdsAsync(metadataPath);
+        var selected = approvedIds.Count == 0
+            ? plan.Candidates
+            : plan.Candidates
+                .Where(candidate => approvedIds.Contains(candidate.Id) || approvedIds.Contains(candidate.Slug))
+                .ToList();
+
+        if (selected.Count == 0 && nonInteractive)
+        {
+            return 0;
+        }
+
+        var changes = await new WorkflowOnboardingArtifactWriter().ApplyAsync(
+            plan,
+            selected,
+            DateOnly.FromDateTime(DateTime.UtcNow));
+        await new SkillCurator().CurateAsync(agentDir, DateOnly.FromDateTime(DateTime.UtcNow));
+        return changes.Count;
+    }
+
+    private static async Task<HashSet<string>> ReadApprovedWorkflowIdsAsync(string metadataPath)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(metadataPath))
+        {
+            return ids;
+        }
+
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
+        if (!document.RootElement.TryGetProperty("skills", out var skills) ||
+            skills.ValueKind != JsonValueKind.Array)
+        {
+            return ids;
+        }
+
+        foreach (var skill in skills.EnumerateArray())
+        {
+            if (skill.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+            {
+                ids.Add(name.GetString() ?? string.Empty);
+            }
+
+            if (!skill.TryGetProperty("workflowIds", out var workflowIds) ||
+                workflowIds.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var workflowId in workflowIds.EnumerateArray())
+            {
+                if (workflowId.ValueKind == JsonValueKind.String)
+                {
+                    ids.Add(workflowId.GetString() ?? string.Empty);
+                }
+            }
+        }
+
+        ids.Remove(string.Empty);
+        return ids;
     }
 
     private static string? FindAgentBlazorDirectory()

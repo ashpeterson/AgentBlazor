@@ -95,6 +95,11 @@ jobs:
         run: |
           ./scripts/smoke-test-local-package.ps1 -Pack -PackageVersion "${{ inputs.package_version }}"
 
+      - name: Smoke test CLI V2 workflow onboarding package
+        run: scripts/smoke-test-cli-v2-workflows.sh
+        env:
+          AGENTBLAZOR_CLI_PACKAGE_VERSION: ${{ inputs.package_version }}
+
       - name: Publish runtime package to nuget.org
         run: >
           dotnet nuget push

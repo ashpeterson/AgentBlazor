@@ -10,6 +10,7 @@ public sealed record ProjectModel
     public string SolutionPath { get; init; } = "";
     public string AppName { get; init; } = "";
     public string Description { get; init; } = "";
+    public IReadOnlyList<string> DesiredAgentWorkflows { get; init; } = [];
     public string BlazorHostProject { get; init; } = "";
     public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
     public IReadOnlyList<ProjectNode> Projects { get; init; } = [];
@@ -18,6 +19,7 @@ public sealed record ProjectModel
     public IReadOnlyList<ServiceModel> Services { get; init; } = [];
     public IReadOnlyList<ActionModel> Actions { get; init; } = [];
     public IReadOnlyList<WorkflowClusterModel> WorkflowClusters { get; init; } = [];
+    public AnalysisCorpus Corpus { get; init; } = new();
     public IReadOnlyList<PageModel> Pages { get; init; } = [];
     public IReadOnlyList<DiRegistrationModel> DiRegistrations { get; init; } = [];
     public IReadOnlyList<RecommendationModel> Recommendations { get; init; } = [];
@@ -199,6 +201,74 @@ public enum ServiceLifetime
     Scoped,
     Transient,
     Singleton
+}
+
+public sealed record AnalysisCorpus
+{
+    public IReadOnlyList<AnalysisCorpusChunk> Chunks { get; init; } = [];
+
+    public IReadOnlyList<RouteCorrelationModel> RouteCorrelations { get; init; } = [];
+
+    public IReadOnlyList<string> DomainTerms { get; init; } = [];
+
+    public IReadOnlyList<FileReferenceModel> FileReferences { get; init; } = [];
+}
+
+public sealed record AnalysisCorpusChunk
+{
+    public string Id { get; init; } = "";
+
+    public AnalysisCorpusChunkKind Kind { get; init; }
+
+    public string Title { get; init; } = "";
+
+    public string Text { get; init; } = "";
+
+    public string FilePath { get; init; } = "";
+
+    public int? LineNumber { get; init; }
+
+    public IReadOnlyList<string> RelatedRoutes { get; init; } = [];
+
+    public IReadOnlyList<string> RelatedServices { get; init; } = [];
+
+    public IReadOnlyList<string> RelatedMethods { get; init; } = [];
+
+    public IReadOnlyList<string> DomainTerms { get; init; } = [];
+}
+
+public enum AnalysisCorpusChunkKind
+{
+    Route,
+    Page,
+    Service,
+    Method,
+    DiRegistration,
+    Capability,
+    WorkflowCluster,
+    RouteCorrelation
+}
+
+public sealed record RouteCorrelationModel
+{
+    public string Route { get; init; } = "";
+
+    public string ComponentName { get; init; } = "";
+
+    public string FilePath { get; init; } = "";
+
+    public IReadOnlyList<string> Services { get; init; } = [];
+
+    public IReadOnlyList<string> Methods { get; init; } = [];
+}
+
+public sealed record FileReferenceModel
+{
+    public string Path { get; init; } = "";
+
+    public IReadOnlyList<string> Symbols { get; init; } = [];
+
+    public IReadOnlyList<string> Routes { get; init; } = [];
 }
 
 /// <summary>

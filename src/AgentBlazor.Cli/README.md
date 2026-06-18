@@ -42,6 +42,8 @@ Version `0.2.20` tightens clustered workflow analysis by preferring non-admin pr
 
 Version `0.2.21` is a corrective package release for `0.2.20`; it carries the same clustered workflow ranking fixes and ensures the packaged CLI executable reports the same version as the NuGet package.
 
+Version `0.2.22` adds the CLI V2 workflow onboarding path through `agentblazor scaffold workflows`, including review artifacts, SOUL/skill generation, reviewer-gated approval, agent-loop patch application, audit output, and packaged V2 workflow smoke coverage.
+
 Current reports put top workflow recommendations and install blockers before the detailed inventory. Workflow clusters are shown before LLM suggestions, preferred process clusters are separated from sensitive/supporting clusters in the prompt, and the service inventory is classified by agent fit so data-access, admin/sensitive, integration, and workflow surfaces are easier to review without treating every public service as an equal first action candidate.
 
 See:

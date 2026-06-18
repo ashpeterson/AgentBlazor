@@ -18,6 +18,7 @@ public sealed class ModelBuilder
     private readonly DiRegistrationAnalyzer _diAnalyzer = new();
     private readonly RecommendationEngine _recommendationEngine = new();
     private readonly WorkflowClusterAnalyzer _workflowClusterAnalyzer = new();
+    private readonly AnalysisCorpusBuilder _corpusBuilder = new();
 
     public event Action<string>? OnProgress;
     public event Action<string>? OnWarning;
@@ -355,6 +356,7 @@ public sealed class ModelBuilder
             SolutionPath = solutionOrProjectPath,
             AppName = hostProject.Name,
             Description = appDescription,
+            DesiredAgentWorkflows = config?.DesiredAgentWorkflows ?? [],
             BlazorHostProject = hostProject.Name,
             GeneratedAtUtc = DateTimeOffset.UtcNow,
             Projects = projectNodes,
@@ -370,6 +372,10 @@ public sealed class ModelBuilder
         initialModel = initialModel with
         {
             WorkflowClusters = workflowClusters
+        };
+        initialModel = initialModel with
+        {
+            Corpus = _corpusBuilder.Build(initialModel)
         };
 
         // 12. Generate recommendations and coverage stats
