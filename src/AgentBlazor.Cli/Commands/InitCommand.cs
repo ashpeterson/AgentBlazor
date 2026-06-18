@@ -24,6 +24,10 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
         [Description("Short description of the application")]
         public string? Description { get; init; }
 
+        [CommandOption("--agent-goals <GOALS>")]
+        [Description("Comma- or semicolon-separated workflows the app agent should help users accomplish")]
+        public string? AgentGoals { get; init; }
+
         [CommandOption("-y|--non-interactive")]
         [Description("Skip interactive prompts and use defaults")]
         public bool NonInteractive { get; init; }
@@ -67,6 +71,8 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
                     "A Blazor application");
             }
             description ??= "A Blazor application";
+            var desiredAgentWorkflows = ResolveAgentGoals(settings.AgentGoals, config?.DesiredAgentWorkflows, settings.NonInteractive);
+            var effectiveConfig = MergeConfig(config, desiredAgentWorkflows);
 
             // Build the model
             var warnings = new List<string>();
@@ -79,7 +85,7 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
                 .Spinner(Spinner.Known.Dots)
                 .StartAsync("Analyzing project...", async ctx =>
                 {
-                    model = await modelBuilder.BuildModelAsync(path, hostProject, description, config);
+                    model = await modelBuilder.BuildModelAsync(path, hostProject, description, effectiveConfig);
 
                     // Write outputs
                     var outputDir = System.IO.Path.GetDirectoryName(path)!;
@@ -139,6 +145,7 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
                 {
                     HostProject = model.BlazorHostProject,
                     Description = description,
+                    DesiredAgentWorkflows = desiredAgentWorkflows.Count == 0 ? null : desiredAgentWorkflows.ToList(),
                     WatchDebounceMs = 500,
                     AutoUpdateOnBuild = true
                 };
@@ -177,6 +184,72 @@ public sealed class InitCommand : AsyncCommand<InitCommand.Settings>
             }
             return 1;
         }
+    }
+
+    private static IReadOnlyList<string> ResolveAgentGoals(
+        string? explicitGoals,
+        IReadOnlyList<string>? configuredGoals,
+        bool nonInteractive)
+    {
+        var goals = ParseAgentGoals(explicitGoals);
+        if (goals.Count > 0)
+        {
+            return goals;
+        }
+
+        if (configuredGoals is { Count: > 0 })
+        {
+            return configuredGoals
+                .Where(goal => !string.IsNullOrWhiteSpace(goal))
+                .Select(goal => goal.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (nonInteractive || Console.IsInputRedirected || Console.IsOutputRedirected)
+        {
+            return [];
+        }
+
+        var answer = AnsiConsole.Prompt(
+            new TextPrompt<string>("[yellow]What workflows should the app agent help users accomplish?[/] [grey](optional; comma-separated)[/]")
+                .AllowEmpty());
+        return ParseAgentGoals(answer);
+    }
+
+    private static IReadOnlyList<string> ParseAgentGoals(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value
+                .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(goal => !string.IsNullOrWhiteSpace(goal))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    private static AgentBlazorConfig? MergeConfig(
+        AgentBlazorConfig? config,
+        IReadOnlyList<string> desiredAgentWorkflows)
+    {
+        if (desiredAgentWorkflows.Count == 0)
+        {
+            return config;
+        }
+
+        return new AgentBlazorConfig
+        {
+            HostProject = config?.HostProject,
+            Description = config?.Description,
+            DesiredAgentWorkflows = desiredAgentWorkflows.ToList(),
+            WatchDebounceMs = config?.WatchDebounceMs,
+            AdditionalServiceSuffixes = config?.AdditionalServiceSuffixes,
+            AdditionalDomainVerbs = config?.AdditionalDomainVerbs,
+            ExcludeMethodPatterns = config?.ExcludeMethodPatterns,
+            ExcludeServicePatterns = config?.ExcludeServicePatterns,
+            ExcludeDirectories = config?.ExcludeDirectories,
+            AutoUpdateOnBuild = config?.AutoUpdateOnBuild,
+            AnalyzeProvider = config?.AnalyzeProvider,
+            AnalyzeModel = config?.AnalyzeModel
+        };
     }
 
     private static void RenderSetupSummary(

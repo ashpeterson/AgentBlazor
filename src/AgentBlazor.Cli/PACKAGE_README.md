@@ -11,7 +11,7 @@ dotnet tool install --global AgentBlazor.Cli
 If you prefer a pinned install:
 
 ```bash
-dotnet tool install --global AgentBlazor.Cli --version 0.2.21
+dotnet tool install --global AgentBlazor.Cli --version 0.2.22
 ```
 
 Example:
@@ -21,6 +21,15 @@ agentblazor init ./MySolution.slnx --host MyBlazorApp
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --diff
 agentblazor scaffold ./MySolution.slnx --host MyBlazorApp --provider openai --approve
 ```
+
+Workflow onboarding preview:
+
+```bash
+agentblazor scaffold workflows ./MySolution.slnx --host MyBlazorApp --description "Inventory operations app" --agent-goals "prepare restock plans" --diff --non-interactive
+agentblazor scaffold workflows ./MySolution.slnx --host MyBlazorApp --workflow inventory-pipeline --reviewed-by "Asha Dev" --approve --non-interactive
+```
+
+`scaffold workflows` analyzes app routes, services, DI registrations, existing `[AgentCapability]` / `[AgentAction]` workflows, and multi-method process clusters. It writes review artifacts under `.agentblazor/workflow-onboarding.json`, `.agentblazor/workflow-onboarding.md`, and `.agentblazor/workflow-onboarding.html`. Approved workflows generate `.agentblazor/SOUL.md`, `.agentblazor/skills/index.json`, skill folders, references, metadata, and an audit record under `.agentblazor/audit/`.
 
 Read-only analysis:
 
@@ -62,6 +71,8 @@ Version `0.2.19` adds workflow-cluster context before LLM suggestion generation.
 
 Version `0.2.20` tightens clustered workflow analysis by preferring non-admin process clusters in the LLM prompt, validating cluster-backed suggestions against the whole pipeline instead of every method verb, and falling back to preferred static clusters when LLM suggestions are only sensitive or supporting surfaces.
 
+Version `0.2.22` adds the CLI V2 workflow onboarding path: `agentblazor scaffold workflows`, review artifacts, SOUL/skill generation, reviewer-gated approval, agent-loop patch application, audit output, and packaged V2 workflow smoke coverage.
+
 Version `0.2.21` is a corrective package release for `0.2.20`; it carries the same clustered workflow ranking fixes and ensures the packaged CLI executable reports the same version as the NuGet package.
 
 Reports put top workflow recommendations and install blockers before the detailed inventory, show workflow clusters before LLM suggestions, separate preferred process clusters from sensitive/supporting clusters in the prompt, filter helper/framework noise, classify remaining services by likely agent fit, show AgentBlazor action adoption, and call out `RequiresApproval = true` guidance for workflow suggestions that reference mutating methods.
@@ -72,6 +83,7 @@ Docs:
 
 - Repository: https://github.com/ashpeterson/AgentBlazor
 - Advanced CLI guide: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/advanced/cli.md
+- 0.2.22 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.22.md
 - 0.2.21 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.21.md
 - 0.2.20 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.20.md
 - 0.2.19 release notes: https://github.com/ashpeterson/AgentBlazor/blob/master/docs/releases/0.2.19.md

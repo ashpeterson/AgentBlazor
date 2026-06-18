@@ -6,7 +6,7 @@
 
   <!-- Common package metadata for all AgentBlazor packages -->
   <PropertyGroup>
-    <Version>0.2.21</Version>
+    <Version>0.2.22</Version>
     <Authors>Ash Peterson</Authors>
     <Company>AgentBlazor</Company>
     <Copyright>Copyright (c) 2026 Ash Peterson</Copyright>
@@ -16,7 +16,7 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReleaseNotes>v0.2.21: Corrective CLI analysis release. Carries the 0.2.20 clustered workflow ranking fixes and ensures the packaged CLI executable reports the same version as the NuGet package.</PackageReleaseNotes>
+    <PackageReleaseNotes>v0.2.22: CLI V2 workflow onboarding release. Adds scaffold workflows review artifacts, SOUL/skill generation, reviewer-gated approval, agent-loop patch application, audit output, and packaged V2 workflow smoke coverage.</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>

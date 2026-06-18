@@ -7,7 +7,7 @@ var version = typeof(ScaffoldCommand).Assembly
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
     ?.InformationalVersion
     ?? typeof(ScaffoldCommand).Assembly.GetName().Version?.ToString()
-    ?? "0.2.21";
+    ?? "0.2.22";
 version = version.Split('+', 2)[0];
 
 app.Configure(config =>
@@ -19,7 +19,8 @@ app.Configure(config =>
         .WithDescription("Initialize AgentBlazor for an existing Blazor app and show the next installer steps")
         .WithExample("init")
         .WithExample("init", "./MySolution.sln")
-        .WithExample("init", "--description", "My app description");
+        .WithExample("init", "--description", "My app description")
+        .WithExample("init", "--description", "Inventory operations app", "--agent-goals", "approve supplier transfers, prepare restock plans", "--save-config");
 
     config.AddCommand<AnalyzeCommand>("analyze")
         .WithDescription("Analyze an existing Blazor app and write a read-only markdown report")
@@ -48,11 +49,15 @@ app.Configure(config =>
         .WithExample("validate", "./MySolution.slnx", "--host", "MyBlazorApp");
 
     config.AddCommand<ScaffoldCommand>("scaffold")
-        .WithDescription("Preview the baseline AgentBlazor install edits for an existing Blazor app")
+        .WithDescription("Preview baseline AgentBlazor install edits or V2 workflow onboarding artifacts")
         .WithExample("scaffold")
         .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp")
         .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--diff")
-        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--approve");
+        .WithExample("scaffold", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--approve")
+        .WithExample("scaffold", "workflows", "./MySolution.slnx", "--host", "MyBlazorApp", "--provider", "openai", "--diff")
+        .WithExample("scaffold", "workflows", "./MySolution.slnx", "--description", "Inventory operations app", "--agent-goals", "approve supplier transfers", "--save-config")
+        .WithExample("scaffold", "workflows", "./MySolution.slnx", "--reject", "low-value-workflow", "--pin", "inventory-approval", "--reviewed-by", "Asha Dev", "--approve", "--non-interactive")
+        .WithExample("scaffold", "workflows", "./MySolution.slnx", "--apply-approved", "--approve", "--non-interactive");
 });
 
 return await app.RunAsync(args);

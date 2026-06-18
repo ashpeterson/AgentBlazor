@@ -5,6 +5,18 @@ namespace AgentBlazor.Cli.Analysis.WorkflowSuggestions;
 
 public sealed class WorkflowSuggestionPromptBuilder
 {
+    private readonly IAnalysisRetrieval _retrieval;
+
+    public WorkflowSuggestionPromptBuilder()
+        : this(new LexicalAnalysisRetrieval())
+    {
+    }
+
+    public WorkflowSuggestionPromptBuilder(IAnalysisRetrieval retrieval)
+    {
+        _retrieval = retrieval;
+    }
+
     public string Build(ProjectModel model)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -60,10 +72,21 @@ public sealed class WorkflowSuggestionPromptBuilder
         sb.AppendLine("Static analysis summary:");
         sb.AppendLine($"Application: {model.AppName}");
         sb.AppendLine($"Host project: {model.BlazorHostProject}");
+        sb.AppendLine($"App description: {model.Description}");
+        if (model.DesiredAgentWorkflows.Count > 0)
+        {
+            sb.AppendLine("Developer-stated agent workflow goals:");
+            foreach (var goal in model.DesiredAgentWorkflows)
+            {
+                sb.AppendLine($"- {goal}");
+            }
+        }
+
         sb.AppendLine();
         AppendRoutes(sb, model);
         AppendConfirmedActions(sb, model);
         AppendWorkflowClusters(sb, model);
+        AppendRetrievedEvidence(sb, model);
         AppendServices(sb, model);
         return sb.ToString();
     }
@@ -83,6 +106,50 @@ public sealed class WorkflowSuggestionPromptBuilder
 
         sb.AppendLine();
     }
+
+    private void AppendRetrievedEvidence(StringBuilder sb, ProjectModel model)
+    {
+        if (model.Corpus.Chunks.Count == 0)
+        {
+            return;
+        }
+
+        var query = string.Join(
+            ' ',
+            model.WorkflowClusters.Select(cluster => cluster.Name)
+                .Concat(model.WorkflowClusters.SelectMany(cluster => cluster.DomainTerms))
+                .Concat(model.DesiredAgentWorkflows)
+                .Concat(model.Routes.Select(route => route.Template))
+                .Take(80));
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            query = model.AppName;
+        }
+
+        var results = _retrieval.Search(model.Corpus, query, maxResults: 10);
+        if (results.Count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine("Retrieved evidence:");
+        foreach (var result in results)
+        {
+            var chunk = result.Chunk;
+            sb.AppendLine($"- [{chunk.Kind}] {chunk.Title}: {Truncate(chunk.Text, 260)}");
+            if (!string.IsNullOrWhiteSpace(chunk.FilePath))
+            {
+                sb.AppendLine($"  file={chunk.FilePath}");
+            }
+        }
+
+        sb.AppendLine();
+    }
+
+    private static string Truncate(string value, int maxLength)
+        => value.Length <= maxLength
+            ? value
+            : value[..maxLength].TrimEnd() + "...";
 
     private static void AppendConfirmedActions(StringBuilder sb, ProjectModel model)
     {

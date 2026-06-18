@@ -28,6 +28,12 @@ public sealed class AgentBlazorConfig
     public string? Description { get; init; }
 
     /// <summary>
+    /// Developer-stated workflows or business outcomes the agent should help with.
+    /// These are intent hints for workflow onboarding, not proof that the app supports them.
+    /// </summary>
+    public List<string>? DesiredAgentWorkflows { get; init; }
+
+    /// <summary>
     /// Debounce time in milliseconds for watch mode.
     /// Default: 500ms
     /// </summary>
@@ -139,12 +145,16 @@ public sealed class AgentBlazorConfig
     /// <summary>
     /// Creates a default configuration with common settings.
     /// </summary>
-    public static AgentBlazorConfig CreateDefault(string? hostProject = null, string? description = null)
+    public static AgentBlazorConfig CreateDefault(
+        string? hostProject = null,
+        string? description = null,
+        List<string>? desiredAgentWorkflows = null)
     {
         return new AgentBlazorConfig
         {
             HostProject = hostProject,
             Description = description,
+            DesiredAgentWorkflows = desiredAgentWorkflows,
             WatchDebounceMs = 500,
             AutoUpdateOnBuild = true
         };
