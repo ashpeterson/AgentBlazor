@@ -27,13 +27,13 @@ assert_file() {
 assert_contains() {
   local path="$1"
   local pattern="$2"
-  rg -q --fixed-strings "$pattern" "$path" || fail "Expected '$path' to contain '$pattern'."
+  grep -F -q -- "$pattern" "$path" || fail "Expected '$path' to contain '$pattern'."
 }
 
 assert_not_contains() {
   local path="$1"
   local pattern="$2"
-  if rg -q --fixed-strings "$pattern" "$path"; then
+  if grep -F -q -- "$pattern" "$path"; then
     fail "Expected '$path' not to contain '$pattern'."
   fi
 }
@@ -168,7 +168,7 @@ reviewer_gate_output="$("$cli_exe" scaffold workflows "$reviewer_gate_app/Realis
 reviewer_gate_exit=$?
 set -e
 [[ "$reviewer_gate_exit" -ne 0 ]] || fail "Workflow approval without --reviewed-by should fail."
-printf '%s\n' "$reviewer_gate_output" | rg -q --fixed-strings 'requires --reviewed-by' ||
+printf '%s\n' "$reviewer_gate_output" | grep -F -q -- 'requires --reviewed-by' ||
   fail "Reviewer gate output did not mention --reviewed-by."
 
 log "CLI V2 workflow package smoke passed for AgentBlazor.Cli $package_version"
