@@ -1,3 +1,5 @@
+
+
 # AgentBlazor
 
 Last updated: 2026-05-28
@@ -14,6 +16,7 @@ Try the hosted demo:
 
 ```bash
 dotnet add package AgentBlazor
+dotnet add package MudBlazor
 ```
 
 Use `0.2.5` or later. This release includes the CLI Windows MSBuild fallback and first-run API-key prompt, CLI v1 analyze package refresh, mobile chat input stability fix, corrected EF package shape, and tool-friendly schemas for `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `Guid` workflow parameters.
